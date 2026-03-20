@@ -63,11 +63,17 @@
 - 测试覆盖要求
 - 质量门禁
 
+### ⚡ [12-Superpowers执行规范](./12-Superpowers执行规范.md)
+
+- OpenSpec 阶段 2 实现变更时的强制执行模式
+- Superpowers Loop（头脑风暴、TDD 驱动、双重审查）
+- 配套技能：`.agents/skills/execute-task/SKILL.md`
+
 ## 使用说明
 
 1. 根据需要的规范类型，点击对应的模块链接查看详细内容
-2. 所有规范文件都包含 `alwaysApply: true` 标记，确保规范自动应用
-3. 详细示例与落地步骤见 `.cursor/skills/` 目录下的技能文件
+2. 所有规范文件均为 `alwaysApply: false`，按需读取而非自动加载
+3. 详细示例与落地步骤见 `.agents/skills/` 目录下的技能文件
 
 ## 快速查找
 
@@ -84,3 +90,4 @@
 | 如何使用主题变量？ | 09-样式规范 |
 | 如何写注释？ | 10-文档规范 |
 | 有何测试要求？ | 11-测试规范 |
+| 执行 tasks.md 时的编码执行模式？ | 12-Superpowers执行规范 |
