@@ -3,10 +3,6 @@
 本项目是 AI Coding 落地架构的参考项目，支持所有主流支持 Skills 的 Agent/AI Coding IDE。
 
 ## 项目架构
-
-详细了解 👉 [《前端 AI Coding 落地指南（一）架构篇
-》](https://blog.antoncook.xyz/00.%E5%8C%85%E7%BD%97%E4%B8%87%E8%B1%A1/AI/%E5%89%8D%E7%AB%AF%20AI%20Coding%20%E8%90%BD%E5%9C%B0%E6%8C%87%E5%8D%97%EF%BC%88%E4%B8%80%EF%BC%89%E6%9E%B6%E6%9E%84%E7%AF%87)
-
 | 架构组成 | 说明 |
 | --- | --- |
 | SDD | 开发流程控制，保证需求不遗漏，开发不脱节，可进行需求分析/开发规划/验收测试/复盘归档 |

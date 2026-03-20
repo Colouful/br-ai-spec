@@ -1,0 +1,3 @@
+# openspec/config.yaml
+# 1. schema (必须): 指定默认的工作流模板，通常保持默认的 spec-driven 即可
+schema: spec-driven

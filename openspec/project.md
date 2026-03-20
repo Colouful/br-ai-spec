@@ -25,6 +25,7 @@
 | `09-样式规范.md` | 编写组件样式或主题适配时   |
 | `10-文档规范.md` | 编写或审查代码注释时       |
 | `11-测试规范.md` | 确认测试要求时             |
+| `12-Superpowers执行规范.md` | 进入阶段 2 开始编写代码或执行 tasks.md 时    |
 
 ### `.agents/skills/` - 实践技能
 
@@ -38,5 +39,6 @@
 | 新增页面路由      | `.agents/skills/create-route/SKILL.md`     |
 | 新增全局状态      | `.agents/skills/create-store/SKILL.md`     |
 | 编写样式/主题适配 | `.agents/skills/theme-variables/SKILL.md`  |
+| 开始执行 tasks.md 开发代码时 | .agents/skills/execute-task/SKILL.md |
 
 技能索引文件：`.agents/skills/README.md`
