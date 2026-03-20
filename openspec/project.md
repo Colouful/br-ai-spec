@@ -39,6 +39,8 @@
 | 新增页面路由      | `.agents/skills/create-route/SKILL.md`     |
 | 新增全局状态      | `.agents/skills/create-store/SKILL.md`     |
 | 编写样式/主题适配 | `.agents/skills/theme-variables/SKILL.md`  |
-| 开始执行 tasks.md 开发代码时 | .agents/skills/execute-task/SKILL.md |
+| 开始执行 tasks.md 开发代码时 | `.agents/skills/execute-task/SKILL.md` |
+| 初始化项目规范（生成 01/03） | `.agents/skills/project-init/SKILL.md`  |
+| 每次对话启动的技能调度       | `.agents/skills/using-superpowers/SKILL.md` |
 
 技能索引文件：`.agents/skills/README.md`
