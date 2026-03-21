@@ -51,13 +51,29 @@ while ($i -lt $args.Count) {
             else { $script:TargetDir = $arg }
         }
         "^--profile$" {
+            if ($i + 1 -ge $args.Count -or $args[$i + 1] -match '^--') {
+                Write-Err "选项 --profile 需要一个参数值"; exit 1
+            }
             $i++; $script:Profile = $args[$i]; $script:ProfileExplicit = $true
         }
         "^--level$" {
+            if ($i + 1 -ge $args.Count -or $args[$i + 1] -match '^--') {
+                Write-Err "选项 --level 需要一个参数值"; exit 1
+            }
             $i++; $script:Level = $args[$i]; $script:LevelExplicit = $true
         }
-        "^--ide$" { $i++; $script:IdeFilter = $args[$i] }
-        "^--repo$" { $i++; $script:SpecRepo = $args[$i] }
+        "^--ide$" {
+            if ($i + 1 -ge $args.Count -or $args[$i + 1] -match '^--') {
+                Write-Err "选项 --ide 需要一个参数值"; exit 1
+            }
+            $i++; $script:IdeFilter = $args[$i]
+        }
+        "^--repo$" {
+            if ($i + 1 -ge $args.Count -or $args[$i + 1] -match '^--') {
+                Write-Err "选项 --repo 需要一个参数值"; exit 1
+            }
+            $i++; $script:SpecRepo = $args[$i]
+        }
         "^--uipro$" { $script:Uipro = "yes" }
         "^--no-uipro$" { $script:Uipro = "no" }
         "^--refresh-cache$" { $script:RefreshCache = $true }
@@ -88,10 +104,21 @@ function Write-Err   { param($Msg) Write-Host "x " -ForegroundColor Red -NoNewli
 
 function New-Link {
     param([string]$Target, [string]$LinkPath)
-    if (Test-Path $LinkPath) { Remove-Item $LinkPath -Recurse -Force -ErrorAction SilentlyContinue }
     $parentDir = Split-Path $LinkPath -Parent
     $resolvedTarget = $null
     try { $resolvedTarget = (Resolve-Path (Join-Path $parentDir $Target) -ErrorAction Stop).Path } catch {}
+
+    if ((Test-Path $LinkPath) -and $resolvedTarget) {
+        $item = Get-Item $LinkPath -Force -ErrorAction SilentlyContinue
+        if ($item -and ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+            $existingTarget = $item.Target
+            if ($existingTarget -eq $resolvedTarget) { return }
+        }
+        Remove-Item $LinkPath -Recurse -Force -ErrorAction SilentlyContinue
+    } elseif (Test-Path $LinkPath) {
+        Remove-Item $LinkPath -Recurse -Force -ErrorAction SilentlyContinue
+    }
+
     if ($resolvedTarget) {
         cmd /c "mklink /J `"$LinkPath`" `"$resolvedTarget`"" 2>$null | Out-Null
         if ($LASTEXITCODE -eq 0) { return }
@@ -138,13 +165,23 @@ function Get-PkgManager {
         $script:PkgManager = ""
         return
     }
-    Write-Info "未检测到 pnpm，正在通过 npm 安装..."
-    try { npm install -g pnpm 2>$null | Out-Null } catch {}
-    if (Get-Command pnpm -ErrorAction SilentlyContinue) {
+    Write-Info "未检测到 pnpm，正在通过 npm 安装（超时 120 秒）..."
+    $installOk = $false
+    try {
+        $job = Start-Job -ScriptBlock { npm install -g pnpm 2>$null | Out-Null }
+        if (Wait-Job $job -Timeout 120) {
+            Receive-Job $job -ErrorAction SilentlyContinue
+            $installOk = $true
+        } else {
+            Stop-Job $job
+        }
+        Remove-Job $job -Force
+    } catch {}
+    if ($installOk -and (Get-Command pnpm -ErrorAction SilentlyContinue)) {
         Write-Ok "pnpm 安装成功"
         $script:PkgManager = "pnpm"
     } else {
-        Write-Warn "pnpm 安装失败，回退使用 npm"
+        Write-Warn "pnpm 安装失败或超时，回退使用 npm"
         $script:PkgManager = "npm"
     }
 }
@@ -222,6 +259,7 @@ function Select-Uipro {
     Write-Host ""
     Write-Info "是否安装 UI UX Pro Max 设计智能技能？"
     Write-Host "  提供 67 种 UI 风格、161 套配色方案、57 组字体搭配、99 条 UX 准则"
+    Write-Host "  适用于需要 AI 自主做出设计决策的场景（无设计稿时特别有用）"
     Write-Host ""
     $choice = Read-Host "安装 UI UX Pro Max? (Y/n) [默认 Y]"
     if ($choice -match '^[Nn]') {
@@ -306,7 +344,7 @@ function Copy-Agents {
 function Copy-ConfigDir {
     param([string]$Src, [string]$Dst, [bool]$SkipExisting = $false)
     if (-not (Test-Path $Src)) { return $false }
-    $copied = $false
+    [ref]$hasCopied = $false
 
     Get-ChildItem -Path $Src -Force -ErrorAction SilentlyContinue | ForEach-Object {
         $name = $_.Name
@@ -322,35 +360,35 @@ function Copy-ConfigDir {
             Get-ChildItem $_.FullName -File | ForEach-Object {
                 Copy-Item $_.FullName -Destination (Join-Path $dstPath $_.Name) -Force
             }
-            $script:configCopied = $true
+            $hasCopied.Value = $true
         } else {
             if ($SkipExisting -and (Test-Path $dstPath)) {
                 Write-Info "  跳过已存在: $name"
                 return
             }
             Copy-Item $_.FullName -Destination $dstPath -Force
-            $script:configCopied = $true
+            $hasCopied.Value = $true
         }
     }
-    return $script:configCopied
+    return $hasCopied.Value
 }
 
 function Copy-Configs {
     param([string]$Target, [bool]$SkipExisting = $false)
     $srcCommon  = Join-Path $script:SourceDir "configs/common"
     $srcProfile = Join-Path $script:SourceDir "configs/profiles/$($script:Profile)"
-    $script:configCopied = $false
+    $anyCopied = $false
 
     if (Test-Path $srcCommon) {
         Write-Info "同步 lint/format 配置 (common) ..."
-        Copy-ConfigDir -Src $srcCommon -Dst $Target -SkipExisting $SkipExisting
+        if (Copy-ConfigDir -Src $srcCommon -Dst $Target -SkipExisting $SkipExisting) { $anyCopied = $true }
     }
     if (Test-Path $srcProfile) {
         Write-Info "同步 lint/format 配置 (profiles/$($script:Profile)) ..."
-        Copy-ConfigDir -Src $srcProfile -Dst $Target -SkipExisting $SkipExisting
+        if (Copy-ConfigDir -Src $srcProfile -Dst $Target -SkipExisting $SkipExisting) { $anyCopied = $true }
     }
 
-    if ($script:configCopied) { Write-Ok "lint/format 配置部署完成" }
+    if ($anyCopied) { Write-Ok "lint/format 配置部署完成" }
     else { Write-Info "未找到 lint/format 配置模板，跳过" }
 }
 
@@ -585,6 +623,15 @@ function Test-Tools {
     try { npx --version 2>$null | Out-Null; Write-Ok "  npx 可用" }
     catch { Write-Warn "  npx 不可用" }
 
+    if ($script:Uipro -eq "yes" -or (Test-Path (Join-Path $script:TargetDir ".agents/skills/ui-ux-pro-max"))) {
+        try {
+            $pyVer = (python3 --version 2>&1) -replace 'Python ',''
+            Write-Ok "  python3 $pyVer"
+        } catch {
+            Write-Warn "  python3 未安装（UI UX Pro Max 搜索脚本需要）"
+        }
+    }
+
     if ($script:Level -eq "L3") {
         try { npx openspec --version 2>$null | Out-Null; if ($LASTEXITCODE -eq 0) { Write-Ok "  openspec 已安装" } else { throw } }
         catch { Write-Warn "  openspec 未安装 -> npm install -g @fission-ai/openspec@latest" }
@@ -759,6 +806,12 @@ function Invoke-Check {
 
     if (Test-Path (Join-Path $target "openspec")) {
         Write-Ok "openspec/ 存在"
+        $configPath = Join-Path $target "openspec/config.yaml"
+        $configPathYml = Join-Path $target "openspec/config.yml"
+        if ((Test-Path $configPath) -or (Test-Path $configPathYml)) { Write-Ok "  config.yaml 存在" }
+        else { Write-Warn "  config.yaml 缺失" }
+        if (Test-Path (Join-Path $target "openspec/specs")) { Write-Ok "  specs/ 存在" } else { Write-Warn "  specs/ 缺失" }
+        if (Test-Path (Join-Path $target "openspec/changes")) { Write-Ok "  changes/ 存在" } else { Write-Warn "  changes/ 缺失" }
     } else {
         Write-Info "openspec/ 不存在（L3 级别才需要）"
     }
