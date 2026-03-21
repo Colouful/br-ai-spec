@@ -22,11 +22,10 @@
     "Playwright": {
       "command": "npx @playwright/mcp@latest"
     },
-    // 安装 pencil vscode 插件会自动安装 mcp
     "pencil": {
       "name": "pencil",
       "transport": "stdio",
-      "command": "/Users/zjsf/.cursor/extensions/highagency.pencildev-0.6.22-universal/out/mcp-server-darwin-arm64",
+      "command": "<pencil-extension-path>/mcp-server-darwin-arm64",
       "args": [
         "--app",
         "cursor"

@@ -1,0 +1,31 @@
+# OpenSpec 项目配置（由 br-ai-spec 提供的增强版模板）
+# install.sh L3 安装时会将此模板写入 openspec/config.yaml
+# 详见 https://github.com/Fission-AI/OpenSpec
+
+schema: spec-driven
+
+context: |
+  本项目使用 br-ai-spec 规范体系，分两层组织：
+  - .agents/rules/: 开发规范（编码、组件、API、路由、状态管理、样式等）
+  - .agents/skills/: 实践技能（创建组件、路由、接口、设计稿分析、UI验收等）
+  创建提案时参考 .agents/skills/create-proposal/SKILL.md
+  执行任务时遵循 .agents/rules/12-Superpowers执行规范.md
+  技能索引：.agents/skills/README.md
+
+rules:
+  proposal:
+    - "创建提案前确认：是否有设计稿、是否有接口、交付形态（页面/组件/模块）"
+    - "有设计稿时使用 .agents/skills/design-analysis/SKILL.md 产出分析清单"
+    - "参考 .agents/skills/create-proposal/SKILL.md 中的完整业务决策流程"
+  tasks:
+    - "执行任务前须读取 .agents/rules/12-Superpowers执行规范.md"
+    - "按 .agents/skills/execute-task/SKILL.md 的四步循环执行"
+    - "涉及组件开发须引用 .agents/rules/04-组件规范.md"
+    - "涉及接口须引用 .agents/rules/05-API规范.md"
+    - "涉及 UI 还原须在末尾加验收任务，引用 .agents/skills/ui-verification/SKILL.md"
+    - "保持改动最小化，聚焦于请求的变更"
+  design:
+    - "技术方案须遵循 .agents/rules/ 中的架构约束"
+    - "样式方案须使用主题变量，见 .agents/rules/09-样式规范.md"
+  specs:
+    - "每个 capability 的验收场景须可测试"
