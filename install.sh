@@ -22,6 +22,7 @@ PKG_MANAGER=""
 IDE_FILTER="default"
 PROFILE="vue"
 LEVEL="L2"
+UIPRO="ask"
 COMMAND=""
 TARGET=""
 
@@ -94,9 +95,9 @@ select_profile() {
 select_level() {
   echo ""
   info "选择安装层级："
-  echo "  L1) 最小接入 — 只安装 .agents（规范 + 技能）"
-  echo "  L2) 标准接入 — .agents + IDE 适配层 + MCP 模板"
-  echo "  L3) 完整接入 — 全量安装含 OpenSpec 流程"
+  echo "  L1) 最小接入 — 只接入 .agents（规范 + 技能）"
+  echo "  L2) 标准接入 — .agents + 工具适配层 + MCP 模板"
+  echo "  L3) 完整接入 — 在 L2 基础上引入 OpenSpec 流程"
   echo ""
   read -rp "请选择 (L1/L2/L3) [默认 L2]: " choice
   case "$choice" in
@@ -105,6 +106,20 @@ select_level() {
     *)       LEVEL="L2" ;;
   esac
   ok "已选择层级: $LEVEL"
+}
+
+# ---- 交互式选择 UI UX Pro Max ----
+select_uipro() {
+  echo ""
+  info "是否安装 UI UX Pro Max 设计智能技能？"
+  echo "  提供 67 种 UI 风格、161 套配色方案、57 组字体搭配、99 条 UX 准则"
+  echo "  适用于需要 AI 自主做出设计决策的场景（无设计稿时特别有用）"
+  echo ""
+  read -rp "安装 UI UX Pro Max? (Y/n) [默认 Y]: " choice
+  case "$choice" in
+    [Nn]*) UIPRO="no"; info "跳过 UI UX Pro Max" ;;
+    *)     UIPRO="yes"; ok "将安装 UI UX Pro Max" ;;
+  esac
 }
 
 # ---- Node 环境前置检查 ----
@@ -433,6 +448,90 @@ setup_openspec() {
   ok "OpenSpec 配置完成"
 }
 
+# ---- 安装 UI UX Pro Max 设计智能技能 ----
+setup_uipro() {
+  local target="$1"
+  local skill_dir="$target/.agents/skills/ui-ux-pro-max"
+
+  if [ -d "$skill_dir" ] && [ -f "$skill_dir/SKILL.md" ]; then
+    ok "UI UX Pro Max 已安装，跳过"
+    return 0
+  fi
+
+  [ -n "$PKG_MANAGER" ] || { warn "无可用的包管理器，跳过 UI UX Pro Max"; return 0; }
+
+  if ! command -v uipro >/dev/null 2>&1; then
+    info "安装 uipro-cli ..."
+    if [ "$PKG_MANAGER" = "pnpm" ]; then
+      pnpm add -g uipro-cli >/dev/null 2>&1 || { warn "uipro-cli 安装失败，跳过 UI UX Pro Max"; return 0; }
+    else
+      npm install -g uipro-cli >/dev/null 2>&1 || { warn "uipro-cli 安装失败，跳过 UI UX Pro Max"; return 0; }
+    fi
+    command -v uipro >/dev/null 2>&1 || { warn "uipro 命令不可用，跳过 UI UX Pro Max"; return 0; }
+    ok "uipro-cli 安装成功"
+  fi
+
+  local tmp_dir
+  tmp_dir="$(mktemp -d)"
+  info "下载 UI UX Pro Max 资源 ..."
+  if ! (cd "$tmp_dir" && uipro init --ai cursor 2>/dev/null); then
+    warn "uipro init 失败，跳过 UI UX Pro Max"
+    rm -rf "$tmp_dir"
+    return 0
+  fi
+
+  if [ ! -d "$tmp_dir/.shared/ui-ux-pro-max" ]; then
+    warn "未找到预期的资源目录 .shared/ui-ux-pro-max，跳过"
+    rm -rf "$tmp_dir"
+    return 0
+  fi
+
+  mkdir -p "$skill_dir/data"
+  cp -R "$tmp_dir/.shared/ui-ux-pro-max/"* "$skill_dir/data/"
+
+  if [ -f "$tmp_dir/.cursor/commands/ui-ux-pro-max.md" ]; then
+    local src_prompt="$tmp_dir/.cursor/commands/ui-ux-pro-max.md"
+    {
+      echo "---"
+      echo "name: ui-ux-pro-max"
+      echo "description: AI 设计智能技能，提供 67 种 UI 风格、161 套配色方案、57 组字体搭配、99 条 UX 准则。当需要 AI 自主做出 UI/UX 设计决策时使用本技能。"
+      echo "---"
+      echo ""
+      sed 's|\.shared/ui-ux-pro-max/|data/|g' "$src_prompt"
+    } > "$skill_dir/SKILL.md"
+  else
+    cat > "$skill_dir/SKILL.md" <<'SKILL_EOF'
+---
+name: ui-ux-pro-max
+description: AI 设计智能技能，提供 67 种 UI 风格、161 套配色方案、57 组字体搭配、99 条 UX 准则。当需要 AI 自主做出 UI/UX 设计决策时使用本技能。
+---
+
+# UI UX Pro Max
+
+本技能为 AI 注入专业 UI/UX 设计决策能力。
+
+## 使用时机
+
+- 没有设计稿，需要 AI 自主选择风格、配色、字体
+- 需要生成完整的设计系统（Design System）
+- 需要行业特定的 UI/UX 建议
+
+## 数据目录
+
+设计数据库和搜索脚本位于 `data/` 子目录，使用 Python 3 运行搜索。
+
+## 与其它技能的关系
+
+- **design-analysis**：有设计稿时用 design-analysis 分析；无设计稿时用本技能生成设计决策
+- **ui-verification**：实现后用 ui-verification 验收
+- **web-design-guidelines**：本技能提供设计决策，web-design-guidelines 审查实现合规性
+SKILL_EOF
+  fi
+
+  rm -rf "$tmp_dir"
+  ok "UI UX Pro Max 安装完成"
+}
+
 # ---- 检查工具 ----
 check_tools() {
   info "工具环境："
@@ -443,6 +542,9 @@ check_tools() {
     if command -v npx >/dev/null 2>&1; then
       npx openspec --version >/dev/null 2>&1 && ok "  openspec 已安装" || warn "  openspec 未安装 → npm install -g @fission-ai/openspec@latest"
     fi
+  fi
+  if [ "$UIPRO" = "yes" ] || [ -d "${TARGET:-.}/.agents/skills/ui-ux-pro-max" ]; then
+    command -v python3 >/dev/null 2>&1 && ok "  python3 $(python3 --version 2>&1 | awk '{print $2}')" || warn "  python3 未安装（UI UX Pro Max 搜索脚本需要）"
   fi
 }
 
@@ -458,11 +560,15 @@ print_report() {
   echo -e "  Profile:  ${BOLD}$PROFILE${NC}"
   echo -e "  Level:    ${BOLD}$LEVEL${NC}"
   echo -e "  IDE:      ${BOLD}$IDE_FILTER${NC}"
+  echo -e "  UIPro:    ${BOLD}$UIPRO${NC}"
   echo ""
   info "已部署内容："
   echo -e "  ${GREEN}✔${NC} .agents/rules + skills (profile: $PROFILE)"
   echo -e "  ${GREEN}✔${NC} lint/format 配置 (.prettierrc, .eslintrc, .stylelintrc)"
   echo -e "  ${GREEN}✔${NC} 提交校验 (.husky, .lintstagedrc, commitlint.config.js)"
+  if [ -d "$target/.agents/skills/ui-ux-pro-max" ]; then
+    echo -e "  ${GREEN}✔${NC} UI UX Pro Max 设计智能技能 (67 styles, 161 palettes)"
+  fi
   if [ "$LEVEL" != "L1" ]; then
     echo -e "  ${GREEN}✔${NC} IDE 适配 (.cursor, .claude)"
   fi
@@ -516,12 +622,22 @@ cmd_init() {
     select_level
   fi
 
+  # UI UX Pro Max 选择（交互模式 + UIPRO=ask 时触发）
+  if [ -t 0 ] && [ "$UIPRO" = "ask" ]; then
+    select_uipro
+  fi
+
   detect_source
 
   # L1: 只安装 .agents
   copy_agents "$target"
   copy_configs "$target"
   install_commit_hooks "$target"
+
+  # UI UX Pro Max（可选）
+  if [ "$UIPRO" = "yes" ]; then
+    setup_uipro "$target"
+  fi
 
   # L2: + IDE 适配层 + MCP
   if [ "$LEVEL" = "L2" ] || [ "$LEVEL" = "L3" ]; then
@@ -543,9 +659,17 @@ cmd_update() {
   target="$(cd "${1:-.}" && pwd)"
   [ -d "$target/.agents" ] || { err "$target 未找到 .agents/，请先运行 init"; exit 1; }
   info "更新规范: $target"
+  detect_pkg_manager
   detect_source
   copy_agents "$target"
   copy_configs "$target"
+
+  # UI UX Pro Max：已安装则更新，或用户显式指定 --uipro
+  if [ "$UIPRO" = "yes" ] || [ -d "$target/.agents/skills/ui-ux-pro-max" ]; then
+    UIPRO="yes"
+    rm -rf "$target/.agents/skills/ui-ux-pro-max"
+    setup_uipro "$target"
+  fi
 
   if [ "$LEVEL" = "L2" ] || [ "$LEVEL" = "L3" ]; then
     create_ide_links "$target"
@@ -579,6 +703,13 @@ cmd_check() {
 
     local skill_count; skill_count=$(find "$target/.agents/skills" -maxdepth 1 -mindepth 1 -type d | wc -l | tr -d ' ')
     ok "  skills: $skill_count 个技能目录"
+
+    # UI UX Pro Max 检查
+    if [ -d "$target/.agents/skills/ui-ux-pro-max" ] && [ -f "$target/.agents/skills/ui-ux-pro-max/SKILL.md" ]; then
+      ok "  UI UX Pro Max: 已安装"
+    else
+      info "  UI UX Pro Max: 未安装（可选，使用 --uipro 安装）"
+    fi
   else
     err ".agents/ 不存在"; has_issue=true
   fi
@@ -645,7 +776,7 @@ cmd_uninstall() {
     rmdir "$target/.$ide" 2>/dev/null || true
   done
 
-  # 核心目录
+  # 核心目录（含 UI UX Pro Max）
   rm -rf "$target/.agents"
 
   # lint/format 配置（仅删除规范库部署的文件）
@@ -684,19 +815,23 @@ ${BOLD}选项:${NC}
   --profile <name>  技术栈 (react|vue)                              默认 vue
   --level <L>       安装层级 (L1|L2|L3)                             默认 L2
   --ide <name>      指定 IDE (default|cursor|claude|opencode|trae|all)  默认 default(cursor+claude)
+  --uipro           安装 UI UX Pro Max 设计智能技能
+  --no-uipro        跳过 UI UX Pro Max（非交互模式默认跳过）
   --repo <url>      自定义规范库地址
   -h, --help        显示帮助
 
 ${BOLD}安装层级:${NC}
-  L1  最小接入 — 只安装 .agents（规范 + 技能）
-  L2  标准接入 — .agents + IDE 适配层 + MCP 模板
-  L3  完整接入 — 全量安装含 OpenSpec 流程
+  L1  最小接入 — 只接入 .agents（规范 + 技能）
+  L2  标准接入 — .agents + 工具适配层 + MCP 模板
+  L3  完整接入 — 在 L2 基础上引入 OpenSpec 流程
 
 ${BOLD}示例:${NC}
   bash install.sh init                                    # 交互式安装（默认 vue + default IDE）
   bash install.sh init ~/projects/my-app                  # Vue 项目标准安装
   bash install.sh init . --profile react --level L3       # React + OpenSpec
   bash install.sh init . --ide all                        # 为所有 IDE 创建适配
+  bash install.sh init . --uipro                          # 安装含 UI UX Pro Max
+  bash install.sh init . --no-uipro                       # 跳过 UI UX Pro Max
   bash install.sh update                                  # 更新规范
   bash install.sh check                                   # 检查安装状态
 
@@ -720,6 +855,8 @@ while [ $# -gt 0 ]; do
     --level)      require_arg "$1" "${2:-}"; LEVEL="$2"; shift ;;
     --ide)        require_arg "$1" "${2:-}"; IDE_FILTER="$2"; shift ;;
     --repo)       require_arg "$1" "${2:-}"; SPEC_REPO="$2"; shift ;;
+    --uipro)      UIPRO="yes" ;;
+    --no-uipro)   UIPRO="no" ;;
     -h|--help)    usage; exit 0 ;;
     *)
       [ -n "$COMMAND" ] && TARGET="$1" || { usage; exit 1; }
