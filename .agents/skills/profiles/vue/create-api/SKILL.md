@@ -9,7 +9,7 @@ description: 指导在 Vue 3 项目中按团队规范创建和维护 HTTP 接口
 
 ```text
 src/api/<name>.ts                # 请求函数（按业务模块拆分）
-src/api/interfaces/<name>.ts     # 请求/响应类型定义
+src/api/types/<name>.ts     # 请求/响应类型定义
 ```
 
 所有请求函数集中在 `src/api/` 下按模块管理，禁止在组件或 store 中直接调用 `request`。
@@ -21,7 +21,7 @@ src/api/interfaces/<name>.ts     # 请求/响应类型定义
 ### 1. 定义类型
 
 ```ts
-// src/api/interfaces/banner.ts
+// src/api/types/banner.ts
 export interface Banner {
   id: number;
   title: string;
@@ -56,7 +56,7 @@ import type {
   GetBannerListResult,
   CreateBannerParams,
   UpdateBannerParams,
-} from './interfaces/banner';
+} from './types/banner';
 
 export function getBannerListApi(data: GetBannerListParams): Promise<GetBannerListResult> {
   return request({ url: '/api/banner/page', method: 'post', data });
@@ -97,7 +97,7 @@ export function deleteBannerApi(id: number): Promise<void> {
 
 ## 快速检查清单
 
-- [ ] 类型在 `src/api/interfaces/<name>.ts`，请求在 `src/api/<name>.ts`？
+- [ ] 类型在 `src/api/types/<name>.ts`，请求在 `src/api/<name>.ts`？
 - [ ] 命名符合 `getXxxApi` / `createXxxApi` / `updateXxxApi` / `deleteXxxApi`？
 - [ ] 使用 `import { request } from '@koi-design/vix-tools'`？
 - [ ] 未重复处理接口错误？

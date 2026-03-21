@@ -12,7 +12,7 @@ src/
 ├── api/                    # 接口请求函数
 │   ├── login.ts
 │   ├── order.ts
-│   └── interfaces/         # 请求/响应类型定义
+│   └── types/              # 请求/响应类型定义
 │       ├── login.ts
 │       └── order.ts
 └── config/
@@ -20,7 +20,7 @@ src/
 ```
 
 - 所有接口请求函数集中在 `src/api/<name>.ts` 中，按业务模块拆分文件
-- 请求/响应类型定义放在 `src/api/interfaces/<name>.ts` 中
+- 请求/响应类型定义放在 `src/api/types/<name>.ts` 中
 - 禁止在组件、页面、store 中直接调用 `request`，必须通过 `src/api/` 下的函数
 
 ## 接口请求规范

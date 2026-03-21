@@ -22,7 +22,7 @@ description: 指导在前端项目中按团队规范创建和拆分 React 组件
 详见 `.agents/rules/04-组件规范.md` 中的"组件放置决策树"。
 
 - **通用组件**（跨页面复用）：`src/components/<component-name>/`
-- **页面级组件**（只在单页使用）：`src/routes/<route>/components/`
+- **页面级组件**（只在单页使用）：`src/pages/<page>/components/`
 
 命名约定：
 
@@ -44,7 +44,7 @@ src/components/shentu-button/
 页面级组件示例：
 
 ```text
-src/routes/home/components/header/
+src/pages/home/components/header/
   ├─ index.tsx
   └─ index.module.scss
 ```
@@ -120,8 +120,8 @@ export * from './shentu-button';
 
 - 单个 `.tsx` 文件建议不超过 **400 行**，超过时优先考虑拆分为子组件。
 - 拆分时遵循：
-  - **页面级组件**：只在一个路由使用 → 放在该路由的 `components/` 下。
-  - **通用组件**：在多个路由使用 → 提取到 `src/components`。
+  - **页面级组件**：只在一个页面使用 → 放在该页面的 `components/` 下。
+  - **通用组件**：在多个页面使用 → 提取到 `src/components`。
 - 一个组件应聚焦单一职责（一个明确的 UI 区块或交互单元）。
 
 ---

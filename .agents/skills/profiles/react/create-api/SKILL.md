@@ -22,7 +22,7 @@ description: 指导在 React 项目中按团队规范创建和维护 HTTP 接口
 1. 先确定业务模块名称（如 `banner`、`user`、`ai-editor`）。
 2. 对应的文件归属：
    - 请求封装文件：`src/api/<module>.ts`
-   - 类型定义文件：`src/api/interfaces/<module>.ts`
+   - 类型定义文件：`src/api/types/<module>.ts`
 
 **约定：**
 
@@ -32,10 +32,10 @@ description: 指导在 React 项目中按团队规范创建和维护 HTTP 接口
 
 ## 步骤 2：定义类型
 
-在 `src/api/interfaces/<module>.ts` 中定义请求/响应类型：
+在 `src/api/types/<module>.ts` 中定义请求/响应类型：
 
 ```ts
-// src/api/interfaces/banner.ts
+// src/api/types/banner.ts
 export interface Banner {
   id: number;
   title: string;
@@ -77,7 +77,7 @@ import type {
   GetBannerListResult,
   CreateBannerParams,
   UpdateBannerParams,
-} from './interfaces/banner';
+} from './types/banner';
 
 export function getBannerListApi(data: GetBannerListParams): Promise<GetBannerListResult> {
   return request({ url: '/api/banner/page', method: 'post', data });
@@ -137,7 +137,7 @@ const loadData = async () => {
 
 ## 快速检查清单
 
-- [ ] 类型在 `src/api/interfaces/<module>.ts`，请求在 `src/api/<module>.ts`？
+- [ ] 类型在 `src/api/types/<module>.ts`，请求在 `src/api/<module>.ts`？
 - [ ] 命名符合 `getXxxApi` / `createXxxApi` / `updateXxxApi` / `deleteXxxApi`？
 - [ ] 使用 `import { request } from '@koi-design/vix-tools'`？
 - [ ] 未重复处理接口错误？
