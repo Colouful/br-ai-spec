@@ -190,7 +190,7 @@ L3 安装时的 OpenSpec 配置流程：
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
-| `BR_AI_SPEC_REPO` | `http://git.100credit.cn/zhenwei.li/br-ai-standards.git` | 规范库 Git 地址 |
+| `BR_AI_SPEC_REPO` | `http://git.100credit.cn/zhenwei.li/br-ai-spec.git` | 规范库 Git 地址 |
 | `BR_AI_SPEC_CACHE` | `~/.br-ai-spec` | 本地缓存目录 |
 
 ---

@@ -4,5 +4,8 @@
   ],
   "src/**/*.{js,ts,jsx,tsx,json,vue}": [
     "eslint --fix"
+  ],
+  "src/**/*.{js,ts,jsx,tsx,json,vue,css,scss,less,md}": [
+    "prettier --write"
   ]
 }

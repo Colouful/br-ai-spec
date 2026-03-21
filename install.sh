@@ -7,7 +7,7 @@ set -euo pipefail
 # ============================================================================
 
 VERSION="2.0.0"
-SPEC_REPO="${BR_AI_SPEC_REPO:-http://git.100credit.cn/zhenwei.li/br-ai-standards.git}"
+SPEC_REPO="${BR_AI_SPEC_REPO:-http://git.100credit.cn/zhenwei.li/br-ai-spec.git}"
 CACHE_DIR="${BR_AI_SPEC_CACHE:-$HOME/.br-ai-spec}"
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; BLUE='\033[0;34m'; BOLD='\033[1m'; NC='\033[0m'
@@ -23,6 +23,9 @@ IDE_FILTER="default"
 PROFILE="vue"
 LEVEL="L2"
 UIPRO="ask"
+REFRESH_CACHE=""
+FORCE=""
+SPEC_BRANCH="${BR_AI_SPEC_BRANCH:-main}"
 COMMAND=""
 TARGET=""
 
@@ -64,12 +67,16 @@ detect_source() {
     SOURCE_DIR="$script_dir"
     info "使用本地规范库: $SOURCE_DIR"
   else
+    if [ -n "$REFRESH_CACHE" ] && [ -d "$CACHE_DIR" ]; then
+      info "清除缓存目录..."
+      rm -rf "$CACHE_DIR"
+    fi
     if [ -d "$CACHE_DIR/.git" ]; then
       info "更新规范库缓存..."
-      git -C "$CACHE_DIR" pull --quiet 2>/dev/null || warn "缓存更新失败，使用现有版本"
+      git -C "$CACHE_DIR" pull --quiet 2>/dev/null || warn "缓存更新失败，将使用本地缓存（可能非最新版本）"
     else
       info "克隆规范库到 $CACHE_DIR ..."
-      git clone --quiet "$SPEC_REPO" "$CACHE_DIR" || { err "克隆失败，请检查: $SPEC_REPO"; exit 1; }
+      git clone --quiet -b "$SPEC_BRANCH" "$SPEC_REPO" "$CACHE_DIR" || { err "克隆失败，请检查: $SPEC_REPO"; exit 1; }
     fi
     SOURCE_DIR="$CACHE_DIR"
     ok "规范库缓存就绪"
@@ -268,8 +275,9 @@ copy_agents() {
 }
 
 # ---- 复制 lint/format 配置文件 ----
+# 参数: $1=源目录 $2=目标目录 $3=skip_existing（非空则跳过已存在的文件）
 _copy_config_dir() {
-  local src="$1" target="$2"
+  local src="$1" target="$2" skip_existing="${3:-}"
   [ -d "$src" ] || return 1
   local copied=false
 
@@ -278,10 +286,17 @@ _copy_config_dir() {
     local name; name="$(basename "$f")"
     [[ "$name" == "." || "$name" == ".." ]] && continue
     if [ -f "$f" ]; then
+      if [ -n "$skip_existing" ] && [ -f "$target/$name" ]; then
+        info "  跳过已存在: $name"
+        continue
+      fi
       cp "$f" "$target/$name"
       copied=true
     elif [ -d "$f" ]; then
-      # 复制点开头的目录（如 .husky/）
+      if [ -n "$skip_existing" ] && [ -d "$target/$name" ]; then
+        info "  跳过已存在: $name/"
+        continue
+      fi
       mkdir -p "$target/$name"
       cp -R "$f"/* "$target/$name/" 2>/dev/null || true
       copied=true
@@ -292,6 +307,10 @@ _copy_config_dir() {
   for f in "$src"/*; do
     [ -f "$f" ] || continue
     local name; name="$(basename "$f")"
+    if [ -n "$skip_existing" ] && [ -f "$target/$name" ]; then
+      info "  跳过已存在: $name"
+      continue
+    fi
     cp "$f" "$target/$name"
     copied=true
   done
@@ -299,20 +318,21 @@ _copy_config_dir() {
   $copied
 }
 
+# 参数: $1=目标目录 $2=skip_existing（非空则跳过已存在的文件）
 copy_configs() {
-  local target="$1"
+  local target="$1" skip_existing="${2:-}"
   local src_common="$SOURCE_DIR/configs/common"
   local src_profile="$SOURCE_DIR/configs/profiles/$PROFILE"
   local copied=false
 
   if [ -d "$src_common" ]; then
     info "同步 lint/format 配置 (common) ..."
-    _copy_config_dir "$src_common" "$target" && copied=true
+    _copy_config_dir "$src_common" "$target" "$skip_existing" && copied=true
   fi
 
   if [ -d "$src_profile" ]; then
     info "同步 lint/format 配置 (profiles/$PROFILE) ..."
-    _copy_config_dir "$src_profile" "$target" && copied=true
+    _copy_config_dir "$src_profile" "$target" "$skip_existing" && copied=true
   fi
 
   $copied && ok "lint/format 配置部署完成" || info "未找到 lint/format 配置模板，跳过"
@@ -325,10 +345,10 @@ install_commit_hooks() {
   [ -n "$PKG_MANAGER" ] || { warn "无可用的包管理器，跳过提交校验依赖安装"; return 0; }
 
   info "正在使用 $PKG_MANAGER 安装提交校验依赖，请稍候 ..."
-  info "  husky@8 + lint-staged + @commitlint/cli + @commitlint/config-conventional"
-  if ! (cd "$target" && $PKG_MANAGER install -D husky@8 lint-staged @commitlint/cli @commitlint/config-conventional); then
+  info "  husky@8 + lint-staged@15 + @commitlint/cli@19 + @commitlint/config-conventional@19"
+  if ! (cd "$target" && $PKG_MANAGER install -D husky@8 lint-staged@15 @commitlint/cli@19 @commitlint/config-conventional@19); then
     warn "$PKG_MANAGER install 失败，请手动执行:"
-    echo "  cd $target && $PKG_MANAGER install -D husky@8 lint-staged @commitlint/cli @commitlint/config-conventional"
+    echo "  cd $target && $PKG_MANAGER install -D husky@8 lint-staged@15 @commitlint/cli@19 @commitlint/config-conventional@19"
     return 0
   fi
 
@@ -391,6 +411,14 @@ copy_cursor_extras() {
   if [ -f "$SOURCE_DIR/.cursor/mcp.json" ] && [ ! -f "$cursor_dst/mcp.json" ]; then
     cp "$SOURCE_DIR/.cursor/mcp.json" "$cursor_dst/mcp.json"
     warn ".cursor/mcp.json 已生成 → 请替换 project-id 与 access-token"
+  fi
+
+  # commands/（复制 *.md）
+  local cmds_src="$SOURCE_DIR/.cursor/commands"
+  if [ -d "$cmds_src" ]; then
+    local cmds_dst="$cursor_dst/commands"
+    mkdir -p "$cmds_dst"
+    cp "$cmds_src"/*.md "$cmds_dst/" 2>/dev/null && ok ".cursor/commands/ 已同步" || true
   fi
 }
 
@@ -662,7 +690,7 @@ cmd_update() {
   detect_pkg_manager
   detect_source
   copy_agents "$target"
-  copy_configs "$target"
+  copy_configs "$target" "skip_existing"
 
   # UI UX Pro Max：已安装则更新，或用户显式指定 --uipro
   if [ "$UIPRO" = "yes" ] || [ -d "$target/.agents/skills/ui-ux-pro-max" ]; then
@@ -761,10 +789,12 @@ cmd_uninstall() {
   local target
   target="$(cd "${1:-.}" && pwd)"
   warn "将移除 $target 下的规范库文件"
-  echo "  包括: .agents/、IDE 链接、lint/format 配置、husky hooks"
+  echo "  包括: .agents/、IDE 链接、lint/format 配置、husky hooks、相关依赖"
   echo ""
-  read -rp "确认？(y/N) " ans
-  [[ "$ans" =~ ^[Yy]$ ]] || { info "已取消"; exit 0; }
+  if [ -z "$FORCE" ]; then
+    read -rp "确认？(y/N) " ans
+    [[ "$ans" =~ ^[Yy]$ ]] || { info "已取消"; exit 0; }
+  fi
 
   # IDE 链接
   for ide in "${IDE_DIRS[@]}"; do
@@ -782,15 +812,42 @@ cmd_uninstall() {
   # lint/format 配置（仅删除规范库部署的文件）
   local lint_files=(".prettierrc.json" ".prettierignore" ".stylelintrc.json" ".stylelintignore"
                     ".eslintrc.js" ".eslintrc.cjs" ".eslintignore"
-                    ".lintstagedrc" "commitlint.config.js")
+                    ".lintstagedrc" "commitlint.config.js" ".editorconfig")
   for f in "${lint_files[@]}"; do
     [ -f "$target/$f" ] && rm -f "$target/$f" && info "  已删除 $f"
   done
 
-  # husky hooks（保留 .husky/_/ 内部目录，只删除 hook 脚本）
-  for hook in pre-commit commit-msg; do
-    [ -f "$target/.husky/$hook" ] && rm -f "$target/.husky/$hook" && info "  已删除 .husky/$hook"
-  done
+  # husky hooks 和 .husky 目录
+  if [ -d "$target/.husky" ]; then
+    rm -rf "$target/.husky"
+    info "  已删除 .husky/"
+  fi
+
+  # 移除 package.json 中的 prepare 脚本
+  if [ -f "$target/package.json" ] && command -v node &>/dev/null; then
+    node -e "
+      const fs = require('fs');
+      const pkg = JSON.parse(fs.readFileSync('$target/package.json', 'utf8'));
+      if (pkg.scripts && pkg.scripts.prepare && pkg.scripts.prepare.includes('husky')) {
+        delete pkg.scripts.prepare;
+        if (Object.keys(pkg.scripts).length === 0) delete pkg.scripts;
+        fs.writeFileSync('$target/package.json', JSON.stringify(pkg, null, 2) + '\n');
+      }
+    " 2>/dev/null && info "  已移除 package.json 中的 husky prepare 脚本" || true
+  fi
+
+  # 卸载规范库安装的依赖
+  if [ -f "$target/package.json" ]; then
+    local pm=""
+    if [ -f "$target/pnpm-lock.yaml" ]; then pm="pnpm"
+    elif command -v pnpm &>/dev/null; then pm="pnpm"
+    elif command -v npm &>/dev/null; then pm="npm"
+    fi
+    if [ -n "$pm" ]; then
+      info "  使用 $pm 卸载 husky lint-staged @commitlint/cli @commitlint/config-conventional ..."
+      (cd "$target" && $pm uninstall husky lint-staged @commitlint/cli @commitlint/config-conventional 2>/dev/null) || true
+    fi
+  fi
 
   ok "卸载完成"
 }
@@ -818,6 +875,8 @@ ${BOLD}选项:${NC}
   --uipro           安装 UI UX Pro Max 设计智能技能
   --no-uipro        跳过 UI UX Pro Max（非交互模式默认跳过）
   --repo <url>      自定义规范库地址
+  --refresh-cache   清除本地缓存并重新克隆规范库
+  -y, --force       跳过确认提示（用于非交互卸载）
   -h, --help        显示帮助
 
 ${BOLD}安装层级:${NC}
@@ -857,6 +916,8 @@ while [ $# -gt 0 ]; do
     --repo)       require_arg "$1" "${2:-}"; SPEC_REPO="$2"; shift ;;
     --uipro)      UIPRO="yes" ;;
     --no-uipro)   UIPRO="no" ;;
+    --refresh-cache) REFRESH_CACHE="true" ;;
+    -y|--force)   FORCE="true" ;;
     -h|--help)    usage; exit 0 ;;
     *)
       [ -n "$COMMAND" ] && TARGET="$1" || { usage; exit 1; }

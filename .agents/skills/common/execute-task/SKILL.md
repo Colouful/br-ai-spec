@@ -1,5 +1,5 @@
 ---
-name: execute-superpowers-task
+name: execute-task
 description: 严格按照 Superpowers 模式（头脑风暴、TDD驱动、双重审查）执行具体的开发任务清单。
 version: 1.0.0
 metadata:

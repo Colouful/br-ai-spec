@@ -8,7 +8,7 @@
 
 ```bash
 # 克隆规范库
-git clone http://git.100credit.cn/zhenwei.li/br-ai-standards.git
+git clone http://git.100credit.cn/zhenwei.li/br-ai-spec.git
 cd br-ai-spec
 
 # 安装到你的项目（交互式，会引导选择技术栈和安装层级）
