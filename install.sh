@@ -16,6 +16,9 @@ IDE_DIRS=(claude cursor opencode trae)
 PROJECT_SPECIFIC_RULES=("01-项目概述.md" "03-项目结构.md")
 AVAILABLE_PROFILES=("react" "vue")
 
+NODE_MIN_VERSION=18
+PKG_MANAGER=""
+
 IDE_FILTER="default"
 PROFILE="vue"
 LEVEL="L2"
@@ -104,6 +107,79 @@ select_level() {
   ok "已选择层级: $LEVEL"
 }
 
+# ---- Node 环境前置检查 ----
+check_node_env() {
+  if ! command -v node >/dev/null 2>&1; then
+    err "未检测到 Node.js 环境"
+    echo ""
+    echo -e "  ${BOLD}请先安装 Node.js (>= $NODE_MIN_VERSION):${NC}"
+    echo "    方式 1: nvm install $NODE_MIN_VERSION        (推荐，https://github.com/nvm-sh/nvm)"
+    echo "    方式 2: volta install node@$NODE_MIN_VERSION  (https://volta.sh)"
+    echo "    方式 3: 从官网下载                    (https://nodejs.org)"
+    echo ""
+    exit 1
+  fi
+
+  local node_version
+  node_version="$(node --version | sed 's/^v//' | cut -d. -f1)"
+  if [ "$node_version" -lt "$NODE_MIN_VERSION" ] 2>/dev/null; then
+    err "Node.js 版本过低: v$(node --version | sed 's/^v//') (最低要求: v$NODE_MIN_VERSION)"
+    echo ""
+    echo -e "  ${BOLD}请升级 Node.js:${NC}"
+    echo "    nvm:   nvm install $NODE_MIN_VERSION && nvm use $NODE_MIN_VERSION"
+    echo "    volta: volta install node@$NODE_MIN_VERSION"
+    echo ""
+    exit 1
+  fi
+
+  if ! command -v npm >/dev/null 2>&1 && ! command -v pnpm >/dev/null 2>&1; then
+    err "Node.js 已安装 (v$(node --version | sed 's/^v//')), 但未找到 npm 或 pnpm"
+    echo ""
+    echo "  请确认 Node.js 安装完整，或手动安装包管理器:"
+    echo "    npm install -g pnpm"
+    echo ""
+    exit 1
+  fi
+
+  ok "Node.js v$(node --version | sed 's/^v//') 环境就绪"
+}
+
+# ---- 包管理器检测（pnpm 优先） ----
+detect_pkg_manager() {
+  if command -v pnpm >/dev/null 2>&1; then
+    PKG_MANAGER="pnpm"
+    ok "使用包管理器: pnpm ($(pnpm --version))"
+    return 0
+  fi
+
+  if ! command -v npm >/dev/null 2>&1; then
+    warn "未找到 npm 或 pnpm，跳过依赖安装"
+    PKG_MANAGER=""
+    return 1
+  fi
+
+  info "未检测到 pnpm，正在通过 npm 安装（超时 120 秒）..."
+  local install_ok=false
+  if is_windows; then
+    timeout 120 npm install -g pnpm >/dev/null 2>&1 && install_ok=true
+  else
+    if command -v timeout >/dev/null 2>&1; then
+      timeout 120 npm install -g pnpm >/dev/null 2>&1 && install_ok=true
+    else
+      # macOS 没有 timeout 命令，使用 perl 替代
+      perl -e 'alarm 120; exec @ARGV' npm install -g pnpm >/dev/null 2>&1 && install_ok=true
+    fi
+  fi
+
+  if $install_ok && command -v pnpm >/dev/null 2>&1; then
+    ok "pnpm 安装成功 ($(pnpm --version))"
+    PKG_MANAGER="pnpm"
+  else
+    warn "pnpm 安装失败或超时，回退使用 npm"
+    PKG_MANAGER="npm"
+  fi
+}
+
 # ---- 复制 .agents/（Profile 合并） ----
 copy_agents() {
   local target="$1" agents_dst="$1/.agents"
@@ -174,6 +250,80 @@ copy_agents() {
   [ -f "$SOURCE_DIR/.agents/skills/README.md" ] && cp "$SOURCE_DIR/.agents/skills/README.md" "$agents_dst/skills/README.md"
 
   ok ".agents/ 同步完成 (profile: $PROFILE)"
+}
+
+# ---- 复制 lint/format 配置文件 ----
+_copy_config_dir() {
+  local src="$1" target="$2"
+  [ -d "$src" ] || return 1
+  local copied=false
+
+  # 复制点开头的文件（.prettierrc.json, .lintstagedrc 等）
+  for f in "$src"/.*; do
+    local name; name="$(basename "$f")"
+    [[ "$name" == "." || "$name" == ".." ]] && continue
+    if [ -f "$f" ]; then
+      cp "$f" "$target/$name"
+      copied=true
+    elif [ -d "$f" ]; then
+      # 复制点开头的目录（如 .husky/）
+      mkdir -p "$target/$name"
+      cp -R "$f"/* "$target/$name/" 2>/dev/null || true
+      copied=true
+    fi
+  done
+
+  # 复制非点开头的文件（commitlint.config.js 等）
+  for f in "$src"/*; do
+    [ -f "$f" ] || continue
+    local name; name="$(basename "$f")"
+    cp "$f" "$target/$name"
+    copied=true
+  done
+
+  $copied
+}
+
+copy_configs() {
+  local target="$1"
+  local src_common="$SOURCE_DIR/configs/common"
+  local src_profile="$SOURCE_DIR/configs/profiles/$PROFILE"
+  local copied=false
+
+  if [ -d "$src_common" ]; then
+    info "同步 lint/format 配置 (common) ..."
+    _copy_config_dir "$src_common" "$target" && copied=true
+  fi
+
+  if [ -d "$src_profile" ]; then
+    info "同步 lint/format 配置 (profiles/$PROFILE) ..."
+    _copy_config_dir "$src_profile" "$target" && copied=true
+  fi
+
+  $copied && ok "lint/format 配置部署完成" || info "未找到 lint/format 配置模板，跳过"
+}
+
+# ---- 安装提交校验依赖（husky + lint-staged + commitlint） ----
+install_commit_hooks() {
+  local target="$1"
+  [ -f "$target/package.json" ] || { warn "未找到 package.json，跳过提交校验依赖安装"; return 0; }
+  [ -n "$PKG_MANAGER" ] || { warn "无可用的包管理器，跳过提交校验依赖安装"; return 0; }
+
+  info "正在使用 $PKG_MANAGER 安装提交校验依赖，请稍候 ..."
+  info "  husky@8 + lint-staged + @commitlint/cli + @commitlint/config-conventional"
+  if ! (cd "$target" && $PKG_MANAGER install -D husky@8 lint-staged @commitlint/cli @commitlint/config-conventional); then
+    warn "$PKG_MANAGER install 失败，请手动执行:"
+    echo "  cd $target && $PKG_MANAGER install -D husky@8 lint-staged @commitlint/cli @commitlint/config-conventional"
+    return 0
+  fi
+
+  info "初始化 husky ..."
+  if ! (cd "$target" && npx husky install); then
+    warn "husky install 失败，请手动执行: cd $target && npx husky install"
+    return 0
+  fi
+
+  ok "提交校验工具链安装完成 (husky@8 + lint-staged + commitlint)"
 }
 
 # ---- 创建 IDE 链接（逐个 skill 目录链接，给 OpenSpec 留空间） ----
@@ -309,6 +459,14 @@ print_report() {
   echo -e "  Level:    ${BOLD}$LEVEL${NC}"
   echo -e "  IDE:      ${BOLD}$IDE_FILTER${NC}"
   echo ""
+  info "已部署内容："
+  echo -e "  ${GREEN}✔${NC} .agents/rules + skills (profile: $PROFILE)"
+  echo -e "  ${GREEN}✔${NC} lint/format 配置 (.prettierrc, .eslintrc, .stylelintrc)"
+  echo -e "  ${GREEN}✔${NC} 提交校验 (.husky, .lintstagedrc, commitlint.config.js)"
+  if [ "$LEVEL" != "L1" ]; then
+    echo -e "  ${GREEN}✔${NC} IDE 适配 (.cursor, .claude)"
+  fi
+  echo ""
   info "后续步骤："
   echo -e "  1. 编辑 ${BOLD}.agents/rules/01-项目概述.md${NC}  填写项目定位和技术栈"
   echo -e "  2. 编辑 ${BOLD}.agents/rules/03-项目结构.md${NC}  填写项目目录结构"
@@ -329,25 +487,41 @@ print_report() {
 cmd_init() {
   local target
   target="$(cd "${1:-.}" 2>/dev/null && pwd || { mkdir -p "${1:-.}"; cd "${1:-.}" && pwd; })"
-  info "初始化项目: $target"
 
-  # 交互式引导（无 --profile/--level 参数时）
-  if [ -t 0 ] && [ "$PROFILE" = "vue" ] && [ "$LEVEL" = "L2" ]; then
-    local need_interactive=true
-    # 检查是否通过命令行指定了参数
-    for arg in "$@"; do
-      case "$arg" in --profile*|--level*) need_interactive=false; break ;; esac
-    done
-    if $need_interactive; then
-      select_profile
-      select_level
+  echo ""
+  info "br-ai-spec v${VERSION} | $(uname -s) $(uname -m) | Node $(node --version 2>/dev/null || echo 'N/A')"
+  info "初始化项目: $target"
+  echo ""
+
+  # 已初始化检测
+  if [ -d "$target/.agents" ]; then
+    warn "目标项目已包含 .agents/ 目录"
+    echo -e "  如果只需更新规范，请使用: ${BOLD}install.sh update${NC}"
+    echo ""
+    if [ -t 0 ]; then
+      read -rp "继续初始化将覆盖现有规范（01/03 除外），确认？(y/N) " ans
+      [[ "$ans" =~ ^[Yy]$ ]] || { info "已取消"; exit 0; }
+    else
+      warn "非交互模式，继续覆盖安装"
     fi
+  fi
+
+  # 前置环境检查
+  check_node_env
+  detect_pkg_manager
+
+  # 交互式引导（仅在使用默认值且终端可交互时触发）
+  if [ -t 0 ] && [ "$PROFILE" = "vue" ] && [ "$LEVEL" = "L2" ]; then
+    select_profile
+    select_level
   fi
 
   detect_source
 
   # L1: 只安装 .agents
   copy_agents "$target"
+  copy_configs "$target"
+  install_commit_hooks "$target"
 
   # L2: + IDE 适配层 + MCP
   if [ "$LEVEL" = "L2" ] || [ "$LEVEL" = "L3" ]; then
@@ -371,6 +545,7 @@ cmd_update() {
   info "更新规范: $target"
   detect_source
   copy_agents "$target"
+  copy_configs "$target"
 
   if [ "$LEVEL" = "L2" ] || [ "$LEVEL" = "L3" ]; then
     create_ide_links "$target"
@@ -434,7 +609,11 @@ cmd_check() {
   # OpenSpec
   if [ -d "$target/openspec" ]; then
     ok "openspec/ 存在"
-    [ -f "$target/openspec/config.yaml" ] || [ -f "$target/openspec/config.yml" ] && ok "  config.yaml 存在" || warn "  config.yaml 缺失"
+    if [ -f "$target/openspec/config.yaml" ] || [ -f "$target/openspec/config.yml" ]; then
+      ok "  config.yaml 存在"
+    else
+      warn "  config.yaml 缺失"
+    fi
     [ -d "$target/openspec/specs" ]   && ok "  specs/ 存在"   || warn "  specs/ 缺失"
     [ -d "$target/openspec/changes" ] && ok "  changes/ 存在" || warn "  changes/ 缺失"
   else
@@ -450,12 +629,14 @@ cmd_check() {
 cmd_uninstall() {
   local target
   target="$(cd "${1:-.}" && pwd)"
-  warn "将移除 $target 下的规范库文件（.agents/ 及 IDE 链接）"
+  warn "将移除 $target 下的规范库文件"
+  echo "  包括: .agents/、IDE 链接、lint/format 配置、husky hooks"
+  echo ""
   read -rp "确认？(y/N) " ans
   [[ "$ans" =~ ^[Yy]$ ]] || { info "已取消"; exit 0; }
 
+  # IDE 链接
   for ide in "${IDE_DIRS[@]}"; do
-    # 移除 skills 目录中的链接
     if [ -d "$target/.$ide/skills" ]; then
       find "$target/.$ide/skills" -maxdepth 1 -type l -delete 2>/dev/null || true
       rmdir "$target/.$ide/skills" 2>/dev/null || true
@@ -463,7 +644,23 @@ cmd_uninstall() {
     rm -f "$target/.$ide/rules" 2>/dev/null || true
     rmdir "$target/.$ide" 2>/dev/null || true
   done
+
+  # 核心目录
   rm -rf "$target/.agents"
+
+  # lint/format 配置（仅删除规范库部署的文件）
+  local lint_files=(".prettierrc.json" ".prettierignore" ".stylelintrc.json" ".stylelintignore"
+                    ".eslintrc.js" ".eslintrc.cjs" ".eslintignore"
+                    ".lintstagedrc" "commitlint.config.js")
+  for f in "${lint_files[@]}"; do
+    [ -f "$target/$f" ] && rm -f "$target/$f" && info "  已删除 $f"
+  done
+
+  # husky hooks（保留 .husky/_/ 内部目录，只删除 hook 脚本）
+  for hook in pre-commit commit-msg; do
+    [ -f "$target/.husky/$hook" ] && rm -f "$target/.husky/$hook" && info "  已删除 .husky/$hook"
+  done
+
   ok "卸载完成"
 }
 
@@ -508,13 +705,21 @@ ${BOLD}远程安装:${NC}
 EOF
 }
 
+require_arg() {
+  if [ -z "${2:-}" ] || [[ "${2:-}" == --* ]]; then
+    err "选项 $1 需要一个参数值"
+    echo "  示例: install.sh init --profile vue"
+    exit 1
+  fi
+}
+
 while [ $# -gt 0 ]; do
   case "$1" in
     init|update|check|uninstall) COMMAND="$1" ;;
-    --profile)    PROFILE="${2:-react}"; shift ;;
-    --level)      LEVEL="${2:-L2}"; shift ;;
-    --ide)        IDE_FILTER="${2:-all}"; shift ;;
-    --repo)       SPEC_REPO="${2:-$SPEC_REPO}"; shift ;;
+    --profile)    require_arg "$1" "${2:-}"; PROFILE="$2"; shift ;;
+    --level)      require_arg "$1" "${2:-}"; LEVEL="$2"; shift ;;
+    --ide)        require_arg "$1" "${2:-}"; IDE_FILTER="$2"; shift ;;
+    --repo)       require_arg "$1" "${2:-}"; SPEC_REPO="$2"; shift ;;
     -h|--help)    usage; exit 0 ;;
     *)
       [ -n "$COMMAND" ] && TARGET="$1" || { usage; exit 1; }
