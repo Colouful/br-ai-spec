@@ -6,6 +6,12 @@
     "ai-spec": "./bin/cli.js",
     "br-ai-spec": "./bin/cli.js"
   },
+  "maintainers": [
+    "zhenwei.li"
+  ],
+  "publishConfig": {
+    "registry": "http://nodejs.100credit.cn/"
+  },
   "files": [
     "bin/",
     ".agents/",
@@ -22,8 +28,5 @@
     "cursor",
     "claude"
   ],
-  "license": "UNLICENSED",
-  "publishConfig": {
-    "registry": "https://your-private-registry.100credit.cn/"
-  }
+  "license": "UNLICENSED"
 }
