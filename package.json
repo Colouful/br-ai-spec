@@ -1,13 +1,14 @@
 {
   "name": "@bairong/ai-spec",
-  "version": "2.0.0",
+  "version": "0.0.7",
   "description": "AI Coding 团队规范库 CLI — 一键安装规范、技能与工具配置",
   "bin": {
     "ai-spec": "./bin/cli.js",
     "br-ai-spec": "./bin/cli.js"
   },
   "maintainers": [
-    "zhenwei.li"
+    "zhenwei.li",
+    "lizhenwei"
   ],
   "publishConfig": {
     "registry": "http://nodejs.100credit.cn/"

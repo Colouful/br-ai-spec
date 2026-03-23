@@ -21,7 +21,7 @@ PKG_MANAGER=""
 
 IDE_FILTER="default"
 PROFILE="vue"
-LEVEL="L2"
+LEVEL="L3"
 UIPRO="ask"
 REFRESH_CACHE=""
 FORCE=""
@@ -113,11 +113,11 @@ select_level() {
   echo "  L2) 标准接入 — .agents + 工具适配层 + MCP 模板"
   echo "  L3) 完整接入 — 在 L2 基础上引入 OpenSpec 流程"
   echo ""
-  read -rp "请选择 (L1/L2/L3) [默认 L2]: " choice
+  read -rp "请选择 (L1/L2/L3) [默认 L3]: " choice
   case "$choice" in
     L1|l1|1) LEVEL="L1" ;;
-    L3|l3|3) LEVEL="L3" ;;
-    *)       LEVEL="L2" ;;
+    L2|l2|2) LEVEL="L2" ;;
+    *)       LEVEL="L3" ;;
   esac
   ok "已选择层级: $LEVEL"
 }
@@ -244,7 +244,7 @@ copy_agents() {
     done
 
     if $is_specific && [ -f "$agents_dst/rules/$name" ]; then
-      warn "跳过项目特有规则: $name（已存在）"
+      warn "跳过项目特有规则: ${name}（已存在）"
     else
       cp "$file" "$agents_dst/rules/$name"
       $is_specific && info "已生成模板: $name → 请根据项目实际情况修改"
@@ -474,7 +474,8 @@ setup_openspec() {
         info "config.yaml 已包含 context 字段，跳过合并"
       fi
     else
-      # 直接复制模板
+      # 直接复制模板（openspec init 失败时目录可能不存在）
+      mkdir -p "$(dirname "$config_file")"
       cp "$template" "$config_file"
       ok "openspec/config.yaml 已创建"
     fi
@@ -652,7 +653,7 @@ cmd_init() {
   detect_pkg_manager
 
   # 交互式引导（仅在使用默认值且终端可交互时触发）
-  if [ -t 0 ] && [ "$PROFILE" = "vue" ] && [ "$LEVEL" = "L2" ]; then
+  if [ -t 0 ] && [ "$PROFILE" = "vue" ] && [ "$LEVEL" = "L3" ]; then
     select_profile
     select_level
   fi
@@ -877,7 +878,7 @@ ${BOLD}命令:${NC}
 
 ${BOLD}选项:${NC}
   --profile <name>  技术栈 (react|vue)                              默认 vue
-  --level <L>       安装层级 (L1|L2|L3)                             默认 L2
+  --level <L>       安装层级 (L1|L2|L3)                             默认 L3
   --ide <name>      指定 IDE (default|cursor|claude|opencode|trae|all)  默认 default(cursor+claude)
   --uipro           安装 UI UX Pro Max 设计智能技能
   --no-uipro        跳过 UI UX Pro Max（非交互模式默认跳过）
@@ -902,7 +903,7 @@ ${BOLD}示例:${NC}
   bash install.sh check                                   # 检查安装状态
 
 ${BOLD}远程安装:${NC}
-  curl -sSL <raw-url>/install.sh | bash -s -- init . --profile vue --level L2
+  curl -sSL <raw-url>/install.sh | bash -s -- init . --profile vue --level L3
 EOF
 }
 

@@ -23,7 +23,7 @@ $DefaultRepo = "http://git.100credit.cn/zhenwei.li/br-ai-spec.git"
 $script:Command = ""
 $script:TargetDir = "."
 $script:Profile = "vue"
-$script:Level = "L2"
+$script:Level = "L3"
 $script:IdeFilter = "default"
 $script:SpecRepo = if ($env:BR_AI_SPEC_REPO) { $env:BR_AI_SPEC_REPO } else { $DefaultRepo }
 $script:CacheDir = if ($env:BR_AI_SPEC_CACHE) { $env:BR_AI_SPEC_CACHE } else { Join-Path $HOME ".br-ai-spec" }
@@ -255,11 +255,11 @@ function Select-Level {
     Write-Host "  L2) 标准接入 -- .agents + 工具适配层 + MCP 模板"
     Write-Host "  L3) 完整接入 -- 在 L2 基础上引入 OpenSpec 流程"
     Write-Host ""
-    $choice = Read-Host "请选择 (L1/L2/L3) [默认 L2]"
+    $choice = Read-Host "请选择 (L1/L2/L3) [默认 L3]"
     switch -Regex ($choice) {
         "^(L1|l1|1)$" { $script:Level = "L1" }
-        "^(L3|l3|3)$" { $script:Level = "L3" }
-        default { $script:Level = "L2" }
+        "^(L2|l2|2)$" { $script:Level = "L2" }
+        default { $script:Level = "L3" }
     }
     Write-Ok "已选择层级: $($script:Level)"
 }
@@ -613,6 +613,8 @@ function Install-OpenSpec {
                 Write-Info "config.yaml 已包含 context 字段，跳过合并"
             }
         } else {
+            $configDir = Split-Path $configFile -Parent
+            if (-not (Test-Path $configDir)) { New-Item -ItemType Directory -Path $configDir -Force | Out-Null }
             Copy-Item $template -Destination $configFile
             Write-Ok "openspec/config.yaml 已创建"
         }
@@ -917,7 +919,7 @@ function Show-Usage {
     Write-Host ""
     Write-Host "选项:" -ForegroundColor White
     Write-Host "  --profile <name>  技术栈 (react|vue)                              默认 vue"
-    Write-Host "  --level <L>       安装层级 (L1|L2|L3)                             默认 L2"
+    Write-Host "  --level <L>       安装层级 (L1|L2|L3)                             默认 L3"
     Write-Host "  --ide <name>      指定 IDE (default|cursor|claude|opencode|trae|all)  默认 default(cursor+claude)"
     Write-Host "  --uipro           安装 UI UX Pro Max 设计智能技能"
     Write-Host "  --no-uipro        跳过 UI UX Pro Max（非交互模式默认跳过）"
