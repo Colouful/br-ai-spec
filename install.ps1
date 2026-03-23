@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
     br-ai-spec 规范库安装脚本 (PowerShell)
     适用于 Windows PowerShell 5.1+ / PowerShell Core 7+
@@ -191,6 +191,15 @@ function Get-PkgManager {
 # ============================================================================
 
 function Get-SourceDir {
+    # npm 包模式：优先使用 BR_AI_SPEC_LOCAL 指向的规范文件
+    if ($env:BR_AI_SPEC_LOCAL -and
+        (Test-Path (Join-Path $env:BR_AI_SPEC_LOCAL ".agents/rules/common")) -and
+        (Test-Path (Join-Path $env:BR_AI_SPEC_LOCAL ".agents/skills/common"))) {
+        $script:SourceDir = $env:BR_AI_SPEC_LOCAL
+        Write-Info "使用 npm 包内规范库: $($script:SourceDir)"
+        return
+    }
+
     $scriptDir = $PSScriptRoot
     if (-not $scriptDir) { $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path }
 

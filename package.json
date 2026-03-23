@@ -1,0 +1,29 @@
+{
+  "name": "@bairong/ai-spec",
+  "version": "2.0.0",
+  "description": "AI Coding 团队规范库 CLI — 一键安装规范、技能与工具配置",
+  "bin": {
+    "ai-spec": "./bin/cli.js",
+    "br-ai-spec": "./bin/cli.js"
+  },
+  "files": [
+    "bin/",
+    ".agents/",
+    "configs/",
+    ".cursor/mcp.json",
+    "openspec/",
+    "install.sh",
+    "install.ps1"
+  ],
+  "keywords": [
+    "ai",
+    "coding",
+    "spec",
+    "cursor",
+    "claude"
+  ],
+  "license": "UNLICENSED",
+  "publishConfig": {
+    "registry": "https://your-private-registry.100credit.cn/"
+  }
+}

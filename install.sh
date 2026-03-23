@@ -60,6 +60,13 @@ make_link() {
 
 # ---- 检测规范源 ----
 detect_source() {
+  # npm 包模式：优先使用 BR_AI_SPEC_LOCAL 指向的规范文件
+  if [ -n "${BR_AI_SPEC_LOCAL:-}" ] && [ -d "$BR_AI_SPEC_LOCAL/.agents/rules/common" ] && [ -d "$BR_AI_SPEC_LOCAL/.agents/skills/common" ]; then
+    SOURCE_DIR="$BR_AI_SPEC_LOCAL"
+    info "使用 npm 包内规范库: $SOURCE_DIR"
+    return 0
+  fi
+
   local script_dir
   script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
