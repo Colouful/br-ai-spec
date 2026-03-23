@@ -1,6 +1,6 @@
 {
   "name": "@ex/ai-spec",
-  "version": "0.0.12",
+  "version": "0.0.13",
   "description": "AI Coding 团队规范库 CLI — 一键安装规范、技能与工具配置",
   "bin": {
     "ai-spec": "./bin/cli.js",

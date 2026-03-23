@@ -308,8 +308,9 @@ copy_agents() {
 
 # ---- 复制 lint/format 配置文件 ----
 # 参数: $1=源目录 $2=目标目录 $3=skip_existing（非空则跳过已存在的文件）
+#       $4=skip_husky_artifacts（非空则跳过 .husky / .lintstagedrc / commitlint.config.js）
 _copy_config_dir() {
-  local src="$1" target="$2" skip_existing="${3:-}"
+  local src="$1" target="$2" skip_existing="${3:-}" skip_husky="${4:-}"
   [ -d "$src" ] || return 1
   local copied=false
 
@@ -317,6 +318,9 @@ _copy_config_dir() {
   for f in "$src"/.*; do
     local name; name="$(basename "$f")"
     [[ "$name" == "." || "$name" == ".." ]] && continue
+    if [ -n "$skip_husky" ]; then
+      [[ "$name" == ".husky" || "$name" == ".lintstagedrc" ]] && continue
+    fi
     if [ -f "$f" ]; then
       if [ -n "$skip_existing" ] && [ -f "$target/$name" ]; then
         info "  跳过已存在: $name"
@@ -339,6 +343,9 @@ _copy_config_dir() {
   for f in "$src"/*; do
     [ -f "$f" ] || continue
     local name; name="$(basename "$f")"
+    if [ -n "$skip_husky" ] && [ "$name" = "commitlint.config.js" ]; then
+      continue
+    fi
     if [ -n "$skip_existing" ] && [ -f "$target/$name" ]; then
       info "  跳过已存在: $name"
       continue
@@ -356,15 +363,22 @@ copy_configs() {
   local src_common="$SOURCE_DIR/configs/common"
   local src_profile="$SOURCE_DIR/configs/profiles/$PROFILE"
   local copied=false
+  local skip_husky=""
+
+  # 未选提交校验且目标尚无 .husky 时，不复制 husky/lint-staged/commitlint 模板（避免「跳过 Husky」仍出现 .husky）
+  if [ "$INSTALL_HUSKY" != "yes" ] && [ ! -d "$target/.husky" ]; then
+    skip_husky=1
+    info "提交校验相关配置（.husky / .lintstagedrc / commitlint）将跳过同步"
+  fi
 
   if [ -d "$src_common" ]; then
     info "同步 lint/format 配置 (common) ..."
-    _copy_config_dir "$src_common" "$target" "$skip_existing" && copied=true
+    _copy_config_dir "$src_common" "$target" "$skip_existing" "$skip_husky" && copied=true
   fi
 
   if [ -d "$src_profile" ]; then
     info "同步 lint/format 配置 (profiles/$PROFILE) ..."
-    _copy_config_dir "$src_profile" "$target" "$skip_existing" && copied=true
+    _copy_config_dir "$src_profile" "$target" "$skip_existing" "$skip_husky" && copied=true
   fi
 
   $copied && ok "lint/format 配置部署完成" || info "未找到 lint/format 配置模板，跳过"

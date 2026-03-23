@@ -381,13 +381,21 @@ function Copy-Agents {
 }
 
 function Copy-ConfigDir {
-    param([string]$Src, [string]$Dst, [bool]$SkipExisting = $false)
+    param(
+        [string]$Src,
+        [string]$Dst,
+        [bool]$SkipExisting = $false,
+        [bool]$SkipHuskyArtifacts = $false
+    )
     if (-not (Test-Path $Src)) { return $false }
     [ref]$hasCopied = $false
 
     Get-ChildItem -Path $Src -Force -ErrorAction SilentlyContinue | ForEach-Object {
         $name = $_.Name
         if ($name -eq "." -or $name -eq "..") { return }
+        if ($SkipHuskyArtifacts) {
+            if ($name -eq ".husky" -or $name -eq ".lintstagedrc" -or $name -eq "commitlint.config.js") { return }
+        }
         $dstPath = Join-Path $Dst $name
 
         if ($_.PSIsContainer) {
@@ -418,13 +426,19 @@ function Copy-Configs {
     $srcProfile = Join-Path $script:SourceDir "configs/profiles/$($script:Profile)"
     $anyCopied = $false
 
+    $includeHuskyConfigs = ($script:InstallHusky -eq "yes") -or (Test-Path (Join-Path $Target ".husky"))
+    $skipHuskyArtifacts = -not $includeHuskyConfigs
+    if ($skipHuskyArtifacts) {
+        Write-Info "提交校验相关配置（.husky / .lintstagedrc / commitlint）将跳过同步"
+    }
+
     if (Test-Path $srcCommon) {
         Write-Info "同步 lint/format 配置 (common) ..."
-        if (Copy-ConfigDir -Src $srcCommon -Dst $Target -SkipExisting $SkipExisting) { $anyCopied = $true }
+        if (Copy-ConfigDir -Src $srcCommon -Dst $Target -SkipExisting $SkipExisting -SkipHuskyArtifacts $skipHuskyArtifacts) { $anyCopied = $true }
     }
     if (Test-Path $srcProfile) {
         Write-Info "同步 lint/format 配置 (profiles/$($script:Profile)) ..."
-        if (Copy-ConfigDir -Src $srcProfile -Dst $Target -SkipExisting $SkipExisting) { $anyCopied = $true }
+        if (Copy-ConfigDir -Src $srcProfile -Dst $Target -SkipExisting $SkipExisting -SkipHuskyArtifacts $skipHuskyArtifacts) { $anyCopied = $true }
     }
 
     if ($anyCopied) { Write-Ok "lint/format 配置部署完成" }
