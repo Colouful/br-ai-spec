@@ -23,6 +23,9 @@ bash install.sh init /path/to/your-project --profile vue --level L2
 **Windows PowerShell：**
 
 ```powershell
+# 首次使用需放开脚本执行策略（仅需执行一次）
+Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
+
 git clone http://git.100credit.cn/zhenwei.li/br-ai-spec.git
 cd br-ai-spec
 
@@ -34,6 +37,7 @@ cd br-ai-spec
 ```
 
 > PS1 脚本与 Bash 脚本功能完全一致，支持交互选择、所有参数和全部安装层级。
+> 如果不想修改全局策略，可使用单次绕过：`powershell -ExecutionPolicy Bypass -File .\install.ps1 init .`
 
 **远程安装（无需手动克隆）：**
 
@@ -325,6 +329,9 @@ bash install.sh init /path/to/project --profile react --level L3
 
 **Q: 安装后 AI 没有遵循规范？**
 A: 运行 `install.sh check`（或 `.\install.ps1 check`）确认链接有效。部分 IDE 需要重启才能识别新的规则文件。
+
+**Q: Windows 上运行 `install.ps1` 提示"禁止运行脚本"怎么办？**
+A: Windows PowerShell 默认禁止执行脚本。运行 `Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned` 放开策略（仅需一次），或使用 `powershell -ExecutionPolicy Bypass -File .\install.ps1 init .` 单次绕过。
 
 **Q: PowerShell 脚本和 Bash 脚本功能一样吗？**
 A: 是的。`install.ps1` v2.0 已与 `install.sh` 完全功能对齐，支持交互选择、所有参数和全部安装层级。Windows 团队成员也可以使用 Git Bash 运行 `install.sh`。

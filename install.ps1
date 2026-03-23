@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     br-ai-spec 规范库安装脚本 (PowerShell)
     适用于 Windows PowerShell 5.1+ / PowerShell Core 7+
@@ -228,8 +228,8 @@ function Get-SourceDir {
 function Select-Profile {
     Write-Host ""
     Write-Info "选择技术栈 Profile："
-    Write-Host "  1) vue    — Vue 3 + TypeScript + Pinia + Vue Router"
-    Write-Host "  2) react  — React + TypeScript + Antd + Zustand"
+    Write-Host "  1) vue    -- Vue 3 + TypeScript + Pinia + Vue Router"
+    Write-Host "  2) react  -- React + TypeScript + Antd + Zustand"
     Write-Host ""
     $choice = Read-Host "请选择 (1/2) [默认 1]"
     switch ($choice) {
@@ -242,9 +242,9 @@ function Select-Profile {
 function Select-Level {
     Write-Host ""
     Write-Info "选择安装层级："
-    Write-Host "  L1) 最小接入 — 只接入 .agents（规范 + 技能）"
-    Write-Host "  L2) 标准接入 — .agents + 工具适配层 + MCP 模板"
-    Write-Host "  L3) 完整接入 — 在 L2 基础上引入 OpenSpec 流程"
+    Write-Host "  L1) 最小接入 -- 只接入 .agents（规范 + 技能）"
+    Write-Host "  L2) 标准接入 -- .agents + 工具适配层 + MCP 模板"
+    Write-Host "  L3) 完整接入 -- 在 L2 基础上引入 OpenSpec 流程"
     Write-Host ""
     $choice = Read-Host "请选择 (L1/L2/L3) [默认 L2]"
     switch -Regex ($choice) {
@@ -918,9 +918,9 @@ function Show-Usage {
     Write-Host "  -h, --help        显示帮助"
     Write-Host ""
     Write-Host "安装层级:" -ForegroundColor White
-    Write-Host "  L1  最小接入 — 只接入 .agents（规范 + 技能）"
-    Write-Host "  L2  标准接入 — .agents + 工具适配层 + MCP 模板"
-    Write-Host "  L3  完整接入 — 在 L2 基础上引入 OpenSpec 流程"
+    Write-Host "  L1  最小接入 -- 只接入 .agents（规范 + 技能）"
+    Write-Host "  L2  标准接入 -- .agents + 工具适配层 + MCP 模板"
+    Write-Host "  L3  完整接入 -- 在 L2 基础上引入 OpenSpec 流程"
     Write-Host ""
     Write-Host "示例:" -ForegroundColor White
     Write-Host "  .\install.ps1 init                                    # 交互式安装"

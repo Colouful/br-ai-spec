@@ -234,3 +234,18 @@ curl -sSL <raw-url>/install.sh | bash -s -- init . --profile vue --level L2
 | Windows (PowerShell) | 使用 `install.ps1` | 独立的 PowerShell 版本 |
 
 脚本通过 `OSTYPE` 环境变量自动检测平台并选择合适的链接方式。
+
+### Windows PowerShell 注意事项
+
+Windows PowerShell 默认禁止执行 `.ps1` 脚本（`Restricted` 策略）。首次使用前需放开执行策略：
+
+```powershell
+# 方式一：修改当前用户策略（仅需执行一次）
+Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
+
+# 方式二：仅本次会话放开
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+
+# 方式三：单次绕过，不修改任何策略
+powershell -ExecutionPolicy Bypass -File .\install.ps1 init .
+```
