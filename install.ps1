@@ -29,6 +29,8 @@ $script:SpecRepo = if ($env:BR_AI_SPEC_REPO) { $env:BR_AI_SPEC_REPO } else { $De
 $script:CacheDir = if ($env:BR_AI_SPEC_CACHE) { $env:BR_AI_SPEC_CACHE } else { Join-Path $HOME ".br-ai-spec" }
 $script:SpecBranch = if ($env:BR_AI_SPEC_BRANCH) { $env:BR_AI_SPEC_BRANCH } else { "main" }
 $script:Uipro = "ask"
+$script:InstallLint = "ask"
+$script:InstallHusky = "ask"
 $script:RefreshCache = $false
 $script:Force = $false
 $script:ProfileExplicit = $false
@@ -74,6 +76,10 @@ while ($i -lt $args.Count) {
             }
             $i++; $script:SpecRepo = $args[$i]
         }
+        "^--lint$" { $script:InstallLint = "yes" }
+        "^--no-lint$" { $script:InstallLint = "no" }
+        "^--husky$" { $script:InstallHusky = "yes" }
+        "^--no-husky$" { $script:InstallHusky = "no" }
         "^--uipro$" { $script:Uipro = "yes" }
         "^--no-uipro$" { $script:Uipro = "no" }
         "^--refresh-cache$" { $script:RefreshCache = $true }
@@ -278,6 +284,30 @@ function Select-Uipro {
     }
 }
 
+function Select-LintTools {
+    Write-Host ""
+    Write-Info "是否安装 ESLint + Prettier + Stylelint 配置？"
+    Write-Host "  部署配置文件并安装对应依赖包"
+    Write-Host ""
+    $choice = Read-Host "安装 lint/format 工具? (Y/n) [默认 Y]"
+    if ($choice -match '^[Nn]') {
+        $script:InstallLint = "no"; Write-Info "跳过 lint/format 工具"
+    } else {
+        $script:InstallLint = "yes"; Write-Ok "将安装 lint/format 工具"
+    }
+
+    Write-Host ""
+    Write-Info "是否安装 Husky 提交校验（husky + lint-staged + commitlint）？"
+    Write-Host "  注册 Git hooks，提交前自动 lint，校验 commit message"
+    Write-Host ""
+    $choice = Read-Host "安装提交校验? (y/N) [默认 N]"
+    if ($choice -match '^[Yy]') {
+        $script:InstallHusky = "yes"; Write-Ok "将安装提交校验"
+    } else {
+        $script:InstallHusky = "no"; Write-Info "跳过提交校验"
+    }
+}
+
 # ============================================================================
 # 核心功能
 # ============================================================================
@@ -429,6 +459,38 @@ function Install-CommitHooks {
     Pop-Location
 
     Write-Ok "提交校验工具链安装完成 (husky@8 + lint-staged + commitlint)"
+}
+
+function Install-LintDeps {
+    param([string]$Target)
+    if (-not (Test-Path (Join-Path $Target "package.json"))) {
+        Write-Warn "未找到 package.json，跳过 lint/format 依赖安装"; return
+    }
+    if (-not $script:PkgManager) {
+        Write-Warn "无可用的包管理器，跳过 lint/format 依赖安装"; return
+    }
+
+    $deps = "eslint prettier stylelint stylelint-config-standard"
+    if ($script:Profile -eq "vue") {
+        $deps = "$deps stylelint-config-html stylelint-config-recommended-vue postcss-html"
+    }
+
+    Write-Info "正在使用 $($script:PkgManager) 安装 lint/format 依赖..."
+    Write-Info "  $deps"
+
+    $installCmd = "$($script:PkgManager) install -D $deps"
+    try {
+        Push-Location $Target
+        Invoke-Expression $installCmd
+        if ($LASTEXITCODE -ne 0) { throw "install failed" }
+    } catch {
+        Write-Warn "$($script:PkgManager) install 失败，请手动执行:"
+        Write-Host "  cd $Target && $installCmd"
+        Pop-Location; return
+    }
+    Pop-Location
+
+    Write-Ok "lint/format 依赖安装完成"
 }
 
 function New-IdeLinks {
@@ -666,8 +728,16 @@ function Write-Report {
     Write-Host ""
     Write-Info "已部署内容："
     Write-Host "  √ .agents/rules + skills (profile: $($script:Profile))" -ForegroundColor Green
-    Write-Host "  √ lint/format 配置 (.prettierrc, .eslintrc, .stylelintrc)" -ForegroundColor Green
-    Write-Host "  √ 提交校验 (.husky, .lintstagedrc, commitlint.config.js)" -ForegroundColor Green
+    if ($script:InstallLint -eq "yes") {
+        Write-Host "  √ lint/format 配置 (.prettierrc, .eslintrc, .stylelintrc)" -ForegroundColor Green
+    } else {
+        Write-Host "  — lint/format 配置（已跳过）" -ForegroundColor Yellow
+    }
+    if ($script:InstallHusky -eq "yes") {
+        Write-Host "  √ 提交校验 (.husky, .lintstagedrc, commitlint.config.js)" -ForegroundColor Green
+    } else {
+        Write-Host "  — 提交校验（已跳过）" -ForegroundColor Yellow
+    }
     if (Test-Path (Join-Path $Target ".agents/skills/ui-ux-pro-max")) {
         Write-Host "  √ UI UX Pro Max 设计智能技能" -ForegroundColor Green
     }
@@ -725,11 +795,26 @@ function Invoke-Init {
     }
     if ([Environment]::UserInteractive -and $script:Uipro -eq "ask") { Select-Uipro }
 
+    # lint/format 工具选择（交互模式 + ask 时触发）
+    if ([Environment]::UserInteractive -and $script:InstallLint -eq "ask") { Select-LintTools }
+    # 非交互模式下 ask 保持默认值
+    if ($script:InstallLint -eq "ask") { $script:InstallLint = "yes" }
+    if ($script:InstallHusky -eq "ask") { $script:InstallHusky = "no" }
+
     Get-SourceDir
 
     Copy-Agents -Target $target
-    Copy-Configs -Target $target
-    Install-CommitHooks -Target $target
+
+    # lint/format 配置（可选）
+    if ($script:InstallLint -eq "yes") {
+        Copy-Configs -Target $target
+        Install-LintDeps -Target $target
+    }
+
+    # 提交校验（可选）
+    if ($script:InstallHusky -eq "yes") {
+        Install-CommitHooks -Target $target
+    }
 
     if ($script:Uipro -eq "yes") { Install-Uipro -Target $target }
 
@@ -901,6 +986,12 @@ if (pkg.scripts && pkg.scripts.prepare && pkg.scripts.prepare.includes('husky'))
                 Invoke-Expression "$pm uninstall husky lint-staged @commitlint/cli @commitlint/config-conventional" 2>$null
                 Pop-Location
             } catch { Pop-Location }
+            Write-Info "  使用 $pm 卸载 eslint prettier stylelint 及相关插件 ..."
+            try {
+                Push-Location $target
+                Invoke-Expression "$pm uninstall eslint prettier stylelint stylelint-config-standard stylelint-config-html stylelint-config-recommended-vue postcss-html" 2>$null
+                Pop-Location
+            } catch { Pop-Location }
         }
     }
 
@@ -923,6 +1014,10 @@ function Show-Usage {
     Write-Host "  --profile <name>  技术栈 (react|vue)                              默认 vue"
     Write-Host "  --level <L>       安装层级 (L1|L2|L3)                             默认 L3"
     Write-Host "  --ide <name>      指定 IDE (default|cursor|claude|opencode|trae|all)  默认 default(cursor+claude)"
+    Write-Host "  --lint            安装 ESLint + Prettier + Stylelint（默认安装）"
+    Write-Host "  --no-lint         跳过 lint/format 工具"
+    Write-Host "  --husky           安装 Husky 提交校验（husky + lint-staged + commitlint）"
+    Write-Host "  --no-husky        跳过提交校验（默认跳过）"
     Write-Host "  --uipro           安装 UI UX Pro Max 设计智能技能"
     Write-Host "  --no-uipro        跳过 UI UX Pro Max（非交互模式默认跳过）"
     Write-Host "  --repo <url>      自定义规范库地址"

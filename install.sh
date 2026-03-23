@@ -23,6 +23,8 @@ IDE_FILTER="default"
 PROFILE="vue"
 LEVEL="L3"
 UIPRO="ask"
+INSTALL_LINT="ask"
+INSTALL_HUSKY="ask"
 REFRESH_CACHE=""
 FORCE=""
 SPEC_BRANCH="${BR_AI_SPEC_BRANCH:-main}"
@@ -133,6 +135,29 @@ select_uipro() {
   case "$choice" in
     [Nn]*) UIPRO="no"; info "跳过 UI UX Pro Max" ;;
     *)     UIPRO="yes"; ok "将安装 UI UX Pro Max" ;;
+  esac
+}
+
+# ---- 交互式选择 lint/format 工具 ----
+select_lint_tools() {
+  echo ""
+  info "是否安装 ESLint + Prettier + Stylelint 配置？"
+  echo "  部署配置文件并安装对应依赖包"
+  echo ""
+  read -rp "安装 lint/format 工具? (Y/n) [默认 Y]: " choice
+  case "$choice" in
+    [Nn]*) INSTALL_LINT="no"; info "跳过 lint/format 工具" ;;
+    *)     INSTALL_LINT="yes"; ok "将安装 lint/format 工具" ;;
+  esac
+
+  echo ""
+  info "是否安装 Husky 提交校验（husky + lint-staged + commitlint）？"
+  echo "  注册 Git hooks，提交前自动 lint，校验 commit message"
+  echo ""
+  read -rp "安装提交校验? (y/N) [默认 N]: " choice
+  case "$choice" in
+    [Yy]*) INSTALL_HUSKY="yes"; ok "将安装提交校验" ;;
+    *)     INSTALL_HUSKY="no"; info "跳过提交校验" ;;
   esac
 }
 
@@ -368,6 +393,28 @@ install_commit_hooks() {
   ok "提交校验工具链安装完成 (husky@8 + lint-staged + commitlint)"
 }
 
+# ---- 安装 lint/format 依赖（eslint + prettier + stylelint） ----
+install_lint_deps() {
+  local target="$1"
+  [ -f "$target/package.json" ] || { warn "未找到 package.json，跳过 lint/format 依赖安装"; return 0; }
+  [ -n "$PKG_MANAGER" ] || { warn "无可用的包管理器，跳过 lint/format 依赖安装"; return 0; }
+
+  local deps="eslint prettier stylelint stylelint-config-standard"
+  if [ "$PROFILE" = "vue" ]; then
+    deps="$deps stylelint-config-html stylelint-config-recommended-vue postcss-html"
+  fi
+
+  info "正在使用 $PKG_MANAGER 安装 lint/format 依赖，请稍候 ..."
+  info "  $deps"
+  if ! (cd "$target" && $PKG_MANAGER install -D $deps); then
+    warn "$PKG_MANAGER install 失败，请手动执行:"
+    echo "  cd $target && $PKG_MANAGER install -D $deps"
+    return 0
+  fi
+
+  ok "lint/format 依赖安装完成"
+}
+
 # ---- 创建 IDE 链接（逐个 skill 目录链接，给 OpenSpec 留空间） ----
 create_ide_links() {
   local target="$1"
@@ -601,8 +648,16 @@ print_report() {
   echo ""
   info "已部署内容："
   echo -e "  ${GREEN}✔${NC} .agents/rules + skills (profile: $PROFILE)"
-  echo -e "  ${GREEN}✔${NC} lint/format 配置 (.prettierrc, .eslintrc, .stylelintrc)"
-  echo -e "  ${GREEN}✔${NC} 提交校验 (.husky, .lintstagedrc, commitlint.config.js)"
+  if [ "$INSTALL_LINT" = "yes" ]; then
+    echo -e "  ${GREEN}✔${NC} lint/format 配置 (.prettierrc, .eslintrc, .stylelintrc)"
+  else
+    echo -e "  ${YELLOW}—${NC} lint/format 配置（已跳过）"
+  fi
+  if [ "$INSTALL_HUSKY" = "yes" ]; then
+    echo -e "  ${GREEN}✔${NC} 提交校验 (.husky, .lintstagedrc, commitlint.config.js)"
+  else
+    echo -e "  ${YELLOW}—${NC} 提交校验（已跳过）"
+  fi
   if [ -d "$target/.agents/skills/ui-ux-pro-max" ]; then
     echo -e "  ${GREEN}✔${NC} UI UX Pro Max 设计智能技能 (67 styles, 161 palettes)"
   fi
@@ -664,12 +719,29 @@ cmd_init() {
     select_uipro
   fi
 
+  # lint/format 工具选择（交互模式 + ask 时触发）
+  if [ -t 0 ] && [ "$INSTALL_LINT" = "ask" ]; then
+    select_lint_tools
+  fi
+  # 非交互模式下 ask 保持默认值
+  [ "$INSTALL_LINT" = "ask" ] && INSTALL_LINT="yes"
+  [ "$INSTALL_HUSKY" = "ask" ] && INSTALL_HUSKY="no"
+
   detect_source
 
   # L1: 只安装 .agents
   copy_agents "$target"
-  copy_configs "$target"
-  install_commit_hooks "$target"
+
+  # lint/format 配置（可选）
+  if [ "$INSTALL_LINT" = "yes" ]; then
+    copy_configs "$target"
+    install_lint_deps "$target"
+  fi
+
+  # 提交校验（可选）
+  if [ "$INSTALL_HUSKY" = "yes" ]; then
+    install_commit_hooks "$target"
+  fi
 
   # UI UX Pro Max（可选）
   if [ "$UIPRO" = "yes" ]; then
@@ -855,6 +927,8 @@ cmd_uninstall() {
     if [ -n "$pm" ]; then
       info "  使用 $pm 卸载 husky lint-staged @commitlint/cli @commitlint/config-conventional ..."
       (cd "$target" && $pm uninstall husky lint-staged @commitlint/cli @commitlint/config-conventional 2>/dev/null) || true
+      info "  使用 $pm 卸载 eslint prettier stylelint 及相关插件 ..."
+      (cd "$target" && $pm uninstall eslint prettier stylelint stylelint-config-standard stylelint-config-html stylelint-config-recommended-vue postcss-html 2>/dev/null) || true
     fi
   fi
 
@@ -881,6 +955,10 @@ ${BOLD}选项:${NC}
   --profile <name>  技术栈 (react|vue)                              默认 vue
   --level <L>       安装层级 (L1|L2|L3)                             默认 L3
   --ide <name>      指定 IDE (default|cursor|claude|opencode|trae|all)  默认 default(cursor+claude)
+  --lint            安装 ESLint + Prettier + Stylelint（默认安装）
+  --no-lint         跳过 lint/format 工具
+  --husky           安装 Husky 提交校验（husky + lint-staged + commitlint）
+  --no-husky        跳过提交校验（默认跳过）
   --uipro           安装 UI UX Pro Max 设计智能技能
   --no-uipro        跳过 UI UX Pro Max（非交互模式默认跳过）
   --repo <url>      自定义规范库地址
@@ -923,6 +1001,10 @@ while [ $# -gt 0 ]; do
     --level)      require_arg "$1" "${2:-}"; LEVEL="$2"; shift ;;
     --ide)        require_arg "$1" "${2:-}"; IDE_FILTER="$2"; shift ;;
     --repo)       require_arg "$1" "${2:-}"; SPEC_REPO="$2"; shift ;;
+    --lint)       INSTALL_LINT="yes" ;;
+    --no-lint)    INSTALL_LINT="no" ;;
+    --husky)      INSTALL_HUSKY="yes" ;;
+    --no-husky)   INSTALL_HUSKY="no" ;;
     --uipro)      UIPRO="yes" ;;
     --no-uipro)   UIPRO="no" ;;
     --refresh-cache) REFRESH_CACHE="true" ;;
