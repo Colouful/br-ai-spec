@@ -187,7 +187,7 @@ br-ai-spec/
 │   │
 │   └── skills/
 │       ├── common/                   # 通用技能（10 个）
-│       │   ├── create-proposal/      # 创建需求提案
+│       │   ├── create-proposal/      # 提案前置分析（OpenSpec 增强层）
 │       │   ├── create-test/          # 创建测试用例
 │       │   ├── design-analysis/      # 设计稿分析
 │       │   ├── execute-task/         # Superpowers 模式执行任务
@@ -279,7 +279,7 @@ br-ai-spec/
 |------|------|
 | using-superpowers | 技能调度核心，每次对话启动前检查适用技能 |
 | execute-task | Superpowers 模式（头脑风暴 → TDD → 双重审查）执行开发任务 |
-| create-proposal | 根据需求创建提案（设计稿分析 + 接口对接 + UI 验收） |
+| create-proposal | 提案前置分析与 OpenSpec 增强层（需求分析后委托 `/opsx:propose`） |
 | design-analysis | 分析设计稿并梳理前端 UI 开发任务 |
 | ui-verification | 以实际页面 vs 设计稿比对完成 UI 验收 |
 | create-test | 按规范创建 Vitest 测试文件（命名、断言、Mock、覆盖率） |

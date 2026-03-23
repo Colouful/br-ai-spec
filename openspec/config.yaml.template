@@ -5,18 +5,20 @@
 schema: spec-driven
 
 context: |
-  本项目使用 br-ai-spec 规范体系，分两层组织：
+  本项目使用 br-ai-spec 规范体系：
   - .agents/rules/: 开发规范（编码、组件、API、路由、状态管理、样式等）
-  - .agents/skills/: 实践技能（创建组件、路由、接口、设计稿分析、UI验收等）
-  创建提案时参考 .agents/skills/create-proposal/SKILL.md
+  - .agents/skills/: 实践技能（组件、路由、接口、设计稿分析、UI验收等）
   执行任务时遵循 .agents/rules/12-Superpowers执行规范.md
   技能索引：.agents/skills/README.md
 
 rules:
   proposal:
     - "创建提案前确认：是否有设计稿、是否有接口、交付形态（页面/组件/模块）"
-    - "有设计稿时使用 .agents/skills/design-analysis/SKILL.md 产出分析清单"
-    - "参考 .agents/skills/create-proposal/SKILL.md 中的完整业务决策流程"
+    - "有设计稿时使用 .agents/skills/design-analysis/SKILL.md 产出 UI 分析清单"
+    - "交付为页面时，参考 .agents/rules/06-路由规范.md 确定路由结构"
+    - "交付为组件时，参考 .agents/rules/04-组件规范.md 确定组件放置"
+    - "涉及接口时，参考 .agents/rules/05-API规范.md 确定接口结构"
+    - "未就绪的接口按项目 Mock 数据策略处理"
   tasks:
     - "执行任务前须读取 .agents/rules/12-Superpowers执行规范.md"
     - "按 .agents/skills/execute-task/SKILL.md 的四步循环执行"
@@ -27,5 +29,7 @@ rules:
   design:
     - "技术方案须遵循 .agents/rules/ 中的架构约束"
     - "样式方案须使用主题变量，见 .agents/rules/09-样式规范.md"
+    - "组件拆分须遵循 .agents/rules/04-组件规范.md"
   specs:
     - "每个 capability 的验收场景须可测试"
+    - "有设计稿时引用 UI 分析清单作为验收参考"

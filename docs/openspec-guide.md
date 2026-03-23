@@ -149,7 +149,7 @@ AI：创建变更 add-user-management...
 
 - AI 会自动读取 `openspec/config.yaml` 中的 `context` 字段，了解项目使用 br-ai-spec 规范体系
 - 创建的技术设计会遵循 `.agents/rules/` 中的架构约束
-- 任务拆分会参考 `.agents/skills/create-proposal/SKILL.md` 的流程
+- 任务拆分由 OpenSpec 根据 `config.yaml` 中的 rules 自动生成，br-ai-spec 通过 rules 注入规范约束而不干预产物生成
 
 ### 3.2 /opsx:apply — 实施任务
 
@@ -230,18 +230,20 @@ openspec/
 schema: spec-driven
 
 context: |
-  本项目使用 br-ai-spec 规范体系，分两层组织：
-  - .agents/rules/: 开发规范（编码、组件、API、路由、状态管理、样式等）
-  - .agents/skills/: 实践技能（创建组件、路由、接口、设计稿分析、UI验收等）
-  创建提案时参考 .agents/skills/create-proposal/SKILL.md
+  本项目使用 br-ai-spec 规范体系：
+  - .agents/rules/: 开发规范（编码、组件、API、路由、样式等）
+  - .agents/skills/: 实践技能（组件、路由、接口、设计稿分析、UI验收等）
   执行任务时遵循 .agents/rules/12-Superpowers执行规范.md
   技能索引：.agents/skills/README.md
 
 rules:
   proposal:
     - "创建提案前确认：是否有设计稿、是否有接口、交付形态（页面/组件/模块）"
-    - "有设计稿时使用 .agents/skills/design-analysis/SKILL.md 产出分析清单"
-    - "参考 .agents/skills/create-proposal/SKILL.md 中的完整业务决策流程"
+    - "有设计稿时使用 .agents/skills/design-analysis/SKILL.md 产出 UI 分析清单"
+    - "交付为页面时，参考 .agents/rules/06-路由规范.md 确定路由结构"
+    - "交付为组件时，参考 .agents/rules/04-组件规范.md 确定组件放置"
+    - "涉及接口时，参考 .agents/rules/05-API规范.md 确定接口结构"
+    - "未就绪的接口按项目 Mock 数据策略处理"
   tasks:
     - "执行任务前须读取 .agents/rules/12-Superpowers执行规范.md"
     - "按 .agents/skills/execute-task/SKILL.md 的四步循环执行"
@@ -252,8 +254,10 @@ rules:
   design:
     - "技术方案须遵循 .agents/rules/ 中的架构约束"
     - "样式方案须使用主题变量，见 .agents/rules/09-样式规范.md"
+    - "组件拆分须遵循 .agents/rules/04-组件规范.md"
   specs:
     - "每个 capability 的验收场景须可测试"
+    - "有设计稿时引用 UI 分析清单作为验收参考"
 ```
 
 ### 各字段作用
@@ -350,19 +354,22 @@ AI：基于探索结果创建提案...
 当需求包含设计稿时的推荐流程：
 
 ```
-1. /opsx:propose（创建变更提案）
+1. 触发 create-proposal 技能（前置分析）
+   → 确认需求条件：设计稿、接口、交付形态
       ↓
-2. 在 AI IDE 中："分析这个 Figma 设计稿"
-   → 触发 design-analysis 技能，产出 UI 分析清单
+2. 使用 design-analysis 技能分析设计稿
+   → 产出 docs/样式还原/<名称>-UI分析清单.md
       ↓
-3. AI 自动将分析结果写入提案的 specs/ 和 tasks.md
+3. /opsx:propose（OpenSpec 生成提案，自动读取 config.yaml 中的 br-ai-spec 规则）
+   → openspec/changes/<name>/ 下生成 proposal.md / specs/ / design.md / tasks.md
       ↓
-4. /opsx:apply（按分析清单逐项实施）
+4. 后置检查：确认 tasks.md 包含 UI 验收任务
       ↓
-5. 在 AI IDE 中："验收 UI 还原"
-   → 触发 ui-verification 技能，对比页面与设计稿
+5. /opsx:apply（按分析清单逐项实施）
       ↓
-6. /opsx:archive（归档）
+6. 使用 ui-verification 技能验收 UI 还原
+      ↓
+7. /opsx:archive（归档）
 ```
 
 ---

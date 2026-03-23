@@ -40,7 +40,7 @@
 
 关键示例：
 - `create-component`：教 AI 在正确目录创建正确结构的组件
-- `create-proposal`：根据是否有设计稿、接口等条件，决定提案内容
+- `create-proposal`：前置分析需求条件后委托 `/opsx:propose` 生成提案（OpenSpec 增强层）
 
 ### `openspec/` — 流程层
 

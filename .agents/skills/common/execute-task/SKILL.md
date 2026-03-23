@@ -84,5 +84,5 @@ metadata:
 ## 相关规范与技能
 
 - `.agents/rules/12-Superpowers执行规范.md` — 执行原则与约束（何时必须启用、何时可跳过）
-- `.agents/skills/create-proposal/SKILL.md` — 产出 tasks.md 的上游技能
+- `.agents/skills/create-proposal/SKILL.md` — 提案前置分析（OpenSpec 增强层，委托 `/opsx:propose` 产出 tasks.md）
 - `openspec/AGENTS.md` — OpenSpec 三阶段工作流说明

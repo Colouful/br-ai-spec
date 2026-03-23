@@ -83,7 +83,7 @@ version: 1.0.0
 2. **实现类技能其次**（组件创建、API 封装）— 指导「做什么」
 
 示例：
-- "开发 X 功能" → 先 `create-proposal`，再 `create-component` / `create-api`
+- "开发 X 功能" / "创建提案" → 先 `create-proposal`（前置分析后委托 `/opsx:propose` 生成提案），再按 tasks 执行
 - "执行 tasks.md" → 先 `execute-task`（Superpowers Loop）
 - "修复这个 bug" → 先调试定位，再读对应领域技能
 
