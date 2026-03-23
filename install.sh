@@ -455,9 +455,10 @@ setup_openspec() {
     fi
   else
     warn "openspec CLI 未安装，请手动安装: npm install -g @fission-ai/openspec@latest"
-    # 创建基础骨架
-    mkdir -p "$target/openspec/specs" "$target/openspec/changes/archive"
   fi
+
+  # 无论 CLI 是否可用，始终确保目录骨架存在
+  mkdir -p "$target/openspec/specs" "$target/openspec/changes/archive"
 
   # 合并增强版 config.yaml 模板
   local template="$SOURCE_DIR/openspec/config.yaml.template"

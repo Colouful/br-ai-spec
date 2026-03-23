@@ -35,7 +35,8 @@ rules:
     - "每个 capability 的验收场景须可测试"
     - "有设计稿时引用 UI 分析清单作为验收参考"
   archive:
-    - "归档前必须将 openspec/changes/<name>/specs/ 下的增量规范合并到 openspec/specs/ 对应域目录"
-    - "合并策略：按 domain 目录名匹配，已存在则更新 spec.md 内容（保留未涉及的 capability），不存在则新建"
-    - "合并完成后再将变更目录移动到 openspec/changes/archive/YYYY-MM-DD-<name>/"
-    - "归档完成后输出合并摘要：新增了哪些 specs、更新了哪些 specs"
+    - "步骤1：检查 openspec/specs/ 目录是否存在，不存在则创建"
+    - "步骤2：遍历 openspec/changes/<name>/specs/ 下的每个域目录（如 ui/、api/），将增量规范合并到 openspec/specs/<domain>/"
+    - "合并策略：按 domain 目录名匹配；openspec/specs/<domain>/ 不存在则创建；已存在则更新对应 spec.md 内容（保留未涉及的 capability）"
+    - "步骤3：合并完成后，将变更目录移动到 openspec/changes/archive/YYYY-MM-DD-<name>/（注意是 changes/archive/ 下，不是 openspec/archive/）"
+    - "步骤4：输出合并摘要 — 新增了哪些 specs 域、更新了哪些 specs、归档路径"

@@ -594,9 +594,11 @@ function Install-OpenSpec {
         }
     } else {
         Write-Warn "openspec CLI 未安装，请手动安装: npm install -g @fission-ai/openspec@latest"
-        New-Item -ItemType Directory -Path (Join-Path $Target "openspec/specs") -Force | Out-Null
-        New-Item -ItemType Directory -Path (Join-Path $Target "openspec/changes/archive") -Force | Out-Null
     }
+
+    # 无论 CLI 是否可用，始终确保目录骨架存在
+    New-Item -ItemType Directory -Path (Join-Path $Target "openspec/specs") -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $Target "openspec/changes/archive") -Force | Out-Null
 
     $template = Join-Path $script:SourceDir "openspec/config.yaml.template"
     $configFile = Join-Path $Target "openspec/config.yaml"
