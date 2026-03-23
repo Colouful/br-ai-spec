@@ -25,6 +25,7 @@ rules:
     - "涉及组件开发须引用 .agents/rules/04-组件规范.md"
     - "涉及接口须引用 .agents/rules/05-API规范.md"
     - "涉及 UI 还原须在末尾加验收任务，引用 .agents/skills/ui-verification/SKILL.md"
+    - "每条任务完成后须按 .agents/rules/14-审计汇报规范.md 输出审计报告"
     - "保持改动最小化，聚焦于请求的变更"
   design:
     - "技术方案须遵循 .agents/rules/ 中的架构约束"
@@ -33,3 +34,8 @@ rules:
   specs:
     - "每个 capability 的验收场景须可测试"
     - "有设计稿时引用 UI 分析清单作为验收参考"
+  archive:
+    - "归档前必须将 openspec/changes/<name>/specs/ 下的增量规范合并到 openspec/specs/ 对应域目录"
+    - "合并策略：按 domain 目录名匹配，已存在则更新 spec.md 内容（保留未涉及的 capability），不存在则新建"
+    - "合并完成后再将变更目录移动到 openspec/changes/archive/YYYY-MM-DD-<name>/"
+    - "归档完成后输出合并摘要：新增了哪些 specs、更新了哪些 specs"

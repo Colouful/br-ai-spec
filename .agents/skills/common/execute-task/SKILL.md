@@ -25,6 +25,7 @@ metadata:
 1. 当前工作区必须存在 `tasks.md` 文件，且包含未完成的任务 (`- [ ]`)。
 2. 必须已完整读取对应变更目录下的 `proposal.md` 或 `design.md` 获取上下文。
 3. 必须已读取 `.agents/rules/12-Superpowers执行规范.md` 确认执行原则。
+4. 必须已读取 `.agents/rules/14-审计汇报规范.md` 确认审计报告格式。
 
 ## 核心执行指令 (Instructions)
 
@@ -57,10 +58,11 @@ metadata:
 2. **代码健壮性**：异常是否全部被正确捕获？类型定义是否严谨？
 3. **规范合规**：代码是否符合头脑风暴阶段加载的项目规范？
 
-### 第四步：状态更新 (Update Status)
+### 第四步：状态更新与审计汇报 (Update Status & Audit)
 
 1. 确认自我审查无误后，修改本地的 `tasks.md` 文件，将刚才完成的任务状态精准更新为 `- [x]`。
-2. 告知用户当前任务已完成，并主动询问："是否继续执行下一个任务？"
+2. 按 `.agents/rules/14-审计汇报规范.md` 的模板输出本次任务的执行审计报告。
+3. 告知用户当前任务已完成，并主动询问："是否继续执行下一个任务？"
 
 ---
 
@@ -84,5 +86,6 @@ metadata:
 ## 相关规范与技能
 
 - `.agents/rules/12-Superpowers执行规范.md` — 执行原则与约束（何时必须启用、何时可跳过）
+- `.agents/rules/14-审计汇报规范.md` — 审计报告格式与约束（第四步必须输出）
 - `.agents/skills/create-proposal/SKILL.md` — 提案前置分析（OpenSpec 增强层，委托 `/opsx:propose` 产出 tasks.md）
 - `openspec/AGENTS.md` — OpenSpec 三阶段工作流说明

@@ -1,6 +1,6 @@
 ---
 alwaysApply: false
-description: 实现变更时的强制执行规范，要求启用 Superpowers 微观执行模式（头脑风暴、TDD 驱动、双重审查）。当开始编写代码或执行 tasks.md 时读取此规则。
+description: 实现变更时的强制执行规范，要求启用 Superpowers 微观执行模式（头脑风暴、TDD 驱动、双重审查、审计汇报）。当开始编写代码或执行 tasks.md 时读取此规则。
 ---
 
 # 12-Superpowers 编码执行规范
@@ -11,17 +11,19 @@ description: 实现变更时的强制执行规范，要求启用 Superpowers 微
 
 ## 核心约束（NON-NEGOTIABLE）
 
-1. **禁止直出代码**：绝对禁止未经思考直接输出大量业务代码。每条 Task 必须经过 Superpowers Loop 的三道关卡后才可提交。
+1. **禁止直出代码**：绝对禁止未经思考直接输出大量业务代码。每条 Task 必须经过 Superpowers Loop 的四道关卡后才可提交。
 2. **逐条执行**：按 `tasks.md` 中的顺序逐条处理，禁止跳过或批量完成。
 3. **用户确认门禁**：每条 Task 的头脑风暴结论必须获得用户明确同意后，才可进入编码阶段。
+4. **审计可追溯**：每条 Task 完成后必须输出结构化审计报告，格式见 `14-审计汇报规范.md`。禁止在未实际 Read 某文件时声称已读取。
 
-## Superpowers Loop（三道关卡）
+## Superpowers Loop（四道关卡）
 
 | 关卡 | 名称 | 核心要求 |
 |------|------|----------|
 | 1 | 头脑风暴 | 先思考边界情况、错误处理和对现有代码的影响；有歧义必须提问 |
 | 2 | TDD 驱动 | RED → GREEN → REFACTOR；REFACTOR 阶段须按需引用 `.agents/rules/` 中的对应规范 |
 | 3 | 双重审查 | 设计对齐（`design.md` / `specs/`）+ 质量门禁（异常捕获、类型严谨） |
+| 4 | 审计汇报 | 按 `14-审计汇报规范.md` 输出读取记录、操作记录、规范对齐、技能状态、偏差说明 |
 
 ## 何时可以跳过
 
@@ -33,4 +35,4 @@ description: 实现变更时的强制执行规范，要求启用 Superpowers 微
 
 ## 具体操作步骤
 
-详见 `.agents/skills/execute-task/SKILL.md`，该技能定义了 Superpowers Loop 的四步操作流程（加载上下文与头脑风暴 → TDD 落地编码 → 双重自我审查 → 状态更新）。
+详见 `.agents/skills/execute-task/SKILL.md`，该技能定义了 Superpowers Loop 的四步操作流程（加载上下文与头脑风暴 → TDD 落地编码 → 双重自我审查 → 状态更新与审计汇报）。
