@@ -21,7 +21,7 @@ npx @ex/ai-spec init --profile vue --level L3
 ```
 
 > 首次使用前需配置私有源（仅一次）：在 `~/.npmrc` 中添加  
-> `@bairong:registry=http://nodejs.100credit.cn/`
+> `@ex:registry=http://nodejs.100credit.cn/`
 
 更新 / 检查 / 卸载：
 

@@ -13,7 +13,7 @@ npx @ex/ai-spec check
 npx @ex/ai-spec uninstall
 ```
 
-> 首次使用需在 `~/.npmrc` 配置私有源：`@bairong:registry=http://nodejs.100credit.cn/`
+> 首次使用需在 `~/.npmrc` 配置私有源：`@ex:registry=http://nodejs.100credit.cn/`
 
 **本文档**侧重 **`install.sh` / `install.ps1` 的参数、合并机制与排错**；npx 底层仍会调用同源脚本。
 
