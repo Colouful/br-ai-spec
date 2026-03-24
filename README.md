@@ -137,6 +137,8 @@ irm <raw-url>/install.ps1 | iex
 | `install.sh check [dir]` | 检查安装状态、链接有效性、工具环境 |
 | `install.sh uninstall [dir]` | 卸载规范库（含清理 lint 配置、husky 和相关依赖） |
 
+`init` / `update` 结束时，终端**最下方**可能再次出现红色「待处理事项」或黄色「配置提醒」：前者表示某步安装/命令失败需按提示补做；仅配置类为后者。若存在未解决的安装失败，脚本会以**非零退出码**结束，便于 CI 感知。
+
 ### 可选参数
 
 | 参数 | 说明 | 默认值 |
@@ -352,7 +354,7 @@ ex-ai-spec 与 OpenSpec 通过 `openspec/config.yaml` 一个文件桥接：**编
 - **OpenSpec** 管理需求流程（propose → apply → archive）
 - `config.yaml` 的 `context` 和 `rules` 字段让 OpenSpec 流程自动引用 ex-ai-spec 规范
 
-L3 安装时，安装脚本会自动运行 `openspec init`，生成 OpenSpec 的 skill 和 command 文件。
+L3 安装时，`install.sh` 会在需要时**尝试全局安装** `@fission-ai/openspec` 并运行 `openspec init`（失败时见文末红色待处理事项）；`npx @ex/ai-spec init` 行为以 npm 包实现为准。
 
 ```bash
 # 完整安装含 OpenSpec

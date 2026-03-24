@@ -33,11 +33,107 @@ TARGET=""
 WORKSPACE_PACKAGE_SUBPATH=""
 MONOREPO_USE_ROOT=""
 
+# init/update 待汇总项（文末红色/黄色二次提醒）
+declare -a INIT_PENDING_FAIL=()
+declare -a INIT_PENDING_CFG=()
+INIT_HAS_INSTALL_FAIL=0
+
 # ---- 输出 ----
 info()  { echo -e "${BLUE}ℹ${NC} $*"; }
 ok()    { echo -e "${GREEN}✔${NC} $*"; }
 warn()  { echo -e "${YELLOW}⚠${NC} $*"; }
 err()   { echo -e "${RED}✖${NC} $*"; }
+
+# 清空待办（进入 init/update 时调用）
+init_pending_reset() {
+  INIT_PENDING_FAIL=()
+  INIT_PENDING_CFG=()
+  INIT_HAS_INSTALL_FAIL=0
+}
+
+# 仅清除安装失败类待办（供可选重试后重新收集）
+clear_install_fail_pending() {
+  INIT_PENDING_FAIL=()
+  INIT_HAS_INSTALL_FAIL=0
+}
+
+# 安装/关键步骤失败：即时红字 + 文末汇总 + 影响退出码
+install_fail() {
+  local title="$1"
+  local detail="$2"
+  echo -e "${RED}✖${NC} ${title}"
+  echo -e "  ${detail}"
+  INIT_PENDING_FAIL+=("${title}"$'\t'"${detail}")
+  INIT_HAS_INSTALL_FAIL=1
+}
+
+# 配置类提醒（非安装失败）：仅纳入文末「配置提醒」小节
+pending_config_add() {
+  local title="$1"
+  local detail="$2"
+  INIT_PENDING_CFG+=("${title}"$'\t'"${detail}")
+}
+
+_openspec_cli_ok() {
+  command -v npx >/dev/null 2>&1 && npx openspec --version >/dev/null 2>&1
+}
+
+# 文末待处理事项（安装失败红字 + 配置黄字），置于 print_report 之后
+print_pending_summary() {
+  local n_fail=${#INIT_PENDING_FAIL[@]}
+  local n_cfg=${#INIT_PENDING_CFG[@]}
+  [ "$((n_fail + n_cfg))" -eq 0 ] && return 0
+
+  echo ""
+  if [ "$n_fail" -gt 0 ]; then
+    echo -e "${RED}${BOLD}════════════════════════════════════════${NC}"
+    echo -e "${RED}${BOLD}  待处理事项（安装或命令失败，请逐项处理）${NC}"
+    echo -e "${RED}${BOLD}════════════════════════════════════════${NC}"
+    local entry t d
+    for entry in "${INIT_PENDING_FAIL[@]}"; do
+      t="${entry%%$'\t'*}"
+      d="${entry#*$'\t'}"
+      echo -e "  ${RED}•${NC} ${BOLD}${t}${NC}"
+      # detail 可能含多行
+      while IFS= read -r line || [ -n "$line" ]; do
+        echo -e "    ${line}"
+      done <<< "$d"
+    done
+    echo -e "${RED}${BOLD}════════════════════════════════════════${NC}"
+  fi
+
+  if [ "$n_cfg" -gt 0 ]; then
+    echo ""
+    echo -e "${YELLOW}${BOLD}════════════════════════════════════════${NC}"
+    echo -e "${YELLOW}${BOLD}  配置提醒（非安装失败）${NC}"
+    echo -e "${YELLOW}${BOLD}════════════════════════════════════════${NC}"
+    local entry t d
+    for entry in "${INIT_PENDING_CFG[@]}"; do
+      t="${entry%%$'\t'*}"
+      d="${entry#*$'\t'}"
+      echo -e "  ${YELLOW}•${NC} ${BOLD}${t}${NC}"
+      while IFS= read -r line || [ -n "$line" ]; do
+        echo -e "    ${line}"
+      done <<< "$d"
+    done
+    echo -e "${YELLOW}${BOLD}════════════════════════════════════════${NC}"
+  fi
+  echo ""
+}
+
+# TTY 下可选：重试全局安装 OpenSpec / uipro-cli
+retry_failed_global_installs() {
+  local target="$1"
+  [ -t 0 ] || return 0
+  [ "${INIT_HAS_INSTALL_FAIL:-0}" != 1 ] && return 0
+  echo ""
+  read -rp "是否再次尝试安装失败的全局依赖（OpenSpec CLI / uipro-cli）？(y/N) " ans
+  [[ "$ans" =~ ^[Yy]$ ]] || return 0
+  clear_install_fail_pending
+  detect_pkg_manager
+  [ "$LEVEL" = "L3" ] && setup_openspec "$target"
+  [ "$UIPRO" = "yes" ] && setup_uipro "$target"
+}
 
 # ---- 平台检测 ----
 is_windows() {
@@ -534,20 +630,19 @@ copy_configs() {
 # ---- 安装提交校验依赖（husky + lint-staged + commitlint） ----
 install_commit_hooks() {
   local target="$1"
-  [ -f "$target/package.json" ] || { warn "未找到 package.json，跳过提交校验依赖安装"; return 0; }
-  [ -n "$PKG_MANAGER" ] || { warn "无可用的包管理器，跳过提交校验依赖安装"; return 0; }
+  [ -f "$target/package.json" ] || { install_fail "提交校验：未找到 package.json" "已跳过依赖安装。请在含 package.json 的目录执行 init，或先创建 package.json。"; return 0; }
+  [ -n "$PKG_MANAGER" ] || { install_fail "提交校验：无可用的包管理器" "无法安装 husky 等依赖。请安装 npm/pnpm 后重试。"; return 0; }
 
   info "正在使用 $PKG_MANAGER 安装提交校验依赖，请稍候 ..."
   info "  husky@8 + lint-staged@15 + @commitlint/cli@19 + @commitlint/config-conventional@19"
   if ! (cd "$target" && $PKG_MANAGER install -D husky@8 lint-staged@15 @commitlint/cli@19 @commitlint/config-conventional@19); then
-    warn "$PKG_MANAGER install 失败，请手动执行:"
-    echo "  cd $target && $PKG_MANAGER install -D husky@8 lint-staged@15 @commitlint/cli@19 @commitlint/config-conventional@19"
+    install_fail "提交校验依赖安装失败" "请手动执行: cd $target && $PKG_MANAGER install -D husky@8 lint-staged@15 @commitlint/cli@19 @commitlint/config-conventional@19"
     return 0
   fi
 
   info "初始化 husky ..."
   if ! (cd "$target" && npx husky install); then
-    warn "husky install 失败，请手动执行: cd $target && npx husky install"
+    install_fail "husky install 失败" "请手动执行: cd $target && npx husky install"
     return 0
   fi
 
@@ -557,8 +652,8 @@ install_commit_hooks() {
 # ---- 安装 lint/format 依赖（eslint + prettier + stylelint） ----
 install_lint_deps() {
   local target="$1"
-  [ -f "$target/package.json" ] || { warn "未找到 package.json，跳过 lint/format 依赖安装"; return 0; }
-  [ -n "$PKG_MANAGER" ] || { warn "无可用的包管理器，跳过 lint/format 依赖安装"; return 0; }
+  [ -f "$target/package.json" ] || { install_fail "lint/format：未找到 package.json" "已跳过依赖安装。请在含 package.json 的目录执行 init。"; return 0; }
+  [ -n "$PKG_MANAGER" ] || { install_fail "lint/format：无可用的包管理器" "无法安装 ESLint 等依赖。请安装 npm/pnpm 后重试。"; return 0; }
 
   local deps="eslint prettier stylelint stylelint-config-standard"
   if [ "$PROFILE" = "vue" ]; then
@@ -568,8 +663,7 @@ install_lint_deps() {
   info "正在使用 $PKG_MANAGER 安装 lint/format 依赖，请稍候 ..."
   info "  $deps"
   if ! (cd "$target" && $PKG_MANAGER install -D $deps); then
-    warn "$PKG_MANAGER install 失败，请手动执行:"
-    echo "  cd $target && $PKG_MANAGER install -D $deps"
+    install_fail "lint/format 依赖安装失败" "请手动执行: cd $target && $PKG_MANAGER install -D $deps"
     return 0
   fi
 
@@ -625,7 +719,8 @@ copy_cursor_extras() {
   # mcp.json（仅在不存在时复制）
   if [ -f "$SOURCE_DIR/.cursor/mcp.json" ] && [ ! -f "$cursor_dst/mcp.json" ]; then
     cp "$SOURCE_DIR/.cursor/mcp.json" "$cursor_dst/mcp.json"
-    warn ".cursor/mcp.json 已生成 → 请在 Cursor「设置 → MCP」中按需启用服务后，再替换 project-id 与 access-token"
+    info ".cursor/mcp.json 已生成（请在 Cursor「设置 → MCP」中按需启用并完成凭证配置）"
+    pending_config_add ".cursor/mcp.json" "在 Cursor「设置 → MCP」中按需启用服务后，将各条目中的 project-id、access-token 等占位符替换为真实值。"
   fi
 
   # commands/（复制 *.md）
@@ -640,29 +735,61 @@ copy_cursor_extras() {
 # ---- 安装 OpenSpec（L3） ----
 setup_openspec() {
   local target="$1"
+  local tools_arg logf tail_err
 
   info "配置 OpenSpec ..."
 
-  # 检测 openspec CLI
-  if command -v npx >/dev/null 2>&1 && npx openspec --version >/dev/null 2>&1; then
-    ok "openspec CLI 可用"
-
-    # 运行 openspec init（如果 openspec/ 目录已存在则跳过 init）
-    if [ ! -f "$target/openspec/config.yaml" ] && [ ! -f "$target/openspec/config.yml" ]; then
-      info "运行 openspec init ..."
-      local tools_arg="cursor"
-      case "$IDE_FILTER" in
-        all)     tools_arg="cursor,claude,opencode,trae" ;;
-        default) tools_arg="cursor,claude" ;;
-        *)       tools_arg="$IDE_FILTER" ;;
-      esac
-      (cd "$target" && npx openspec init --tools "$tools_arg" --force --no-interactive 2>/dev/null) || warn "openspec init 执行失败，请手动运行"
+  if ! _openspec_cli_ok; then
+    if ! command -v npx >/dev/null 2>&1; then
+      install_fail "OpenSpec：npx 不可用" "无法安装或运行 openspec。请安装 Node.js 完整发行版后重试。"
+    elif [ -z "$PKG_MANAGER" ]; then
+      install_fail "OpenSpec CLI 不可用" "未检测到包管理器，无法自动全局安装。请执行: npm install -g @fission-ai/openspec@latest"
     else
-      info "openspec/ 已存在，运行 openspec update ..."
-      (cd "$target" && npx openspec update --force 2>/dev/null) || warn "openspec update 执行失败"
+      info "正在全局安装 @fission-ai/openspec ..."
+      logf="$(mktemp)"
+      if [ "$PKG_MANAGER" = "pnpm" ]; then
+        pnpm add -g @fission-ai/openspec@latest >"$logf" 2>&1 || true
+      else
+        npm install -g @fission-ai/openspec@latest >"$logf" 2>&1 || true
+      fi
+      if _openspec_cli_ok; then
+        ok "openspec CLI 已安装并可用"
+        rm -f "$logf"
+      else
+        tail_err="$(tail -n 25 "$logf" 2>/dev/null || true)"
+        install_fail "OpenSpec CLI 自动全局安装失败" "日志文件: $logf"$'\n'"日志尾部:"$'\n'"${tail_err}"$'\n'"请手动执行: npm install -g @fission-ai/openspec@latest 或 pnpm add -g @fission-ai/openspec@latest"
+      fi
     fi
   else
-    warn "openspec CLI 未安装，请手动安装: npm install -g @fission-ai/openspec@latest"
+    ok "openspec CLI 可用"
+  fi
+
+  if _openspec_cli_ok; then
+    tools_arg="cursor"
+    case "$IDE_FILTER" in
+      all)     tools_arg="cursor,claude,opencode,trae" ;;
+      default) tools_arg="cursor,claude" ;;
+      *)       tools_arg="$IDE_FILTER" ;;
+    esac
+    if [ ! -f "$target/openspec/config.yaml" ] && [ ! -f "$target/openspec/config.yml" ]; then
+      info "运行 openspec init ..."
+      logf="$(mktemp)"
+      if ! (cd "$target" && npx openspec init --tools "$tools_arg" --force --no-interactive >"$logf" 2>&1); then
+        tail_err="$(tail -n 40 "$logf" 2>/dev/null || true)"
+        install_fail "openspec init 失败" "日志文件: $logf"$'\n'"日志尾部:"$'\n'"${tail_err}"$'\n'"请在目录 $target 下手动排查后执行: npx openspec init --tools \"$tools_arg\""
+      else
+        rm -f "$logf"
+      fi
+    else
+      info "openspec/ 已存在，运行 openspec update ..."
+      logf="$(mktemp)"
+      if ! (cd "$target" && npx openspec update --force >"$logf" 2>&1); then
+        tail_err="$(tail -n 40 "$logf" 2>/dev/null || true)"
+        install_fail "openspec update 失败" "日志文件: $logf"$'\n'"日志尾部:"$'\n'"${tail_err}"$'\n'"请在目录 $target 下手动执行: npx openspec update --force"
+      else
+        rm -f "$logf"
+      fi
+    fi
   fi
 
   # 无论 CLI 是否可用，始终确保目录骨架存在
@@ -673,17 +800,14 @@ setup_openspec() {
   local config_file="$target/openspec/config.yaml"
   if [ -f "$template" ]; then
     if [ -f "$config_file" ]; then
-      # config.yaml 已存在：只在没有 context 字段时追加
       if ! grep -q "^context:" "$config_file" 2>/dev/null; then
         info "合并 ex-ai-spec  context/rules 到 config.yaml ..."
-        # 追加 context 和 rules（跳过第一行 schema:）
         tail -n +2 "$template" >> "$config_file"
         ok "config.yaml 已增强"
       else
         info "config.yaml 已包含 context 字段，跳过合并"
       fi
     else
-      # 直接复制模板（openspec init 失败时目录可能不存在）
       mkdir -p "$(dirname "$config_file")"
       cp "$template" "$config_file"
       ok "openspec/config.yaml 已创建"
@@ -697,36 +821,46 @@ setup_openspec() {
 setup_uipro() {
   local target="$1"
   local skill_dir="$target/.agents/skills/ui-ux-pro-max"
+  local logf tail_err
 
   if [ -d "$skill_dir" ] && [ -f "$skill_dir/SKILL.md" ]; then
     ok "UI UX Pro Max 已安装，跳过"
     return 0
   fi
 
-  [ -n "$PKG_MANAGER" ] || { warn "无可用的包管理器，跳过 UI UX Pro Max"; return 0; }
+  [ -n "$PKG_MANAGER" ] || { install_fail "UI UX Pro Max：无可用的包管理器" "无法全局安装 uipro-cli。请安装 npm/pnpm 后重试。"; return 0; }
 
   if ! command -v uipro >/dev/null 2>&1; then
     info "安装 uipro-cli ..."
+    logf="$(mktemp)"
     if [ "$PKG_MANAGER" = "pnpm" ]; then
-      pnpm add -g uipro-cli >/dev/null 2>&1 || { warn "uipro-cli 安装失败，跳过 UI UX Pro Max"; return 0; }
+      pnpm add -g uipro-cli >"$logf" 2>&1 || true
     else
-      npm install -g uipro-cli >/dev/null 2>&1 || { warn "uipro-cli 安装失败，跳过 UI UX Pro Max"; return 0; }
+      npm install -g uipro-cli >"$logf" 2>&1 || true
     fi
-    command -v uipro >/dev/null 2>&1 || { warn "uipro 命令不可用，跳过 UI UX Pro Max"; return 0; }
+    if ! command -v uipro >/dev/null 2>&1; then
+      tail_err="$(tail -n 25 "$logf" 2>/dev/null || true)"
+      install_fail "uipro-cli 全局安装失败" "日志文件: $logf"$'\n'"日志尾部:"$'\n'"${tail_err}"$'\n'"请检查权限/网络/registry，或手动执行: npm install -g uipro-cli"
+      return 0
+    fi
+    rm -f "$logf"
     ok "uipro-cli 安装成功"
   fi
 
   local tmp_dir
   tmp_dir="$(mktemp -d)"
   info "下载 UI UX Pro Max 资源 ..."
-  if ! (cd "$tmp_dir" && uipro init --ai cursor 2>/dev/null); then
-    warn "uipro init 失败，跳过 UI UX Pro Max"
+  logf="$(mktemp)"
+  if ! (cd "$tmp_dir" && uipro init --ai cursor >"$logf" 2>&1); then
+    tail_err="$(tail -n 40 "$logf" 2>/dev/null || true)"
+    install_fail "uipro init 失败" "日志文件: $logf"$'\n'"日志尾部:"$'\n'"${tail_err}"$'\n'"请检查网络后重试，或手动执行: uipro init --ai cursor"
     rm -rf "$tmp_dir"
     return 0
   fi
+  rm -f "$logf"
 
   if [ ! -d "$tmp_dir/.shared/ui-ux-pro-max" ]; then
-    warn "未找到预期的资源目录 .shared/ui-ux-pro-max，跳过"
+    install_fail "UI UX Pro Max 资源目录缺失" "未找到 .shared/ui-ux-pro-max，可能是 uipro-cli 版本或网络问题。请升级 uipro-cli 后重试。"
     rm -rf "$tmp_dir"
     return 0
   fi
@@ -796,10 +930,17 @@ check_tools() {
 # ---- 安装报告 ----
 print_report() {
   local target="$1"
+  local has_pending=$(( ${#INIT_PENDING_FAIL[@]} + ${#INIT_PENDING_CFG[@]} ))
   echo ""
   echo -e "${BOLD}════════════════════════════════════════${NC}"
-  ok "安装完成！"
-  echo -e "${BOLD}════════════════════════════════════════${NC}"
+  if [ "$has_pending" -gt 0 ]; then
+    info "规范与配置文件已同步到项目。"
+    echo -e "${YELLOW}⚠${NC} 存在 ${has_pending} 项待处理（见文末「待处理事项 / 配置提醒」汇总）。"
+    echo -e "${BOLD}════════════════════════════════════════${NC}"
+  else
+    ok "安装完成！"
+    echo -e "${BOLD}════════════════════════════════════════${NC}"
+  fi
   echo ""
   info "安装配置："
   echo -e "  Profile:  ${BOLD}$PROFILE${NC}"
@@ -819,8 +960,10 @@ print_report() {
   else
     echo -e "  ${YELLOW}—${NC} 提交校验（已跳过）"
   fi
-  if [ -d "$target/.agents/skills/ui-ux-pro-max" ]; then
+  if [ -d "$target/.agents/skills/ui-ux-pro-max" ] && [ -f "$target/.agents/skills/ui-ux-pro-max/SKILL.md" ]; then
     echo -e "  ${GREEN}✔${NC} UI UX Pro Max 设计智能技能 (67 styles, 161 palettes)"
+  elif [ "$UIPRO" = "yes" ]; then
+    echo -e "  ${RED}✖${NC} UI UX Pro Max（已选择安装但未就绪，见文末待处理事项）"
   fi
   if [ "$LEVEL" != "L1" ]; then
     echo -e "  ${GREEN}✔${NC} IDE 适配 (.cursor, .claude)"
@@ -856,6 +999,7 @@ cmd_init() {
     exit 1
   fi
   target="$_resolved"
+  init_pending_reset
 
   echo ""
   info "ex-ai-spec  v${VERSION} | $(uname -s) $(uname -m) | Node $(node --version 2>/dev/null || echo 'N/A')"
@@ -930,14 +1074,19 @@ cmd_init() {
     setup_openspec "$target"
   fi
 
+  TARGET="$target"
   check_tools
+  retry_failed_global_installs "$target"
   print_report "$target"
+  print_pending_summary
+  [ "${INIT_HAS_INSTALL_FAIL:-0}" = 1 ] && exit 1
 }
 
 cmd_update() {
   local target
   target="$(cd "${1:-.}" && pwd)"
   [ -d "$target/.agents" ] || { err "$target 未找到 .agents/，请先运行 init"; exit 1; }
+  init_pending_reset
   info "更新规范: $target"
   detect_pkg_manager
   detect_source
@@ -960,7 +1109,11 @@ cmd_update() {
     setup_openspec "$target"
   fi
 
+  TARGET="$target"
+  retry_failed_global_installs "$target"
   ok "更新完成 (profile: $PROFILE, level: $LEVEL)"
+  print_pending_summary
+  [ "${INIT_HAS_INSTALL_FAIL:-0}" = 1 ] && exit 1
 }
 
 cmd_check() {
