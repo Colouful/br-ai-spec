@@ -74,16 +74,9 @@ cd ex-ai-spec
 
 ### Monorepo / pnpm workspace
 
-若仓库根目录存在 **`pnpm-workspace.yaml`** 或根 **`package.json`** 含 **`workspaces`**，在安装脚本看来即 **Monorepo**。在**工作区根**执行 `npx @ex/ai-spec init` 时：
+若仓库根目录存在 **`pnpm-workspace.yaml`** 或根 **`package.json`** 含 **`workspaces`**，在安装脚本看来即 **Monorepo**。请在**希望落规范与依赖的目录**执行 `init`（多数为工作区根；若只针对某一应用包，先 `cd` 到该子包再执行）。
 
-- **交互终端**：会提示选择「在根目录安装」或「输入子包相对路径」（如 `packages/web`），推荐把规范与 lint/husky 依赖落在**具体前端应用包**内。
-- **非交互**（CI、管道输入）：不会停顿；脚本会打印建议在子包执行的示例命令，并**默认仍在根目录**继续安装。若要在子包安装且无需交互，请使用：
-  - `npx @ex/ai-spec init . --package packages/your-app`（路径相对**工作区根**），或
-  - 先 `cd` 到子包再执行 `npx @ex/ai-spec init`，或
-  - 环境变量 `EX_AI_SPEC_WORKSPACE_PACKAGE=packages/your-app`（与 `--package` 等价）。
-- **确需在根 `package.json` 安装依赖**（pnpm）：使用 `pnpm add -w <包名>`；详见 `.agents/rules/common/08-通用约束.md` 中「pnpm workspace」说明。
-
-`install.sh` / `install.ps1` 同样支持 **`--package <path>`** 与 **`--workspace-root`**（强制根目录、跳过上述交互）。
+安装脚本在向 **pnpm 工作区根** 的 `package.json` 写入 **devDependencies**（如 ESLint、husky 链）时会自动执行 `pnpm add -w -D …`，避免 `ERR_PNPM_ADDING_TO_ROOT`。手动加包时仍请使用 `pnpm add -w <包名>`；详见 `.agents/rules/common/08-通用约束.md`。
 
 ## 安装后必做事项
 

@@ -30,8 +30,6 @@ FORCE=""
 SPEC_BRANCH="${BR_AI_SPEC_BRANCH:-main}"
 COMMAND=""
 TARGET=""
-WORKSPACE_PACKAGE_SUBPATH=""
-MONOREPO_USE_ROOT=""
 
 # init/update 待汇总项（文末红色/黄色二次提醒）
 declare -a INIT_PENDING_FAIL=()
@@ -335,11 +333,6 @@ detect_pkg_manager() {
 # ---- Monorepo（pnpm / npm workspaces）安装目标解析 ----
 # 说明：本组函数仅将「最终安装目录」打印到 stdout；其余提示一律走 stderr，便于 target=$(...) 捕获。
 
-_mr_info() { echo -e "${BLUE}ℹ${NC} $*" >&2; }
-_mr_warn() { echo -e "${YELLOW}⚠${NC} $*" >&2; }
-_mr_ok()   { echo -e "${GREEN}✔${NC} $*" >&2; }
-_mr_err()  { echo -e "${RED}✖${NC} $*" >&2; }
-
 _pkg_json_has_workspaces() {
   local pj="$1/package.json"
   [ -f "$pj" ] || return 1
@@ -371,110 +364,10 @@ find_monorepo_workspace_root() {
   return 1
 }
 
-# 输入：当前安装目标绝对路径；输出：解析后的绝对路径（仅 stdout）
-monorepo_resolve_target() {
+# 将安装目标解析为物理绝对路径（始终使用用户指定的目录，不再做 Monorepo 子包重定向）
+resolve_install_target() {
   local target="$1"
-  local t_canon
-  t_canon="$(cd "$target" 2>/dev/null && pwd -P)" || { _mr_err "无法进入目录: $target"; return 1; }
-
-  local ws_root
-  ws_root="$(find_monorepo_workspace_root "$t_canon")" || { printf '%s\n' "$t_canon"; return 0; }
-
-  local env_pkg="${EX_AI_SPEC_WORKSPACE_PACKAGE:-}"
-  local use_pkg="${WORKSPACE_PACKAGE_SUBPATH:-$env_pkg}"
-
-  # 已不在工作区根（子目录）
-  if [ "$t_canon" != "$ws_root" ]; then
-    case "$t_canon" in
-      "$ws_root"/*)
-        if [ -f "$t_canon/package.json" ]; then
-          _mr_info "检测到 Monorepo，当前安装目标为子包: $t_canon（工作区根: $ws_root）"
-        else
-          _mr_warn "检测到 Monorepo，但当前目录缺少 package.json: $t_canon"
-        fi
-        ;;
-    esac
-    printf '%s\n' "$t_canon"
-    return 0
-  fi
-
-  # 当前在工作区根
-  if [ -n "$use_pkg" ]; then
-    local sub="${use_pkg#/}"
-    sub="${sub%/}"
-    local dest="$ws_root/$sub"
-    if [ ! -d "$dest" ]; then
-      _mr_err "子包路径不存在: $dest（相对工作区根: $sub）"
-      return 1
-    fi
-    if [ ! -f "$dest/package.json" ]; then
-      _mr_err "子包目录缺少 package.json: $dest"
-      return 1
-    fi
-    _mr_ok "已根据 --package / EX_AI_SPEC_WORKSPACE_PACKAGE 将安装目标设为: $(cd "$dest" && pwd -P)"
-    printf '%s\n' "$(cd "$dest" && pwd -P)"
-    return 0
-  fi
-
-  if [ "${MONOREPO_USE_ROOT:-}" = "yes" ]; then
-    printf '%s\n' "$t_canon"
-    return 0
-  fi
-
-  if [ ! -t 0 ]; then
-    _mr_warn "检测到 Monorepo（工作区根: $ws_root），当前在根目录执行 init。"
-    _mr_warn "若规范与依赖应落在某个前端子包，建议在子包目录执行，例如:"
-    echo "    npx @ex/ai-spec init ./packages/your-app" >&2
-    echo "  或: npx @ex/ai-spec init . --package packages/your-app" >&2
-    echo "  若确需在根目录安装，请使用: --workspace-root" >&2
-    _mr_warn "非交互模式将继续在根目录安装。"
-    printf '%s\n' "$t_canon"
-    return 0
-  fi
-
-  echo "" >&2
-  _mr_info "检测到 Monorepo（pnpm / npm workspaces），工作区根目录: $ws_root"
-  _mr_info "规范与 lint/husky 等依赖将写入「安装目标」目录及其 package.json。"
-  echo -e "  ${BOLD}[1]${NC} 在工作区根目录继续安装" >&2
-  echo -e "  ${BOLD}[2]${NC} 改为在具体子包中安装（推荐）" >&2
-  echo -e "  若仅在根 package.json 添加依赖，pnpm 可使用: ${BOLD}pnpm add -w <包名>${NC}" >&2
-  local choice=""
-  read -rp "请选择 [1/2]（默认 2）: " choice
-  choice="${choice:-2}"
-  if [ "$choice" = "1" ]; then
-    printf '%s\n' "$t_canon"
-    return 0
-  fi
-
-  local tries=0 dest=""
-  while [ $tries -lt 3 ]; do
-    tries=$((tries + 1))
-    local rel=""
-    read -rp "请输入子包相对路径（相对工作区根，如 packages/web）: " rel
-    rel="${rel#/}"
-    rel="${rel%/}"
-    if [ -z "$rel" ]; then
-      _mr_warn "路径不能为空"
-      continue
-    fi
-    dest="$ws_root/$rel"
-    if [ ! -d "$dest" ]; then
-      _mr_warn "目录不存在: $dest"
-      continue
-    fi
-    if [ ! -f "$dest/package.json" ]; then
-      _mr_warn "该目录下缺少 package.json: $dest"
-      continue
-    fi
-    _mr_ok "安装目标已切换为: $(cd "$dest" && pwd -P)"
-    printf '%s\n' "$(cd "$dest" && pwd -P)"
-    return 0
-  done
-
-  _mr_err "多次输入无效子包路径。请使用显式路径重新执行，例如:"
-  echo "  npx @ex/ai-spec init ./packages/your-app" >&2
-  echo "  npx @ex/ai-spec init . --package packages/your-app" >&2
-  return 1
+  (cd "$target" 2>/dev/null && pwd -P) || { err "无法进入目录: $target"; return 1; }
 }
 
 # ---- 复制 .agents/（Profile 合并） ----
@@ -1039,7 +932,7 @@ cmd_init() {
   target="$(cd "${1:-.}" 2>/dev/null && pwd || { mkdir -p "${1:-.}"; cd "${1:-.}" && pwd; })"
 
   local _resolved
-  if ! _resolved="$(monorepo_resolve_target "$target")"; then
+  if ! _resolved="$(resolve_install_target "$target")"; then
     exit 1
   fi
   target="$_resolved"
@@ -1331,12 +1224,8 @@ ${BOLD}选项:${NC}
   --no-uipro        跳过 UI UX Pro Max（非交互模式默认跳过）
   --repo <url>      自定义规范库地址
   --refresh-cache   清除本地缓存并重新克隆规范库
-  --package <path>  Monorepo 下相对「工作区根」的子包路径（跳过交互，如 packages/web）
-  --workspace-root  Monorepo 下显式在根目录安装（跳过交互）
   -y, --force       跳过确认提示（用于非交互卸载）
   -h, --help        显示帮助
-
-  环境变量 EX_AI_SPEC_WORKSPACE_PACKAGE 与 --package 等价（非交互指定子包）
 
 ${BOLD}安装层级:${NC}
   L1  最小接入 — 只接入 .agents（规范 + 技能）
@@ -1350,8 +1239,6 @@ ${BOLD}示例:${NC}
   bash install.sh init . --ide all                        # 为所有 IDE 创建适配
   bash install.sh init . --uipro                          # 安装含 UI UX Pro Max
   bash install.sh init . --no-uipro                       # 跳过 UI UX Pro Max
-  bash install.sh init . --package packages/app           # Monorepo 根目录执行，安装到子包
-  bash install.sh init . --workspace-root               # Monorepo 下强制在根目录安装
   bash install.sh update                                  # 更新规范
   bash install.sh check                                   # 检查安装状态
 
@@ -1382,8 +1269,6 @@ while [ $# -gt 0 ]; do
     --uipro)      UIPRO="yes" ;;
     --no-uipro)   UIPRO="no" ;;
     --refresh-cache) REFRESH_CACHE="true" ;;
-    --package)    require_arg "$1" "${2:-}"; WORKSPACE_PACKAGE_SUBPATH="$2"; shift ;;
-    --workspace-root) MONOREPO_USE_ROOT="yes" ;;
     -y|--force)   FORCE="true" ;;
     -h|--help)    usage; exit 0 ;;
     *)

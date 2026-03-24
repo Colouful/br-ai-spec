@@ -33,8 +33,6 @@ $script:InstallLint = "ask"
 $script:InstallHusky = "ask"
 $script:RefreshCache = $false
 $script:Force = $false
-$script:WorkspacePackageSubpath = ""
-$script:MonorepoUseRoot = $false
 $script:ProfileExplicit = $false
 $script:LevelExplicit = $false
 $script:SourceDir = ""
@@ -45,55 +43,48 @@ $ProjectSpecificRules = @("01-项目概述.md", "03-项目结构.md")
 $AvailableProfiles = @("react", "vue")
 $NodeMinVersion = 18
 
-# 解析命令行参数
+# 解析命令行参数（正则必须使用单引号，避免 "..." 中 $ 被当作变量、-y 被当作运算符）
 $i = 0
 while ($i -lt $args.Count) {
     $arg = $args[$i]
     switch -Regex ($arg) {
-        "^(init|update|check|uninstall|help)$" {
+        '^(init|update|check|uninstall|help)$' {
             if (-not $script:Command) { $script:Command = $arg }
             else { $script:TargetDir = $arg }
         }
-        "^--profile$" {
+        '^--profile$' {
             if ($i + 1 -ge $args.Count -or $args[$i + 1] -match '^--') {
                 Write-Err "选项 --profile 需要一个参数值"; exit 1
             }
             $i++; $script:Profile = $args[$i]; $script:ProfileExplicit = $true
         }
-        "^--level$" {
+        '^--level$' {
             if ($i + 1 -ge $args.Count -or $args[$i + 1] -match '^--') {
                 Write-Err "选项 --level 需要一个参数值"; exit 1
             }
             $i++; $script:Level = $args[$i]; $script:LevelExplicit = $true
         }
-        "^--ide$" {
+        '^--ide$' {
             if ($i + 1 -ge $args.Count -or $args[$i + 1] -match '^--') {
                 Write-Err "选项 --ide 需要一个参数值"; exit 1
             }
             $i++; $script:IdeFilter = $args[$i]
         }
-        "^--repo$" {
+        '^--repo$' {
             if ($i + 1 -ge $args.Count -or $args[$i + 1] -match '^--') {
                 Write-Err "选项 --repo 需要一个参数值"; exit 1
             }
             $i++; $script:SpecRepo = $args[$i]
         }
-        "^--lint$" { $script:InstallLint = "yes" }
-        "^--no-lint$" { $script:InstallLint = "no" }
-        "^--husky$" { $script:InstallHusky = "yes" }
-        "^--no-husky$" { $script:InstallHusky = "no" }
-        "^--uipro$" { $script:Uipro = "yes" }
-        "^--no-uipro$" { $script:Uipro = "no" }
-        "^--refresh-cache$" { $script:RefreshCache = $true }
-        "^--package$" {
-            if ($i + 1 -ge $args.Count -or $args[$i + 1] -match '^--') {
-                Write-Err "选项 --package 需要一个参数值"; exit 1
-            }
-            $i++; $script:WorkspacePackageSubpath = $args[$i]
-        }
-        "^--workspace-root$" { $script:MonorepoUseRoot = $true }
-        "^(-y|--force)$" { $script:Force = $true }
-        "^(-h|--help)$" { $script:Command = "help" }
+        '^--lint$' { $script:InstallLint = "yes" }
+        '^--no-lint$' { $script:InstallLint = "no" }
+        '^--husky$' { $script:InstallHusky = "yes" }
+        '^--no-husky$' { $script:InstallHusky = "no" }
+        '^--uipro$' { $script:Uipro = "yes" }
+        '^--no-uipro$' { $script:Uipro = "no" }
+        '^--refresh-cache$' { $script:RefreshCache = $true }
+        '^(-y|--force)$' { $script:Force = $true }
+        '^(-h|--help)$' { $script:Command = "help" }
         default {
             if ($script:Command) { $script:TargetDir = $arg }
             else { $script:Command = "help" }
@@ -272,8 +263,8 @@ function Select-Level {
     Write-Host ""
     $choice = Read-Host "请选择 (L1/L2/L3) [默认 L3]"
     switch -Regex ($choice) {
-        "^(L1|l1|1)$" { $script:Level = "L1" }
-        "^(L2|l2|2)$" { $script:Level = "L2" }
+        '^(L1|l1|1)$' { $script:Level = "L1" }
+        '^(L2|l2|2)$' { $script:Level = "L2" }
         default { $script:Level = "L3" }
     }
     Write-Ok "已选择层级: $($script:Level)"
@@ -317,10 +308,7 @@ function Select-LintTools {
     }
 }
 
-# ============================================================================
-# Monorepo（pnpm / npm workspaces）
-# ============================================================================
-
+# pnpm workspace 根检测（仅用于 pnpm add -w，不向用户询问安装目录）
 function Test-PackageJsonHasWorkspaces {
     param([string]$Dir)
     $pj = Join-Path $Dir "package.json"
@@ -341,110 +329,6 @@ function Find-MonorepoWorkspaceRoot {
         if ([string]::IsNullOrEmpty($parent) -or $parent -eq $d) { return $null }
         $d = $parent
     }
-}
-
-function Test-MonorepoChildOf {
-    param([string]$Child, [string]$Parent)
-    $p = $Parent.TrimEnd('\', '/')
-    if ($Child.Length -le $p.Length) { return $false }
-    if (-not $Child.StartsWith($p, [StringComparison]::OrdinalIgnoreCase)) { return $false }
-    $sep = $Child.Substring($p.Length, 1)
-    return ($sep -eq '\' -or $sep -eq '/')
-}
-
-function Test-StdinInteractive {
-    try {
-        if ([Console]::IsInputRedirected) { return $false }
-    } catch {}
-    return [Environment]::UserInteractive
-}
-
-function Resolve-MonorepoInstallTarget {
-    param([string]$Target)
-    $tCanon = (Resolve-Path -LiteralPath $Target -ErrorAction Stop).Path
-    $wsRoot = Find-MonorepoWorkspaceRoot $tCanon
-    if (-not $wsRoot) { return $tCanon }
-
-    $usePkg = $script:WorkspacePackageSubpath
-    if (-not $usePkg -and $env:EX_AI_SPEC_WORKSPACE_PACKAGE) { $usePkg = $env:EX_AI_SPEC_WORKSPACE_PACKAGE }
-
-    if ($tCanon -ne $wsRoot) {
-        if (Test-MonorepoChildOf -Child $tCanon -Parent $wsRoot) {
-            $pj = Join-Path $tCanon "package.json"
-            if (Test-Path $pj) {
-                Write-Info "检测到 Monorepo，当前安装目标为子包: $tCanon（工作区根: $wsRoot）"
-            } else {
-                Write-Warn "检测到 Monorepo，但当前目录缺少 package.json: $tCanon"
-            }
-        }
-        return $tCanon
-    }
-
-    if ($usePkg) {
-        $rel = $usePkg.TrimStart('/', '\').TrimEnd('/', '\')
-        $dest = Join-Path $wsRoot $rel
-        if (-not (Test-Path $dest -PathType Container)) {
-            Write-Err "子包路径不存在: $dest（相对工作区根: $rel）"
-            exit 1
-        }
-        if (-not (Test-Path (Join-Path $dest "package.json"))) {
-            Write-Err "子包目录缺少 package.json: $dest"
-            exit 1
-        }
-        $resolved = (Resolve-Path -LiteralPath $dest).Path
-        Write-Ok "已根据 --package / EX_AI_SPEC_WORKSPACE_PACKAGE 将安装目标设为: $resolved"
-        return $resolved
-    }
-
-    if ($script:MonorepoUseRoot) { return $tCanon }
-
-    if (-not (Test-StdinInteractive)) {
-        Write-Warn "检测到 Monorepo（工作区根: $wsRoot），当前在根目录执行 init。"
-        Write-Warn "若规范与依赖应落在某个前端子包，建议在子包目录执行，例如:"
-        Write-Host "    npx @ex/ai-spec init .\packages\your-app"
-        Write-Host "  或: npx @ex/ai-spec init . --package packages/your-app"
-        Write-Host "  若确需在根目录安装，请使用: --workspace-root"
-        Write-Warn "非交互模式将继续在根目录安装。"
-        return $tCanon
-    }
-
-    Write-Host ""
-    Write-Info "检测到 Monorepo（pnpm / npm workspaces），工作区根目录: $wsRoot"
-    Write-Info "规范与 lint/husky 等依赖将写入「安装目标」目录及其 package.json。"
-    Write-Host "  [1] 在工作区根目录继续安装"
-    Write-Host "  [2] 改为在具体子包中安装（推荐）"
-    Write-Host "  若仅在根 package.json 添加依赖，pnpm 可使用: pnpm add -w <包名>"
-    $choice = Read-Host "请选择 [1/2]（默认 2）"
-    if ([string]::IsNullOrWhiteSpace($choice)) { $choice = "2" }
-    if ($choice -eq "1") { return $tCanon }
-
-    $tries = 0
-    while ($tries -lt 3) {
-        $tries++
-        $rel = Read-Host "请输入子包相对路径（相对工作区根，如 packages/web）"
-        if ([string]::IsNullOrWhiteSpace($rel)) {
-            Write-Warn "路径不能为空"
-            continue
-        }
-        $rel = $rel.TrimStart('/', '\').TrimEnd('/', '\')
-        $dest = Join-Path $wsRoot $rel
-        if (-not (Test-Path $dest -PathType Container)) {
-            Write-Warn "目录不存在: $dest"
-            continue
-        }
-        if (-not (Test-Path (Join-Path $dest "package.json"))) {
-            Write-Warn "该目录下缺少 package.json: $dest"
-            continue
-        }
-        $resolved = (Resolve-Path -LiteralPath $dest).Path
-        Write-Ok "安装目标已切换为: $resolved"
-        return $resolved
-    }
-
-    Write-Err "多次输入无效子包路径。请使用显式路径重新执行，例如:"
-    Write-Host "  npx @ex/ai-spec init .\packages\your-app"
-    Write-Host "  npx @ex/ai-spec init . --package packages/your-app"
-    exit 1
 }
 
 function Test-PnpmWorkspacePackageRoot {
@@ -971,8 +855,6 @@ function Invoke-Init {
     try { $target = (Resolve-Path $Dir -ErrorAction Stop).Path }
     catch { New-Item -ItemType Directory -Path $Dir -Force | Out-Null; $target = (Resolve-Path $Dir).Path }
 
-    $target = Resolve-MonorepoInstallTarget -Target $target
-
     Write-Host ""
     $nodeVer = try { node --version 2>$null } catch { "N/A" }
     Write-Info "ex-ai-spec  v$Version | Windows | Node $nodeVer"
@@ -1227,12 +1109,8 @@ function Show-Usage {
     Write-Host "  --no-uipro        跳过 UI UX Pro Max（非交互模式默认跳过）"
     Write-Host "  --repo <url>      自定义规范库地址"
     Write-Host "  --refresh-cache   清除本地缓存并重新克隆规范库"
-    Write-Host "  --package <path>  Monorepo 下相对工作区根的子包路径（跳过交互）"
-    Write-Host "  --workspace-root  Monorepo 下显式在根目录安装（跳过交互）"
     Write-Host "  -y, --force       跳过确认提示（用于非交互卸载）"
     Write-Host "  -h, --help        显示帮助"
-    Write-Host ""
-    Write-Host "  环境变量 EX_AI_SPEC_WORKSPACE_PACKAGE 与 --package 等价"
     Write-Host ""
     Write-Host "安装层级:" -ForegroundColor White
     Write-Host "  L1  最小接入 -- 只接入 .agents（规范 + 技能）"
@@ -1245,8 +1123,6 @@ function Show-Usage {
     Write-Host "  .\install.ps1 init . --profile react --level L3       # React + OpenSpec"
     Write-Host "  .\install.ps1 init . --ide all                        # 为所有 IDE 创建适配"
     Write-Host "  .\install.ps1 init . --uipro                          # 安装含 UI UX Pro Max"
-    Write-Host "  .\install.ps1 init . --package packages/app           # Monorepo 根执行，安装到子包"
-    Write-Host "  .\install.ps1 init . --workspace-root                 # Monorepo 下强制根目录安装"
     Write-Host "  .\install.ps1 update                                  # 更新规范"
     Write-Host "  .\install.ps1 check                                   # 检查安装状态"
     Write-Host ""
