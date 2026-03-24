@@ -166,30 +166,14 @@ function Get-PkgManager {
         Write-Ok "使用包管理器: pnpm ($ver)"
         return
     }
-    if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
-        Write-Warn "未找到 npm 或 pnpm，跳过依赖安装"
-        $script:PkgManager = ""
+    if (Get-Command npm -ErrorAction SilentlyContinue) {
+        $script:PkgManager = "npm"
+        $ver = npm --version 2>$null
+        Write-Ok "使用包管理器: npm ($ver)（未检测到 pnpm）"
         return
     }
-    Write-Info "未检测到 pnpm，正在通过 npm 安装（超时 120 秒）..."
-    $installOk = $false
-    try {
-        $job = Start-Job -ScriptBlock { npm install -g pnpm 2>$null | Out-Null }
-        if (Wait-Job $job -Timeout 120) {
-            Receive-Job $job -ErrorAction SilentlyContinue
-            $installOk = $true
-        } else {
-            Stop-Job $job
-        }
-        Remove-Job $job -Force
-    } catch {}
-    if ($installOk -and (Get-Command pnpm -ErrorAction SilentlyContinue)) {
-        Write-Ok "pnpm 安装成功"
-        $script:PkgManager = "pnpm"
-    } else {
-        Write-Warn "pnpm 安装失败或超时，回退使用 npm"
-        $script:PkgManager = "npm"
-    }
+    Write-Warn "未找到 npm 或 pnpm，跳过依赖安装"
+    $script:PkgManager = ""
 }
 
 # ============================================================================

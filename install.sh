@@ -294,7 +294,7 @@ check_node_env() {
   ok "Node.js v$(node --version | sed 's/^v//') 环境就绪"
 }
 
-# ---- 包管理器检测（pnpm 优先） ----
+# ---- 包管理器检测（pnpm 优先，无 pnpm 则用 npm，不自动全局安装 pnpm） ----
 detect_pkg_manager() {
   if command -v pnpm >/dev/null 2>&1; then
     PKG_MANAGER="pnpm"
@@ -302,32 +302,15 @@ detect_pkg_manager() {
     return 0
   fi
 
-  if ! command -v npm >/dev/null 2>&1; then
-    warn "未找到 npm 或 pnpm，跳过依赖安装"
-    PKG_MANAGER=""
-    return 1
-  fi
-
-  info "未检测到 pnpm，正在通过 npm 安装（超时 120 秒）..."
-  local install_ok=false
-  if is_windows; then
-    timeout 120 npm install -g pnpm >/dev/null 2>&1 && install_ok=true
-  else
-    if command -v timeout >/dev/null 2>&1; then
-      timeout 120 npm install -g pnpm >/dev/null 2>&1 && install_ok=true
-    else
-      # macOS 没有 timeout 命令，使用 perl 替代
-      perl -e 'alarm 120; exec @ARGV' npm install -g pnpm >/dev/null 2>&1 && install_ok=true
-    fi
-  fi
-
-  if $install_ok && command -v pnpm >/dev/null 2>&1; then
-    ok "pnpm 安装成功 ($(pnpm --version))"
-    PKG_MANAGER="pnpm"
-  else
-    warn "pnpm 安装失败或超时，回退使用 npm"
+  if command -v npm >/dev/null 2>&1; then
     PKG_MANAGER="npm"
+    ok "使用包管理器: npm ($(npm --version))（未检测到 pnpm）"
+    return 0
   fi
+
+  warn "未找到 npm 或 pnpm，跳过依赖安装"
+  PKG_MANAGER=""
+  return 1
 }
 
 # ---- Monorepo（pnpm / npm workspaces）安装目标解析 ----
