@@ -415,6 +415,9 @@ A: 运行 `npx @ex/ai-spec check`，或 `install.sh check` / `.\install.ps1 chec
 **Q: Windows 上运行 `install.ps1` 提示"禁止运行脚本"怎么办？**
 A: Windows PowerShell 默认禁止执行脚本。运行 `Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned` 放开策略（仅需一次），或使用 `powershell -ExecutionPolicy Bypass -File .\install.ps1 init .` 单次绕过。
 
+**Q: Windows 上 `npx @ex/ai-spec` 报 ParserError / 乱码怎么办？**
+A: npm 包内的 `install.ps1` 为 **带 UTF-8 BOM** 的脚本，供 Windows PowerShell 5.1 按 UTF-8 解析中文。若你从网页或聊天里**复制粘贴**了脚本内容另存，可能丢失 BOM，5.1 会按系统代码页误读并出现解析错误；请始终使用包内文件或通过 `npx` 运行。仓库根目录 [`.editorconfig`](.editorconfig) 对 `install.ps1` 指定了 `utf-8-bom`，避免编辑器去掉 BOM。
+
 **Q: PowerShell 脚本和 Bash 脚本功能一样吗？**
 A: 是的。`install.ps1` v2.0 已与 `install.sh` 完全功能对齐，支持交互选择、所有参数和全部安装层级。Windows 团队成员也可以使用 Git Bash 运行 `install.sh`。
 

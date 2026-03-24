@@ -10,9 +10,15 @@ const opts = { stdio: 'inherit', cwd: process.cwd(), env };
 try {
   if (process.platform === 'win32') {
     const ps1 = path.join(pkgRoot, 'install.ps1');
-    execFileSync('powershell', [
-      '-ExecutionPolicy', 'Bypass', '-File', ps1, ...args
-    ], opts);
+    const psArgs = ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ps1, ...args];
+    try {
+      execFileSync('pwsh', psArgs, opts);
+    } catch (e) {
+      if (e.code !== 'ENOENT') {
+        process.exit(e.status ?? 1);
+      }
+      execFileSync('powershell', psArgs, opts);
+    }
   } else {
     const sh = path.join(pkgRoot, 'install.sh');
     execFileSync('bash', [sh, ...args], opts);

@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     ex-ai-spec  规范库安装脚本 (PowerShell)
     适用于 Windows PowerShell 5.1+ / PowerShell Core 7+
@@ -18,7 +18,7 @@ $ErrorActionPreference = "Stop"
 # ============================================================================
 
 $Version = "2.0.0"
-$DefaultRepo = "http://git.100credit.cn/zhenwei.li/ex-ai-spec .git"
+$DefaultRepo = "http://git.100credit.cn/zhenwei.li/ex-ai-spec.git"
 
 $script:Command = ""
 $script:TargetDir = "."
@@ -26,7 +26,7 @@ $script:Profile = "vue"
 $script:Level = "L3"
 $script:IdeFilter = "default"
 $script:SpecRepo = if ($env:BR_AI_SPEC_REPO) { $env:BR_AI_SPEC_REPO } else { $DefaultRepo }
-$script:CacheDir = if ($env:BR_AI_SPEC_CACHE) { $env:BR_AI_SPEC_CACHE } else { Join-Path $HOME ".ex-ai-spec " }
+$script:CacheDir = if ($env:BR_AI_SPEC_CACHE) { $env:BR_AI_SPEC_CACHE } else { Join-Path $HOME ".ex-ai-spec" }
 $script:SpecBranch = if ($env:BR_AI_SPEC_BRANCH) { $env:BR_AI_SPEC_BRANCH } else { "main" }
 $script:Uipro = "ask"
 $script:InstallLint = "ask"
@@ -1073,7 +1073,7 @@ function Show-Usage {
     Write-Host ""
     Write-Host "ex-ai-spec  规范库安装工具 v$Version" -ForegroundColor Cyan
     Write-Host ""
-    Write-Host "用法: .\install.ps1 <命令> [目标目录] [选项]"
+    Write-Host '用法: .\install.ps1 [命令] [目标目录] [选项]'
     Write-Host ""
     Write-Host "命令:" -ForegroundColor White
     Write-Host "  init [dir]        首次安装到目标项目（默认当前目录）"
@@ -1082,16 +1082,16 @@ function Show-Usage {
     Write-Host "  uninstall [dir]   卸载规范库"
     Write-Host ""
     Write-Host "选项:" -ForegroundColor White
-    Write-Host "  --profile <name>  技术栈 (react|vue)                              默认 vue"
-    Write-Host "  --level <L>       安装层级 (L1|L2|L3)                             默认 L3"
-    Write-Host "  --ide <name>      指定 IDE (default|cursor|claude|opencode|trae|all)  默认 default(cursor+claude)"
+    Write-Host '  --profile NAME    技术栈 (react|vue)                              默认 vue'
+    Write-Host '  --level L         安装层级 (L1|L2|L3)                             默认 L3'
+    Write-Host '  --ide NAME        指定 IDE (default|cursor|claude|opencode|trae|all)  默认 default(cursor+claude)'
     Write-Host "  --lint            安装 ESLint + Prettier + Stylelint（默认安装）"
     Write-Host "  --no-lint         跳过 lint/format 工具"
     Write-Host "  --husky           安装 Husky 提交校验（husky + lint-staged + commitlint）"
     Write-Host "  --no-husky        跳过提交校验（默认跳过）"
     Write-Host "  --uipro           安装 UI UX Pro Max 设计智能技能"
     Write-Host "  --no-uipro        跳过 UI UX Pro Max（非交互模式默认跳过）"
-    Write-Host "  --repo <url>      自定义规范库地址"
+    Write-Host '  --repo URL        自定义规范库地址'
     Write-Host "  --refresh-cache   清除本地缓存并重新克隆规范库"
     Write-Host "  -y, --force       跳过确认提示（用于非交互卸载）"
     Write-Host "  -h, --help        显示帮助"
