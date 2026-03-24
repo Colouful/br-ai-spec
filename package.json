@@ -17,6 +17,7 @@
     "bin/",
     ".agents/",
     "configs/",
+    "templates/",
     ".cursor/mcp.json",
     "openspec/",
     "install.sh",

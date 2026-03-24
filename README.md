@@ -128,6 +128,19 @@ irm <raw-url>/install.ps1 | iex
 | **L2** | `.agents` + IDE 适配层 + MCP 模板 | 团队编码规范 + 外部上下文（**不含** OpenSpec，需显式 `--level L2`） |
 | **L3** | L2 + OpenSpec（`openspec/`、OPSX 命令与产物） | **默认安装层级、团队主推**：需求提案 → 实施 → 归档闭环，与 `.agents` 通过 `config.yaml` 一体联动 |
 
+### 最小上下文包
+
+为了支撑“项目实操分享”和最小可运行的 AI 协作闭环，仓库提供一套轻量模板：
+
+- `templates/context-pack/PROJECT.md`
+- `templates/context-pack/RULES.md`
+- `templates/context-pack/DESIGN.md`
+- `templates/context-pack/TASKS.md`
+- `templates/context-pack/ITERATIONS.md`
+- `templates/context-pack/CHECKLIST.md`
+
+建议在目标项目中以浅层目录 `context/` 落地这 6 个文件。它们与 `.agents`、`openspec/` 不是竞争关系，而是补足“项目背景 + 当前设计 + 执行记录 + 验证清单”的最小上下文系统。
+
 ### 脚本命令一览
 
 | 命令 | 说明 |
