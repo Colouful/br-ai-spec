@@ -447,6 +447,40 @@ function Resolve-MonorepoInstallTarget {
     exit 1
 }
 
+function Test-PnpmWorkspacePackageRoot {
+    param([string]$Target)
+    if ($script:PkgManager -ne "pnpm") { return $false }
+    try {
+        $tCanon = (Resolve-Path -LiteralPath $Target -ErrorAction Stop).Path
+    } catch { return $false }
+    $wsRoot = Find-MonorepoWorkspaceRoot $tCanon
+    if (-not $wsRoot) { return $false }
+    return ($tCanon -eq $wsRoot)
+}
+
+function Invoke-DevDependenciesInstall {
+    param(
+        [string]$Target,
+        [Parameter(Mandatory = $true)]
+        [string[]]$Packages
+    )
+    Push-Location $Target
+    try {
+        if ($script:PkgManager -eq "pnpm") {
+            if (Test-PnpmWorkspacePackageRoot -Target $Target) {
+                & pnpm add -w -D @Packages
+            } else {
+                & pnpm add -D @Packages
+            }
+        } else {
+            & npm install -D @Packages
+        }
+        if ($LASTEXITCODE -ne 0) { throw "install failed" }
+    } finally {
+        Pop-Location
+    }
+}
+
 # ============================================================================
 # 核心功能
 # ============================================================================
@@ -596,18 +630,25 @@ function Install-CommitHooks {
     Write-Info "正在使用 $($script:PkgManager) 安装提交校验依赖..."
     Write-Info "  husky@8 + lint-staged@15 + @commitlint/cli@19 + @commitlint/config-conventional@19"
 
-    $installCmd = "$($script:PkgManager) install -D husky@8 lint-staged@15 `"@commitlint/cli@19`" `"@commitlint/config-conventional@19`""
+    $commitPkgs = @("husky@8", "lint-staged@15", "@commitlint/cli@19", "@commitlint/config-conventional@19")
+    $manualCmd = if ($script:PkgManager -eq "pnpm" -and (Test-PnpmWorkspacePackageRoot -Target $Target)) {
+        "cd $Target && pnpm add -w -D husky@8 lint-staged@15 `"@commitlint/cli@19`" `"@commitlint/config-conventional@19`""
+    } elseif ($script:PkgManager -eq "pnpm") {
+        "cd $Target && pnpm add -D husky@8 lint-staged@15 `"@commitlint/cli@19`" `"@commitlint/config-conventional@19`""
+    } else {
+        "cd $Target && npm install -D husky@8 lint-staged@15 `"@commitlint/cli@19`" `"@commitlint/config-conventional@19`""
+    }
+
     try {
-        Push-Location $Target
-        Invoke-Expression $installCmd
-        if ($LASTEXITCODE -ne 0) { throw "install failed" }
+        Invoke-DevDependenciesInstall -Target $Target -Packages $commitPkgs
     } catch {
-        Write-Warn "$($script:PkgManager) install 失败，请手动执行:"
-        Write-Host "  cd $Target && $installCmd"
-        Pop-Location; return
+        Write-Warn "$($script:PkgManager) 依赖安装失败，请手动执行:"
+        Write-Host "  $manualCmd"
+        return
     }
 
     Write-Info "初始化 husky ..."
+    Push-Location $Target
     try { npx husky install 2>$null } catch { Write-Warn "husky install 失败，请手动执行: npx husky install" }
     Pop-Location
 
@@ -623,25 +664,30 @@ function Install-LintDeps {
         Write-Warn "无可用的包管理器，跳过 lint/format 依赖安装"; return
     }
 
-    $deps = "eslint prettier stylelint stylelint-config-standard"
+    $depList = @("eslint", "prettier", "stylelint", "stylelint-config-standard")
     if ($script:Profile -eq "vue") {
-        $deps = "$deps stylelint-config-html stylelint-config-recommended-vue postcss-html"
+        $depList += @("stylelint-config-html", "stylelint-config-recommended-vue", "postcss-html")
     }
+    $depsDisplay = $depList -join " "
 
     Write-Info "正在使用 $($script:PkgManager) 安装 lint/format 依赖..."
-    Write-Info "  $deps"
+    Write-Info "  $depsDisplay"
 
-    $installCmd = "$($script:PkgManager) install -D $deps"
-    try {
-        Push-Location $Target
-        Invoke-Expression $installCmd
-        if ($LASTEXITCODE -ne 0) { throw "install failed" }
-    } catch {
-        Write-Warn "$($script:PkgManager) install 失败，请手动执行:"
-        Write-Host "  cd $Target && $installCmd"
-        Pop-Location; return
+    $manualCmd = if ($script:PkgManager -eq "pnpm" -and (Test-PnpmWorkspacePackageRoot -Target $Target)) {
+        "cd $Target && pnpm add -w -D $depsDisplay"
+    } elseif ($script:PkgManager -eq "pnpm") {
+        "cd $Target && pnpm add -D $depsDisplay"
+    } else {
+        "cd $Target && npm install -D $depsDisplay"
     }
-    Pop-Location
+
+    try {
+        Invoke-DevDependenciesInstall -Target $Target -Packages $depList
+    } catch {
+        Write-Warn "$($script:PkgManager) 依赖安装失败，请手动执行:"
+        Write-Host "  $manualCmd"
+        return
+    }
 
     Write-Ok "lint/format 依赖安装完成"
 }

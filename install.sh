@@ -627,16 +627,50 @@ copy_configs() {
   $copied && ok "lint/format 配置部署完成" || info "未找到 lint/format 配置模板，跳过"
 }
 
+# pnpm 在 workspace 根向根 package.json 添加依赖需 -w，否则 ERR_PNPM_ADDING_TO_ROOT
+_is_pnpm_workspace_package_root() {
+  local target="$1"
+  local t_canon ws_root
+  t_canon="$(cd "$target" 2>/dev/null && pwd -P)" || return 1
+  ws_root="$(find_monorepo_workspace_root "$t_canon" 2>/dev/null)" || return 1
+  [ "$t_canon" = "$ws_root" ]
+}
+
+# 向安装目标的 package.json 添加 devDependencies（npm: install -D；pnpm: add [-w] -D）
+install_dev_dependencies_at() {
+  local target="$1"
+  shift
+  [ "$#" -ge 1 ] || return 1
+  if [ "$PKG_MANAGER" = "pnpm" ]; then
+    if _is_pnpm_workspace_package_root "$target"; then
+      (cd "$target" && pnpm add -w -D "$@")
+    else
+      (cd "$target" && pnpm add -D "$@")
+    fi
+  else
+    (cd "$target" && npm install -D "$@")
+  fi
+}
+
 # ---- 安装提交校验依赖（husky + lint-staged + commitlint） ----
 install_commit_hooks() {
   local target="$1"
+  local manual_hint
   [ -f "$target/package.json" ] || { install_fail "提交校验：未找到 package.json" "已跳过依赖安装。请在含 package.json 的目录执行 init，或先创建 package.json。"; return 0; }
   [ -n "$PKG_MANAGER" ] || { install_fail "提交校验：无可用的包管理器" "无法安装 husky 等依赖。请安装 npm/pnpm 后重试。"; return 0; }
 
+  if [ "$PKG_MANAGER" = "pnpm" ] && _is_pnpm_workspace_package_root "$target"; then
+    manual_hint="cd $target && pnpm add -w -D husky@8 lint-staged@15 @commitlint/cli@19 @commitlint/config-conventional@19"
+  elif [ "$PKG_MANAGER" = "pnpm" ]; then
+    manual_hint="cd $target && pnpm add -D husky@8 lint-staged@15 @commitlint/cli@19 @commitlint/config-conventional@19"
+  else
+    manual_hint="cd $target && npm install -D husky@8 lint-staged@15 @commitlint/cli@19 @commitlint/config-conventional@19"
+  fi
+
   info "正在使用 $PKG_MANAGER 安装提交校验依赖，请稍候 ..."
   info "  husky@8 + lint-staged@15 + @commitlint/cli@19 + @commitlint/config-conventional@19"
-  if ! (cd "$target" && $PKG_MANAGER install -D husky@8 lint-staged@15 @commitlint/cli@19 @commitlint/config-conventional@19); then
-    install_fail "提交校验依赖安装失败" "请手动执行: cd $target && $PKG_MANAGER install -D husky@8 lint-staged@15 @commitlint/cli@19 @commitlint/config-conventional@19"
+  if ! install_dev_dependencies_at "$target" husky@8 lint-staged@15 @commitlint/cli@19 @commitlint/config-conventional@19; then
+    install_fail "提交校验依赖安装失败" "请手动执行: $manual_hint"
     return 0
   fi
 
@@ -652,18 +686,28 @@ install_commit_hooks() {
 # ---- 安装 lint/format 依赖（eslint + prettier + stylelint） ----
 install_lint_deps() {
   local target="$1"
+  local deps manual_hint
   [ -f "$target/package.json" ] || { install_fail "lint/format：未找到 package.json" "已跳过依赖安装。请在含 package.json 的目录执行 init。"; return 0; }
   [ -n "$PKG_MANAGER" ] || { install_fail "lint/format：无可用的包管理器" "无法安装 ESLint 等依赖。请安装 npm/pnpm 后重试。"; return 0; }
 
-  local deps="eslint prettier stylelint stylelint-config-standard"
+  deps="eslint prettier stylelint stylelint-config-standard"
   if [ "$PROFILE" = "vue" ]; then
     deps="$deps stylelint-config-html stylelint-config-recommended-vue postcss-html"
   fi
 
+  if [ "$PKG_MANAGER" = "pnpm" ] && _is_pnpm_workspace_package_root "$target"; then
+    manual_hint="cd $target && pnpm add -w -D $deps"
+  elif [ "$PKG_MANAGER" = "pnpm" ]; then
+    manual_hint="cd $target && pnpm add -D $deps"
+  else
+    manual_hint="cd $target && npm install -D $deps"
+  fi
+
   info "正在使用 $PKG_MANAGER 安装 lint/format 依赖，请稍候 ..."
   info "  $deps"
-  if ! (cd "$target" && $PKG_MANAGER install -D $deps); then
-    install_fail "lint/format 依赖安装失败" "请手动执行: cd $target && $PKG_MANAGER install -D $deps"
+  # shellcheck disable=SC2086
+  if ! install_dev_dependencies_at "$target" $deps; then
+    install_fail "lint/format 依赖安装失败" "请手动执行: $manual_hint"
     return 0
   fi
 
