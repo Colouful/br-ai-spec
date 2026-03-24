@@ -2,13 +2,13 @@
 set -euo pipefail
 
 # ============================================================================
-# br-ai-spec 规范库安装脚本 (Bash)
+# ex-ai-spec  规范库安装脚本 (Bash)
 # 适用于 macOS / Linux / Git Bash / WSL
 # ============================================================================
 
 VERSION="2.0.0"
-SPEC_REPO="${BR_AI_SPEC_REPO:-http://git.100credit.cn/zhenwei.li/br-ai-spec.git}"
-CACHE_DIR="${BR_AI_SPEC_CACHE:-$HOME/.br-ai-spec}"
+SPEC_REPO="${BR_AI_SPEC_REPO:-http://git.100credit.cn/zhenwei.li/ex-ai-spec .git}"
+CACHE_DIR="${BR_AI_SPEC_CACHE:-$HOME/.ex-ai-spec }"
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; BLUE='\033[0;34m'; BOLD='\033[1m'; NC='\033[0m'
 
@@ -528,7 +528,7 @@ setup_openspec() {
     if [ -f "$config_file" ]; then
       # config.yaml 已存在：只在没有 context 字段时追加
       if ! grep -q "^context:" "$config_file" 2>/dev/null; then
-        info "合并 br-ai-spec context/rules 到 config.yaml ..."
+        info "合并 ex-ai-spec  context/rules 到 config.yaml ..."
         # 追加 context 和 rules（跳过第一行 schema:）
         tail -n +2 "$template" >> "$config_file"
         ok "config.yaml 已增强"
@@ -701,7 +701,7 @@ cmd_init() {
   target="$(cd "${1:-.}" 2>/dev/null && pwd || { mkdir -p "${1:-.}"; cd "${1:-.}" && pwd; })"
 
   echo ""
-  info "br-ai-spec v${VERSION} | $(uname -s) $(uname -m) | Node $(node --version 2>/dev/null || echo 'N/A')"
+  info "ex-ai-spec  v${VERSION} | $(uname -s) $(uname -m) | Node $(node --version 2>/dev/null || echo 'N/A')"
   info "初始化项目: $target"
   echo ""
 
@@ -955,7 +955,7 @@ cmd_uninstall() {
 
 usage() {
   cat <<EOF
-${BOLD}br-ai-spec${NC} 规范库安装工具 v${VERSION}
+${BOLD}ex-ai-spec ${NC} 规范库安装工具 v${VERSION}
 
 ${BOLD}用法:${NC} install.sh <命令> [目标目录] [选项]
 

@@ -1,24 +1,24 @@
 # L3 OpenSpec 集成使用指南
 
-> br-ai-spec v2.0 | 适用于需要需求治理与变更归档的团队
+> ex-ai-spec  v2.0 | 适用于需要需求治理与变更归档的团队
 
 ---
 
 ## 一、OpenSpec 是什么
 
-OpenSpec 是一个**规范驱动开发（Spec-Driven Development）**框架，通过结构化的**提案 → 实施 → 归档**流程管理代码变更。它与 br-ai-spec 的关系是：
+OpenSpec 是一个**规范驱动开发（Spec-Driven Development）**框架，通过结构化的**提案 → 实施 → 归档**流程管理代码变更。它与 ex-ai-spec  的关系是：
 
 | 组件 | 管理范围 | 目录 |
 |------|----------|------|
-| **br-ai-spec** | 编码规范 + 实践技能 | `.agents/rules/` + `.agents/skills/` |
+| **ex-ai-spec ** | 编码规范 + 实践技能 | `.agents/rules/` + `.agents/skills/` |
 | **OpenSpec** | 需求流程（提案 → 实施 → 归档） | `openspec/` |
 
-两者通过 `openspec/config.yaml` 桥接 — OpenSpec 在执行流程时自动引用 br-ai-spec 的规范和技能。
+两者通过 `openspec/config.yaml` 桥接 — OpenSpec 在执行流程时自动引用 ex-ai-spec  的规范和技能。
 
 ```
 需求 → /opsx:propose（创建提案、拆解任务）
              ↓
-       /opsx:apply（按 br-ai-spec 规范执行任务）
+       /opsx:apply（按 ex-ai-spec  规范执行任务）
              ↓
        /opsx:archive（归档变更、合并规范）
 ```
@@ -47,8 +47,8 @@ npx @ex/ai-spec init --profile vue --level L3
 ### 2.2 手动安装
 
 ```bash
-git clone http://git.100credit.cn/zhenwei.li/br-ai-spec.git
-cd br-ai-spec
+git clone http://git.100credit.cn/zhenwei.li/ex-ai-spec .git
+cd ex-ai-spec 
 bash install.sh init /path/to/your-project --profile vue --level L3
 ```
 
@@ -58,7 +58,7 @@ L3 安装完成后，项目中会多出以下内容（相比 L2）：
 
 ```
 your-project/
-├── .agents/                  # br-ai-spec 规范与技能（L1 已有）
+├── .agents/                  # ex-ai-spec  规范与技能（L1 已有）
 │   ├── rules/
 │   └── skills/
 ├── .cursor/                  # IDE 适配（L2 已有）
@@ -74,7 +74,7 @@ your-project/
 │   └── skills/
 │
 ├── openspec/                 ← L3 新增
-│   ├── config.yaml           # OpenSpec 配置（含 br-ai-spec 上下文）
+│   ├── config.yaml           # OpenSpec 配置（含 ex-ai-spec  上下文）
 │   ├── AGENTS.md             # OpenSpec 命令说明
 │   ├── specs/                # 已归档的规范（随项目积累）
 │   └── changes/              # 进行中 + 已归档的变更
@@ -145,11 +145,11 @@ AI：创建变更 add-user-management...
 | `design.md` | 技术设计：方案选型、数据结构、组件拆分 |
 | `tasks.md` | 任务清单：可逐项勾选的实施步骤 |
 
-**与 br-ai-spec 的联动：**
+**与 ex-ai-spec  的联动：**
 
-- AI 会自动读取 `openspec/config.yaml` 中的 `context` 字段，了解项目使用 br-ai-spec 规范体系
+- AI 会自动读取 `openspec/config.yaml` 中的 `context` 字段，了解项目使用 ex-ai-spec  规范体系
 - 创建的技术设计会遵循 `.agents/rules/` 中的架构约束
-- 任务拆分由 OpenSpec 根据 `config.yaml` 中的 rules 自动生成，br-ai-spec 通过 rules 注入规范约束而不干预产物生成
+- 任务拆分由 OpenSpec 根据 `config.yaml` 中的 rules 自动生成，ex-ai-spec  通过 rules 注入规范约束而不干预产物生成
 
 ### 3.2 /opsx:apply — 实施任务
 
@@ -179,7 +179,7 @@ AI：开始实施 add-user-management...
 
 - 每个任务执行前会读取 `.agents/rules/12-Superpowers执行规范.md`
 - 按 `.agents/skills/execute-task/SKILL.md` 的四步循环执行（头脑风暴 → TDD → 实现 → 审查）
-- 涉及组件、接口、路由等操作时自动引用对应的 br-ai-spec 规范和技能
+- 涉及组件、接口、路由等操作时自动引用对应的 ex-ai-spec  规范和技能
 - 每完成一个任务，自动在 `tasks.md` 中勾选
 
 ### 3.3 /opsx:archive — 归档变更
@@ -223,14 +223,14 @@ openspec/
 
 ## 四、config.yaml 详解
 
-`openspec/config.yaml` 是 br-ai-spec 与 OpenSpec 的桥梁。L3 安装时会自动写入以下配置：
+`openspec/config.yaml` 是 ex-ai-spec  与 OpenSpec 的桥梁。L3 安装时会自动写入以下配置：
 
 ```yaml
-# OpenSpec 项目配置（由 br-ai-spec 提供的增强版模板）
+# OpenSpec 项目配置（由 ex-ai-spec  提供的增强版模板）
 schema: spec-driven
 
 context: |
-  本项目使用 br-ai-spec 规范体系：
+  本项目使用 ex-ai-spec  规范体系：
   - .agents/rules/: 开发规范（编码、组件、API、路由、样式等）
   - .agents/skills/: 实践技能（组件、路由、接口、设计稿分析、UI验收等）
   执行任务时遵循 .agents/rules/12-Superpowers执行规范.md
@@ -360,7 +360,7 @@ AI：基于探索结果创建提案...
 2. 使用 design-analysis 技能分析设计稿
    → 产出 docs/样式还原/<名称>-UI分析清单.md
       ↓
-3. /opsx:propose（OpenSpec 生成提案，自动读取 config.yaml 中的 br-ai-spec 规则）
+3. /opsx:propose（OpenSpec 生成提案，自动读取 config.yaml 中的 ex-ai-spec  规则）
    → openspec/changes/<name>/ 下生成 proposal.md / specs/ / design.md / tasks.md
       ↓
 4. 后置检查：确认 tasks.md 包含 UI 验收任务

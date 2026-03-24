@@ -2,14 +2,14 @@
 
 ## 你将获得什么
 
-安装 br-ai-spec 后，AI 编码助手会自动遵循团队的目录结构、组件规范、API 命名、样式变量等约束，不再需要每次聊天重复解释项目规则。
+安装 ex-ai-spec  后，AI 编码助手会自动遵循团队的目录结构、组件规范、API 命名、样式变量等约束，不再需要每次聊天重复解释项目规则。
 
 ## 安装
 
 ```bash
 # 克隆规范库
-git clone http://git.100credit.cn/zhenwei.li/br-ai-spec.git
-cd br-ai-spec
+git clone http://git.100credit.cn/zhenwei.li/ex-ai-spec .git
+cd ex-ai-spec 
 
 # 安装到你的项目（交互式，会引导选择技术栈和安装层级）
 bash install.sh init /path/to/your-project

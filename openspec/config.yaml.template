@@ -1,11 +1,11 @@
-# OpenSpec 项目配置（由 br-ai-spec 提供的增强版模板）
+# OpenSpec 项目配置（由 ex-ai-spec  提供的增强版模板）
 # install.sh L3 安装时会将此模板写入 openspec/config.yaml
 # 详见 https://github.com/Fission-AI/OpenSpec
 
 schema: spec-driven
 
 context: |
-  本项目使用 br-ai-spec 规范体系：
+  本项目使用 ex-ai-spec  规范体系：
   - .agents/rules/: 开发规范（编码、组件、API、路由、状态管理、样式等）
   - .agents/skills/: 实践技能（组件、路由、接口、设计稿分析、UI验收等）
   执行任务时遵循 .agents/rules/12-Superpowers执行规范.md

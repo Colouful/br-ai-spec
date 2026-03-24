@@ -4,7 +4,7 @@
   "description": "AI Coding 团队规范库 CLI — 一键安装规范、技能与工具配置",
   "bin": {
     "ai-spec": "./bin/cli.js",
-    "br-ai-spec": "./bin/cli.js"
+    "ex-ai-spec ": "./bin/cli.js"
   },
   "maintainers": [
     "zhenwei.li",

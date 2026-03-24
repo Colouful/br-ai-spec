@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    br-ai-spec 规范库安装脚本 (PowerShell)
+    ex-ai-spec  规范库安装脚本 (PowerShell)
     适用于 Windows PowerShell 5.1+ / PowerShell Core 7+
 
 .EXAMPLE
@@ -18,7 +18,7 @@ $ErrorActionPreference = "Stop"
 # ============================================================================
 
 $Version = "2.0.0"
-$DefaultRepo = "http://git.100credit.cn/zhenwei.li/br-ai-spec.git"
+$DefaultRepo = "http://git.100credit.cn/zhenwei.li/ex-ai-spec .git"
 
 $script:Command = ""
 $script:TargetDir = "."
@@ -26,7 +26,7 @@ $script:Profile = "vue"
 $script:Level = "L3"
 $script:IdeFilter = "default"
 $script:SpecRepo = if ($env:BR_AI_SPEC_REPO) { $env:BR_AI_SPEC_REPO } else { $DefaultRepo }
-$script:CacheDir = if ($env:BR_AI_SPEC_CACHE) { $env:BR_AI_SPEC_CACHE } else { Join-Path $HOME ".br-ai-spec" }
+$script:CacheDir = if ($env:BR_AI_SPEC_CACHE) { $env:BR_AI_SPEC_CACHE } else { Join-Path $HOME ".ex-ai-spec " }
 $script:SpecBranch = if ($env:BR_AI_SPEC_BRANCH) { $env:BR_AI_SPEC_BRANCH } else { "main" }
 $script:Uipro = "ask"
 $script:InstallLint = "ask"
@@ -581,7 +581,7 @@ function Install-Uipro {
         }
     }
 
-    $tmpDir = Join-Path ([System.IO.Path]::GetTempPath()) "br-ai-spec-uipro-$(Get-Random)"
+    $tmpDir = Join-Path ([System.IO.Path]::GetTempPath()) "ex-ai-spec -uipro-$(Get-Random)"
     New-Item -ItemType Directory -Path $tmpDir -Force | Out-Null
     Write-Info "下载 UI UX Pro Max 资源 ..."
     try {
@@ -682,7 +682,7 @@ function Install-OpenSpec {
         if (Test-Path $configFile) {
             $content = Get-Content $configFile -Raw -ErrorAction SilentlyContinue
             if ($content -and $content -notmatch '(?m)^context:') {
-                Write-Info "合并 br-ai-spec context/rules 到 config.yaml ..."
+                Write-Info "合并 ex-ai-spec  context/rules 到 config.yaml ..."
                 $templateContent = Get-Content $template -Raw
                 $linesToAppend = ($templateContent -split "`n" | Select-Object -Skip 1) -join "`n"
                 Add-Content -Path $configFile -Value $linesToAppend
@@ -784,7 +784,7 @@ function Invoke-Init {
 
     Write-Host ""
     $nodeVer = try { node --version 2>$null } catch { "N/A" }
-    Write-Info "br-ai-spec v$Version | Windows | Node $nodeVer"
+    Write-Info "ex-ai-spec  v$Version | Windows | Node $nodeVer"
     Write-Info "初始化项目: $target"
     Write-Host ""
 
@@ -1014,7 +1014,7 @@ if (pkg.scripts && pkg.scripts.prepare && pkg.scripts.prepare.includes('husky'))
 
 function Show-Usage {
     Write-Host ""
-    Write-Host "br-ai-spec 规范库安装工具 v$Version" -ForegroundColor Cyan
+    Write-Host "ex-ai-spec  规范库安装工具 v$Version" -ForegroundColor Cyan
     Write-Host ""
     Write-Host "用法: .\install.ps1 <命令> [目标目录] [选项]"
     Write-Host ""

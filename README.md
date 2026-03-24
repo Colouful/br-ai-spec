@@ -1,4 +1,4 @@
-# br-ai-spec
+# ex-ai-spec 
 
 AI Coding 团队规范库 — 让 AI 编码助手遵循统一的开发规范、工作流程和最佳实践。
 
@@ -41,8 +41,8 @@ ai-spec init --profile react --level L2
 
 ```bash
 # 克隆规范库
-git clone http://git.100credit.cn/zhenwei.li/br-ai-spec.git
-cd br-ai-spec
+git clone http://git.100credit.cn/zhenwei.li/ex-ai-spec .git
+cd ex-ai-spec 
 
 # 交互式安装（引导选择技术栈和层级）
 bash install.sh init /path/to/your-project
@@ -57,8 +57,8 @@ bash install.sh init /path/to/your-project --profile vue --level L2
 # 首次使用需放开脚本执行策略（仅需执行一次）
 Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
 
-git clone http://git.100credit.cn/zhenwei.li/br-ai-spec.git
-cd br-ai-spec
+git clone http://git.100credit.cn/zhenwei.li/ex-ai-spec .git
+cd ex-ai-spec 
 
 # 交互式安装（引导选择技术栈和层级）
 .\install.ps1 init C:\path\to\your-project
@@ -166,7 +166,7 @@ graph LR
 ### 源仓库目录结构
 
 ```
-br-ai-spec/
+ex-ai-spec /
 ├── .agents/                          # 规范维护源
 │   ├── rules/
 │   │   ├── common/                   # 技术栈无关的通用规范（7 个）
@@ -311,11 +311,11 @@ br-ai-spec/
 
 ## OpenSpec 集成（L3）
 
-br-ai-spec 与 OpenSpec 通过 `openspec/config.yaml` 一个文件桥接，职责完全分离：
+ex-ai-spec  与 OpenSpec 通过 `openspec/config.yaml` 一个文件桥接，职责完全分离：
 
-- **br-ai-spec** 管理编码规范和业务技能（`.agents/`）
+- **ex-ai-spec ** 管理编码规范和业务技能（`.agents/`）
 - **OpenSpec** 管理需求流程（propose → apply → archive）
-- `config.yaml` 的 `context` 和 `rules` 字段让 OpenSpec 流程自动引用 br-ai-spec 规范
+- `config.yaml` 的 `context` 和 `rules` 字段让 OpenSpec 流程自动引用 ex-ai-spec  规范
 
 L3 安装时，`install.sh` 会自动运行 `openspec init`，生成 OpenSpec 的 skill 和 command 文件。
 
@@ -346,7 +346,7 @@ npx @ex/ai-spec init --profile react --level L3
 | **OpenSpec** | 仅 L3 级别安装，其他级别可忽略 |
 | **Windows 链接** | 使用 Junction（`mklink /J`）替代 symlink，无需管理员权限 |
 | **规范更新** | 定期运行 `install.sh update`（或 `.\install.ps1 update`）同步最新通用规范 |
-| **缓存管理** | 规范库会缓存到 `~/.br-ai-spec/`，切换分支或强制刷新时使用 `--refresh-cache` |
+| **缓存管理** | 规范库会缓存到 `~/.ex-ai-spec /`，切换分支或强制刷新时使用 `--refresh-cache` |
 
 ---
 
