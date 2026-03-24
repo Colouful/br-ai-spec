@@ -1,6 +1,6 @@
 # install.sh 安装脚本详解
 
-ex-ai-spec 规范库安装工具 v2.0.0，适用于 macOS / Linux / Git Bash / WSL。
+ex-ai-spec 规范库安装工具 v0.0.16，适用于 macOS / Linux / Git Bash / WSL。
 
 ## 推荐入口（npx）
 
