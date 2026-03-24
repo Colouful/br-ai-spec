@@ -42,8 +42,9 @@ git clone http://git.100credit.cn/zhenwei.li/ex-ai-spec.git
 cd ex-ai-spec
 
 bash install.sh init /path/to/your-project
-# 或
-bash install.sh init /path/to/your-project --profile vue --level L2
+# 或显式指定（与脚本默认一致：L3）
+bash install.sh init /path/to/your-project --profile vue --level L3
+# 不要 OpenSpec 时用 --level L2
 ```
 
 **Windows PowerShell**（首次可执行 `Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned`）：
@@ -61,8 +62,8 @@ cd ex-ai-spec
 | 层级 | 内容 | 适合场景 |
 |------|------|----------|
 | **L1** | 只安装 `.agents`（规范 + 技能） | 快速试用、个人体验 |
-| **L2** | `.agents` + IDE 适配层 + MCP 模板 | 团队编码规范 + 外部上下文（默认层级） |
-| **L3** | L2 + OpenSpec（`openspec/`） | **团队完整方案**：需求治理与归档，与 `.agents` 一体联动 |
+| **L2** | `.agents` + IDE 适配层 + MCP 模板 | 团队编码规范 + 外部上下文（**不含** OpenSpec，需显式 `--level L2`） |
+| **L3** | L2 + OpenSpec（`openspec/`） | **默认安装层级、团队主推**：需求治理与归档闭环，与 `.agents` 一体联动 |
 
 ### 技术栈 Profile
 
@@ -80,7 +81,7 @@ cd ex-ai-spec
 - `.agents/rules/01-项目概述.md` — 项目定位与技术栈
 - `.agents/rules/03-项目结构.md` — 目录结构
 
-### 2. 配置 MCP（L2 / L3）
+### 2. 配置 MCP（L2 / L3）（可选: 只有使用MCP才配置）
 
 修改 `.cursor/mcp.json` 中的占位符（如 ApiFox 的 `project-id`、`access-token`）。
 

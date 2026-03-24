@@ -355,7 +355,7 @@ telemetry_events
 建议示例：
 
 ```bash
-ai-spec init --profile vue --level L2 --flows demand,quality --roles requirement-analyst,code-guardian,perf-optimizer
+ai-spec init --profile vue --level L3 --flows demand,quality --roles requirement-analyst,code-guardian,perf-optimizer
 ```
 
 ### 6.3 推荐的功能包

@@ -54,8 +54,8 @@ bash install.sh <命令> [目标目录] [选项]
 | 层级 | 安装内容 | 适合场景 |
 |------|----------|----------|
 | `L1` | 只安装 `.agents/`（rules + skills） | 个人试用、最小接入 |
-| `L2`（默认） | `.agents/` + IDE 适配层（软链接）+ MCP 模板 | 团队编码规范 + 外部上下文 |
-| `L3` | L2 全部 + **OpenSpec**（`openspec/`、OPSX；与 `.agents` 经 `config.yaml` **一体安装**） | **团队完整方案**：需求治理与归档闭环 |
+| `L2` | `.agents/` + IDE 适配层（软链接）+ MCP 模板 | 团队编码规范 + 外部上下文（**不含** OpenSpec，需显式 `--level L2`） |
+| `L3`（**默认**） | L2 全部 + **OpenSpec**（`openspec/`、OPSX；与 `.agents` 经 `config.yaml` **一体安装**） | **团队主推**：需求治理与归档闭环 |
 
 ### --ide（IDE 选择）
 
@@ -79,8 +79,9 @@ bash install.sh <命令> [目标目录] [选项]
 ### init 命令完整流程
 
 ```
-bash install.sh init /path/to/project --profile vue --level L2
+bash install.sh init /path/to/project --profile vue
 ```
+（未指定 `--level` 时脚本默认为 **L3**；不要 OpenSpec 时加 `--level L2`。）
 
 执行步骤如下：
 
@@ -213,18 +214,17 @@ L3 安装时的 OpenSpec 配置流程：
 ## 六、常用示例
 
 ```bash
-# npx（在目标项目根目录，与 README 一致）
+# npx（在目标项目根目录，与 README 一致；未写 --level 时默认为 L3）
+npx @ex/ai-spec init --profile vue
 npx @ex/ai-spec init --profile vue --level L2
-npx @ex/ai-spec init --profile react --level L3
+npx @ex/ai-spec init --profile react
 
 # 交互式安装（推荐新用户，会引导选择）
 bash install.sh init
 
-# Vue 项目标准接入
+# Vue / React 项目标准接入（默认 L3，含 OpenSpec）
 bash install.sh init ~/projects/my-vue-app --profile vue
-
-# React 项目完整接入（含 OpenSpec）
-bash install.sh init ~/projects/my-react-app --profile react --level L3
+bash install.sh init ~/projects/my-react-app --profile react
 
 # 仅安装 Cursor 适配
 bash install.sh init ~/projects/my-app --ide cursor
@@ -239,7 +239,7 @@ bash install.sh check ~/projects/my-app
 bash install.sh uninstall ~/projects/my-app
 
 # 远程一行安装
-curl -sSL <raw-url>/install.sh | bash -s -- init . --profile vue --level L2
+curl -sSL <raw-url>/install.sh | bash -s -- init . --profile vue
 ```
 
 ---

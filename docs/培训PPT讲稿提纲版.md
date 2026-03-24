@@ -103,7 +103,7 @@
 - 一套结构化的规范 + 技能文件，让 AI IDE 自动遵循团队规范
 - 支持 Cursor / Claude Code / OpenCode / Trae
 - 支持 Vue 3 和 React 双技术栈
-- 三级安装（L1 最小体验 / L2 团队标准 / L3 含需求治理）
+- 三级安装（L1 最小体验 / L2 规范+MCP 无 OpenSpec / **L3 默认主推** 含需求治理）
 - 一键安装，5 分钟上手
 
 **讲师备注**：
@@ -217,11 +217,11 @@
 - Profile 选择：Vue（Pinia + Element Plus）或 React（Zustand + Ant Design）
 - 安装时 common + profile 自动合并为扁平目录
 - L1：最小体验（仅 .agents）
-- L2：团队标准（+ IDE 适配 + MCP），推荐
-- L3：完整版（+ OpenSpec 需求治理）
+- L2：规范 + IDE + MCP（**不含** OpenSpec，需显式 `--level L2`）
+- L3：**安装器默认**；完整版（+ OpenSpec 需求治理），团队主推
 
 **讲师备注**：
-建议团队从 L2 开始。L1 适合个人先试用感受，L3 适合大型需求开发。
+默认安装为 **L3**（与 `install.sh` / `npx` 一致）。仅需规范与 MCP、暂不要提案流程时选 **L2**；个人试用可用 **L1**。
 
 **时间**：2 分钟
 
@@ -656,7 +656,7 @@ src/components/UserCard/
 
 **要点**：
 - 一个空的 Vue 3 + Vite 项目
-- 已运行 `bash install.sh init . --profile vue --level L2`
+- 已运行 `bash install.sh init . --profile vue`（默认 L3）
 - Cursor IDE 已打开
 - 将演示：安装 → 初始化 → 创建组件 → 创建页面 → 对接接口
 
@@ -673,7 +673,7 @@ src/components/UserCard/
 
 **演示步骤**：
 1. `git clone` 规范库
-2. `bash install.sh init ./demo-project --profile vue --level L2`
+2. `bash install.sh init ./demo-project --profile vue`
 3. 展示安装后的目录结构（.agents/rules/、.agents/skills/）
 4. `bash install.sh check ./demo-project` 验证安装
 

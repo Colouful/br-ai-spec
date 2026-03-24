@@ -85,13 +85,14 @@
 ### Profile 机制
 
 ```bash
-# 推荐：在目标项目根目录（npx）
-npx @ex/ai-spec init --profile react --level L3
+# 推荐：在目标项目根目录（npx；未写 --level 时默认为 L3）
+npx @ex/ai-spec init --profile react
+npx @ex/ai-spec init --profile vue
 npx @ex/ai-spec init --profile vue --level L2
 
 # 或：克隆规范库后
 bash install.sh init /path/to/project --profile react
-bash install.sh init /path/to/project --profile vue --level L3
+bash install.sh init /path/to/project --profile vue
 ```
 
 ### 8 个必须回答的决策点

@@ -5,7 +5,7 @@
 
 .EXAMPLE
     .\install.ps1 init
-    .\install.ps1 init C:\projects\my-app --profile react --level L2
+    .\install.ps1 init C:\projects\my-app --profile react
     .\install.ps1 update
     .\install.ps1 check
     .\install.ps1 uninstall --force
