@@ -69,8 +69,21 @@ cd ex-ai-spec
 
 | Profile | 技术栈 |
 |---------|--------|
-| **react** | React + TypeScript + Vite + Zustand + Ant Design |
-| **vue** | Vue 3 + TypeScript + Vite + Pinia + Vue Router |
+| **react** | React + TypeScript（优先；纯 JS 见 02-编码规范）+ Vite + Zustand + Ant Design |
+| **vue** | Vue 3 + TypeScript（优先；纯 JS 见 02-编码规范）+ Vite + Pinia + Vue Router |
+
+### Monorepo / pnpm workspace
+
+若仓库根目录存在 **`pnpm-workspace.yaml`** 或根 **`package.json`** 含 **`workspaces`**，在安装脚本看来即 **Monorepo**。在**工作区根**执行 `npx @ex/ai-spec init` 时：
+
+- **交互终端**：会提示选择「在根目录安装」或「输入子包相对路径」（如 `packages/web`），推荐把规范与 lint/husky 依赖落在**具体前端应用包**内。
+- **非交互**（CI、管道输入）：不会停顿；脚本会打印建议在子包执行的示例命令，并**默认仍在根目录**继续安装。若要在子包安装且无需交互，请使用：
+  - `npx @ex/ai-spec init . --package packages/your-app`（路径相对**工作区根**），或
+  - 先 `cd` 到子包再执行 `npx @ex/ai-spec init`，或
+  - 环境变量 `EX_AI_SPEC_WORKSPACE_PACKAGE=packages/your-app`（与 `--package` 等价）。
+- **确需在根 `package.json` 安装依赖**（pnpm）：使用 `pnpm add -w <包名>`；详见 `.agents/rules/common/08-通用约束.md` 中「pnpm workspace」说明。
+
+`install.sh` / `install.ps1` 同样支持 **`--package <path>`** 与 **`--workspace-root`**（强制根目录、跳过上述交互）。
 
 ## 安装后必做事项
 
@@ -81,9 +94,11 @@ cd ex-ai-spec
 - `.agents/rules/01-项目概述.md` — 项目定位与技术栈
 - `.agents/rules/03-项目结构.md` — 目录结构
 
-### 2. 配置 MCP（L2 / L3）（可选: 只有使用MCP才配置）
+### 2. 配置 MCP（L2 / L3）（可选：仅在使用 MCP 时配置）
 
-修改 `.cursor/mcp.json` 中的占位符（如 ApiFox 的 `project-id`、`access-token`）。
+- **默认状态**：Cursor 中各 MCP 服务多为**关闭/未启用**，属于正常情况，不代表安装失败。
+- **建议顺序**：打开 **Cursor → 设置 → MCP**，按需**启用**目标服务 → 再编辑 `.cursor/mcp.json`，把 ApiFox 等条目中的 **`project-id`**、**`access-token`** 等占位符换成真实值。
+- **不需要的服务**可保持关闭；若配置里某条目带有 **`disabled`**（或与 IDE 版本对应的禁用字段），请在**填好凭证后再启用**，避免未配置即连接报错。
 
 ### 3. L3：确认 OpenSpec
 
