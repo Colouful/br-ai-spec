@@ -1,6 +1,21 @@
 # install.sh 安装脚本详解
 
-ex-ai-spec  规范库安装工具 v2.0.0，适用于 macOS / Linux / Git Bash / WSL。
+ex-ai-spec 规范库安装工具 v2.0.0，适用于 macOS / Linux / Git Bash / WSL。
+
+## 推荐入口（npx）
+
+在**目标前端项目根目录**优先使用 **npx**（无需先克隆本仓库），与仓库根目录 [README.md](../README.md) 一致：
+
+```bash
+npx @ex/ai-spec init
+npx @ex/ai-spec update
+npx @ex/ai-spec check
+npx @ex/ai-spec uninstall
+```
+
+> 首次使用需在 `~/.npmrc` 配置私有源：`@bairong:registry=http://nodejs.100credit.cn/`
+
+**本文档**侧重 **`install.sh` / `install.ps1` 的参数、合并机制与排错**；npx 底层仍会调用同源脚本。
 
 ---
 
@@ -27,20 +42,20 @@ bash install.sh <命令> [目标目录] [选项]
 
 ### --profile（技术栈选择）
 
-| 值 | 技术栈 | 说明 |
-|----|--------|------|
-| `vue`（默认） | Vue 3 + TS + Vite + Pinia + Vue Router | 6 条技术栈规范 + 5 个技能 |
+| 值 | 技术栈 | Profile 内条数（合并前） |
+|----|--------|--------------------------|
+| `vue`（默认） | Vue 3 + TS + Vite + Pinia + Vue Router | 6 条技术栈规范 + 6 个技能 |
 | `react` | React + TS + Vite + Zustand + Ant Design | 6 条技术栈规范 + 7 个技能 |
 
-安装时会将 `common/`（6 条通用规范 + 9 个通用技能）与选中的 profile 合并为扁平目录。
+安装时将 **`common/`**（**7 条通用规范** + **10 个通用技能**）与选中 profile 的 **6 条规范** + **上表技能数** 合并到目标项目 **`.agents/`** 扁平目录，合计 **13 条规范**；技能合计 **Vue：16 个**、**React：17 个**。
 
 ### --level（安装层级）
 
 | 层级 | 安装内容 | 适合场景 |
 |------|----------|----------|
 | `L1` | 只安装 `.agents/`（rules + skills） | 个人试用、最小接入 |
-| `L2`（默认） | `.agents/` + IDE 适配层（软链接）+ MCP 模板 | 团队标准接入 |
-| `L3` | L2 全部 + OpenSpec 流程集成 | 需要需求治理与归档 |
+| `L2`（默认） | `.agents/` + IDE 适配层（软链接）+ MCP 模板 | 团队编码规范 + 外部上下文 |
+| `L3` | L2 全部 + **OpenSpec**（`openspec/`、OPSX；与 `.agents` 经 `config.yaml` **一体安装**） | **团队完整方案**：需求治理与归档闭环 |
 
 ### --ide（IDE 选择）
 
@@ -171,7 +186,7 @@ L3 安装时的 OpenSpec 配置流程：
 3. 已安装 → 运行 `openspec init --tools <ide>` 自动生成 skills + commands
 4. 将 `config.yaml.template` 中的 `context` 和 `rules` 字段合并到 `openspec/config.yaml`
 
-这让 OpenSpec 流程自动引用 ex-ai-spec  的规范和技能，两者通过 `config.yaml` 一个文件桥接。
+这让 OpenSpec 流程自动引用 ex-ai-spec 的规范和技能，两者通过 **`openspec/config.yaml`** 桥接，与 **`.agents`** 同属本规范库交付的一体能力（非独立外挂）。
 
 ### 规范源检测
 
@@ -190,7 +205,7 @@ L3 安装时的 OpenSpec 配置流程：
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
-| `BR_AI_SPEC_REPO` | `http://git.100credit.cn/zhenwei.li/ex-ai-spec .git` | 规范库 Git 地址 |
+| `BR_AI_SPEC_REPO` | `http://git.100credit.cn/zhenwei.li/ex-ai-spec.git` | 规范库 Git 地址 |
 | `BR_AI_SPEC_CACHE` | `~/.ex-ai-spec ` | 本地缓存目录 |
 
 ---
@@ -198,6 +213,10 @@ L3 安装时的 OpenSpec 配置流程：
 ## 六、常用示例
 
 ```bash
+# npx（在目标项目根目录，与 README 一致）
+npx @ex/ai-spec init --profile vue --level L2
+npx @ex/ai-spec init --profile react --level L3
+
 # 交互式安装（推荐新用户，会引导选择）
 bash install.sh init
 
@@ -226,6 +245,8 @@ curl -sSL <raw-url>/install.sh | bash -s -- init . --profile vue --level L2
 ---
 
 ## 七、跨平台支持
+
+**Windows**：若使用 **PowerShell**，请使用仓库内 **`install.ps1`**（与 `install.sh` 功能对齐）；下文表格含 Git Bash / WSL 与原生 Windows 的差异说明。
 
 | 平台 | 链接方式 | 说明 |
 |------|----------|------|

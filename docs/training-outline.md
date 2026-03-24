@@ -2,7 +2,7 @@
 
 ## 培训目标
 
-让团队成员理解"规则 + 技能 + OpenSpec + MCP"的协同方式，并能在自己的项目中完成第一轮试点落地。
+面向 **前端团队**（Vue / React Profile），让成员理解 **规则 + 技能 + OpenSpec + MCP** 在同一项目内的协同方式，并能在自己的前端仓库中完成第一轮试点落地（可先 L2 再升 L3）。
 
 ---
 
@@ -20,8 +20,10 @@
 
 - Rule 决定"边界"——告诉 AI 什么能做、什么不能做
 - Skill 决定"步骤"——告诉 AI 具体怎么做
-- OpenSpec 决定"流程"——管理需求到归档的闭环
-- MCP 提供"上下文"——让 AI 能看设计稿、接口文档、页面效果
+- OpenSpec 决定"流程"——管理需求到归档的闭环（**L3**，`openspec/`）
+- MCP 提供"上下文"——让 AI 能看设计稿、接口文档、页面效果（**L2+**，`.cursor/mcp.json`）
+
+**一体化提示**：上述能力对应仓库里 **不同路径**，只有组合起来才是完整方案——仅有 `.agents` 没有 MCP 则接口/设计稿上下文弱；仅有编码规范没有 **L3 / `openspec/`** 则 **`/opsx:*` 与提案产物无从落地**。详见仓库 README「一体化能力与关键路径」。
 
 ## 第二部分：四层结构（20 分钟）
 
@@ -50,15 +52,27 @@
 
 让 AI 接入外部能力：设计稿（Figma）、接口文档（ApiFox）、页面验收（Playwright）。
 
+### 关键路径速查（目录 → 职责 → 典型文件）
+
+| 路径 / 配置 | 职责 | 典型文件或产物 |
+|-------------|------|----------------|
+| `.agents/rules/` | 约束层 | `02-编码规范.md`、`05-API规范.md`、`03-项目结构.md` 等 |
+| `.agents/skills/` | 操作层 | `create-component/`、`create-proposal/`、`SKILL.md` |
+| `.cursor/`、`.claude/` 等 | IDE 适配 | 指向 `.agents` 的链接；**L3** 下还有 OpenSpec 生成的 command/skill |
+| `.cursor/mcp.json` | 上下文层 | ApiFox、Figma、Playwright 等 MCP 条目 |
+| `openspec/`（L3） | 流程层 | `config.yaml`（桥接 ex-ai-spec）、`changes/`、`specs/` |
+
 ## 第三部分：现场演示（30 分钟）
+
+> **环境要求**：下列演示依赖 **L3**（已执行 `init --level L3`，存在 `openspec/` 与 OpenSpec CLI）。若试点仅为 L2，可改为演示「创建组件 + MCP 查接口」；OpenSpec 流程需升级 L3 后再演示。
 
 ### 最小闭环演示
 
 1. 选一个小需求："新增用户列表页筛选栏"
-2. 使用 `/opsx-propose` 创建提案
-3. AI 按 rules + skills 编写 proposal / tasks / specs
-4. 人工审批后，使用 `/opsx-apply` 执行实现
-5. 验收后使用 `/opsx-archive` 归档
+2. 使用 `/opsx:propose` 创建提案
+3. AI 按 rules + skills 编写 proposal / tasks / specs（产物在 `openspec/changes/` 等）
+4. 人工审批后，使用 `/opsx:apply` 执行实现
+5. 验收后使用 `/opsx:archive` 归档
 
 ### 观察点
 
@@ -71,11 +85,13 @@
 ### Profile 机制
 
 ```bash
-# React 项目
-bash install.sh init /path/to/project --profile react
+# 推荐：在目标项目根目录（npx）
+npx @ex/ai-spec init --profile react --level L3
+npx @ex/ai-spec init --profile vue --level L2
 
-# Vue 项目
-bash install.sh init /path/to/project --profile vue
+# 或：克隆规范库后
+bash install.sh init /path/to/project --profile react
+bash install.sh init /path/to/project --profile vue --level L3
 ```
 
 ### 8 个必须回答的决策点
@@ -119,17 +135,18 @@ bash install.sh init /path/to/project --profile vue
 |------|------|
 | "写规则太麻烦" | 规则不是额外成本，而是把反复口头解释的成本一次性沉淀 |
 | "AI 已经会写代码了" | AI 会写"通用代码"，Skill 是让它写"团队认可的代码" |
-| "OpenSpec 太重" | 只在新功能、跨模块变更时用，bug fix 可跳过 |
+| "OpenSpec 太重" | 只在新功能、跨模块变更时走 `/opsx:*`；bug fix 可跳过；团队完整闭环仍建议以 L3 为目标 |
 
 ## 第六部分：Q&A + 行动计划（15 分钟）
 
 ### 第一轮试点检查表
 
-- [ ] 确定试点项目与负责人
-- [ ] 选择 Profile 并运行安装
+- [ ] 确定试点项目与负责人（前端 Vue 或 React 仓库）
+- [ ] 选择 Profile 并运行安装（推荐 `npx @ex/ai-spec init`，至少 **L2**）
 - [ ] 填写 01-项目概述 和 03-项目结构
 - [ ] 跑通一个组件创建场景
 - [ ] 接通至少一个 MCP（Figma/ApiFox/Playwright）
+- [ ] **（完整闭环）** 升级到 **L3**：`openspec/config.yaml` 存在，能完成一次 `/opsx:propose` → `/opsx:apply` 最小路径（参见 [openspec-guide.md](openspec-guide.md)）
 - [ ] 两周后复盘，调整 rules/skills
 
 ### 90 分钟工作坊方法
