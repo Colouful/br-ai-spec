@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
     ex-ai-spec  规范库安装脚本 (PowerShell)
     适用于 Windows PowerShell 5.1+ / PowerShell Core 7+
@@ -12,6 +12,15 @@
 #>
 
 $ErrorActionPreference = "Stop"
+
+# ============================================================================
+# 输出函数（必须在参数解析之前定义：缺参等分支会调用 Write-Err）
+# ============================================================================
+
+function Write-Info  { param($Msg) Write-Host "i " -ForegroundColor Blue -NoNewline; Write-Host $Msg }
+function Write-Ok    { param($Msg) Write-Host "√ " -ForegroundColor Green -NoNewline; Write-Host $Msg }
+function Write-Warn  { param($Msg) Write-Host "! " -ForegroundColor Yellow -NoNewline; Write-Host $Msg }
+function Write-Err   { param($Msg) Write-Host "x " -ForegroundColor Red -NoNewline; Write-Host $Msg }
 
 # ============================================================================
 # 参数解析（手动解析以支持 --profile 风格参数）
@@ -43,15 +52,21 @@ $ProjectSpecificRules = @("01-项目概述.md", "03-项目结构.md")
 $AvailableProfiles = @("react", "vue")
 $NodeMinVersion = 18
 
-# 解析命令行参数（正则必须使用单引号，避免 "..." 中 $ 被当作变量、-y 被当作运算符）
+# 解析命令行参数：
+# - 正则模式一律用单引号字面量，禁止双引号（否则 $ 与 -y 等会被 PowerShell 误解析，脚本无法加载）
+# - -y/--force、-h/--help 使用独立分支，避免模式串中含 (-y|...) 在误用引号或编码异常时触发 ParserError
+# - 为何不按 $PSVersionTable 分版本写两套？ParserError 发生在「解析整文件」阶段，早于任何运行时 if；
+#   不合法语法只要出现在文件中就会导致无法加载。故此处采用 5.1 与 7+ 共用的同一套写法。
+#   若将来需要「仅运行时分支」（如某 cmdlet 仅 7+ 可用），再在具体功能函数内用版本判断即可。
 $i = 0
 while ($i -lt $args.Count) {
     $arg = $args[$i]
     switch -Regex ($arg) {
-        '^(init|update|check|uninstall|help)$' {
-            if (-not $script:Command) { $script:Command = $arg }
-            else { $script:TargetDir = $arg }
-        }
+        '^init$' { if (-not $script:Command) { $script:Command = $arg } else { $script:TargetDir = $arg } }
+        '^update$' { if (-not $script:Command) { $script:Command = $arg } else { $script:TargetDir = $arg } }
+        '^check$' { if (-not $script:Command) { $script:Command = $arg } else { $script:TargetDir = $arg } }
+        '^uninstall$' { if (-not $script:Command) { $script:Command = $arg } else { $script:TargetDir = $arg } }
+        '^help$' { if (-not $script:Command) { $script:Command = $arg } else { $script:TargetDir = $arg } }
         '^--profile$' {
             if ($i + 1 -ge $args.Count -or $args[$i + 1] -match '^--') {
                 Write-Err "选项 --profile 需要一个参数值"; exit 1
@@ -83,8 +98,10 @@ while ($i -lt $args.Count) {
         '^--uipro$' { $script:Uipro = "yes" }
         '^--no-uipro$' { $script:Uipro = "no" }
         '^--refresh-cache$' { $script:RefreshCache = $true }
-        '^(-y|--force)$' { $script:Force = $true }
-        '^(-h|--help)$' { $script:Command = "help" }
+        '^-y$' { $script:Force = $true }
+        '^--force$' { $script:Force = $true }
+        '^-h$' { $script:Command = "help" }
+        '^--help$' { $script:Command = "help" }
         default {
             if ($script:Command) { $script:TargetDir = $arg }
             else { $script:Command = "help" }
@@ -96,13 +113,8 @@ while ($i -lt $args.Count) {
 if (-not $script:Command) { $script:Command = "help" }
 
 # ============================================================================
-# 输出函数
+# 输出函数（续）
 # ============================================================================
-
-function Write-Info  { param($Msg) Write-Host "i " -ForegroundColor Blue -NoNewline; Write-Host $Msg }
-function Write-Ok    { param($Msg) Write-Host "√ " -ForegroundColor Green -NoNewline; Write-Host $Msg }
-function Write-Warn  { param($Msg) Write-Host "! " -ForegroundColor Yellow -NoNewline; Write-Host $Msg }
-function Write-Err   { param($Msg) Write-Host "x " -ForegroundColor Red -NoNewline; Write-Host $Msg }
 
 function Show-UiproLogTail {
     param([string]$Path, [int]$Lines = 25)
