@@ -141,8 +141,8 @@ irm <raw-url>/install.ps1 | iex
 | `--profile <name>` | 技术栈选择 (`react` / `vue`) | `vue` |
 | `--level <L>` | 安装层级 (`L1` / `L2` / `L3`) | `L3` |
 | `--ide <name>` | 指定 IDE (`default` / `cursor` / `claude` / `opencode` / `trae` / `all`) | `default`（cursor+claude） |
-| `--uipro` | 安装 UI UX Pro Max 设计智能技能 | 交互询问 |
-| `--no-uipro` | 跳过 UI UX Pro Max | - |
+| `--uipro` | 安装 UI UX Pro Max 设计智能技能 | 交互询问；**非交互必须显式传入** |
+| `--no-uipro` | 跳过 UI UX Pro Max | 非交互默认等效于未传 `--uipro`（不安装） |
 | `--lint` / `--no-lint` | 是否部署 ESLint/Prettier/Stylelint 并安装依赖 | 交互询问；非交互默认安装 |
 | `--husky` / `--no-husky` | 是否部署提交校验（`.husky`、`lint-staged`、`commitlint`）并安装依赖 | 交互默认 N；非交互默认跳过 |
 | `--repo <url>` | 自定义规范库地址 | 内置默认地址 |
@@ -152,6 +152,16 @@ irm <raw-url>/install.ps1 | iex
 ---
 
 **说明**：若使用 `npm` / `npx` 时出现 `Unknown project config "strict-peer-dependencies"`、`shamefully-hoist` 等警告，多为项目根目录 `.npmrc` 中写了 **pnpm 专用** 配置；可改用 `pnpm dlx @ex/ai-spec init`，或从仅在 npm 使用的场景下移除/拆分这些键。
+
+### UI UX Pro Max（可选设计技能）
+
+该技能依赖全局包 **`uipro-cli`**（命令 **`uipro`**），在临时目录执行 `uipro init --ai cursor` 后，将资源落到 `.agents/skills/ui-ux-pro-max/`。
+
+- **非交互**（CI、`npx` 无 TTY、脚本管道等）下 **`init` 不会自动安装**（与 lint 不同：lint 非交互默认安装，UI UX Pro Max 必须显式开启）。需要时请加上 **`--uipro`**：
+  - `npx @ex/ai-spec init . --uipro`
+  - 已有规范后补装或重装：`npx @ex/ai-spec update . --uipro`
+- **Windows**：若全局安装后仍提示找不到 `uipro`，请检查 **npm 全局 bin 目录是否已加入 PATH**，或新开终端再试；安装失败时脚本会尽量输出日志路径与尾部内容便于排查。
+- **`check`**：仅当存在 `skills/ui-ux-pro-max/SKILL.md` 时显示「已安装」；未安装与安装不完整（仅有目录、缺 `SKILL.md`）会分别提示，不完整时可执行 `update . --uipro` 修复。
 
 ---
 
