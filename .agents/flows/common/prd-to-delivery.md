@@ -4,6 +4,10 @@
 
 把一个输入需求转成可验证的前端交付结果。
 
+## 触发者
+
+- `task-orchestrator`
+
 ## 流程顺序
 
 1. `requirement-analyst`
