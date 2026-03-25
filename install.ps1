@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     ex-ai-spec  规范库安装脚本 (PowerShell)
     适用于 Windows PowerShell 5.1+ / PowerShell Core 7+
@@ -11,6 +11,11 @@
     .\install.ps1 uninstall --force
 #>
 
+# ============================================================================
+# 兼容性设置：强制终端输出使用 UTF-8 编码，防止中文乱码
+# ============================================================================
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
 $ErrorActionPreference = "Stop"
 
 # ============================================================================
@@ -52,12 +57,6 @@ $ProjectSpecificRules = @("01-项目概述.md", "03-项目结构.md")
 $AvailableProfiles = @("react", "vue")
 $NodeMinVersion = 18
 
-# 解析命令行参数：
-# - 正则模式一律用单引号字面量，禁止双引号（否则 $ 与 -y 等会被 PowerShell 误解析，脚本无法加载）
-# - -y/--force、-h/--help 使用独立分支，避免模式串中含 (-y|...) 在误用引号或编码异常时触发 ParserError
-# - 为何不按 $PSVersionTable 分版本写两套？ParserError 发生在「解析整文件」阶段，早于任何运行时 if；
-#   不合法语法只要出现在文件中就会导致无法加载。故此处采用 5.1 与 7+ 共用的同一套写法。
-#   若将来需要「仅运行时分支」（如某 cmdlet 仅 7+ 可用），再在具体功能函数内用版本判断即可。
 $i = 0
 while ($i -lt $args.Count) {
     $arg = $args[$i]
@@ -204,7 +203,6 @@ function Get-PkgManager {
 # ============================================================================
 
 function Get-SourceDir {
-    # npm 包模式：优先使用 BR_AI_SPEC_LOCAL 指向的规范文件
     if ($env:BR_AI_SPEC_LOCAL -and
         (Test-Path (Join-Path $env:BR_AI_SPEC_LOCAL ".agents/rules/common")) -and
         (Test-Path (Join-Path $env:BR_AI_SPEC_LOCAL ".agents/skills/common"))) {
@@ -315,7 +313,6 @@ function Select-LintTools {
     }
 }
 
-# pnpm workspace 根检测（仅用于 pnpm add -w，不向用户询问安装目录）
 function Test-PackageJsonHasWorkspaces {
     param([string]$Dir)
     $pj = Join-Path $Dir "package.json"
@@ -395,12 +392,10 @@ function Copy-Agents {
     Write-Info "同步 rules (common + profiles/$($script:Profile)) ..."
     $rulesDst = Join-Path $agentsDst "rules"
 
-    # common rules
     Get-ChildItem -Path $srcCommonRules -Filter "*.md" -File -ErrorAction SilentlyContinue | ForEach-Object {
         Copy-Item $_.FullName -Destination (Join-Path $rulesDst $_.Name) -Force
     }
 
-    # profile rules (protect project-specific)
     Get-ChildItem -Path $srcProfileRules -Filter "*.md" -File -ErrorAction SilentlyContinue | ForEach-Object {
         $dstFile = Join-Path $rulesDst $_.Name
         $isSpecific = $ProjectSpecificRules -contains $_.Name
@@ -412,14 +407,12 @@ function Copy-Agents {
         }
     }
 
-    # rules README
     $rulesReadme = Join-Path $script:SourceDir ".agents/rules/README.md"
     if (Test-Path $rulesReadme) { Copy-Item $rulesReadme -Destination (Join-Path $rulesDst "README.md") -Force }
 
     Write-Info "同步 skills (common + profiles/$($script:Profile)) ..."
     $skillsDst = Join-Path $agentsDst "skills"
 
-    # common skills
     if (Test-Path $srcCommonSkills) {
         Get-ChildItem -Path $srcCommonSkills -Directory | ForEach-Object {
             $dst = Join-Path $skillsDst $_.Name
@@ -428,7 +421,6 @@ function Copy-Agents {
         }
     }
 
-    # profile skills
     if (Test-Path $srcProfileSkills) {
         Get-ChildItem -Path $srcProfileSkills -Directory | ForEach-Object {
             $dst = Join-Path $skillsDst $_.Name
@@ -437,7 +429,6 @@ function Copy-Agents {
         }
     }
 
-    # skills README
     $skillsReadme = Join-Path $script:SourceDir ".agents/skills/README.md"
     if (Test-Path $skillsReadme) { Copy-Item $skillsReadme -Destination (Join-Path $skillsDst "README.md") -Force }
 
@@ -789,7 +780,6 @@ function Install-OpenSpec {
         Write-Warn "openspec CLI 未安装，请手动安装: npm install -g @fission-ai/openspec@latest"
     }
 
-    # 无论 CLI 是否可用，始终确保目录骨架存在
     New-Item -ItemType Directory -Path (Join-Path $Target "openspec/specs") -Force | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $Target "openspec/changes/archive") -Force | Out-Null
 
@@ -889,7 +879,7 @@ function Write-Report {
     if ($script:Level -eq "L3") {
         Write-Host "  4. 使用 /opsx-propose              开始第一个变更提案"
     }
-    Write-Host "  *  在 AI IDE 中输入 `"初始化项目规范`" 让 AI 自动生成 01/03"
+    Write-Host "  * 在 AI IDE 中输入 `"初始化项目规范`" 让 AI 自动生成 01/03"
     Write-Host ""
 }
 
@@ -934,9 +924,7 @@ function Invoke-Init {
         $script:Uipro = "no"
     }
 
-    # lint/format 工具选择（交互模式 + ask 时触发）
     if ([Environment]::UserInteractive -and $script:InstallLint -eq "ask") { Select-LintTools }
-    # 非交互模式下 ask 保持默认值
     if ($script:InstallLint -eq "ask") { $script:InstallLint = "yes" }
     if ($script:InstallHusky -eq "ask") { $script:InstallHusky = "no" }
 
@@ -944,13 +932,11 @@ function Invoke-Init {
 
     Copy-Agents -Target $target
 
-    # lint/format 配置（可选）
     if ($script:InstallLint -eq "yes") {
         Copy-Configs -Target $target
         Install-LintDeps -Target $target
     }
 
-    # 提交校验（可选）
     if ($script:InstallHusky -eq "yes") {
         Install-CommitHooks -Target $target
     }
