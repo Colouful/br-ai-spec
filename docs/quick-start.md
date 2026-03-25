@@ -35,6 +35,8 @@ npx @ex/ai-spec uninstall
 
 > Windows 下 npx 安装器会自动选用 PowerShell 脚本，无需额外配置。
 
+**UI UX Pro Max（可选）**：非交互执行 `npx @ex/ai-spec init` 时**不会**自动安装该技能；需要时请显式执行 `npx @ex/ai-spec init . --uipro`，或事后 `npx @ex/ai-spec update . --uipro`。详见根目录 README「UI UX Pro Max」小节。
+
 ### 方式二：克隆规范库后使用脚本
 
 ```bash

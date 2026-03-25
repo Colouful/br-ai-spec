@@ -113,6 +113,17 @@ function Write-Ok    { param($Msg) Write-Host "√ " -ForegroundColor Green -NoN
 function Write-Warn  { param($Msg) Write-Host "! " -ForegroundColor Yellow -NoNewline; Write-Host $Msg }
 function Write-Err   { param($Msg) Write-Host "x " -ForegroundColor Red -NoNewline; Write-Host $Msg }
 
+function Show-UiproLogTail {
+    param([string]$Path, [int]$Lines = 25)
+    if (-not (Test-Path -LiteralPath $Path)) {
+        Write-Host "    (无日志文件: $Path)"
+        return
+    }
+    $tail = Get-Content -LiteralPath $Path -Tail $Lines -ErrorAction SilentlyContinue
+    if (-not $tail) { Write-Host "    (日志为空)"; return }
+    foreach ($line in $tail) { Write-Host "    $line" }
+}
+
 # ============================================================================
 # 工具函数
 # ============================================================================
@@ -753,31 +764,71 @@ function Install-Uipro {
     if ((Test-Path $skillDir) -and (Test-Path (Join-Path $skillDir "SKILL.md"))) {
         Write-Ok "UI UX Pro Max 已安装，跳过"; return
     }
-    if (-not $script:PkgManager) { Write-Warn "无可用的包管理器，跳过 UI UX Pro Max"; return }
+    if (-not $script:PkgManager) {
+        Write-Warn "UI UX Pro Max：无可用的包管理器，无法全局安装 uipro-cli。请安装 npm/pnpm 后重试。"
+        return
+    }
 
     if (-not (Get-Command uipro -ErrorAction SilentlyContinue)) {
         Write-Info "安装 uipro-cli ..."
-        try {
-            if ($script:PkgManager -eq "pnpm") { pnpm add -g uipro-cli 2>$null | Out-Null }
-            else { npm install -g uipro-cli 2>$null | Out-Null }
-        } catch { Write-Warn "uipro-cli 安装失败，跳过 UI UX Pro Max"; return }
-        if (-not (Get-Command uipro -ErrorAction SilentlyContinue)) {
-            Write-Warn "uipro 命令不可用，跳过 UI UX Pro Max"; return
+        $logCli = Join-Path ([System.IO.Path]::GetTempPath()) "ex-ai-spec-uipro-cli-$([guid]::NewGuid().ToString('n')).log"
+        if ($script:PkgManager -eq "pnpm") {
+            cmd /c "pnpm add -g uipro-cli 1>`"$logCli`" 2>&1" | Out-Null
+        } else {
+            cmd /c "npm install -g uipro-cli 1>`"$logCli`" 2>&1" | Out-Null
         }
+        $cliExit = $LASTEXITCODE
+        if (-not (Get-Command uipro -ErrorAction SilentlyContinue)) {
+            Write-Warn "uipro-cli 全局安装失败，或安装成功但 uipro 不在当前 PATH 中（可新开终端再试）。"
+            Write-Host "  日志文件: $logCli"
+            Write-Host "  日志尾部:"
+            Show-UiproLogTail -Path $logCli -Lines 25
+            Write-Host "  可手动执行: npm install -g uipro-cli（或 pnpm add -g uipro-cli），并确认全局 npm bin 已加入 PATH。"
+            return
+        }
+        if ($cliExit -ne 0) {
+            Write-Info "uipro-cli 安装命令返回非零退出码，但已检测到 uipro 命令，继续执行 ..."
+        }
+        Remove-Item -LiteralPath $logCli -Force -ErrorAction SilentlyContinue
+        Write-Ok "uipro-cli 可用"
     }
 
-    $tmpDir = Join-Path ([System.IO.Path]::GetTempPath()) "ex-ai-spec -uipro-$(Get-Random)"
+    $tmpDir = Join-Path ([System.IO.Path]::GetTempPath()) "ex-ai-spec-uipro-$(Get-Random)"
     New-Item -ItemType Directory -Path $tmpDir -Force | Out-Null
+    $logInit = Join-Path ([System.IO.Path]::GetTempPath()) "ex-ai-spec-uipro-init-$([guid]::NewGuid().ToString('n')).log"
     Write-Info "下载 UI UX Pro Max 资源 ..."
+    $uiproCmd = (Get-Command uipro -ErrorAction SilentlyContinue).Source
+    if (-not $uiproCmd) {
+        Write-Warn "uipro 命令在安装过程中丢失，跳过 UI UX Pro Max"
+        Remove-Item $tmpDir -Recurse -Force -ErrorAction SilentlyContinue
+        return
+    }
+    Push-Location $tmpDir
     try {
-        Push-Location $tmpDir
-        uipro init --ai cursor 2>$null
+        cmd /c "`"$uiproCmd`" init --ai cursor 1>`"$logInit`" 2>&1" | Out-Null
+        $initExit = $LASTEXITCODE
+    } finally {
         Pop-Location
-    } catch { Write-Warn "uipro init 失败，跳过 UI UX Pro Max"; Pop-Location; Remove-Item $tmpDir -Recurse -Force; return }
+    }
 
     $uiproSrc = Join-Path $tmpDir ".shared/ui-ux-pro-max"
+    if ($initExit -ne 0) {
+        Write-Warn "uipro init 失败（退出码 $initExit）。"
+        Write-Host "  日志文件: $logInit"
+        Write-Host "  日志尾部:"
+        Show-UiproLogTail -Path $logInit -Lines 40
+        Write-Host "  请检查网络后重试，或手动在空目录执行: uipro init --ai cursor"
+        Remove-Item $tmpDir -Recurse -Force -ErrorAction SilentlyContinue
+        return
+    }
     if (-not (Test-Path $uiproSrc)) {
-        Write-Warn "未找到预期的资源目录，跳过"; Remove-Item $tmpDir -Recurse -Force; return
+        Write-Warn "UI UX Pro Max 资源目录缺失：未找到 .shared/ui-ux-pro-max（可能是 uipro-cli 版本或网络问题）。"
+        Write-Host "  日志文件: $logInit"
+        Write-Host "  日志尾部:"
+        Show-UiproLogTail -Path $logInit -Lines 40
+        Write-Host "  请尝试升级: npm install -g uipro-cli@latest"
+        Remove-Item $tmpDir -Recurse -Force -ErrorAction SilentlyContinue
+        return
     }
 
     New-Item -ItemType Directory -Path (Join-Path $skillDir "data") -Force | Out-Null
@@ -818,7 +869,8 @@ description: AI 设计智能技能，提供 67 种 UI 风格、161 套配色方�
         Set-Content -Path (Join-Path $skillDir "SKILL.md") -Value $fallback -Encoding UTF8
     }
 
-    Remove-Item $tmpDir -Recurse -Force
+    Remove-Item $tmpDir -Recurse -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $logInit -Force -ErrorAction SilentlyContinue
     Write-Ok "UI UX Pro Max 安装完成"
 }
 
@@ -999,6 +1051,10 @@ function Invoke-Init {
         Select-Level
     }
     if ([Environment]::UserInteractive -and $script:Uipro -eq "ask") { Select-Uipro }
+    if ($script:Uipro -eq "ask") {
+        Write-Info "未安装 UI UX Pro Max：非交互环境或未参与询问时默认跳过。需要时请执行: npx @ex/ai-spec init . --uipro（已有项目可: npx @ex/ai-spec update . --uipro）"
+        $script:Uipro = "no"
+    }
 
     # lint/format 工具选择（交互模式 + ask 时触发）
     if ([Environment]::UserInteractive -and $script:InstallLint -eq "ask") { Select-LintTools }
@@ -1085,10 +1141,16 @@ function Invoke-Check {
         $skillCount = (Get-ChildItem (Join-Path $agentsDir "skills") -Directory -ErrorAction SilentlyContinue).Count
         Write-Ok "  skills: $skillCount 个技能目录"
 
-        if (Test-Path (Join-Path $agentsDir "skills/ui-ux-pro-max/SKILL.md")) {
+        $uiproSkillDir = Join-Path $agentsDir "skills/ui-ux-pro-max"
+        $uiproSkillMd = Join-Path $uiproSkillDir "SKILL.md"
+        if (Test-Path $uiproSkillMd) {
             Write-Ok "  UI UX Pro Max: 已安装"
+        } elseif (Test-Path $uiproSkillDir) {
+            Write-Warn "  UI UX Pro Max: 目录存在但缺少 SKILL.md（安装不完整）"
+            Write-Host "    建议执行: npx @ex/ai-spec update . --uipro"
+            $hasIssue = $true
         } else {
-            Write-Info "  UI UX Pro Max: 未安装（可选）"
+            Write-Info "  UI UX Pro Max: 未安装（可选）。非交互 init 不会自动安装，需要请加 --uipro"
         }
     } else { Write-Err ".agents/ 不存在"; $hasIssue = $true }
 
