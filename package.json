@@ -1,10 +1,11 @@
 {
   "name": "@ex/ai-spec-test",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "description": "AI Coding 团队规范驱动开发 CLI — 一键安装规范、技能与工具配置",
   "bin": {
     "ai-spec": "./bin/cli.js",
-    "ex-ai-spec ": "./bin/cli.js"
+    "ai-spec-test": "./bin/cli.js",
+    "ex-ai-spec": "./bin/cli.js"
   },
   "maintainers": [
     "zhenwei.li",

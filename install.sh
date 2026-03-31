@@ -652,9 +652,22 @@ install_dev_dependencies_at() {
   fi
 }
 
+read_source_package_ident() {
+  local package_json="$SOURCE_DIR/package.json"
+  [ -f "$package_json" ] || return 1
+  command -v node >/dev/null 2>&1 || return 1
+
+  node -e '
+    const fs = require("fs");
+    const pkg = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+    if (!pkg.name || !pkg.version) process.exit(1);
+    process.stdout.write(`${pkg.name}@${pkg.version}`);
+  ' "$package_json" 2>/dev/null
+}
+
 install_local_ai_spec_cli() {
   local target="$1"
-  local target_canon source_canon manual_hint
+  local target_canon source_canon manual_hint install_spec install_label source_pkg_ident
   [ -f "$target/package.json" ] || { warn "未找到 package.json，跳过本地 ai-spec CLI 安装"; return 0; }
   [ -n "$PKG_MANAGER" ] || { warn "无可用的包管理器，跳过本地 ai-spec CLI 安装"; return 0; }
 
@@ -662,17 +675,28 @@ install_local_ai_spec_cli() {
   source_canon="$(cd "$SOURCE_DIR" 2>/dev/null && pwd -P)" || return 0
   [ "$target_canon" = "$source_canon" ] && { info "当前就在规范仓库目录，跳过本地 ai-spec CLI 自安装"; return 0; }
 
-  if [ "$PKG_MANAGER" = "pnpm" ] && _is_pnpm_workspace_package_root "$target"; then
-    manual_hint="cd $target && pnpm add -w -D \"$SOURCE_DIR\""
-  elif [ "$PKG_MANAGER" = "pnpm" ]; then
-    manual_hint="cd $target && pnpm add -D \"$SOURCE_DIR\""
+  if [ -n "${BR_AI_SPEC_FORCE_LOCAL_CLI:-}" ]; then
+    install_spec="$SOURCE_DIR"
+    install_label="$SOURCE_DIR (forced local path)"
+  elif source_pkg_ident="$(read_source_package_ident)"; then
+    install_spec="$source_pkg_ident"
+    install_label="$source_pkg_ident (registry)"
   else
-    manual_hint="cd $target && npm install -D \"$SOURCE_DIR\""
+    install_spec="$SOURCE_DIR"
+    install_label="$SOURCE_DIR (local path fallback)"
+  fi
+
+  if [ "$PKG_MANAGER" = "pnpm" ] && _is_pnpm_workspace_package_root "$target"; then
+    manual_hint="cd $target && pnpm add -w -D \"$install_spec\""
+  elif [ "$PKG_MANAGER" = "pnpm" ]; then
+    manual_hint="cd $target && pnpm add -D \"$install_spec\""
+  else
+    manual_hint="cd $target && npm install -D \"$install_spec\""
   fi
 
   info "正在使用 $PKG_MANAGER 安装项目内 ai-spec CLI ..."
-  info "  source: $SOURCE_DIR"
-  if ! install_dev_dependencies_at "$target" "$SOURCE_DIR"; then
+  info "  source: $install_label"
+  if ! install_dev_dependencies_at "$target" "$install_spec"; then
     install_fail "本地 ai-spec CLI 安装失败" "请手动执行: $manual_hint"
     return 0
   fi

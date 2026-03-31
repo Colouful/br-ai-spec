@@ -492,6 +492,27 @@ function Invoke-DevDependenciesInstall {
     }
 }
 
+function Get-SourcePackageIdent {
+    $packageJson = Join-Path $script:SourceDir "package.json"
+    if (-not (Test-Path $packageJson) -or -not (Get-Command node -ErrorAction SilentlyContinue)) {
+        return $null
+    }
+
+    try {
+        $script = @'
+const fs = require("fs");
+const pkg = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+if (!pkg.name || !pkg.version) process.exit(1);
+process.stdout.write(`${pkg.name}@${pkg.version}`);
+'@
+        $ident = & node -e $script $packageJson 2>$null
+        if ($LASTEXITCODE -ne 0 -or -not $ident) { return $null }
+        return $ident.Trim()
+    } catch {
+        return $null
+    }
+}
+
 function Install-LocalAiSpecCli {
     param([string]$Target)
     if (-not (Test-Path (Join-Path $Target "package.json"))) {
@@ -510,18 +531,34 @@ function Install-LocalAiSpecCli {
         }
     } catch {}
 
-    $manualCmd = if ($script:PkgManager -eq "pnpm" -and (Test-PnpmWorkspacePackageRoot -Target $Target)) {
-        "cd $Target && pnpm add -w -D `"$($script:SourceDir)`""
-    } elseif ($script:PkgManager -eq "pnpm") {
-        "cd $Target && pnpm add -D `"$($script:SourceDir)`""
+    $installSpec = $null
+    $installLabel = $null
+    if ($env:BR_AI_SPEC_FORCE_LOCAL_CLI) {
+        $installSpec = $script:SourceDir
+        $installLabel = "$($script:SourceDir) (forced local path)"
     } else {
-        "cd $Target && npm install -D `"$($script:SourceDir)`""
+        $sourcePkgIdent = Get-SourcePackageIdent
+        if ($sourcePkgIdent) {
+            $installSpec = $sourcePkgIdent
+            $installLabel = "$sourcePkgIdent (registry)"
+        } else {
+            $installSpec = $script:SourceDir
+            $installLabel = "$($script:SourceDir) (local path fallback)"
+        }
+    }
+
+    $manualCmd = if ($script:PkgManager -eq "pnpm" -and (Test-PnpmWorkspacePackageRoot -Target $Target)) {
+        "cd $Target && pnpm add -w -D `"$installSpec`""
+    } elseif ($script:PkgManager -eq "pnpm") {
+        "cd $Target && pnpm add -D `"$installSpec`""
+    } else {
+        "cd $Target && npm install -D `"$installSpec`""
     }
 
     Write-Info "正在使用 $($script:PkgManager) 安装项目内 ai-spec CLI ..."
-    Write-Info "  source: $($script:SourceDir)"
+    Write-Info "  source: $installLabel"
     try {
-        Invoke-DevDependenciesInstall -Target $Target -Packages @($script:SourceDir)
+        Invoke-DevDependenciesInstall -Target $Target -Packages @($installSpec)
     } catch {
         Write-Warn "本地 ai-spec CLI 安装失败，请手动执行:"
         Write-Host "  $manualCmd"
