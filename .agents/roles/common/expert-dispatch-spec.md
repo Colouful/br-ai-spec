@@ -98,6 +98,9 @@ cat ./.ai-spec/tmp/current-dispatch.json | ai-spec expert-dispatch apply --stdin
 
 - `expert-dispatch（专家派发载荷）` 的内容由 `task-orchestrator（任务主代理）` 产出
 - `bin/` 只做校验、补齐时间戳和 ID、落盘
+- 对 `prd-to-delivery（需求到交付）`，`task.change_id` 必须随派发一起下发，不能丢
+- `requirement-analyst（需求解析专家）` 的 `expected_output` 必须显式包含 `proposal.md` 与 `tasks.md`
+- `code-guardian（规范守护者）` 的 `expected_output` 必须显式包含 `checklist.md` 与 `iterations.md`
 
 推荐在以下动作后由 `task-orchestrator（任务主代理）` 再次产出新的当前派发：
 
@@ -115,3 +118,7 @@ cat ./.ai-spec/tmp/current-dispatch.json | ai-spec expert-dispatch apply --stdin
 ## 5. 一句话约束
 
 > `expert-dispatch（专家派发载荷）` 应由 `task-orchestrator（任务主代理）` 产出，本地只负责校验与落盘；不要让本地脚本替代 `task-orchestrator（任务主代理）` 做角色理解、技能选择和上下文裁剪。
+
+补充：
+
+- 若当前流程是 `prd-to-delivery（需求到交付）` 且目标角色是 `requirement-analyst / frontend-implementer / code-guardian`，则 `task.change_id` 缺失应视为非法派发

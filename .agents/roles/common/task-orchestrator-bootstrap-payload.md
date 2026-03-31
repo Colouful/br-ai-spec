@@ -76,9 +76,11 @@ cat ./.ai-spec/tmp/task-orchestrator-first-response.json | ai-spec runtime-state
   "run_plan": {
     "schema_version": 1,
     "kind": "run-plan",
+    "mode": "auto",
     "status": "planned",
     "task": {
       "type": "component-development",
+      "change_id": "add-product-card",
       "raw_input": "创建一个商品组件",
       "risk_level": "low"
     },
@@ -92,16 +94,27 @@ cat ./.ai-spec/tmp/task-orchestrator-first-response.json | ai-spec runtime-state
       "first_handoff": "requirement-analyst",
       "approval_gates": []
     },
+    "assumptions": [
+      "默认沿用项目现有组件目录与命名规范"
+    ],
     "missing_inputs": [
       "组件目录位置未明确"
     ],
-    "next_action": "先补齐关键信息，再进入 requirement-analyst"
+    "artifacts": [
+      "openspec/changes/add-product-card/proposal.md",
+      "openspec/changes/add-product-card/tasks.md",
+      "code",
+      "openspec/changes/add-product-card/checklist.md",
+      "openspec/changes/add-product-card/iterations.md"
+    ],
+    "next_action": "先按默认假设进入 requirement-analyst；若发现高风险冲突，再转 suggest 或 manual"
   },
   "task_anchor": {
     "schema_version": 1,
     "kind": "task-anchor",
     "task": {
       "raw_goal": "创建一个商品组件",
+      "change_id": "add-product-card",
       "input_kind": "natural-language"
     },
     "stage": {
@@ -123,4 +136,10 @@ cat ./.ai-spec/tmp/task-orchestrator-first-response.json | ai-spec runtime-state
 
 ## 6. 一句话要求
 
-> 如果 `task-orchestrator（任务主代理）` 需要在首轮产出后立刻初始化 `run-state（运行状态）`，应优先输出这份组合载荷，再调用 `ai-spec runtime-state bootstrap`，而不是让调用方手工拆分 `run-plan（运行计划）` 和 `task-anchor（任务锚点）`。
+> 如果 `task-orchestrator（任务主代理）` 需要在首轮产出后立刻初始化 `run-state（运行状态）`，应优先输出这份组合载荷；其中 `run-plan（运行计划）` 在 `auto（自动）` 模式下应先保留 `mode（运行模式）` 与 `assumptions（默认假设）`，再调用 `ai-spec runtime-state bootstrap`，而不是让调用方手工拆分 `run-plan（运行计划）` 和 `task-anchor（任务锚点）`。
+
+补充约束：
+
+- 对 `prd-to-delivery（需求到交付）`，首轮载荷必须带出稳定 `change_id（变更 ID）`
+- 必须能解析出 `openspec/changes/<change-id>/proposal.md`、`tasks.md`、`checklist.md`、`iterations.md`
+- 如果主代理漏写了上述产物路径，本地运行态也应按 `change_id（变更 ID）` 机械补齐默认路径

@@ -93,6 +93,36 @@ function createDispatchId(roleId, now = new Date()) {
   return `${iso}__${roleId}`;
 }
 
+function readJsonIfExists(filePath) {
+  if (!fs.existsSync(filePath)) {
+    return null;
+  }
+  return readJson(filePath, 'json');
+}
+
+function hydrateDispatchPayload(targetDir, payload) {
+  const hydrated = JSON.parse(JSON.stringify(payload));
+  const aiSpecDir = path.join(targetDir, '.ai-spec');
+  const currentRun = readJsonIfExists(path.join(aiSpecDir, 'current-run.json'));
+
+  if (!hydrated.task || typeof hydrated.task !== 'object') {
+    hydrated.task = {};
+  }
+
+  if (!hydrated.task.change_id) {
+    const inferredChangeId =
+      currentRun?.task?.change_id ||
+      currentRun?.anchor?.task?.change_id ||
+      null;
+
+    if (inferredChangeId) {
+      hydrated.task.change_id = inferredChangeId;
+    }
+  }
+
+  return hydrated;
+}
+
 function validateDispatchPayload(payload, sourceLabel) {
   if (!payload || typeof payload !== 'object') {
     throw new Error(`Invalid dispatch payload: ${sourceLabel}`);
@@ -105,6 +135,13 @@ function validateDispatchPayload(payload, sourceLabel) {
   }
   if (!payload.role || typeof payload.role !== 'object' || !payload.role.id) {
     throw new Error(`Dispatch payload is missing role.id: ${sourceLabel}`);
+  }
+  if (
+    payload.flow?.id === 'prd-to-delivery' &&
+    ['requirement-analyst', 'frontend-implementer', 'code-guardian'].includes(payload.role.id) &&
+    !payload.task?.change_id
+  ) {
+    throw new Error(`Dispatch payload is missing task.change_id for ${payload.role.id}: ${sourceLabel}`);
   }
 }
 
@@ -134,6 +171,21 @@ function writeDispatchArtifacts(targetDir, payload) {
   };
 }
 
+function cleanupTmpSource(targetDir, sourcePath) {
+  if (!sourcePath || sourcePath === 'stdin' || !fs.existsSync(sourcePath)) {
+    return null;
+  }
+
+  const tmpDir = path.join(path.resolve(targetDir), '.ai-spec', 'tmp');
+  const relative = path.relative(tmpDir, sourcePath);
+  if (relative.startsWith('..') || path.isAbsolute(relative)) {
+    return null;
+  }
+
+  fs.unlinkSync(sourcePath);
+  return sourcePath;
+}
+
 function applyDispatch(options) {
   const targetDir = path.resolve(options.target || '.');
   const sourcePath = options.payload
@@ -144,9 +196,11 @@ function applyDispatch(options) {
     ? readJson(sourcePath, 'expert-dispatch')
     : readJsonFromStdin('expert-dispatch');
 
-  validateDispatchPayload(rawPayload, sourcePath);
-  const payload = normalizeDispatchPayload(rawPayload);
+  const hydratedPayload = hydrateDispatchPayload(targetDir, rawPayload);
+  validateDispatchPayload(hydratedPayload, sourcePath);
+  const payload = normalizeDispatchPayload(hydratedPayload);
   const artifacts = writeDispatchArtifacts(targetDir, payload);
+  const cleanedSource = cleanupTmpSource(targetDir, sourcePath);
 
   return {
     status: 'success',
@@ -154,6 +208,7 @@ function applyDispatch(options) {
     source: sourcePath,
     artifacts,
     payload,
+    cleaned_source: cleanedSource,
   };
 }
 

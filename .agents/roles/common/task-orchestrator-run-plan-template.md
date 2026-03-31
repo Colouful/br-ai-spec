@@ -22,13 +22,17 @@ description: 定义 task-orchestrator 在首次识别任务时必须输出的最
 
 ## 2. 必填字段
 
-首轮输出至少必须覆盖下面 5 类信息：
+首轮输出至少必须覆盖下面 9 类信息：
 
 1. `task_identification（任务识别）`
-2. `selected_flow（选中的流程模板）`
-3. `selected_roles（本次激活专家）`
-4. `missing_inputs（缺失输入）`
-5. `next_action（下一步动作）`
+2. `change_identification（稳定变更 ID）`
+3. `artifact_targets（关键产物路径）`
+4. `mode（运行模式）`
+5. `selected_flow（选中的流程模板）`
+6. `selected_roles（本次激活专家）`
+7. `assumptions（默认假设）`
+8. `missing_inputs（缺失输入）`
+9. `next_action（下一步动作）`
 
 ## 3. 推荐 Markdown（标记语言）模板
 
@@ -42,10 +46,17 @@ description: 定义 task-orchestrator 在首次识别任务时必须输出的最
 - `selected_flow（选中的流程模板）`：<flow-id>
 - 原因：<为什么选择这条模板>
 
+## 运行模式
+- `mode（运行模式）`：auto / suggest / manual
+
 ## 推荐专家
 - 必选：<required_roles>
 - 可选：<activated_optional_roles>
 - 第一跳：<first_handoff>
+
+## 默认假设
+- <assumption_1>
+- <assumption_2>
 
 ## 缺失输入
 - <missing_input_1>
@@ -65,9 +76,11 @@ description: 定义 task-orchestrator 在首次识别任务时必须输出的最
 {
   "schema_version": 1,
   "kind": "run-plan",
+  "mode": "auto",
   "status": "planned",
   "task": {
     "type": "component-development",
+    "change_id": "add-product-card",
     "raw_input": "创建一个商品组件",
     "risk_level": "low"
   },
@@ -81,17 +94,38 @@ description: 定义 task-orchestrator 在首次识别任务时必须输出的最
     "first_handoff": "requirement-analyst",
     "approval_gates": []
   },
+  "assumptions": [
+    "默认沿用项目现有组件目录与命名规范",
+    "默认沿用项目现有主题变量和表单校验模式"
+  ],
   "missing_inputs": [
     "组件目录位置未明确",
     "是否有设计稿未明确"
   ],
-  "next_action": "先补齐关键信息，再进入 requirement-analyst"
+  "artifacts": [
+    "openspec/changes/add-product-card/proposal.md",
+    "openspec/changes/add-product-card/tasks.md",
+    "code",
+    "openspec/changes/add-product-card/checklist.md",
+    "openspec/changes/add-product-card/iterations.md"
+  ],
+  "next_action": "先按默认假设交给 requirement-analyst 收敛任务；若发现高风险冲突，再转 suggest 或 manual"
 }
 ```
 
 ## 5. 最小判定规则
 
-### 5.1 可以直接进入实现前置阶段
+### 5.1 auto 模式默认行为
+
+当运行模式是 `auto（自动）` 时，主代理应优先：
+
+- 先读取项目规范中的明确结论
+- 先读取仓库与规范上下文
+- 先推断可补齐的信息
+- 把推断结果写入 `assumptions（默认假设）`
+- 在不引入明显高风险的前提下继续交给下一跳专家
+
+### 5.2 可以直接进入实现前置阶段
 
 当满足以下条件时，可以继续向下游专家交接：
 
@@ -99,8 +133,12 @@ description: 定义 task-orchestrator 在首次识别任务时必须输出的最
 - 已选出基础 `flow（流程模板）`
 - 已明确第一跳专家
 - 关键阻断输入已知，或已显式列为 `missing_inputs（缺失输入）`
+- 当前缺口已经被仓库推断或默认假设部分覆盖
+- 项目规范中已有明确结论的信息已经被吸收到 `assumptions（默认假设）`
+- 已生成稳定 `change_id（变更 ID）`
+- 已明确 `openspec/changes/<change-id>/` 下的关键产物落点
 
-### 5.2 不能直接进入实现阶段
+### 5.3 不能直接进入实现阶段
 
 遇到以下情况时，不应直接让 `frontend-implementer（前端实现专家）` 开始写代码：
 
@@ -110,6 +148,34 @@ description: 定义 task-orchestrator 在首次识别任务时必须输出的最
 - 是否需要接口 / 状态 / 设计稿完全未知
 
 此时必须先输出缺口清单或先交给 `requirement-analyst（需求解析专家）`。
+
+### 5.4 必须从 auto 转 suggest / manual 的场景
+
+满足以下任一条件时，不应继续默认自动推进：
+
+- 认证、支付、安全、合规等高风险能力无法可靠推断
+- 关键默认假设与仓库现有实现冲突
+- 继续执行会显著放大返工成本
+- 需要明确业务口径才能决定实现方向
+
+### 5.5 page-development 任务的缺口分类
+
+对于 `page-development（页面开发）`：
+
+- 技术栈：优先从 `package.json`、`01-项目概述.md` 推断；可推断时写入 `assumptions（默认假设）`
+- 页面目录与路由落点：优先从 `03-项目结构.md`、`06-路由规范.md` 推断；可推断时写入 `assumptions（默认假设）`
+- 样式承载方式：优先从 `09-样式规范.md` 推断；可推断时写入 `assumptions（默认假设）`
+- 认证方式与字段校验：优先从现有代码和 `05-API规范.md` 推断；若仓库无现成认证实现，`auto` 模式下默认可假设为“账号密码登录 + 基础前端校验”
+- 只有“设计稿原稿、品牌主色实际值、后端真实认证协议、必须遵循的业务字段规则”这类无法从规范和代码推断的内容，才应进入 `missing_inputs（缺失输入）`
+
+### 5.6 prd-to-delivery 的强制产物门禁
+
+对于 `prd-to-delivery（需求到交付）`：
+
+- 首轮 `run-plan（运行计划）` 必须确定稳定 `change_id（变更 ID）`
+- 首轮 `run-plan（运行计划）` 必须显式带出 `proposal/tasks/checklist/iterations` 的目标路径
+- 未存在 `proposal.md` 与 `tasks.md` 时，不得交给 `frontend-implementer（前端实现专家）`
+- 未存在 `checklist.md` 与 `iterations.md` 时，不得进入 `complete（完成）`
 
 ## 6. 示例
 
@@ -131,10 +197,17 @@ description: 定义 task-orchestrator 在首次识别任务时必须输出的最
 - `selected_flow（选中的流程模板）`：prd-to-delivery
 - 原因：当前输入属于需求驱动的前端交付任务，且缺少实现细节，适合先走最小规划再进入实现
 
+## 运行模式
+- `mode（运行模式）`：auto
+
 ## 推荐专家
 - 必选：frontend-implementer（前端实现专家）、code-guardian（规范守护者）
 - 可选：requirement-analyst（需求解析专家）
 - 第一跳：requirement-analyst（需求解析专家）
+
+## 默认假设
+- 默认沿用项目现有前端技术栈与目录规范
+- 默认沿用项目现有主题变量和基础校验方式
 
 ## 缺失输入
 - 组件使用的是 Vue（前端框架）还是 React（前端框架）
@@ -145,12 +218,12 @@ description: 定义 task-orchestrator 在首次识别任务时必须输出的最
 - 暂无
 
 ## 下一步
-- 请先补齐上述信息，再进入 requirement-analyst（需求解析专家）
+- 先按默认假设进入 requirement-analyst（需求解析专家）；若需求收敛阶段发现高风险冲突，再转 suggest 或 manual
 ```
 
 ## 7. 一句话约束
 
-> `task-orchestrator（任务主代理）` 的首轮输出必须先形成结构化 `run-plan（运行计划）`，再决定是否交给下游专家，不允许在信息明显不足时直接进入实现。
+> `task-orchestrator（任务主代理）` 的首轮输出必须先形成结构化 `run-plan（运行计划）`；在 `auto（自动）` 模式下，应先做仓库推断并记录 `assumptions（默认假设）`，不默认回问用户，只有高风险关键分歧才转 `suggest（建议）` 或 `manual（手动）`。
 
 ## 8. 与首轮桥接载荷的关系
 

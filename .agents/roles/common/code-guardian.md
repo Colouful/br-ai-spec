@@ -47,6 +47,7 @@ handoff_to: []
 4. 必要时执行 UI 验收或补充测试建议
 5. 产出 `checklist.md`
 6. 记录本轮问题、调整和经验到 `iterations.md`
+7. 在 `checklist.md` 与 `iterations.md` 落盘前，不得给出 `complete（完成）` 结论
 
 ## 输出标准
 
@@ -69,6 +70,7 @@ handoff_to: []
 - 不把明显未通过项写成“建议优化”
 - 不省略阻断原因
 - 不在没有检查证据时给出“已完成”判断
+- 不在未生成 `checklist.md` 与 `iterations.md` 时宣称审查完成
 
 ## 交接
 

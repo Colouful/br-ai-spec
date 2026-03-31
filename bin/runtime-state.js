@@ -189,6 +189,72 @@ function createRunId(now = new Date()) {
   return `run_${y}${m}${d}_${hh}${mm}${ss}_${rand}`;
 }
 
+function slugifyValue(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .replace(/-{2,}/g, '-');
+}
+
+function deriveChangeId({ explicitChangeId, rawInput, taskType, runId }) {
+  const normalizedExplicit = slugifyValue(explicitChangeId);
+  if (normalizedExplicit) {
+    return normalizedExplicit;
+  }
+
+  const normalizedInput = slugifyValue(rawInput);
+  if (normalizedInput) {
+    return normalizedInput.slice(0, 64);
+  }
+
+  const normalizedTaskType = slugifyValue(taskType) || 'change';
+  const normalizedRunId = slugifyValue(runId) || 'run';
+  return `${normalizedTaskType}-${normalizedRunId}`.slice(0, 96);
+}
+
+function buildDefaultArtifacts(changeId) {
+  if (!changeId) {
+    return {
+      proposal: null,
+      tasks: null,
+      checklist: null,
+      iterations: null,
+      additional: [],
+    };
+  }
+
+  const baseDir = `openspec/changes/${changeId}`;
+  return {
+    proposal: `${baseDir}/proposal.md`,
+    tasks: `${baseDir}/tasks.md`,
+    checklist: `${baseDir}/checklist.md`,
+    iterations: `${baseDir}/iterations.md`,
+    additional: [],
+  };
+}
+
+function mergeArtifacts(baseArtifacts, inferredArtifacts) {
+  const additional = [
+    ...(Array.isArray(baseArtifacts?.additional) ? baseArtifacts.additional : []),
+    ...(Array.isArray(inferredArtifacts?.additional) ? inferredArtifacts.additional : []),
+  ];
+
+  const merged = {
+    proposal: inferredArtifacts?.proposal || baseArtifacts?.proposal || null,
+    tasks: inferredArtifacts?.tasks || baseArtifacts?.tasks || null,
+    checklist: inferredArtifacts?.checklist || baseArtifacts?.checklist || null,
+    iterations: inferredArtifacts?.iterations || baseArtifacts?.iterations || null,
+    additional: Array.from(new Set(additional.filter(Boolean))),
+  };
+
+  if (merged.additional.length === 0) {
+    delete merged.additional;
+  }
+
+  return merged;
+}
+
 function inferArtifacts(artifacts) {
   const normalized = {
     proposal: null,
@@ -197,6 +263,32 @@ function inferArtifacts(artifacts) {
     iterations: null,
     additional: [],
   };
+
+  if (!artifacts) {
+    return normalized;
+  }
+
+  if (artifacts && typeof artifacts === 'object' && !Array.isArray(artifacts)) {
+    const directKeys = ['proposal', 'tasks', 'checklist', 'iterations'];
+    for (const key of directKeys) {
+      if (typeof artifacts[key] === 'string' && artifacts[key].trim()) {
+        normalized[key] = artifacts[key];
+      }
+    }
+
+    const additional = artifacts.additional;
+    if (typeof additional === 'string' && additional.trim()) {
+      normalized.additional.push(additional);
+    } else if (Array.isArray(additional)) {
+      normalized.additional.push(...additional.filter((item) => typeof item === 'string' && item.trim()));
+    }
+
+    if (normalized.additional.length === 0) {
+      delete normalized.additional;
+    }
+
+    return normalized;
+  }
 
   if (!Array.isArray(artifacts)) {
     return normalized;
@@ -241,6 +333,7 @@ function sanitizeAnchor(taskAnchor) {
     task: taskAnchor.task || null,
     stage: taskAnchor.stage || null,
     constraints: taskAnchor.constraints || null,
+    artifacts: taskAnchor.artifacts || null,
     expected_output: taskAnchor.expected_output || [],
   };
 }
@@ -270,13 +363,34 @@ function normalizeBootstrapPayload(payload, sourceLabel) {
 function buildRunState({ runPlan, taskAnchor, options, now, source }) {
   const runId = options.runId || runPlan.run_id || createRunId(now);
   const createdAt = now.toISOString();
-  const artifacts = inferArtifacts(runPlan.artifacts);
+  const rawInput =
+    options.rawInput ||
+    runPlan.task?.raw_input ||
+    taskAnchor?.task?.raw_goal ||
+    null;
+  const changeId = deriveChangeId({
+    explicitChangeId: options.changeId || runPlan.task?.change_id || taskAnchor?.task?.change_id || null,
+    rawInput,
+    taskType: runPlan.task?.type || null,
+    runId,
+  });
+  const artifacts = mergeArtifacts(buildDefaultArtifacts(changeId), inferArtifacts(runPlan.artifacts));
   const currentRole = runPlan.plan?.first_handoff || null;
   const approvalGates = Array.isArray(runPlan.plan?.approval_gates)
     ? runPlan.plan.approval_gates
     : [];
   const pendingGate = approvalGates.length > 0 ? approvalGates[0] : null;
-  const anchor = sanitizeAnchor(taskAnchor);
+  const sanitizedAnchor = sanitizeAnchor(taskAnchor);
+  const anchor = sanitizedAnchor
+    ? {
+        ...sanitizedAnchor,
+        task: {
+          ...(sanitizedAnchor.task || {}),
+          change_id: sanitizedAnchor.task?.change_id || changeId,
+        },
+        artifacts: sanitizedAnchor.artifacts || artifacts,
+      }
+    : null;
   const initMessage = source?.bootstrapPayload
     ? 'runtime-state initialized from task-orchestrator bootstrap payload'
     : 'runtime-state initialized from run-plan';
@@ -285,18 +399,15 @@ function buildRunState({ runPlan, taskAnchor, options, now, source }) {
     schema_version: 1,
     kind: 'run-state',
     run_id: runId,
+    mode: runPlan.mode || 'auto',
     status: options.status || runPlan.status || 'planned',
     trigger: {
       source: options.triggerSource,
       entry: options.entry,
-      raw_input:
-        options.rawInput ||
-        runPlan.task?.raw_input ||
-        taskAnchor?.task?.raw_goal ||
-        null,
+      raw_input: rawInput,
     },
     task: {
-      change_id: options.changeId || runPlan.task?.change_id || taskAnchor?.task?.change_id || null,
+      change_id: changeId,
       input_kind: runPlan.task?.input_kind || taskAnchor?.task?.input_kind || 'unknown',
       risk_level: runPlan.task?.risk_level || 'unknown',
       type: runPlan.task?.type || null,
@@ -316,6 +427,7 @@ function buildRunState({ runPlan, taskAnchor, options, now, source }) {
     current_role: currentRole,
     pending_gate: pendingGate,
     artifacts,
+    assumptions: Array.isArray(runPlan.assumptions) ? runPlan.assumptions : [],
     missing_inputs: runPlan.missing_inputs || [],
     warnings: runPlan.warnings || [],
     errors: runPlan.errors || [],
@@ -333,6 +445,57 @@ function buildRunState({ runPlan, taskAnchor, options, now, source }) {
       updated_at: createdAt,
     },
   };
+}
+
+function listMissingOpenSpecArtifacts(targetDir, state, artifactKeys) {
+  const artifactMap = mergeArtifacts(
+    buildDefaultArtifacts(state.task?.change_id || state.anchor?.task?.change_id || null),
+    inferArtifacts(state.artifacts || null),
+  );
+  const missing = [];
+
+  for (const key of artifactKeys) {
+    const relPath = artifactMap[key];
+    if (!relPath) {
+      missing.push(`artifact:${key}`);
+      continue;
+    }
+
+    const absolutePath = path.join(targetDir, relPath);
+    if (!fs.existsSync(absolutePath)) {
+      missing.push(relPath);
+    }
+  }
+
+  return missing;
+}
+
+function assertRequiredOpenSpecArtifacts(targetDir, state, action, toRole) {
+  if (state.flow?.id !== 'prd-to-delivery') {
+    return;
+  }
+
+  if (!state.task?.change_id) {
+    throw new Error(`Cannot ${action} prd-to-delivery run without task.change_id`);
+  }
+
+  let requiredArtifacts = [];
+  if (action === 'handoff' && toRole === 'frontend-implementer') {
+    requiredArtifacts = ['proposal', 'tasks'];
+  } else if (action === 'complete') {
+    requiredArtifacts = ['proposal', 'tasks', 'checklist', 'iterations'];
+  }
+
+  if (requiredArtifacts.length === 0) {
+    return;
+  }
+
+  const missingArtifacts = listMissingOpenSpecArtifacts(targetDir, state, requiredArtifacts);
+  if (missingArtifacts.length > 0) {
+    throw new Error(
+      `Cannot ${action} prd-to-delivery run; missing required OpenSpec artifacts: ${missingArtifacts.join(', ')}`,
+    );
+  }
 }
 
 function ensureDir(dirPath) {
@@ -500,6 +663,7 @@ function handoffRunState(options) {
     ? path.resolve(process.cwd(), options.taskAnchor)
     : null;
   const { currentRunPath, historyRunPath, state, syncCurrent } = resolveRunStatePaths(targetDir, options.runId);
+  assertRequiredOpenSpecArtifacts(targetDir, state, 'handoff', options.toRole);
   const taskAnchor = loadTaskAnchor(taskAnchorPath, options.taskAnchorData || null);
   const sanitizedAnchor = updateAnchorForRole(
     state.anchor || null,
@@ -673,6 +837,7 @@ function statusRunState(options) {
     },
     summary: {
       run_id: state.run_id,
+      mode: state.mode || null,
       status: state.status || null,
       flow_id: state.flow?.id || null,
       current_role: state.current_role || null,
@@ -746,6 +911,7 @@ function completeRunState(options) {
     ? path.resolve(process.cwd(), options.taskAnchor)
     : null;
   const { currentRunPath, historyRunPath, state, syncCurrent } = resolveRunStatePaths(targetDir, options.runId);
+  assertRequiredOpenSpecArtifacts(targetDir, state, 'complete', options.toRole || state.current_role || null);
   const toRole = options.toRole || state.current_role || null;
   const taskAnchor = loadTaskAnchor(taskAnchorPath, options.taskAnchorData || null);
   const anchor = updateAnchorForRole(state.anchor || null, taskAnchor, toRole, options.nextRole);
@@ -999,6 +1165,7 @@ function printPretty(result, action = 'init') {
   console.log(`  run_id: ${result.state.run_id}`);
   console.log(`  current: ${result.artifacts.current_run}`);
   console.log(`  history: ${result.artifacts.run_history}`);
+  console.log(`  mode: ${result.state.mode || 'n/a'}`);
   if (action === 'status') {
     console.log(`  status: ${result.state.status || 'n/a'}`);
     console.log(`  current_role: ${result.state.current_role || 'n/a'}`);

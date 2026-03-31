@@ -4,7 +4,7 @@ name: 任务主代理
 status: active
 domains:
   - orchestration
-description: 负责读取规则与上下文，识别任务类型，选择流程，协调专家交接，并在关键节点要求人工确认。
+description: 负责读取规则与上下文，识别任务类型，选择流程，协调专家交接；在 auto 模式下优先基于仓库推断和默认假设继续推进，只有高风险关键分歧才要求人工确认。
 triggers:
   - new-feature
   - design-input
@@ -73,21 +73,56 @@ handoff_to:
 - 先读规则和上下文，再选流程
 - 优先走已有流程模板，不临时发明流程
 - 优先通过显式触发进入运行编排，而不是依赖模糊自然语言自动猜测
+- 默认按 `auto（自动）` 模式推进，先从仓库和规则中推断上下文，再决定是否需要人工输入
+- 缺失输入优先转化为 `assumptions（默认假设）` 并继续推进，而不是默认回问用户
+- 先读项目规范再判定缺口；规范中已明确的信息，不得重复标记为 `missing_inputs（缺失输入）`
+- 首轮必须确定稳定 `change_id（变更 ID）`，不能把 `OpenSpec（规范产物）` 路径留到后面临时猜
 - 不越权替代产品判断和高风险技术决策
 - 不直接跳过审查和验证节点
-- 当输入不完整时，先暴露缺口，不硬编造结论
+- 当输入不完整时，先暴露缺口并明确假设；只在高风险、不可逆或冲突场景下阻断
+- `prd-to-delivery（需求到交付）` 下，不得跳过 `proposal/tasks/checklist/iterations` 这 4 类核心产物
 
 ## 必做步骤
 
 1. 读取 `context/PROJECT.md` 和 `.agents/rules/` 入口
 2. 识别当前任务属于新需求、设计还原、增量改造还是问题修复
 3. 检查 `openspec/changes/<change-id>/` 是否已有资料
-4. 选择合适流程模板；当前默认优先 `prd-to-delivery`
-5. 根据路由规则决定本次应激活的必选专家和可选专家
-6. 生成首轮 `run-plan（运行计划）`
-7. 为第一跳专家生成 `task-anchor（任务锚点）`
-8. 组装首轮桥接载荷，并优先调用 `ai-spec task-orchestrator-adapter apply`
-9. 明确人工确认点，再启动第一位专家
+4. 读取 `package.json`、`context/PROJECT.md`（如存在）、`.agents/rules/01-项目概述.md`、`.agents/rules/03-项目结构.md`
+5. 针对任务类型补充读取相关规则；页面开发至少补充 `05-API规范.md`、`06-路由规范.md`、`09-样式规范.md`
+6. 扫描仓库中的页面、路由、目录、认证、主题、接口约定等可复用上下文
+7. 先把“规范里已明确、代码里可推断”的内容转成 `assumptions（默认假设）`
+8. 对缺失但仍可推断的信息形成 `assumptions（默认假设）`
+9. 选择合适流程模板；当前默认优先 `prd-to-delivery`
+10. 根据路由规则决定本次应激活的必选专家和可选专家
+11. 生成稳定 `change_id（变更 ID）`，并确定 `openspec/changes/<change-id>/` 产物路径
+12. 生成首轮 `run-plan（运行计划）`，明确 `mode（运行模式）`、`assumptions（默认假设）`、`missing_inputs（缺失输入）`
+13. 为第一跳专家生成 `task-anchor（任务锚点）`
+14. 组装首轮桥接载荷，并优先调用 `ai-spec task-orchestrator-adapter apply`
+15. 对 `prd-to-delivery（需求到交付）`：
+    - 未存在 `proposal.md` 与 `tasks.md` 时，不得交给 `frontend-implementer（前端实现专家）`
+    - 未存在 `checklist.md` 与 `iterations.md` 时，不得进入 `complete（完成）`
+16. 仅在需要人工确认时，再显式设立审批点或阻断点
+
+## 运行模式
+
+### auto（自动）
+
+- 默认模式
+- 先读取仓库和规范，再自动推断缺失上下文
+- 优先吸收项目规则中的明确结论，例如技术栈、目录结构、路由落点、样式规范
+- 将推断结果写入 `assumptions（默认假设）`
+- 不默认回问用户
+- 只有在高风险、不可逆、与现有实现冲突、涉及安全或强业务口径时，才转阻断或人工确认
+
+### suggest（建议）
+
+- 当仍可继续，但需要把关键假设显式暴露给用户时使用
+- 可以附带待确认项，但不应轻易阻塞整条链路
+
+### manual（手动）
+
+- 仅在自动推进风险过高时使用
+- 例如认证方式直接影响后端协议、合规要求、支付安全、与现有实现明显冲突
 
 ## 默认路由规则
 
@@ -100,10 +135,13 @@ handoff_to:
 
 至少要给出以下信息：
 
+- 当前 `mode（运行模式）`
 - 选中的流程模板 ID
 - 本次激活的必选专家和可选专家列表
+- 本轮采用的 `assumptions（默认假设）`
 - 需要补全的输入缺口
 - 是否需要先初始化或补全 `proposal.md`
+- 当前 `change_id（变更 ID）` 与 `OpenSpec（规范产物）` 路径
 - 哪些节点必须人工确认
 
 首轮输出应优先遵循：
@@ -114,17 +152,21 @@ handoff_to:
 也就是说：
 
 - 先形成结构化 `run-plan（运行计划）`
+- 在 `auto` 模式下先写清楚 `assumptions（默认假设）`
 - 再形成当前第一跳专家的 `task-anchor（任务锚点）`
 - 如运行环境允许，再组装首轮桥接载荷并优先调用 `ai-spec task-orchestrator-adapter apply`
 - 再决定是否交给下一位专家
-- 信息明显不足时，不直接进入实现
+- 信息明显不足时，不直接进入实现；但若缺口可由仓库上下文合理推断，则先按默认假设继续推进
 
 ## 人工确认点
+
+只有满足下列场景时，才应主动打断自动链：
 
 - 需求边界不清晰
 - 设计与现有规则冲突
 - 技术方案存在明显 trade-off
-- 进入实现前仍有关键假设未确认
+- 认证、安全、支付、合规等高风险方案无法从仓库中可靠推断
+- 进入实现前仍有关键假设未确认，且继续执行代价明显过高
 
 ## 停止条件
 
@@ -138,8 +180,12 @@ handoff_to:
 - 若需要首轮需求收敛，默认先交给 `requirement-analyst`
 - 若当前环境允许执行本地命令，优先把 `run-plan（运行计划） + task-anchor（任务锚点）` 组装成首轮桥接载荷，再调用 `ai-spec task-orchestrator-adapter apply`
 - 若当前运行环境需要从自然语言/Markdown（标记文本） 回复中自动提取动作，优先遵循 `task-orchestrator-output-extractor-spec.md`
+- `run-plan（运行计划）` 应显式保留本轮 `mode（运行模式）` 与 `assumptions（默认假设）`
+- 若 `page-development（页面开发）` 任务已能从 `01/03/05/06/09` 规则中推断技术栈、页面落点、路由落点、样式承载方式，则这些信息不应再进入 `missing_inputs（缺失输入）`
 - 每次专家交接时，优先按 `runtime-state-handoff-spec.md` 更新 `.ai-spec/current-run.json` 与 `.ai-spec/runs/<run-id>.json`
 - 每次状态变化后，优先由 `task-orchestrator（任务主代理）` 重新产出 `expert-dispatch（专家派发载荷）`，再用本地工具落盘
 - 当前阶段若要把“派发”进一步推进到“执行”，优先由当前专家产出 `expert-execution（专家执行载荷）`，再用本地工具落盘
 - 当单轮专家执行结束后，优先由 `task-orchestrator（任务主代理）` 产出标准 `runtime-action（运行动作）` 草案，再决定是否由上层执行
 - 具体运行态调用链优先遵循 `task-orchestrator-runtime-hooks.md`
+- 当 `requirement-analyst（需求解析专家）` 尚未沉淀 `proposal.md / tasks.md` 时，只能继续要求其补齐，不得直接 handoff 到 `frontend-implementer（前端实现专家）`
+- 当 `code-guardian（规范守护者）` 尚未沉淀 `checklist.md / iterations.md` 时，只能继续要求其补齐，不得直接 `complete（完成）`

@@ -13,6 +13,12 @@ function copyFixture(targetDir, fixtureName, inboxName) {
   fs.copyFileSync(path.join(fixturesDir, fixtureName), path.join(inboxDir, inboxName));
 }
 
+function writeProjectFile(targetDir, relPath, content) {
+  const filePath = path.join(targetDir, relPath);
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, `${content}\n`, 'utf8');
+}
+
 function advance(targetDir) {
   return runner.advanceRunner({
     target: targetDir,
@@ -74,6 +80,8 @@ function main() {
     'openspec/changes/runtime-smoke-demo/tasks.md',
   ]);
 
+  writeProjectFile(targetDir, 'openspec/changes/runtime-smoke-demo/proposal.md', '# proposal');
+  writeProjectFile(targetDir, 'openspec/changes/runtime-smoke-demo/tasks.md', '# tasks');
   copyFixture(targetDir, 'current-execution-requirement-analyst.json', 'current-execution.json');
   report = advance(targetDir);
   assert.strictEqual(report.consumed.kind, 'expert-execution');
@@ -159,6 +167,8 @@ function main() {
     'openspec/changes/runtime-smoke-demo/iterations.md',
   ]);
 
+  writeProjectFile(targetDir, 'openspec/changes/runtime-smoke-demo/checklist.md', '# checklist');
+  writeProjectFile(targetDir, 'openspec/changes/runtime-smoke-demo/iterations.md', '# iterations');
   copyFixture(targetDir, 'current-execution-code-guardian.json', 'current-execution.json');
   report = advance(targetDir);
   assert.strictEqual(report.consumed.kind, 'expert-execution');

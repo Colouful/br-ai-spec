@@ -169,6 +169,21 @@ function printApplyPretty(result) {
   console.log(`  status: ${result.applied.result.state.status || 'n/a'}`);
 }
 
+function cleanupTmpSource(targetDir, sourcePath) {
+  if (!sourcePath || sourcePath === 'stdin' || !fs.existsSync(sourcePath)) {
+    return null;
+  }
+
+  const tmpDir = path.join(path.resolve(process.cwd(), targetDir || '.'), '.ai-spec', 'tmp');
+  const relative = path.relative(tmpDir, sourcePath);
+  if (relative.startsWith('..') || path.isAbsolute(relative)) {
+    return null;
+  }
+
+  fs.unlinkSync(sourcePath);
+  return sourcePath;
+}
+
 function main(argv = process.argv.slice(2)) {
   const { command, options } = parseArgs(argv);
 
@@ -214,18 +229,20 @@ function main(argv = process.argv.slice(2)) {
     return 0;
   }
 
-  const applied = adapter.applyPayload({
+  const applied = adapter.attachDispatch(adapter.applyPayload({
     action: extracted.action,
     payload: extracted.payload,
     options,
     payloadSource: source,
-  });
+  }), options);
+  const cleanedSource = cleanupTmpSource(options.target, source);
   const result = {
     status: 'success',
     source,
     extraction: extracted.extraction,
     action: extracted.action,
     applied,
+    cleaned_source: cleanedSource,
   };
 
   if (options.json) {

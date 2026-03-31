@@ -1,52 +1,47 @@
-使用 `task-orchestrator（任务主代理）` 的单动作链处理本次任务。
+使用 `task-orchestrator（任务主代理）` 的统一入口处理本次任务。
 
-兼容说明：
+兼容规则：
 
-- 新任务优先使用 `/spec-start`
-- 运行中继续推进优先使用 `/spec-continue`
-- 本命令保留为统一兼容入口
+- 新任务优先按 `/spec-start` 语义执行
+- 已有运行态优先按 `/spec-continue` 语义执行
+- 本命令仍要求自动推进，不是只生成单步 payload
 
 执行要求：
 
-1. 先读取这些规范：
-   - `.agents/roles/common/task-orchestrator.md`
-   - `.agents/roles/common/task-orchestrator-run-plan-template.md`
-   - `.agents/roles/common/task-anchor-spec.md`
-   - `.agents/roles/common/task-orchestrator-bootstrap-payload.md`
-   - `.agents/roles/common/task-orchestrator-adapter-payload.md`
-   - `.agents/roles/common/task-orchestrator-output-extractor-spec.md`
-   - `.agents/roles/common/task-orchestrator-runtime-hooks.md`
+1. 先判断：
+   - 若不存在 `./.ai-spec/current-run.json`，按新任务启动
+   - 若已存在运行态，按当前状态继续推进
 
-2. 识别这次属于哪种最小动作：
-   - 如果当前项目还没有 `.ai-spec/current-run.json`，或这是一个新任务，产出 `task-orchestrator-bootstrap（主代理首轮桥接载荷）`
-   - 如果当前项目已经有运行态，且用户是在继续、审批、阻断、恢复、完成、失败、取消、查询状态，则只产出一个 `task-orchestrator-runtime-action（主代理运行动作载荷）`
+2. 无论哪种入口，都要自动完成以下链路，直到终态或真实阻断：
+   - `bootstrap`
+   - `expert-dispatch`
+   - `expert-execution`
+   - `runtime-action`
 
-3. 不要在这一步直接写业务代码。当前命令只负责：
-   - 收敛任务
-   - 生成结构化载荷
-   - 触发运行态更新
+3. `prd-to-delivery` 强制要求：
+   - 必须有稳定 `change_id`
+   - 必须有 `proposal.md / tasks.md / checklist.md / iterations.md`
+   - 缺少这些文件时，继续让当前专家补齐，不要交给用户手动处理
 
-4. 先在内存里准备一份 Markdown（标记文本） 内容，格式必须是：
-   - 上面可以有简短说明
-   - 下面必须包含且只包含一个合法的 `json` 代码块
-   - 代码块内容必须符合当前所需 payload（载荷） 规范
+4. 写盘方式：
+   - `bootstrap` 或 `runtime-action`：写 `./.ai-spec/tmp/task-orchestrator-reply.md`，再执行 `task-orchestrator-extractor apply`
+   - `expert-dispatch`：写 `./.ai-spec/tmp/current-dispatch.json`，再执行 `expert-dispatch apply`
+   - `expert-execution`：写 `./.ai-spec/tmp/current-execution.json`，再执行 `expert-executor apply`
 
-5. 使用 Bash（命令行） 工具执行：
-   - `mkdir -p ./.ai-spec/tmp`
-   - 将上一步准备好的 Markdown（标记文本） 内容写入 `./.ai-spec/tmp/task-orchestrator-reply.md`
-   - 运行：
-     - `./node_modules/.bin/ai-spec task-orchestrator-extractor apply --payload ./.ai-spec/tmp/task-orchestrator-reply.md --target .`
+5. 交互要求：
+   - 中间不回显原始 JSON、adapter 字段和命令链
+   - 只输出短进度语义
+   - 优先做最小状态变更，不要长篇解释，以避免 IDE 超时
 
-6. 最终对用户只输出简要结果：
-   - `task_type（任务类型）`
-   - `flow（流程模板）`
-   - `current_role（当前专家）`
-   - `run_id（运行 ID）`
-   - `status（状态）`
-   - `pending_gate（待审批点）`
-   - `missing_inputs（缺失输入） / next_action（下一步）`
-
-7. 如果信息不足：
-   - 允许首轮 `bootstrap（首轮桥接）` 里保留 `missing_inputs（缺失输入）`
-   - 或输出 `gate-blocked（阻断）`
-   - 不要为了继续执行而虚构信息
+6. 最终只输出：
+   - `mode`
+   - `run_id`
+   - `task_type`
+   - `flow`
+   - `current_role`
+   - `status`
+   - `completed_roles`
+   - `pending_gate`
+   - `assumptions`
+   - `missing_inputs`
+   - `artifacts`

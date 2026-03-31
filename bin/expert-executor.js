@@ -106,6 +106,77 @@ function normalizeList(value) {
   return [String(value)].filter(Boolean);
 }
 
+function readJsonIfExists(filePath) {
+  if (!fs.existsSync(filePath)) {
+    return null;
+  }
+
+  return readJson(filePath, 'json');
+}
+
+function buildOpenSpecArtifactMap(changeId, artifacts = {}) {
+  if (!changeId) {
+    return {
+      proposal: null,
+      tasks: null,
+      checklist: null,
+      iterations: null,
+    };
+  }
+
+  const baseDir = `openspec/changes/${changeId}`;
+  return {
+    proposal: artifacts.proposal || `${baseDir}/proposal.md`,
+    tasks: artifacts.tasks || `${baseDir}/tasks.md`,
+    checklist: artifacts.checklist || `${baseDir}/checklist.md`,
+    iterations: artifacts.iterations || `${baseDir}/iterations.md`,
+  };
+}
+
+function validateOpenSpecOutputs(targetDir, payload) {
+  const requiredByRole = {
+    'requirement-analyst': ['proposal', 'tasks'],
+    'code-guardian': ['checklist', 'iterations'],
+  };
+
+  const requiredKeys = requiredByRole[payload.role.id] || [];
+  if (requiredKeys.length === 0) {
+    return null;
+  }
+
+  const aiSpecDir = path.join(targetDir, '.ai-spec');
+  const currentRun = readJsonIfExists(path.join(aiSpecDir, 'current-run.json'));
+  const currentDispatch = readJsonIfExists(path.join(aiSpecDir, 'current-dispatch.json'));
+  const changeId =
+    payload.task?.change_id ||
+    currentDispatch?.task?.change_id ||
+    currentRun?.task?.change_id ||
+    currentRun?.anchor?.task?.change_id ||
+    null;
+
+  if (!changeId) {
+    throw new Error(
+      `Execution payload for ${payload.role.id} requires task.change_id or current-run.task.change_id to resolve OpenSpec outputs`,
+    );
+  }
+
+  const artifactMap = buildOpenSpecArtifactMap(changeId, currentRun?.artifacts || {});
+  const missingOutputs = requiredKeys
+    .map((key) => artifactMap[key])
+    .filter((relPath) => !relPath || !fs.existsSync(path.join(targetDir, relPath)));
+
+  if (missingOutputs.length > 0) {
+    throw new Error(
+      `Execution payload for ${payload.role.id} is missing required OpenSpec artifacts: ${missingOutputs.join(', ')}`,
+    );
+  }
+
+  return {
+    change_id: changeId,
+    required_outputs: requiredKeys.map((key) => artifactMap[key]),
+  };
+}
+
 function renderExecutionMarkdown(payload) {
   if (payload.markdown && typeof payload.markdown === 'string') {
     return payload.markdown.trim();
@@ -266,12 +337,29 @@ function readPayloadFromOptions(options, label) {
   return { sourcePath, rawPayload };
 }
 
+function cleanupTmpSource(targetDir, sourcePath) {
+  if (!sourcePath || sourcePath === 'stdin' || !fs.existsSync(sourcePath)) {
+    return null;
+  }
+
+  const tmpDir = path.join(path.resolve(targetDir), '.ai-spec', 'tmp');
+  const relative = path.relative(tmpDir, sourcePath);
+  if (relative.startsWith('..') || path.isAbsolute(relative)) {
+    return null;
+  }
+
+  fs.unlinkSync(sourcePath);
+  return sourcePath;
+}
+
 function applyExecution(options) {
   const targetDir = path.resolve(options.target || '.');
   const { sourcePath, rawPayload } = readPayloadFromOptions(options, 'expert-execution');
   validateExecutionPayload(rawPayload, sourcePath);
+  const validation = validateOpenSpecOutputs(targetDir, rawPayload);
   const payload = normalizeExecutionPayload(rawPayload);
   const artifacts = writeExecutionArtifacts(targetDir, payload);
+  const cleanedSource = cleanupTmpSource(targetDir, sourcePath);
 
   return {
     status: 'success',
@@ -279,6 +367,8 @@ function applyExecution(options) {
     source: sourcePath,
     artifacts,
     payload,
+    validation,
+    cleaned_source: cleanedSource,
   };
 }
 
@@ -287,6 +377,7 @@ function applyExecutionData(options) {
   const sourcePath = options.source || 'memory-payload';
   const rawPayload = options.payloadData;
   validateExecutionPayload(rawPayload, sourcePath);
+  const validation = validateOpenSpecOutputs(targetDir, rawPayload);
   const payload = normalizeExecutionPayload(rawPayload);
   const artifacts = writeExecutionArtifacts(targetDir, payload);
 
@@ -296,6 +387,7 @@ function applyExecutionData(options) {
     source: sourcePath,
     artifacts,
     payload,
+    validation,
   };
 }
 
@@ -305,6 +397,7 @@ function applyRuntimeAction(options) {
   validateRuntimeActionPayload(rawPayload, sourcePath);
   const payload = normalizeRuntimeActionPayload(rawPayload);
   const artifacts = writeRuntimeActionArtifacts(targetDir, payload);
+  const cleanedSource = cleanupTmpSource(targetDir, sourcePath);
 
   return {
     status: 'success',
@@ -312,6 +405,7 @@ function applyRuntimeAction(options) {
     source: sourcePath,
     artifacts,
     payload,
+    cleaned_source: cleanedSource,
   };
 }
 
