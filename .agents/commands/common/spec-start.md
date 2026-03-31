@@ -1,102 +1,114 @@
-使用 `task-orchestrator（任务主代理）` 启动一个**新任务**，并默认自动推进到终态或真实阻断。
+这是**编排命令**，不是直接开发命令。
 
-执行要求：
+目标：
+- 由 `task-orchestrator（任务主代理）` 协调专家链完成任务
+- 默认自动推进到终态或真实阻断
+- 不把中间 payload / adapter / apply 命令交给用户
 
-1. 先读取最小必要上下文：
-   - `./package.json`
-   - `./src/`（如存在）
-   - `context/PROJECT.md`（如存在）
-   - `.agents/rules/01-项目概述.md`（如存在）
-   - `.agents/rules/03-项目结构.md`（如存在）
-   - `.agents/rules/05-API规范.md`（如存在）
-   - `.agents/rules/06-路由规范.md`（如存在）
-   - `.agents/rules/09-样式规范.md`（如存在）
-   - `.agents/roles/common/task-orchestrator.md`
-   - `.agents/roles/common/task-orchestrator-run-plan-template.md`
-   - `.agents/roles/common/task-anchor-spec.md`
-   - `.agents/roles/common/task-orchestrator-bootstrap-payload.md`
-   - `.agents/roles/common/task-orchestrator-output-extractor-spec.md`
+硬性要求：
+- 禁止在 `requirement-analyst（需求解析专家）` 完成前直接修改业务代码
+- 禁止跳过 `task-orchestrator -> requirement-analyst -> frontend-implementer -> code-guardian -> task-orchestrator` 这条主链
+- 即使同一个 AI 会话里完成全部流程，也必须**显式按角色阶段推进**，不能把“自动推进”理解成“自己直接把代码写完”
+- 用户只看阶段语义；payload、适配器、状态清理属于内部机制，静默执行
 
-2. 先识别并写清：
-   - `task_type`
-   - `flow`
-   - `mode=auto`
-   - 稳定 `change_id`
-   - `assumptions`
-   - `missing_inputs`
-   - `first_handoff`
-   - `artifacts`
+先读取：
+- `./package.json`
+- `./src/`（如存在）
+- `context/PROJECT.md`（如存在）
+- `.agents/rules/01-项目概述.md`（如存在）
+- `.agents/rules/03-项目结构.md`（如存在）
+- `.agents/rules/05-API规范.md`（如存在）
+- `.agents/rules/06-路由规范.md`（如存在）
+- `.agents/rules/09-样式规范.md`（如存在）
+- `.agents/roles/common/task-orchestrator.md`
+- `.agents/roles/common/task-orchestrator-run-plan-template.md`
+- `.agents/roles/common/task-anchor-spec.md`
+- `.agents/roles/common/task-orchestrator-bootstrap-payload.md`
+- `.agents/roles/common/task-orchestrator-output-extractor-spec.md`
 
-3. `auto` 模式规则：
-   - 先从规范和仓库推断技术栈、页面落点、路由落点、样式承载方式、认证方式
-   - 能推断的内容写入 `assumptions`，不要重复写入 `missing_inputs`
-   - `page-development` 且仓库无现成认证实现时，默认可假设为“账号密码登录 + 基础前端校验”
-   - 只有高风险、不可逆、与现有实现冲突时，才允许阻断
+按以下阶段严格执行：
 
-4. `prd-to-delivery` 强制门禁：
-   - 首轮必须确定 `change_id`
-   - 首轮必须带出：
-     - `openspec/changes/<change-id>/proposal.md`
-     - `openspec/changes/<change-id>/tasks.md`
-     - `openspec/changes/<change-id>/checklist.md`
-     - `openspec/changes/<change-id>/iterations.md`
-   - `requirement-analyst` 阶段必须真实创建 `proposal.md` 和 `tasks.md`
-   - `code-guardian` 阶段必须真实创建 `checklist.md` 和 `iterations.md`
-   - 不得只在 JSON 中宣称完成而不落盘这些文件
+阶段 A：`task-orchestrator`
+- 识别任务、选择 `flow`、确定 `mode=auto`
+- 先从规则和仓库推断 `assumptions`，不要把可推断信息重复写入 `missing_inputs`
+- 生成稳定 `change_id`
+- 生成 `run-plan + task-anchor + artifacts`
+- 将首轮桥接内容写入 `./.ai-spec/tmp/task-orchestrator-reply.md`
+- 执行：
+  - `mkdir -p ./.ai-spec/tmp`
+  - `./node_modules/.bin/ai-spec task-orchestrator-extractor apply --payload ./.ai-spec/tmp/task-orchestrator-reply.md --target .`
+- 对用户只输出一句进度：
+  - `task-orchestrator 已完成任务识别，进入需求收敛阶段`
 
-5. 第一步必须先完成 `bootstrap`：
-   - 产出一份 Markdown 内容
-   - 内容里必须且只允许有一个合法 `json` 代码块
-   - 代码块必须符合 `task-orchestrator-bootstrap`
-   - 使用 Bash 执行：
-     - `mkdir -p ./.ai-spec/tmp`
-     - 写入 `./.ai-spec/tmp/task-orchestrator-reply.md`
-     - 执行 `./node_modules/.bin/ai-spec task-orchestrator-extractor apply --payload ./.ai-spec/tmp/task-orchestrator-reply.md --target .`
+阶段 B：`requirement-analyst`
+- 必须创建：
+  - `openspec/changes/<change-id>/proposal.md`
+  - `openspec/changes/<change-id>/tasks.md`
+- 必须在产物落盘后再写 `./.ai-spec/tmp/current-execution.json`
+- 执行：
+  - `./node_modules/.bin/ai-spec expert-executor apply --payload ./.ai-spec/tmp/current-execution.json --target .`
+- 对用户只输出一句进度：
+  - `requirement-analyst 已完成提案与任务清单，返回主代理交接实现阶段`
 
-6. `bootstrap` 后继续自动循环，不要停下来等用户：
-   - 每轮只重新读取：
-     - `./.ai-spec/current-run.json`
-     - `./.ai-spec/current-dispatch.json`（如存在）
-     - `./.ai-spec/current-execution.json`（如存在）
-   - 决策顺序固定：
-     - 无 `current-dispatch.json` 且无 `current-execution.json`
-       - 由 `task-orchestrator` 产出 `./.ai-spec/tmp/current-dispatch.json`
-       - 执行 `./node_modules/.bin/ai-spec expert-dispatch apply --payload ./.ai-spec/tmp/current-dispatch.json --target .`
-     - 有 `current-dispatch.json` 且无 `current-execution.json`
-       - 由当前专家完成本轮工作，创建本轮必须的文件，并产出 `./.ai-spec/tmp/current-execution.json`
-       - 执行 `./node_modules/.bin/ai-spec expert-executor apply --payload ./.ai-spec/tmp/current-execution.json --target .`
-     - 有 `current-execution.json`
-       - 由 `task-orchestrator` 产出最小 `runtime-action`
-       - 写入 `./.ai-spec/tmp/task-orchestrator-reply.md`
-       - 执行 `./node_modules/.bin/ai-spec task-orchestrator-extractor apply --payload ./.ai-spec/tmp/task-orchestrator-reply.md --target .`
+阶段 C：`task-orchestrator`
+- 基于 requirement-analyst 的结果重新接管
+- 产出 handoff 到 `frontend-implementer` 的最小 runtime-action
+- 写入 `./.ai-spec/tmp/task-orchestrator-reply.md`
+- 执行：
+  - `./node_modules/.bin/ai-spec task-orchestrator-extractor apply --payload ./.ai-spec/tmp/task-orchestrator-reply.md --target .`
+- 对用户只输出一句进度：
+  - `task-orchestrator 已完成交接，进入前端实现阶段`
 
-7. 自动推进前置校验：
-   - handoff 到 `frontend-implementer` 前，确认 `proposal.md` 和 `tasks.md` 已存在
-   - `complete` 前，确认 `checklist.md` 和 `iterations.md` 已存在
-   - 若文件缺失，继续让当前专家补齐，不要把命令链交还给用户
+阶段 D：`frontend-implementer`
+- 先读取 `proposal.md` 和 `tasks.md`
+- 只按任务范围实现代码，不扩 scope
+- 产出 `./.ai-spec/tmp/current-execution.json`
+- 执行：
+  - `./node_modules/.bin/ai-spec expert-executor apply --payload ./.ai-spec/tmp/current-execution.json --target .`
+- 对用户只输出一句进度：
+  - `frontend-implementer 已完成实现，返回主代理交接审查阶段`
 
-8. 交互要求：
-   - 用户已执行 `/spec-start`，视为允许整条链自动推进
-   - 若用户表达“继续 / 不要再问我 / 直至完成任务”，继续自动推进
-   - 中间不要回显原始 JSON、adapter 字段、命令回显
-   - 只输出短进度语义，例如：
-     - `已进入需求收敛阶段`
-     - `已进入前端实现阶段`
-     - `已进入规范审查阶段`
-     - `已完成任务收尾`
-   - 优先做最小状态变更，不要长篇解释，以避免 IDE 超时
+阶段 E：`task-orchestrator`
+- 基于实现结果重新接管
+- 产出 handoff 到 `code-guardian` 的最小 runtime-action
+- 写入 `./.ai-spec/tmp/task-orchestrator-reply.md`
+- 执行：
+  - `./node_modules/.bin/ai-spec task-orchestrator-extractor apply --payload ./.ai-spec/tmp/task-orchestrator-reply.md --target .`
+- 对用户只输出一句进度：
+  - `task-orchestrator 已完成交接，进入规范审查阶段`
 
-9. 停止条件：
-   - `current-run.json.status` 进入 `success / failed / cancelled`
-   - 或出现真实 `blocked / waiting-approval`
+阶段 F：`code-guardian`
+- 必须创建：
+  - `openspec/changes/<change-id>/checklist.md`
+  - `openspec/changes/<change-id>/iterations.md`
+- 完成检查后产出 `./.ai-spec/tmp/current-execution.json`
+- 执行：
+  - `./node_modules/.bin/ai-spec expert-executor apply --payload ./.ai-spec/tmp/current-execution.json --target .`
+- 对用户只输出一句进度：
+  - `code-guardian 已完成审查，返回主代理收尾`
 
-10. 最终只输出：
-   - `mode`
-   - `task_type`
-   - `flow`
-   - `run_id`
-   - `status`
-   - `completed_roles`
-   - `assumptions`
-   - `missing_inputs`
-   - `artifacts`
+阶段 G：`task-orchestrator`
+- 再次接管
+- 只有在 `proposal/tasks/checklist/iterations` 都存在时，才允许产出 `complete`
+- 写入 `./.ai-spec/tmp/task-orchestrator-reply.md`
+- 执行：
+  - `./node_modules/.bin/ai-spec task-orchestrator-extractor apply --payload ./.ai-spec/tmp/task-orchestrator-reply.md --target .`
+- 对用户只输出一句进度：
+  - `task-orchestrator 已完成任务收尾`
+
+自动推进规则：
+- 若用户执行 `/spec-start`，视为允许整条链自动推进
+- 若用户表达“继续 / 不要再问我 / 直至完成任务”，继续推进，不要停下来等用户
+- 中间不要贴原始 JSON、adapter 字段、命令回显
+- 若遇到真实高风险阻断，才允许停下
+
+最终只输出：
+- `mode`
+- `task_type`
+- `flow`
+- `run_id`
+- `status`
+- `completed_roles`
+- `assumptions`
+- `missing_inputs`
+- `artifacts`

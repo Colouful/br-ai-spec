@@ -10,13 +10,13 @@ triggers:
   - implementation-ready
   - tasks-available
 preferred_skills:
-  - execute-task
   - create-component
   - create-view
   - create-route
   - create-api
   - create-store
   - theme-variables
+  - execute-task
 reads:
   - context/PROJECT.md
   - .agents/rules/
@@ -56,7 +56,7 @@ handoff_to:
 
 ## 技能选择原则
 
-- 通用执行方法优先用 `execute-task`
+- 先按主代理交接的当前实现阶段完成本轮范围；需要细化单项任务时再使用 `execute-task`
 - 组件相关优先用 `create-component`
 - Vue 页面用 `create-view`
 - React 路由页面用 `create-route`

@@ -67,6 +67,7 @@ handoff_to:
 - 选择正确流程
 - 决定本次激活哪些专家
 - 控制交接顺序和人工确认点
+- 在每位专家完成后重新接管，并显式发起下一次交接
 
 ## 工作原则
 
@@ -77,6 +78,7 @@ handoff_to:
 - 缺失输入优先转化为 `assumptions（默认假设）` 并继续推进，而不是默认回问用户
 - 先读项目规范再判定缺口；规范中已明确的信息，不得重复标记为 `missing_inputs（缺失输入）`
 - 首轮必须确定稳定 `change_id（变更 ID）`，不能把 `OpenSpec（规范产物）` 路径留到后面临时猜
+- 自动推进不等于“主代理自己直接把代码写完”；主代理必须显式协调专家链，而不是隐式脑补完成全部阶段
 - 不越权替代产品判断和高风险技术决策
 - 不直接跳过审查和验证节点
 - 当输入不完整时，先暴露缺口并明确假设；只在高风险、不可逆或冲突场景下阻断
@@ -101,7 +103,8 @@ handoff_to:
 15. 对 `prd-to-delivery（需求到交付）`：
     - 未存在 `proposal.md` 与 `tasks.md` 时，不得交给 `frontend-implementer（前端实现专家）`
     - 未存在 `checklist.md` 与 `iterations.md` 时，不得进入 `complete（完成）`
-16. 仅在需要人工确认时，再显式设立审批点或阻断点
+16. 在每位专家完成后，必须重新接管并产出下一次 handoff / complete；不得让专家阶段直接跨到终态
+17. 仅在需要人工确认时，再显式设立审批点或阻断点
 
 ## 运行模式
 
@@ -189,3 +192,4 @@ handoff_to:
 - 具体运行态调用链优先遵循 `task-orchestrator-runtime-hooks.md`
 - 当 `requirement-analyst（需求解析专家）` 尚未沉淀 `proposal.md / tasks.md` 时，只能继续要求其补齐，不得直接 handoff 到 `frontend-implementer（前端实现专家）`
 - 当 `code-guardian（规范守护者）` 尚未沉淀 `checklist.md / iterations.md` 时，只能继续要求其补齐，不得直接 `complete（完成）`
+- 对用户可见的协作语义应始终体现为：`task-orchestrator` 识别 -> `requirement-analyst` 收敛 -> `task-orchestrator` 交接 -> `frontend-implementer` 实现 -> `task-orchestrator` 交接 -> `code-guardian` 审查 -> `task-orchestrator` 收尾
