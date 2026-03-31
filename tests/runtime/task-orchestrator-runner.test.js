@@ -8,7 +8,7 @@ const runner = require('../../bin/task-orchestrator-runner');
 const fixturesDir = path.join(__dirname, 'fixtures');
 
 function copyFixture(targetDir, fixtureName, inboxName) {
-  const inboxDir = path.join(targetDir, '.ai-spec', 'tmp');
+  const inboxDir = path.join(targetDir, '.ai-spec', 'internal', 'tmp');
   fs.mkdirSync(inboxDir, { recursive: true });
   fs.copyFileSync(path.join(fixturesDir, fixtureName), path.join(inboxDir, inboxName));
 }
@@ -48,7 +48,7 @@ function main() {
   assert.strictEqual(workflow.turn.mode, 'start');
   assert.strictEqual(workflow.turn.actor.id, 'task-orchestrator');
   assert.strictEqual(workflow.turn.command, '/spec-start');
-  assert.deepStrictEqual(listTurnTargets(workflow.turn), ['.ai-spec/tmp/task-orchestrator-reply.md']);
+  assert.deepStrictEqual(listTurnTargets(workflow.turn), ['.ai-spec/internal/tmp/task-orchestrator-reply.md']);
 
   copyFixture(targetDir, 'task-orchestrator-bootstrap-reply.md', 'task-orchestrator-reply.md');
   let report = advance(targetDir);
@@ -56,26 +56,26 @@ function main() {
   assert.strictEqual(report.consumed.kind, 'task-orchestrator-reply');
   assert.strictEqual(report.applied.adapter_action, 'bootstrap');
   assert.strictEqual(report.applied.run_id, 'run_20260331_160700_smoke');
-  assert.deepStrictEqual(report.next_expected.files, ['.ai-spec/tmp/current-dispatch.json']);
+  assert.deepStrictEqual(report.next_expected.files, ['.ai-spec/internal/tmp/current-dispatch.json']);
 
   workflow = step(targetDir);
   assert.strictEqual(workflow.turn.mode, 'dispatch');
   assert.strictEqual(workflow.turn.actor.id, 'task-orchestrator');
   assert.strictEqual(workflow.turn.command, 'task-orchestrator:dispatch');
-  assert.deepStrictEqual(listTurnTargets(workflow.turn), ['.ai-spec/tmp/current-dispatch.json']);
+  assert.deepStrictEqual(listTurnTargets(workflow.turn), ['.ai-spec/internal/tmp/current-dispatch.json']);
 
   copyFixture(targetDir, 'current-dispatch-requirement-analyst.json', 'current-dispatch.json');
   report = advance(targetDir);
   assert.strictEqual(report.consumed.kind, 'expert-dispatch');
   assert.strictEqual(report.recorded.dispatch.role, 'requirement-analyst');
-  assert.deepStrictEqual(report.next_expected.files, ['.ai-spec/tmp/current-execution.json']);
+  assert.deepStrictEqual(report.next_expected.files, ['.ai-spec/internal/tmp/current-execution.json']);
 
   workflow = step(targetDir);
   assert.strictEqual(workflow.turn.mode, 'execute');
   assert.strictEqual(workflow.turn.actor.id, 'requirement-analyst');
   assert.strictEqual(workflow.turn.command, 'requirement-analyst');
   assert.deepStrictEqual(listTurnTargets(workflow.turn), [
-    '.ai-spec/tmp/current-execution.json',
+    '.ai-spec/internal/tmp/current-execution.json',
     'openspec/changes/runtime-smoke-demo/proposal.md',
     'openspec/changes/runtime-smoke-demo/tasks.md',
   ]);
@@ -87,15 +87,15 @@ function main() {
   assert.strictEqual(report.consumed.kind, 'expert-execution');
   assert.strictEqual(report.recorded.execution.role, 'requirement-analyst');
   assert.deepStrictEqual(report.next_expected.files, [
-    '.ai-spec/tmp/task-orchestrator-reply.md',
-    '.ai-spec/tmp/current-runtime-action.json',
+    '.ai-spec/internal/tmp/task-orchestrator-reply.md',
+    '.ai-spec/internal/tmp/current-runtime-action.json',
   ]);
 
   workflow = step(targetDir);
   assert.strictEqual(workflow.turn.mode, 'continue');
   assert.strictEqual(workflow.turn.actor.id, 'task-orchestrator');
   assert.strictEqual(workflow.turn.command, '/spec-continue');
-  assert.deepStrictEqual(listTurnTargets(workflow.turn), ['.ai-spec/tmp/task-orchestrator-reply.md']);
+  assert.deepStrictEqual(listTurnTargets(workflow.turn), ['.ai-spec/internal/tmp/task-orchestrator-reply.md']);
 
   copyFixture(targetDir, 'task-orchestrator-handoff-reply.md', 'task-orchestrator-reply.md');
   report = advance(targetDir);
@@ -103,7 +103,7 @@ function main() {
   assert.strictEqual(report.recorded.runtime_action.action, 'handoff');
   assert.strictEqual(report.applied.adapter_action, 'handoff');
   assert.strictEqual(report.applied.current_role, 'frontend-implementer');
-  assert.deepStrictEqual(report.next_expected.files, ['.ai-spec/tmp/current-dispatch.json']);
+  assert.deepStrictEqual(report.next_expected.files, ['.ai-spec/internal/tmp/current-dispatch.json']);
 
   workflow = step(targetDir);
   assert.strictEqual(workflow.turn.mode, 'dispatch');
@@ -113,14 +113,14 @@ function main() {
   copyFixture(targetDir, 'current-dispatch-frontend-implementer.json', 'current-dispatch.json');
   report = advance(targetDir);
   assert.strictEqual(report.recorded.dispatch.role, 'frontend-implementer');
-  assert.deepStrictEqual(report.next_expected.files, ['.ai-spec/tmp/current-execution.json']);
+  assert.deepStrictEqual(report.next_expected.files, ['.ai-spec/internal/tmp/current-execution.json']);
 
   workflow = step(targetDir);
   assert.strictEqual(workflow.turn.mode, 'execute');
   assert.strictEqual(workflow.turn.actor.id, 'frontend-implementer');
   assert.strictEqual(workflow.turn.command, 'frontend-implementer');
   assert.deepStrictEqual(listTurnTargets(workflow.turn), [
-    '.ai-spec/tmp/current-execution.json',
+    '.ai-spec/internal/tmp/current-execution.json',
     'code',
     'implementation-notes',
   ]);
@@ -129,8 +129,8 @@ function main() {
   report = advance(targetDir);
   assert.strictEqual(report.recorded.execution.role, 'frontend-implementer');
   assert.deepStrictEqual(report.next_expected.files, [
-    '.ai-spec/tmp/task-orchestrator-reply.md',
-    '.ai-spec/tmp/current-runtime-action.json',
+    '.ai-spec/internal/tmp/task-orchestrator-reply.md',
+    '.ai-spec/internal/tmp/current-runtime-action.json',
   ]);
 
   workflow = step(targetDir);
@@ -144,7 +144,7 @@ function main() {
   assert.strictEqual(report.recorded.runtime_action.action, 'handoff');
   assert.strictEqual(report.applied.adapter_action, 'handoff');
   assert.strictEqual(report.applied.current_role, 'code-guardian');
-  assert.deepStrictEqual(report.next_expected.files, ['.ai-spec/tmp/current-dispatch.json']);
+  assert.deepStrictEqual(report.next_expected.files, ['.ai-spec/internal/tmp/current-dispatch.json']);
 
   workflow = step(targetDir);
   assert.strictEqual(workflow.turn.mode, 'dispatch');
@@ -155,14 +155,14 @@ function main() {
   report = advance(targetDir);
   assert.strictEqual(report.consumed.kind, 'expert-dispatch');
   assert.strictEqual(report.recorded.dispatch.role, 'code-guardian');
-  assert.deepStrictEqual(report.next_expected.files, ['.ai-spec/tmp/current-execution.json']);
+  assert.deepStrictEqual(report.next_expected.files, ['.ai-spec/internal/tmp/current-execution.json']);
 
   workflow = step(targetDir);
   assert.strictEqual(workflow.turn.mode, 'execute');
   assert.strictEqual(workflow.turn.actor.id, 'code-guardian');
   assert.strictEqual(workflow.turn.command, 'code-guardian');
   assert.deepStrictEqual(listTurnTargets(workflow.turn), [
-    '.ai-spec/tmp/current-execution.json',
+    '.ai-spec/internal/tmp/current-execution.json',
     'openspec/changes/runtime-smoke-demo/checklist.md',
     'openspec/changes/runtime-smoke-demo/iterations.md',
   ]);
@@ -174,8 +174,8 @@ function main() {
   assert.strictEqual(report.consumed.kind, 'expert-execution');
   assert.strictEqual(report.recorded.execution.role, 'code-guardian');
   assert.deepStrictEqual(report.next_expected.files, [
-    '.ai-spec/tmp/task-orchestrator-reply.md',
-    '.ai-spec/tmp/current-runtime-action.json',
+    '.ai-spec/internal/tmp/task-orchestrator-reply.md',
+    '.ai-spec/internal/tmp/current-runtime-action.json',
   ]);
 
   workflow = step(targetDir);
@@ -212,7 +212,7 @@ function main() {
   assert.strictEqual(runnerStatus.pending_inputs.length, 0);
   assert.strictEqual(runnerStatus.next_expected.producer, null);
 
-  const consumedDir = path.join(targetDir, '.ai-spec', 'runner', 'consumed');
+  const consumedDir = path.join(targetDir, '.ai-spec', 'internal', 'runner', 'consumed');
   const consumedFiles = fs.readdirSync(consumedDir);
   assert.strictEqual(consumedFiles.length, 10);
 

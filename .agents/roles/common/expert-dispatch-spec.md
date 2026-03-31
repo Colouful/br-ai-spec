@@ -23,14 +23,14 @@ description: 定义当前运行态如何生成并更新当前专家执行载荷�
 
 当前阶段使用两处落盘：
 
-- `.ai-spec/current-dispatch.json`
-- `.ai-spec/dispatches/<run-id>/<dispatch-id>.json`
+- `.ai-spec/internal/current-dispatch.json`
+- `.ai-spec/internal/dispatches/<run-id>/<dispatch-id>.json`
 
 其中：
 
-- `current-dispatch.json`
+- `internal/current-dispatch.json`
   - 始终表示“当前这一轮应该交给谁执行”
-- `dispatches/<run-id>/`
+- `internal/dispatches/<run-id>/`
   - 记录本次运行历史上生成过哪些专家执行载荷
 
 ## 3. 最小结构
@@ -85,13 +85,13 @@ description: 定义当前运行态如何生成并更新当前专家执行载荷�
 当前最稳的接入方式是：
 
 ```bash
-ai-spec expert-dispatch apply --payload ./.ai-spec/tmp/current-dispatch.json
+ai-spec expert-dispatch apply --payload ./.ai-spec/internal/tmp/current-dispatch.json
 ```
 
 或：
 
 ```bash
-cat ./.ai-spec/tmp/current-dispatch.json | ai-spec expert-dispatch apply --stdin
+cat ./.ai-spec/internal/tmp/current-dispatch.json | ai-spec expert-dispatch apply --stdin
 ```
 
 也就是说：

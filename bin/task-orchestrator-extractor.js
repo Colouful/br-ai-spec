@@ -2,6 +2,7 @@
 const fs = require('fs');
 const path = require('path');
 const adapter = require('./task-orchestrator-adapter');
+const { resolveRuntimePaths, getCandidatePaths } = require('./runtime-paths');
 
 function printUsage() {
   console.log(`Usage:
@@ -174,14 +175,15 @@ function cleanupTmpSource(targetDir, sourcePath) {
     return null;
   }
 
-  const tmpDir = path.join(path.resolve(process.cwd(), targetDir || '.'), '.ai-spec', 'tmp');
-  const relative = path.relative(tmpDir, sourcePath);
-  if (relative.startsWith('..') || path.isAbsolute(relative)) {
-    return null;
+  const runtimePaths = resolveRuntimePaths(path.resolve(process.cwd(), targetDir || '.'));
+  for (const candidate of getCandidatePaths(runtimePaths.tmpDir)) {
+    const relative = path.relative(candidate, sourcePath);
+    if (!relative.startsWith('..') && !path.isAbsolute(relative)) {
+      fs.unlinkSync(sourcePath);
+      return sourcePath;
+    }
   }
-
-  fs.unlinkSync(sourcePath);
-  return sourcePath;
+  return null;
 }
 
 function main(argv = process.argv.slice(2)) {

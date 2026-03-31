@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 const fs = require('fs');
 const path = require('path');
+const { resolveRuntimePaths, getCandidatePaths, getExistingPath } = require('./runtime-paths');
 
 function printUsage() {
   console.log(`Usage:
@@ -144,9 +145,9 @@ function validateOpenSpecOutputs(targetDir, payload) {
     return null;
   }
 
-  const aiSpecDir = path.join(targetDir, '.ai-spec');
-  const currentRun = readJsonIfExists(path.join(aiSpecDir, 'current-run.json'));
-  const currentDispatch = readJsonIfExists(path.join(aiSpecDir, 'current-dispatch.json'));
+  const runtimePaths = resolveRuntimePaths(targetDir);
+  const currentRun = readJsonIfExists(runtimePaths.currentRun.path);
+  const currentDispatch = readJsonIfExists(getExistingPath(runtimePaths.currentDispatch));
   const changeId =
     payload.task?.change_id ||
     currentDispatch?.task?.change_id ||
@@ -272,15 +273,21 @@ function normalizeRuntimeActionPayload(payload) {
 }
 
 function writeExecutionArtifacts(targetDir, payload) {
-  const aiSpecDir = path.join(targetDir, '.ai-spec');
-  const executionsDir = path.join(aiSpecDir, 'executions', payload.run_id);
+  const runtimePaths = resolveRuntimePaths(targetDir);
+  const executionsDir = path.join(runtimePaths.executionsDir.path, payload.run_id);
   ensureDir(executionsDir);
 
-  const currentExecutionJson = path.join(aiSpecDir, 'current-execution.json');
-  const currentExecutionMd = path.join(aiSpecDir, 'current-execution.md');
+  const currentExecutionJson = runtimePaths.currentExecutionJson.path;
+  const currentExecutionMd = runtimePaths.currentExecutionMd.path;
   const recordJson = path.join(executionsDir, `${payload.execution_id}.json`);
   const recordMd = path.join(executionsDir, `${payload.execution_id}.md`);
 
+  if (runtimePaths.currentExecutionJson.legacyPath && fs.existsSync(runtimePaths.currentExecutionJson.legacyPath)) {
+    fs.unlinkSync(runtimePaths.currentExecutionJson.legacyPath);
+  }
+  if (runtimePaths.currentExecutionMd.legacyPath && fs.existsSync(runtimePaths.currentExecutionMd.legacyPath)) {
+    fs.unlinkSync(runtimePaths.currentExecutionMd.legacyPath);
+  }
   writeJson(currentExecutionJson, payload);
   writeText(currentExecutionMd, payload.markdown);
   writeJson(recordJson, payload);
@@ -295,15 +302,21 @@ function writeExecutionArtifacts(targetDir, payload) {
 }
 
 function writeRuntimeActionArtifacts(targetDir, payload) {
-  const aiSpecDir = path.join(targetDir, '.ai-spec');
-  const actionDir = path.join(aiSpecDir, 'runtime-actions', payload.run_id);
+  const runtimePaths = resolveRuntimePaths(targetDir);
+  const actionDir = path.join(runtimePaths.runtimeActionsDir.path, payload.run_id);
   ensureDir(actionDir);
 
-  const currentActionJson = path.join(aiSpecDir, 'current-runtime-action.json');
-  const currentActionMd = path.join(aiSpecDir, 'current-runtime-action.md');
+  const currentActionJson = runtimePaths.currentRuntimeActionJson.path;
+  const currentActionMd = runtimePaths.currentRuntimeActionMd.path;
   const recordJson = path.join(actionDir, `${payload.action_id}.json`);
   const recordMd = path.join(actionDir, `${payload.action_id}.md`);
 
+  if (runtimePaths.currentRuntimeActionJson.legacyPath && fs.existsSync(runtimePaths.currentRuntimeActionJson.legacyPath)) {
+    fs.unlinkSync(runtimePaths.currentRuntimeActionJson.legacyPath);
+  }
+  if (runtimePaths.currentRuntimeActionMd.legacyPath && fs.existsSync(runtimePaths.currentRuntimeActionMd.legacyPath)) {
+    fs.unlinkSync(runtimePaths.currentRuntimeActionMd.legacyPath);
+  }
   writeJson(currentActionJson, payload);
   writeText(currentActionMd, payload.markdown);
   writeJson(recordJson, payload);
@@ -342,14 +355,15 @@ function cleanupTmpSource(targetDir, sourcePath) {
     return null;
   }
 
-  const tmpDir = path.join(path.resolve(targetDir), '.ai-spec', 'tmp');
-  const relative = path.relative(tmpDir, sourcePath);
-  if (relative.startsWith('..') || path.isAbsolute(relative)) {
-    return null;
+  const runtimePaths = resolveRuntimePaths(path.resolve(targetDir));
+  for (const candidate of getCandidatePaths(runtimePaths.tmpDir)) {
+    const relative = path.relative(candidate, sourcePath);
+    if (!relative.startsWith('..') && !path.isAbsolute(relative)) {
+      fs.unlinkSync(sourcePath);
+      return sourcePath;
+    }
   }
-
-  fs.unlinkSync(sourcePath);
-  return sourcePath;
+  return null;
 }
 
 function applyExecution(options) {
@@ -428,46 +442,50 @@ function applyRuntimeActionData(options) {
 
 function clearExecution(options) {
   const targetDir = path.resolve(options.target || '.');
-  const aiSpecDir = path.join(targetDir, '.ai-spec');
-  const currentExecutionJson = path.join(aiSpecDir, 'current-execution.json');
-  const currentExecutionMd = path.join(aiSpecDir, 'current-execution.md');
+  const runtimePaths = resolveRuntimePaths(targetDir);
 
-  if (fs.existsSync(currentExecutionJson)) {
-    fs.unlinkSync(currentExecutionJson);
+  for (const currentExecutionJson of getCandidatePaths(runtimePaths.currentExecutionJson)) {
+    if (fs.existsSync(currentExecutionJson)) {
+      fs.unlinkSync(currentExecutionJson);
+    }
   }
-  if (fs.existsSync(currentExecutionMd)) {
-    fs.unlinkSync(currentExecutionMd);
+  for (const currentExecutionMd of getCandidatePaths(runtimePaths.currentExecutionMd)) {
+    if (fs.existsSync(currentExecutionMd)) {
+      fs.unlinkSync(currentExecutionMd);
+    }
   }
 
   return {
     status: 'success',
     target: targetDir,
     artifacts: {
-      current_execution_json: currentExecutionJson,
-      current_execution_md: currentExecutionMd,
+      current_execution_json: runtimePaths.currentExecutionJson.path,
+      current_execution_md: runtimePaths.currentExecutionMd.path,
     },
   };
 }
 
 function clearRuntimeAction(options) {
   const targetDir = path.resolve(options.target || '.');
-  const aiSpecDir = path.join(targetDir, '.ai-spec');
-  const currentActionJson = path.join(aiSpecDir, 'current-runtime-action.json');
-  const currentActionMd = path.join(aiSpecDir, 'current-runtime-action.md');
+  const runtimePaths = resolveRuntimePaths(targetDir);
 
-  if (fs.existsSync(currentActionJson)) {
-    fs.unlinkSync(currentActionJson);
+  for (const currentActionJson of getCandidatePaths(runtimePaths.currentRuntimeActionJson)) {
+    if (fs.existsSync(currentActionJson)) {
+      fs.unlinkSync(currentActionJson);
+    }
   }
-  if (fs.existsSync(currentActionMd)) {
-    fs.unlinkSync(currentActionMd);
+  for (const currentActionMd of getCandidatePaths(runtimePaths.currentRuntimeActionMd)) {
+    if (fs.existsSync(currentActionMd)) {
+      fs.unlinkSync(currentActionMd);
+    }
   }
 
   return {
     status: 'success',
     target: targetDir,
     artifacts: {
-      current_runtime_action_json: currentActionJson,
-      current_runtime_action_md: currentActionMd,
+      current_runtime_action_json: runtimePaths.currentRuntimeActionJson.path,
+      current_runtime_action_md: runtimePaths.currentRuntimeActionMd.path,
     },
   };
 }

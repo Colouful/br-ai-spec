@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 const fs = require('fs');
 const path = require('path');
+const { resolveRuntimePaths, getCandidatePaths } = require('./runtime-paths');
 
 function printUsage() {
   console.log(`Usage:
@@ -102,8 +103,8 @@ function readJsonIfExists(filePath) {
 
 function hydrateDispatchPayload(targetDir, payload) {
   const hydrated = JSON.parse(JSON.stringify(payload));
-  const aiSpecDir = path.join(targetDir, '.ai-spec');
-  const currentRun = readJsonIfExists(path.join(aiSpecDir, 'current-run.json'));
+  const runtimePaths = resolveRuntimePaths(targetDir);
+  const currentRun = readJsonIfExists(runtimePaths.currentRun.path);
 
   if (!hydrated.task || typeof hydrated.task !== 'object') {
     hydrated.task = {};
@@ -155,13 +156,16 @@ function normalizeDispatchPayload(payload) {
 }
 
 function writeDispatchArtifacts(targetDir, payload) {
-  const aiSpecDir = path.join(targetDir, '.ai-spec');
-  const dispatchesDir = path.join(aiSpecDir, 'dispatches', payload.run_id);
+  const runtimePaths = resolveRuntimePaths(targetDir);
+  const dispatchesDir = path.join(runtimePaths.dispatchesDir.path, payload.run_id);
   ensureDir(dispatchesDir);
 
-  const currentDispatchPath = path.join(aiSpecDir, 'current-dispatch.json');
+  const currentDispatchPath = runtimePaths.currentDispatch.path;
   const dispatchRecordPath = path.join(dispatchesDir, `${payload.dispatch_id}.json`);
 
+  if (runtimePaths.currentDispatch.legacyPath && fs.existsSync(runtimePaths.currentDispatch.legacyPath)) {
+    fs.unlinkSync(runtimePaths.currentDispatch.legacyPath);
+  }
   writeJson(currentDispatchPath, payload);
   writeJson(dispatchRecordPath, payload);
 
@@ -176,14 +180,15 @@ function cleanupTmpSource(targetDir, sourcePath) {
     return null;
   }
 
-  const tmpDir = path.join(path.resolve(targetDir), '.ai-spec', 'tmp');
-  const relative = path.relative(tmpDir, sourcePath);
-  if (relative.startsWith('..') || path.isAbsolute(relative)) {
-    return null;
+  const runtimePaths = resolveRuntimePaths(path.resolve(targetDir));
+  for (const candidate of getCandidatePaths(runtimePaths.tmpDir)) {
+    const relative = path.relative(candidate, sourcePath);
+    if (!relative.startsWith('..') && !path.isAbsolute(relative)) {
+      fs.unlinkSync(sourcePath);
+      return sourcePath;
+    }
   }
-
-  fs.unlinkSync(sourcePath);
-  return sourcePath;
+  return null;
 }
 
 function applyDispatch(options) {
@@ -214,18 +219,18 @@ function applyDispatch(options) {
 
 function clearDispatch(options) {
   const targetDir = path.resolve(options.target || '.');
-  const aiSpecDir = path.join(targetDir, '.ai-spec');
-  const currentDispatchPath = path.join(aiSpecDir, 'current-dispatch.json');
-
-  if (fs.existsSync(currentDispatchPath)) {
-    fs.unlinkSync(currentDispatchPath);
+  const runtimePaths = resolveRuntimePaths(targetDir);
+  for (const currentDispatchPath of getCandidatePaths(runtimePaths.currentDispatch)) {
+    if (fs.existsSync(currentDispatchPath)) {
+      fs.unlinkSync(currentDispatchPath);
+    }
   }
 
   return {
     status: 'success',
     target: targetDir,
     artifacts: {
-      current_dispatch: currentDispatchPath,
+      current_dispatch: runtimePaths.currentDispatch.path,
     },
   };
 }

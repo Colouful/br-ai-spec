@@ -3,7 +3,7 @@ id: task-orchestrator-adapter-payload
 name: 主代理自动执行适配载荷规范
 status: active
 owner: task-orchestrator
-description: 定义 task-orchestrator 输出给自动执行适配层消费的最小 payload 结构，用于把结构化结果自动翻译成 runtime-state 命令。
+description: 定义 task-orchestrator 输出给自动执行适配层消费的最小 payload 结构；该适配层仅作为宿主 Runner 不可用时的回退桥接。
 ---
 
 # 主代理自动执行适配载荷规范
@@ -14,7 +14,7 @@ description: 定义 task-orchestrator 输出给自动执行适配层消费的最
 
 > `task-orchestrator（任务主代理）` 已经产出了结构化结果，但运行环境不想手工拼 `runtime-state（运行状态）` 命令。
 
-因此需要一个稳定的适配入口：
+当宿主 `Runner（运行器）` 不可用时，需要一个稳定的回退适配入口：
 
 ```bash
 ai-spec task-orchestrator-adapter apply --payload <file>
@@ -43,7 +43,7 @@ ai-spec task-orchestrator-adapter apply --payload <file>
 也就是说，这类输入本身就可直接交给适配器：
 
 ```bash
-ai-spec task-orchestrator-adapter apply --payload ./.ai-spec/tmp/task-orchestrator-first-response.json
+ai-spec task-orchestrator-adapter apply --payload ./.ai-spec/internal/tmp/task-orchestrator-bootstrap.json
 ```
 
 ### 2.2 运行态动作 payload
@@ -150,4 +150,4 @@ ai-spec task-orchestrator-adapter apply --payload ./.ai-spec/tmp/task-orchestrat
 
 ## 5. 一句话约束
 
-> 主代理若要进入自动执行链，应优先输出结构化 adapter payload（适配层载荷），由 `ai-spec task-orchestrator-adapter apply` 统一翻译为 `runtime-state（运行状态）` 更新，而不是在对话里手写命令。 
+> 主代理若要进入自动执行链，应优先输出最小结构化 scratch 交给宿主 `Runner（运行器）` 消费；若 `Runner` 不可用，再回退为 adapter payload，由 `ai-spec task-orchestrator-adapter apply` 统一翻译为 `runtime-state（运行状态）` 更新，而不是在对话里手写命令。 

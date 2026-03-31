@@ -3,7 +3,7 @@ id: task-orchestrator-bootstrap-payload
 name: 主代理首轮桥接载荷规范
 status: active
 owner: task-orchestrator
-description: 定义 task-orchestrator 在首轮输出后交给 runtime-state（运行状态） 桥接命令消费的最小组合载荷结构。
+description: 定义 task-orchestrator 在首轮输出后，供宿主 Runner 回退到 adapter/runtime-state 时消费的最小组合载荷结构。
 ---
 
 # 主代理首轮桥接载荷规范
@@ -14,7 +14,7 @@ description: 定义 task-orchestrator 在首轮输出后交给 runtime-state（�
 
 - `task-orchestrator（任务主代理）` 已经产出了 `run-plan（运行计划）`
 - 也已经产出了首轮 `task-anchor（任务锚点）`
-- 需要把这两个对象一次性交给 `ai-spec runtime-state bootstrap`
+- 需要把这两个对象一次性交给宿主桥接层，或在回退路径下交给 `runtime-state bootstrap`
 
 也就是说，这份载荷是：
 
@@ -46,10 +46,10 @@ description: 定义 task-orchestrator 在首轮输出后交给 runtime-state（�
 
 ## 3. 推荐文件位置
 
-当前阶段建议主代理把这份载荷暂存在：
+当前阶段建议仅在回退桥接路径下，把这份载荷暂存在：
 
 ```text
-.ai-spec/tmp/task-orchestrator-first-response.json
+.ai-spec/internal/tmp/task-orchestrator-bootstrap.json
 ```
 
 这不是长期归档文件，只是一次桥接输入。
@@ -58,13 +58,13 @@ description: 定义 task-orchestrator 在首轮输出后交给 runtime-state（�
 
 ```bash
 ai-spec runtime-state bootstrap \
-  --payload ./.ai-spec/tmp/task-orchestrator-first-response.json
+  --payload ./.ai-spec/internal/tmp/task-orchestrator-bootstrap.json
 ```
 
 如果运行环境支持标准输入，也可以：
 
 ```bash
-cat ./.ai-spec/tmp/task-orchestrator-first-response.json | ai-spec runtime-state bootstrap --stdin
+cat ./.ai-spec/internal/tmp/task-orchestrator-bootstrap.json | ai-spec runtime-state bootstrap --stdin
 ```
 
 ## 5. 示例
@@ -136,7 +136,7 @@ cat ./.ai-spec/tmp/task-orchestrator-first-response.json | ai-spec runtime-state
 
 ## 6. 一句话要求
 
-> 如果 `task-orchestrator（任务主代理）` 需要在首轮产出后立刻初始化 `run-state（运行状态）`，应优先输出这份组合载荷；其中 `run-plan（运行计划）` 在 `auto（自动）` 模式下应先保留 `mode（运行模式）` 与 `assumptions（默认假设）`，再调用 `ai-spec runtime-state bootstrap`，而不是让调用方手工拆分 `run-plan（运行计划）` 和 `task-anchor（任务锚点）`。
+> 如果宿主环境暂未直接消费 `task-orchestrator-reply.md`，可回退到这份组合载荷；其中 `run-plan（运行计划）` 在 `auto（自动）` 模式下应先保留 `mode（运行模式）` 与 `assumptions（默认假设）`，再调用 `runtime-state bootstrap`，而不是让调用方手工拆分 `run-plan（运行计划）` 和 `task-anchor（任务锚点）`。
 
 补充约束：
 

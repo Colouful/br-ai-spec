@@ -67,13 +67,13 @@ ai-spec task-orchestrator-extractor apply --payload <file>
 ### 5.1 只抽取，不执行
 
 ```bash
-ai-spec task-orchestrator-extractor extract --payload ./.ai-spec/tmp/task-orchestrator-reply.md
+ai-spec task-orchestrator-extractor extract --payload ./.ai-spec/internal/tmp/task-orchestrator-reply.md
 ```
 
 ### 5.2 抽取后直接执行
 
 ```bash
-ai-spec task-orchestrator-extractor apply --payload ./.ai-spec/tmp/task-orchestrator-reply.md
+ai-spec task-orchestrator-extractor apply --payload ./.ai-spec/internal/tmp/task-orchestrator-reply.md
 ```
 
 ## 6. 当前阶段边界

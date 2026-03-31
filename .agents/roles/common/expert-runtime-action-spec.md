@@ -17,7 +17,7 @@ description: 定义如何把 task-orchestrator（任务主代理） 产出的 ta
 这一步只负责：
 
 - 校验 `task-orchestrator-runtime-action（主代理运行动作载荷）`
-- 落盘到 `.ai-spec/current-runtime-action.json`
+- 落盘到 `.ai-spec/internal/current-runtime-action.json`
 
 这一步不负责：
 
@@ -27,21 +27,21 @@ description: 定义如何把 task-orchestrator（任务主代理） 产出的 ta
 
 ## 2. 推荐落盘位置
 
-- `.ai-spec/current-runtime-action.json`
-- `.ai-spec/current-runtime-action.md`
-- `.ai-spec/runtime-actions/<run-id>/<action-id>.json`
-- `.ai-spec/runtime-actions/<run-id>/<action-id>.md`
+- `.ai-spec/internal/current-runtime-action.json`
+- `.ai-spec/internal/current-runtime-action.md`
+- `.ai-spec/internal/runtime-actions/<run-id>/<action-id>.json`
+- `.ai-spec/internal/runtime-actions/<run-id>/<action-id>.md`
 
 ## 3. 当前最小命令
 
 ```bash
-ai-spec expert-executor apply-action --payload ./.ai-spec/tmp/current-runtime-action.json
+ai-spec expert-executor apply-action --payload ./.ai-spec/internal/tmp/current-runtime-action.json
 ```
 
 或：
 
 ```bash
-cat ./.ai-spec/tmp/current-runtime-action.json | ai-spec expert-executor apply-action --stdin
+cat ./.ai-spec/internal/tmp/current-runtime-action.json | ai-spec expert-executor apply-action --stdin
 ```
 
 ## 4. 与 Phase C（第三步） 的边界

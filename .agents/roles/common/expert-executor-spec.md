@@ -32,29 +32,29 @@ Phase A（第一步） 当前只要求支持 3 个角色：
 
 ## 3. 推荐落盘位置
 
-- `.ai-spec/current-execution.json`
-- `.ai-spec/current-execution.md`
-- `.ai-spec/executions/<run-id>/<execution-id>.json`
-- `.ai-spec/executions/<run-id>/<execution-id>.md`
+- `.ai-spec/internal/current-execution.json`
+- `.ai-spec/internal/current-execution.md`
+- `.ai-spec/internal/executions/<run-id>/<execution-id>.json`
+- `.ai-spec/internal/executions/<run-id>/<execution-id>.md`
 
 ## 4. 推荐接入方式
 
 当前最稳的接入方式是：
 
 ```bash
-ai-spec expert-executor apply --payload ./.ai-spec/tmp/current-execution.json
+ai-spec expert-executor apply --payload ./.ai-spec/internal/tmp/current-execution.json
 ```
 
 或：
 
 ```bash
-cat ./.ai-spec/tmp/current-execution.json | ai-spec expert-executor apply --stdin
+cat ./.ai-spec/internal/tmp/current-execution.json | ai-spec expert-executor apply --stdin
 ```
 
 Phase B（第二步） 当前只建议继续落盘 `runtime-action（运行动作）` 草案，不建议由本地脚本自行推理：
 
 ```bash
-ai-spec expert-executor apply-action --payload ./.ai-spec/tmp/current-runtime-action.json
+ai-spec expert-executor apply-action --payload ./.ai-spec/internal/tmp/current-runtime-action.json
 ```
 
 ## 5. 一句话约束

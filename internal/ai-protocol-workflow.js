@@ -1,6 +1,11 @@
 const fs = require('fs');
 const path = require('path');
 const runner = require('../bin/task-orchestrator-runner');
+const {
+  resolveRuntimePaths,
+  getExistingPath,
+  getExistingRelPath,
+} = require('../bin/runtime-paths');
 const PACKAGE_ROOT = path.resolve(__dirname, '..');
 
 const START_INSTRUCTION_FILES = [
@@ -216,11 +221,11 @@ function buildCommandTargets(targetDir, relPaths) {
 }
 
 function loadCurrentArtifacts(targetDir) {
-  const aiSpecDir = path.join(targetDir, '.ai-spec');
+  const runtimePaths = resolveRuntimePaths(targetDir);
   return {
-    run: readJsonIfExists(path.join(aiSpecDir, 'current-run.json')),
-    dispatch: readJsonIfExists(path.join(aiSpecDir, 'current-dispatch.json')),
-    execution: readJsonIfExists(path.join(aiSpecDir, 'current-execution.json')),
+    run: readJsonIfExists(runtimePaths.currentRun.path),
+    dispatch: readJsonIfExists(getExistingPath(runtimePaths.currentDispatch)),
+    execution: readJsonIfExists(getExistingPath(runtimePaths.currentExecutionJson)),
   };
 }
 
@@ -235,6 +240,7 @@ function buildSummary(status) {
 }
 
 function buildStartTurn(targetDir, userInput) {
+  const runtimePaths = resolveRuntimePaths(targetDir);
   return {
     kind: 'ai-protocol-turn',
     status: userInput ? 'ready' : 'waiting-input',
@@ -259,7 +265,7 @@ function buildStartTurn(targetDir, userInput) {
     },
     reads: buildCommandTargets(targetDir, START_INSTRUCTION_FILES),
     writes: [
-      buildFileTarget(targetDir, path.join('.ai-spec', 'tmp', 'task-orchestrator-reply.md'), {
+      buildFileTarget(targetDir, runtimePaths.tmpTaskOrchestratorReply.relPath, {
         required: true,
         label: 'task-orchestrator reply inbox',
       }),
@@ -267,12 +273,13 @@ function buildStartTurn(targetDir, userInput) {
     expected_output: [
       '输出 task-orchestrator-bootstrap Markdown reply',
       '在 reply 中包含唯一合法 json 代码块',
-      '写入 .ai-spec/tmp/task-orchestrator-reply.md',
+      '写入 .ai-spec/internal/tmp/task-orchestrator-reply.md',
     ],
   };
 }
 
 function buildDispatchTurn(targetDir, status, currentArtifacts) {
+  const runtimePaths = resolveRuntimePaths(targetDir);
   return {
     kind: 'ai-protocol-turn',
     status: 'ready',
@@ -296,7 +303,7 @@ function buildDispatchTurn(targetDir, status, currentArtifacts) {
       }),
     ]),
     writes: [
-      buildFileTarget(targetDir, path.join('.ai-spec', 'tmp', 'current-dispatch.json'), {
+      buildFileTarget(targetDir, runtimePaths.tmpCurrentDispatch.relPath, {
         required: true,
         label: 'expert dispatch inbox',
       }),
@@ -309,6 +316,7 @@ function buildDispatchTurn(targetDir, status, currentArtifacts) {
 }
 
 function buildContinueTurn(targetDir, status, currentArtifacts) {
+  const runtimePaths = resolveRuntimePaths(targetDir);
   const expectedOutput = currentArtifacts.run?.pending_gate
     ? ['基于当前审批点产出最小 runtime-action']
     : ['基于当前专家执行结果产出最小 runtime-action'];
@@ -323,7 +331,7 @@ function buildContinueTurn(targetDir, status, currentArtifacts) {
 
   if (currentArtifacts.execution) {
     reads.push(
-      buildFileTarget(targetDir, path.join('.ai-spec', 'current-execution.json'), {
+      buildFileTarget(targetDir, getExistingRelPath(runtimePaths.currentExecutionJson), {
         required: true,
         label: 'current expert execution',
       }),
@@ -348,7 +356,7 @@ function buildContinueTurn(targetDir, status, currentArtifacts) {
     },
     reads: dedupeTargets(reads),
     writes: [
-      buildFileTarget(targetDir, path.join('.ai-spec', 'tmp', 'task-orchestrator-reply.md'), {
+      buildFileTarget(targetDir, runtimePaths.tmpTaskOrchestratorReply.relPath, {
         required: true,
         label: 'task-orchestrator reply inbox',
       }),
@@ -360,8 +368,9 @@ function buildContinueTurn(targetDir, status, currentArtifacts) {
 function buildExpertTurn(targetDir, status, currentArtifacts) {
   const dispatch = currentArtifacts.dispatch;
   if (!dispatch) {
-    throw new Error('Cannot build expert turn without current-dispatch.json');
+    throw new Error('Cannot build expert turn without a recorded current expert dispatch');
   }
+  const runtimePaths = resolveRuntimePaths(targetDir);
 
   const roleSource = dispatch.role?.source || null;
   const roleDefinition = loadRoleDefinition(targetDir, roleSource) || {
@@ -384,7 +393,7 @@ function buildExpertTurn(targetDir, status, currentArtifacts) {
       required: true,
       label: 'current run-state',
     }),
-    buildFileTarget(targetDir, path.join('.ai-spec', 'current-dispatch.json'), {
+    buildFileTarget(targetDir, getExistingRelPath(runtimePaths.currentDispatch), {
       required: true,
       label: 'current expert dispatch',
     }),
@@ -407,7 +416,7 @@ function buildExpertTurn(targetDir, status, currentArtifacts) {
   }
 
   const writes = [
-    buildFileTarget(targetDir, path.join('.ai-spec', 'tmp', 'current-execution.json'), {
+    buildFileTarget(targetDir, runtimePaths.tmpCurrentExecution.relPath, {
       required: true,
       label: 'expert execution inbox',
     }),
@@ -452,6 +461,7 @@ function buildExpertTurn(targetDir, status, currentArtifacts) {
 function buildProtocolTurn(options = {}) {
   const targetDir = resolveTargetDir(options.target);
   const status = runner.buildStatus(targetDir);
+  const userInput = options.userInput || null;
 
   if (status.pending_inputs.length > 0) {
     return {
@@ -475,10 +485,14 @@ function buildProtocolTurn(options = {}) {
   }
 
   if (!status.current.run_id) {
-    return buildStartTurn(targetDir, options.userInput || null);
+    return buildStartTurn(targetDir, userInput);
   }
 
   if (status.next_expected.producer === null) {
+    if (userInput) {
+      return buildStartTurn(targetDir, userInput);
+    }
+
     return {
       kind: 'ai-protocol-turn',
       status: 'terminal',

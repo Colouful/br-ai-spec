@@ -227,14 +227,15 @@ description: 定义 task-orchestrator 在首次识别任务时必须输出的最
 
 ## 8. 与首轮桥接载荷的关系
 
-如果当前运行环境支持本地命令调用，则在生成 `run-plan（运行计划）` 后，应继续：
+如果当前运行环境支持宿主层推进，则在生成 `run-plan（运行计划）` 后，应继续：
 
 1. 生成首轮 `task-anchor（任务锚点）`
-2. 组装 `task-orchestrator-bootstrap（主代理首轮桥接载荷）`
-3. 调用：
+2. 优先产出 `task-orchestrator-reply.md` 交给宿主 `Runner（运行器）`
+3. 若宿主 `Runner` 不可用，再回退到 `task-orchestrator-bootstrap（主代理首轮桥接载荷）`
+4. 回退时调用：
 
 ```bash
-ai-spec runtime-state bootstrap --payload ./.ai-spec/tmp/task-orchestrator-first-response.json
+ai-spec runtime-state bootstrap --payload ./.ai-spec/internal/tmp/task-orchestrator-bootstrap.json
 ```
 
 对应规范见：

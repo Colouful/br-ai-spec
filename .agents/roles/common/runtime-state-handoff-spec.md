@@ -39,7 +39,7 @@ description: 定义专家交接以及审批、恢复、状态查询时如何更�
 ai-spec runtime-state handoff \
   --to-role frontend-implementer \
   --next-role code-guardian \
-  --task-anchor ./.ai-spec/tmp/frontend-implementer-anchor.json \
+  --task-anchor ./.ai-spec/internal/tmp/frontend-implementer-anchor.json \
   --status running
 ```
 

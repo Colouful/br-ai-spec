@@ -5,26 +5,31 @@ const extractor = require('./task-orchestrator-extractor');
 const adapter = require('./task-orchestrator-adapter');
 const expertDispatch = require('./expert-dispatch');
 const expertExecutor = require('./expert-executor');
+const {
+  resolveRuntimePaths,
+  getExistingPath,
+  getCandidatePaths,
+} = require('./runtime-paths');
 
 const INBOX_SPECS = [
   {
     kind: 'task-orchestrator-reply',
-    relPath: path.join('.ai-spec', 'tmp', 'task-orchestrator-reply.md'),
+    pathKey: 'tmpTaskOrchestratorReply',
     producer: 'task-orchestrator',
   },
   {
     kind: 'expert-dispatch',
-    relPath: path.join('.ai-spec', 'tmp', 'current-dispatch.json'),
+    pathKey: 'tmpCurrentDispatch',
     producer: 'task-orchestrator',
   },
   {
     kind: 'expert-execution',
-    relPath: path.join('.ai-spec', 'tmp', 'current-execution.json'),
+    pathKey: 'tmpCurrentExecution',
     producer: 'current-expert',
   },
   {
     kind: 'task-orchestrator-runtime-action',
-    relPath: path.join('.ai-spec', 'tmp', 'current-runtime-action.json'),
+    pathKey: 'tmpCurrentRuntimeAction',
     producer: 'task-orchestrator',
   },
 ];
@@ -114,30 +119,42 @@ function loadJsonIfExists(filePath, label) {
 }
 
 function resolvePendingInputs(targetDir) {
-  return INBOX_SPECS
-    .map((spec) => {
-      const filePath = path.join(targetDir, spec.relPath);
-      return {
+  const runtimePaths = resolveRuntimePaths(targetDir);
+  const pending = [];
+
+  for (const spec of INBOX_SPECS) {
+    const entry = runtimePaths[spec.pathKey];
+    for (const candidatePath of getCandidatePaths(entry)) {
+      if (!fs.existsSync(candidatePath)) {
+        continue;
+      }
+
+      pending.push({
         ...spec,
-        path: filePath,
-        exists: fs.existsSync(filePath),
-      };
-    })
-    .filter((item) => item.exists);
+        path: candidatePath,
+        relPath: candidatePath === entry.path ? entry.relPath : entry.legacyRelPath,
+        exists: true,
+      });
+      break;
+    }
+  }
+
+  return pending;
 }
 
 function loadCurrentArtifacts(targetDir) {
-  const aiSpecDir = path.join(targetDir, '.ai-spec');
+  const runtimePaths = resolveRuntimePaths(targetDir);
   return {
-    run: loadJsonIfExists(path.join(aiSpecDir, 'current-run.json'), 'current run-state'),
-    dispatch: loadJsonIfExists(path.join(aiSpecDir, 'current-dispatch.json'), 'current dispatch'),
-    execution: loadJsonIfExists(path.join(aiSpecDir, 'current-execution.json'), 'current execution'),
-    runtimeAction: loadJsonIfExists(path.join(aiSpecDir, 'current-runtime-action.json'), 'current runtime action'),
+    run: loadJsonIfExists(runtimePaths.currentRun.path, 'current run-state'),
+    dispatch: loadJsonIfExists(getExistingPath(runtimePaths.currentDispatch), 'current dispatch'),
+    execution: loadJsonIfExists(getExistingPath(runtimePaths.currentExecutionJson), 'current execution'),
+    runtimeAction: loadJsonIfExists(getExistingPath(runtimePaths.currentRuntimeActionJson), 'current runtime action'),
   };
 }
 
 function buildNextExpected(targetDir) {
   const pendingInputs = resolvePendingInputs(targetDir);
+  const runtimePaths = resolveRuntimePaths(targetDir);
   if (pendingInputs.length > 0) {
     return {
       producer: 'runner',
@@ -151,7 +168,7 @@ function buildNextExpected(targetDir) {
   if (!current.run) {
     return {
       producer: 'task-orchestrator',
-      files: [path.join('.ai-spec', 'tmp', 'task-orchestrator-reply.md')],
+      files: [runtimePaths.tmpTaskOrchestratorReply.relPath],
       reason: 'no current run-state yet; waiting for task-orchestrator bootstrap or runtime reply',
     };
   }
@@ -168,8 +185,8 @@ function buildNextExpected(targetDir) {
     return {
       producer: 'task-orchestrator',
       files: [
-        path.join('.ai-spec', 'tmp', 'task-orchestrator-reply.md'),
-        path.join('.ai-spec', 'tmp', 'current-runtime-action.json'),
+        runtimePaths.tmpTaskOrchestratorReply.relPath,
+        runtimePaths.tmpCurrentRuntimeAction.relPath,
       ],
       reason: 'expert execution has been recorded; waiting for task-orchestrator runtime action',
     };
@@ -178,7 +195,7 @@ function buildNextExpected(targetDir) {
   if (current.dispatch) {
     return {
       producer: current.dispatch.role?.id || 'current-expert',
-      files: [path.join('.ai-spec', 'tmp', 'current-execution.json')],
+      files: [runtimePaths.tmpCurrentExecution.relPath],
       reason: 'current expert dispatch is active; waiting for expert execution output',
     };
   }
@@ -187,8 +204,8 @@ function buildNextExpected(targetDir) {
     return {
       producer: 'task-orchestrator',
       files: [
-        path.join('.ai-spec', 'tmp', 'task-orchestrator-reply.md'),
-        path.join('.ai-spec', 'tmp', 'current-runtime-action.json'),
+        runtimePaths.tmpTaskOrchestratorReply.relPath,
+        runtimePaths.tmpCurrentRuntimeAction.relPath,
       ],
       reason: `run is waiting at approval gate "${current.run.pending_gate}"`,
     };
@@ -196,7 +213,7 @@ function buildNextExpected(targetDir) {
 
   return {
     producer: 'task-orchestrator',
-    files: [path.join('.ai-spec', 'tmp', 'current-dispatch.json')],
+    files: [runtimePaths.tmpCurrentDispatch.relPath],
     reason: 'run-state is ready for the next expert dispatch',
   };
 }
@@ -229,7 +246,8 @@ function buildStatus(targetDir) {
 }
 
 function archiveConsumedInput(targetDir, filePath, kind) {
-  const consumedDir = path.join(targetDir, '.ai-spec', 'runner', 'consumed');
+  const runtimePaths = resolveRuntimePaths(targetDir);
+  const consumedDir = runtimePaths.runnerConsumedDir.path;
   ensureDir(consumedDir);
 
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');

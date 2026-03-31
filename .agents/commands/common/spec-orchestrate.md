@@ -13,7 +13,7 @@
 - `task-orchestrator` 最后收尾
 
 中间要求：
-- payload / adapter / apply 只做内部静默机制
+- payload / adapter / apply 只做内部静默机制，内部 scratch 默认位于 `./.ai-spec/internal/`
 - 用户只看到阶段进度
 - 不把中间命令链交还给用户
 
