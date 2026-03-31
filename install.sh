@@ -652,22 +652,35 @@ install_dev_dependencies_at() {
   fi
 }
 
-read_source_package_ident() {
+read_source_package_field() {
   local package_json="$SOURCE_DIR/package.json"
   [ -f "$package_json" ] || return 1
   command -v node >/dev/null 2>&1 || return 1
+  local field="$1"
 
   node -e '
     const fs = require("fs");
     const pkg = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
-    if (!pkg.name || !pkg.version) process.exit(1);
-    process.stdout.write(`${pkg.name}@${pkg.version}`);
-  ' "$package_json" 2>/dev/null
+    const field = process.argv[2];
+    let value = null;
+    if (field === "ident") {
+      if (!pkg.name || !pkg.version) process.exit(1);
+      value = `${pkg.name}@${pkg.version}`;
+    } else if (field === "name") {
+      value = pkg.name || null;
+    } else if (field === "registry") {
+      value = pkg.publishConfig?.registry || null;
+    }
+    if (!value) process.exit(1);
+    process.stdout.write(String(value));
+  ' "$package_json" "$field" 2>/dev/null
 }
 
 install_local_ai_spec_cli() {
   local target="$1"
-  local target_canon source_canon manual_hint install_spec install_label source_pkg_ident
+  local target_canon source_canon manual_hint install_spec install_label source_pkg_ident source_pkg_name source_pkg_registry
+  local scope_name=""
+  local -a install_cmd=()
   [ -f "$target/package.json" ] || { warn "未找到 package.json，跳过本地 ai-spec CLI 安装"; return 0; }
   [ -n "$PKG_MANAGER" ] || { warn "无可用的包管理器，跳过本地 ai-spec CLI 安装"; return 0; }
 
@@ -678,12 +691,36 @@ install_local_ai_spec_cli() {
   if [ -n "${BR_AI_SPEC_FORCE_LOCAL_CLI:-}" ]; then
     install_spec="$SOURCE_DIR"
     install_label="$SOURCE_DIR (forced local path)"
-  elif source_pkg_ident="$(read_source_package_ident)"; then
+  elif source_pkg_ident="$(read_source_package_field ident)"; then
     install_spec="$source_pkg_ident"
     install_label="$source_pkg_ident (registry)"
+    source_pkg_name="$(read_source_package_field name || true)"
+    source_pkg_registry="$(read_source_package_field registry || true)"
   else
     install_spec="$SOURCE_DIR"
     install_label="$SOURCE_DIR (local path fallback)"
+  fi
+
+  if [[ "$install_spec" == @*/* ]]; then
+    scope_name="${install_spec%%/*}"
+  elif [[ -n "$source_pkg_name" && "$source_pkg_name" == @*/* ]]; then
+    scope_name="${source_pkg_name%%/*}"
+  fi
+
+  if [ "$PKG_MANAGER" = "pnpm" ] && _is_pnpm_workspace_package_root "$target"; then
+    install_cmd=(pnpm add -w -D "$install_spec")
+  elif [ "$PKG_MANAGER" = "pnpm" ]; then
+    install_cmd=(pnpm add -D "$install_spec")
+  else
+    install_cmd=(npm install -D "$install_spec")
+  fi
+
+  if [ -n "${source_pkg_registry:-}" ]; then
+    install_cmd+=(--registry "$source_pkg_registry")
+    if [ -n "$scope_name" ]; then
+      install_cmd+=("--${scope_name}:registry=$source_pkg_registry")
+    fi
+    install_label="$install_label via $source_pkg_registry"
   fi
 
   if [ "$PKG_MANAGER" = "pnpm" ] && _is_pnpm_workspace_package_root "$target"; then
@@ -693,10 +730,16 @@ install_local_ai_spec_cli() {
   else
     manual_hint="cd $target && npm install -D \"$install_spec\""
   fi
+  if [ -n "${source_pkg_registry:-}" ]; then
+    manual_hint="$manual_hint --registry \"$source_pkg_registry\""
+    if [ -n "$scope_name" ]; then
+      manual_hint="$manual_hint --${scope_name}:registry=\"$source_pkg_registry\""
+    fi
+  fi
 
   info "正在使用 $PKG_MANAGER 安装项目内 ai-spec CLI ..."
   info "  source: $install_label"
-  if ! install_dev_dependencies_at "$target" "$install_spec"; then
+  if ! (cd "$target" && "${install_cmd[@]}"); then
     install_fail "本地 ai-spec CLI 安装失败" "请手动执行: $manual_hint"
     return 0
   fi
@@ -905,7 +948,7 @@ setup_openspec() {
     if [ ! -f "$target/openspec/config.yaml" ] && [ ! -f "$target/openspec/config.yml" ]; then
       info "运行 openspec init ..."
       logf="$(mktemp)"
-      if ! (cd "$target" && npx openspec init --tools "$tools_arg" --force --no-interactive >"$logf" 2>&1); then
+      if ! (cd "$target" && npx openspec init --tools "$tools_arg" --force >"$logf" 2>&1); then
         tail_err="$(tail -n 40 "$logf" 2>/dev/null || true)"
         install_fail "openspec init 失败" "日志文件: $logf"$'\n'"日志尾部:"$'\n'"${tail_err}"$'\n'"请在目录 $target 下手动排查后执行: npx openspec init --tools \"$tools_arg\""
       else

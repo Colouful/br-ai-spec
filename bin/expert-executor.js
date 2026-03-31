@@ -1,7 +1,12 @@
 #!/usr/bin/env node
 const fs = require('fs');
 const path = require('path');
-const { resolveRuntimePaths, getCandidatePaths, getExistingPath } = require('./runtime-paths');
+const {
+  resolveRuntimePaths,
+  getCandidatePaths,
+  getExistingPath,
+  shouldPersistHistory,
+} = require('./runtime-paths');
 
 function printUsage() {
   console.log(`Usage:
@@ -274,13 +279,17 @@ function normalizeRuntimeActionPayload(payload) {
 
 function writeExecutionArtifacts(targetDir, payload) {
   const runtimePaths = resolveRuntimePaths(targetDir);
-  const executionsDir = path.join(runtimePaths.executionsDir.path, payload.run_id);
-  ensureDir(executionsDir);
-
   const currentExecutionJson = runtimePaths.currentExecutionJson.path;
   const currentExecutionMd = runtimePaths.currentExecutionMd.path;
-  const recordJson = path.join(executionsDir, `${payload.execution_id}.json`);
-  const recordMd = path.join(executionsDir, `${payload.execution_id}.md`);
+  const persistHistory = shouldPersistHistory();
+  let recordJson = null;
+  let recordMd = null;
+  if (persistHistory) {
+    const executionsDir = path.join(runtimePaths.executionsDir.path, payload.run_id);
+    ensureDir(executionsDir);
+    recordJson = path.join(executionsDir, `${payload.execution_id}.json`);
+    recordMd = path.join(executionsDir, `${payload.execution_id}.md`);
+  }
 
   if (runtimePaths.currentExecutionJson.legacyPath && fs.existsSync(runtimePaths.currentExecutionJson.legacyPath)) {
     fs.unlinkSync(runtimePaths.currentExecutionJson.legacyPath);
@@ -290,8 +299,10 @@ function writeExecutionArtifacts(targetDir, payload) {
   }
   writeJson(currentExecutionJson, payload);
   writeText(currentExecutionMd, payload.markdown);
-  writeJson(recordJson, payload);
-  writeText(recordMd, payload.markdown);
+  if (recordJson && recordMd) {
+    writeJson(recordJson, payload);
+    writeText(recordMd, payload.markdown);
+  }
 
   return {
     current_execution_json: currentExecutionJson,
@@ -303,13 +314,17 @@ function writeExecutionArtifacts(targetDir, payload) {
 
 function writeRuntimeActionArtifacts(targetDir, payload) {
   const runtimePaths = resolveRuntimePaths(targetDir);
-  const actionDir = path.join(runtimePaths.runtimeActionsDir.path, payload.run_id);
-  ensureDir(actionDir);
-
   const currentActionJson = runtimePaths.currentRuntimeActionJson.path;
   const currentActionMd = runtimePaths.currentRuntimeActionMd.path;
-  const recordJson = path.join(actionDir, `${payload.action_id}.json`);
-  const recordMd = path.join(actionDir, `${payload.action_id}.md`);
+  const persistHistory = shouldPersistHistory();
+  let recordJson = null;
+  let recordMd = null;
+  if (persistHistory) {
+    const actionDir = path.join(runtimePaths.runtimeActionsDir.path, payload.run_id);
+    ensureDir(actionDir);
+    recordJson = path.join(actionDir, `${payload.action_id}.json`);
+    recordMd = path.join(actionDir, `${payload.action_id}.md`);
+  }
 
   if (runtimePaths.currentRuntimeActionJson.legacyPath && fs.existsSync(runtimePaths.currentRuntimeActionJson.legacyPath)) {
     fs.unlinkSync(runtimePaths.currentRuntimeActionJson.legacyPath);
@@ -319,8 +334,10 @@ function writeRuntimeActionArtifacts(targetDir, payload) {
   }
   writeJson(currentActionJson, payload);
   writeText(currentActionMd, payload.markdown);
-  writeJson(recordJson, payload);
-  writeText(recordMd, payload.markdown);
+  if (recordJson && recordMd) {
+    writeJson(recordJson, payload);
+    writeText(recordMd, payload.markdown);
+  }
 
   return {
     current_runtime_action_json: currentActionJson,

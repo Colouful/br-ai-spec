@@ -37,6 +37,16 @@ try {
     throw new Error('task-orchestrator-runner is an internal runtime module; call it from the AI host layer instead of ai-spec CLI');
   }
 
+  if (args[0] === 'protocol-step') {
+    const protocolWorkflow = require('./protocol-workflow');
+    process.exit(protocolWorkflow.main('step', args.slice(1)));
+  }
+
+  if (args[0] === 'protocol-advance') {
+    const protocolWorkflow = require('./protocol-workflow');
+    process.exit(protocolWorkflow.main('advance', args.slice(1)));
+  }
+
   if (args[0] === 'expert-dispatch') {
     const expertDispatch = require('./expert-dispatch');
     process.exit(expertDispatch.main(args.slice(1)));

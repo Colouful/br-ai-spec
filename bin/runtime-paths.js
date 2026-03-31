@@ -2,11 +2,16 @@ const fs = require('fs');
 const path = require('path');
 
 function buildEntry(targetDir, relPath, legacyRelPath = null) {
+  const legacyRelPaths = Array.isArray(legacyRelPath)
+    ? legacyRelPath.filter(Boolean)
+    : [legacyRelPath].filter(Boolean);
   return {
     relPath,
     path: path.join(targetDir, relPath),
-    legacyRelPath,
-    legacyPath: legacyRelPath ? path.join(targetDir, legacyRelPath) : null,
+    legacyRelPath: legacyRelPaths[0] || null,
+    legacyPath: legacyRelPaths[0] ? path.join(targetDir, legacyRelPaths[0]) : null,
+    legacyRelPaths,
+    legacyPaths: legacyRelPaths.map((item) => path.join(targetDir, item)),
   };
 }
 
@@ -15,7 +20,11 @@ function resolveRuntimePaths(targetDir) {
     aiSpecDir: buildEntry(targetDir, path.join('.ai-spec')),
     internalDir: buildEntry(targetDir, path.join('.ai-spec', 'internal')),
     currentRun: buildEntry(targetDir, path.join('.ai-spec', 'current-run.json')),
-    runsDir: buildEntry(targetDir, path.join('.ai-spec', 'runs')),
+    runsDir: buildEntry(
+      targetDir,
+      path.join('.ai-spec', '.history', 'runs'),
+      [path.join('.ai-spec', 'internal', 'history', 'runs'), path.join('.ai-spec', 'runs')],
+    ),
     tmpDir: buildEntry(targetDir, path.join('.ai-spec', 'internal', 'tmp'), path.join('.ai-spec', 'tmp')),
     tmpTaskOrchestratorReply: buildEntry(
       targetDir,
@@ -44,8 +53,12 @@ function resolveRuntimePaths(targetDir) {
     ),
     dispatchesDir: buildEntry(
       targetDir,
-      path.join('.ai-spec', 'internal', 'dispatches'),
-      path.join('.ai-spec', 'dispatches'),
+      path.join('.ai-spec', '.history', 'dispatches'),
+      [
+        path.join('.ai-spec', 'internal', 'history', 'dispatches'),
+        path.join('.ai-spec', 'internal', 'dispatches'),
+        path.join('.ai-spec', 'dispatches'),
+      ],
     ),
     currentExecutionJson: buildEntry(
       targetDir,
@@ -59,8 +72,12 @@ function resolveRuntimePaths(targetDir) {
     ),
     executionsDir: buildEntry(
       targetDir,
-      path.join('.ai-spec', 'internal', 'executions'),
-      path.join('.ai-spec', 'executions'),
+      path.join('.ai-spec', '.history', 'executions'),
+      [
+        path.join('.ai-spec', 'internal', 'history', 'executions'),
+        path.join('.ai-spec', 'internal', 'executions'),
+        path.join('.ai-spec', 'executions'),
+      ],
     ),
     currentRuntimeActionJson: buildEntry(
       targetDir,
@@ -74,8 +91,12 @@ function resolveRuntimePaths(targetDir) {
     ),
     runtimeActionsDir: buildEntry(
       targetDir,
-      path.join('.ai-spec', 'internal', 'runtime-actions'),
-      path.join('.ai-spec', 'runtime-actions'),
+      path.join('.ai-spec', '.history', 'runtime-actions'),
+      [
+        path.join('.ai-spec', 'internal', 'history', 'runtime-actions'),
+        path.join('.ai-spec', 'internal', 'runtime-actions'),
+        path.join('.ai-spec', 'runtime-actions'),
+      ],
     ),
     runnerConsumedDir: buildEntry(
       targetDir,
@@ -89,8 +110,10 @@ function getExistingPath(entry) {
   if (fs.existsSync(entry.path)) {
     return entry.path;
   }
-  if (entry.legacyPath && fs.existsSync(entry.legacyPath)) {
-    return entry.legacyPath;
+  for (const candidate of entry.legacyPaths || []) {
+    if (fs.existsSync(candidate)) {
+      return candidate;
+    }
   }
   return entry.path;
 }
@@ -99,14 +122,22 @@ function getExistingRelPath(entry) {
   if (fs.existsSync(entry.path)) {
     return entry.relPath;
   }
-  if (entry.legacyPath && fs.existsSync(entry.legacyPath)) {
-    return entry.legacyRelPath;
+  const legacyRelPaths = entry.legacyRelPaths || [];
+  const legacyPaths = entry.legacyPaths || [];
+  for (let index = 0; index < legacyPaths.length; index += 1) {
+    if (fs.existsSync(legacyPaths[index])) {
+      return legacyRelPaths[index];
+    }
   }
   return entry.relPath;
 }
 
 function getCandidatePaths(entry) {
-  return [entry.path, entry.legacyPath].filter(Boolean);
+  return [entry.path, ...(entry.legacyPaths || [])].filter(Boolean);
+}
+
+function shouldPersistHistory() {
+  return process.env.AI_SPEC_PERSIST_HISTORY === '1' || process.env.BR_AI_SPEC_DEBUG_HISTORY === '1';
 }
 
 module.exports = {
@@ -114,4 +145,5 @@ module.exports = {
   getExistingPath,
   getExistingRelPath,
   getCandidatePaths,
+  shouldPersistHistory,
 };

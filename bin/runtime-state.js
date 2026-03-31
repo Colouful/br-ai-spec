@@ -1,6 +1,12 @@
 #!/usr/bin/env node
 const fs = require('fs');
 const path = require('path');
+const {
+  resolveRuntimePaths,
+  getExistingPath,
+  getCandidatePaths,
+  shouldPersistHistory,
+} = require('./runtime-paths');
 
 function printUsage() {
   console.log(`Usage:
@@ -525,7 +531,9 @@ function loadTaskAnchor(taskAnchorPath, taskAnchorData = null) {
 }
 
 function saveUpdatedRunState({ historyRunPath, currentRunPath, syncCurrent, state }) {
-  writeJsonFile(historyRunPath, state);
+  if (historyRunPath) {
+    writeJsonFile(historyRunPath, state);
+  }
   if (syncCurrent) {
     writeJsonFile(currentRunPath, state);
   }
@@ -534,16 +542,22 @@ function saveUpdatedRunState({ historyRunPath, currentRunPath, syncCurrent, stat
 function writeRunState({ targetDir, runPlan, taskAnchor, options, source }) {
   const now = new Date();
   const state = buildRunState({ runPlan, taskAnchor, options, now, source });
+  const runtimePaths = resolveRuntimePaths(targetDir);
+  const persistHistory = shouldPersistHistory();
+  if (persistHistory) {
+    ensureDir(runtimePaths.runsDir.path);
+  }
+  ensureDir(path.dirname(runtimePaths.currentRun.path));
 
-  const aiSpecDir = path.join(targetDir, '.ai-spec');
-  const runsDir = path.join(aiSpecDir, 'runs');
-  ensureDir(runsDir);
-
-  const currentRunPath = path.join(aiSpecDir, 'current-run.json');
-  const historyRunPath = path.join(runsDir, `${state.run_id}.json`);
+  const currentRunPath = runtimePaths.currentRun.path;
+  const historyRunPath = persistHistory
+    ? path.join(runtimePaths.runsDir.path, `${state.run_id}.json`)
+    : null;
 
   writeJsonFile(currentRunPath, state);
-  writeJsonFile(historyRunPath, state);
+  if (historyRunPath) {
+    writeJsonFile(historyRunPath, state);
+  }
 
   return {
     status: 'success',
@@ -562,28 +576,43 @@ function writeRunState({ targetDir, runPlan, taskAnchor, options, source }) {
 }
 
 function resolveRunStatePaths(targetDir, runId) {
-  const aiSpecDir = path.join(targetDir, '.ai-spec');
-  const currentRunPath = path.join(aiSpecDir, 'current-run.json');
+  const runtimePaths = resolveRuntimePaths(targetDir);
+  const aiSpecDir = runtimePaths.aiSpecDir.path;
+  const currentRunPath = runtimePaths.currentRun.path;
   let historyRunPath = null;
   let state = null;
+  const currentState = fs.existsSync(currentRunPath)
+    ? readRunStateFile(currentRunPath)
+    : null;
 
   if (runId) {
-    historyRunPath = path.join(aiSpecDir, 'runs', `${runId}.json`);
-    if (!fs.existsSync(historyRunPath)) {
-      throw new Error(`run-state history file not found: ${historyRunPath}`);
+    if (currentState && currentState.run_id === runId) {
+      state = currentState;
     }
-    state = readRunStateFile(historyRunPath);
+    for (const candidateDir of getCandidatePaths(runtimePaths.runsDir)) {
+      const candidatePath = path.join(candidateDir, `${runId}.json`);
+      if (fs.existsSync(candidatePath)) {
+        historyRunPath = candidatePath;
+        if (!state) {
+          state = readRunStateFile(historyRunPath);
+        }
+        break;
+      }
+    }
+    if (!state) {
+      throw new Error(`run-state history file not found for run_id: ${runId}`);
+    }
   } else {
     if (!fs.existsSync(currentRunPath)) {
       throw new Error(`current run-state file not found: ${currentRunPath}`);
     }
-    state = readRunStateFile(currentRunPath);
-    historyRunPath = path.join(aiSpecDir, 'runs', `${state.run_id}.json`);
+    state = currentState;
+    const candidateHistory = getExistingPath({
+      path: path.join(runtimePaths.runsDir.path, `${state.run_id}.json`),
+      legacyPaths: getCandidatePaths(runtimePaths.runsDir).map((dirPath) => path.join(dirPath, `${state.run_id}.json`)).slice(1),
+    });
+    historyRunPath = fs.existsSync(candidateHistory) ? candidateHistory : null;
   }
-
-  const currentState = fs.existsSync(currentRunPath)
-    ? readRunStateFile(currentRunPath)
-    : null;
 
   return {
     aiSpecDir,
@@ -1164,7 +1193,9 @@ function printPretty(result, action = 'init') {
   console.log(`  target: ${result.target}`);
   console.log(`  run_id: ${result.state.run_id}`);
   console.log(`  current: ${result.artifacts.current_run}`);
-  console.log(`  history: ${result.artifacts.run_history}`);
+  if (result.artifacts.run_history) {
+    console.log(`  history: ${result.artifacts.run_history}`);
+  }
   console.log(`  mode: ${result.state.mode || 'n/a'}`);
   if (action === 'status') {
     console.log(`  status: ${result.state.status || 'n/a'}`);

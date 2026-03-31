@@ -9,6 +9,7 @@ const {
   resolveRuntimePaths,
   getExistingPath,
   getCandidatePaths,
+  shouldPersistHistory,
 } = require('./runtime-paths');
 
 const INBOX_SPECS = [
@@ -246,6 +247,11 @@ function buildStatus(targetDir) {
 }
 
 function archiveConsumedInput(targetDir, filePath, kind) {
+  if (!shouldPersistHistory()) {
+    fs.unlinkSync(filePath);
+    return null;
+  }
+
   const runtimePaths = resolveRuntimePaths(targetDir);
   const consumedDir = runtimePaths.runnerConsumedDir.path;
   ensureDir(consumedDir);

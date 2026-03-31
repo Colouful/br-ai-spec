@@ -30,6 +30,34 @@ const DISPATCH_INSTRUCTION_FILES = [
   '.agents/roles/common/expert-dispatch-spec.md',
 ];
 
+const EXPERT_INSTRUCTION_FILES = [
+  '.agents/roles/common/expert-executor-spec.md',
+];
+
+const ROLE_RULE_HINTS = {
+  'requirement-analyst': [
+    '.agents/rules/01-项目概述.md',
+    '.agents/rules/03-项目结构.md',
+    '.agents/rules/05-API规范.md',
+    '.agents/rules/06-路由规范.md',
+    '.agents/rules/09-样式规范.md',
+  ],
+  'frontend-implementer': [
+    '.agents/rules/03-项目结构.md',
+    '.agents/rules/04-组件规范.md',
+    '.agents/rules/06-路由规范.md',
+    '.agents/rules/09-样式规范.md',
+    '.agents/rules/11-测试规范.md',
+  ],
+  'code-guardian': [
+    '.agents/rules/02-编码规范.md',
+    '.agents/rules/09-样式规范.md',
+    '.agents/rules/11-测试规范.md',
+    '.agents/rules/13-代码格式化与检查.md',
+    '.agents/rules/14-审计汇报规范.md',
+  ],
+};
+
 function resolveTargetDir(target) {
   return path.resolve(process.cwd(), target || '.');
 }
@@ -239,9 +267,158 @@ function buildSummary(status) {
   };
 }
 
+function buildSkillTargets(targetDir, skills) {
+  if (!Array.isArray(skills)) {
+    return [];
+  }
+
+  return skills
+    .filter((item) => item && typeof item === 'object' && item.path)
+    .map((item) => buildReadableTarget(targetDir, item.path, {
+      required: Boolean(item.installed),
+      label: item.id ? `${item.id} skill` : 'skill',
+    }));
+}
+
+function buildRuleTargetsForRole(targetDir, roleId) {
+  const relPaths = ROLE_RULE_HINTS[roleId] || [];
+  if (relPaths.length === 0) {
+    return [buildReadableTarget(targetDir, '.agents/rules/')];
+  }
+
+  return relPaths.map((relPath) => buildReadableTarget(targetDir, relPath));
+}
+
+function buildExecutionContract(runtimePaths, dispatch, roleDefinition, writes) {
+  const artifactWrites = writes
+    .filter((item) => item.kind === 'file' && item.rel_path !== runtimePaths.tmpCurrentExecution.relPath)
+    .map((item) => item.rel_path);
+
+  const contract = {
+    kind: 'expert-execution',
+    write_to: runtimePaths.tmpCurrentExecution.relPath,
+    required_fields: [
+      'kind',
+      'run_id',
+      'dispatch_id',
+      'role.id',
+      'status',
+      'summary',
+      'artifacts',
+      'next_action',
+    ],
+    required_artifacts: artifactWrites,
+    next_advance_command: './node_modules/.bin/ai-spec protocol-advance --target . --json',
+  };
+
+  if (dispatch.role?.id === 'frontend-implementer') {
+    contract.required_fields.push('verification');
+  }
+
+  if (dispatch.role?.id === 'requirement-analyst') {
+    contract.required_fields.push('assumptions');
+  }
+
+  if (Array.isArray(roleDefinition.handoff_to) && roleDefinition.handoff_to.length > 0) {
+    contract.default_next_role = roleDefinition.handoff_to[0];
+  }
+
+  return contract;
+}
+
+function buildExpertExpectedOutput(dispatch, writes, runtimePaths) {
+  const outputs = [];
+
+  if (dispatch.role?.id === 'requirement-analyst') {
+    outputs.push('完成 openspec proposal.md');
+    outputs.push('完成 openspec tasks.md');
+  } else if (dispatch.role?.id === 'frontend-implementer') {
+    outputs.push('完成当前范围内的代码实现');
+  } else if (dispatch.role?.id === 'code-guardian') {
+    outputs.push('完成 openspec checklist.md');
+    outputs.push('完成 openspec iterations.md');
+  }
+
+  const artifactWrites = writes
+    .filter((item) => item.kind === 'file' && item.rel_path !== runtimePaths.tmpCurrentExecution.relPath)
+    .map((item) => item.rel_path);
+
+  for (const relPath of artifactWrites) {
+    outputs.push(`写入 ${relPath}`);
+  }
+
+  outputs.push(`写入 ${runtimePaths.tmpCurrentExecution.relPath}`);
+  outputs.push('产出合法的 expert-execution JSON 回执');
+  outputs.push('完成后立即执行 protocol-advance 推进下一轮');
+
+  return [...new Set(outputs)];
+}
+
+function buildActorPresentation(actorId, mode) {
+  switch (actorId) {
+    case 'task-orchestrator':
+      return {
+        label: '任务主代理',
+        enter: '当前阶段：任务主代理（task-orchestrator）',
+        exit: mode === 'start'
+          ? '任务主代理已完成首轮编排'
+          : '任务主代理已完成当前编排',
+      };
+    case 'requirement-analyst':
+      return {
+        label: '需求解析专家',
+        enter: '当前阶段：需求解析专家（requirement-analyst）',
+        exit: '需求解析专家已完成 proposal 与 tasks',
+      };
+    case 'frontend-implementer':
+      return {
+        label: '前端实现专家',
+        enter: '当前阶段：前端实现专家（frontend-implementer）',
+        exit: '前端实现专家已完成代码实现',
+      };
+    case 'code-guardian':
+      return {
+        label: '规范守护专家',
+        enter: '当前阶段：规范守护专家（code-guardian）',
+        exit: '规范守护专家已完成 checklist 与 iterations',
+      };
+    case 'runner':
+      return {
+        label: '运行时推进器',
+        enter: '当前阶段：运行时推进器（runner）',
+        exit: '运行时推进器已完成当前态消费',
+      };
+    default:
+      return {
+        label: actorId || null,
+        enter: actorId ? `当前阶段：${actorId}` : null,
+        exit: actorId ? `${actorId} 已完成当前轮次` : null,
+      };
+  }
+}
+
+function attachActorPresentation(turn) {
+  if (!turn.actor?.id) {
+    return turn;
+  }
+
+  const presentation = buildActorPresentation(turn.actor.id, turn.mode);
+  return {
+    ...turn,
+    actor: {
+      ...turn.actor,
+      label: turn.actor.label || presentation.label,
+    },
+    announcements: {
+      enter: presentation.enter,
+      exit: presentation.exit,
+    },
+  };
+}
+
 function buildStartTurn(targetDir, userInput) {
   const runtimePaths = resolveRuntimePaths(targetDir);
-  return {
+  return attachActorPresentation({
     kind: 'ai-protocol-turn',
     status: userInput ? 'ready' : 'waiting-input',
     mode: 'start',
@@ -275,12 +452,12 @@ function buildStartTurn(targetDir, userInput) {
       '在 reply 中包含唯一合法 json 代码块',
       '写入 .ai-spec/internal/tmp/task-orchestrator-reply.md',
     ],
-  };
+  });
 }
 
 function buildDispatchTurn(targetDir, status, currentArtifacts) {
   const runtimePaths = resolveRuntimePaths(targetDir);
-  return {
+  return attachActorPresentation({
     kind: 'ai-protocol-turn',
     status: 'ready',
     mode: 'dispatch',
@@ -312,7 +489,7 @@ function buildDispatchTurn(targetDir, status, currentArtifacts) {
       '根据 current-run 选择当前专家并产出 expert-dispatch',
       '将当前任务锚点和期望输出裁剪到当前专家可执行粒度',
     ],
-  };
+  });
 }
 
 function buildContinueTurn(targetDir, status, currentArtifacts) {
@@ -338,7 +515,7 @@ function buildContinueTurn(targetDir, status, currentArtifacts) {
     );
   }
 
-  return {
+  return attachActorPresentation({
     kind: 'ai-protocol-turn',
     status: 'ready',
     mode: 'continue',
@@ -362,7 +539,7 @@ function buildContinueTurn(targetDir, status, currentArtifacts) {
       }),
     ],
     expected_output: expectedOutput,
-  };
+  });
 }
 
 function buildExpertTurn(targetDir, status, currentArtifacts) {
@@ -389,6 +566,7 @@ function buildExpertTurn(targetDir, status, currentArtifacts) {
   };
 
   const reads = [
+    ...buildCommandTargets(targetDir, EXPERT_INSTRUCTION_FILES),
     buildFileTarget(targetDir, path.join('.ai-spec', 'current-run.json'), {
       required: true,
       label: 'current run-state',
@@ -406,8 +584,15 @@ function buildExpertTurn(targetDir, status, currentArtifacts) {
     }));
   }
 
+  const skillTargets = buildSkillTargets(targetDir, dispatch.execution?.skills);
+  reads.push(...skillTargets);
+
   for (const item of roleDefinition.reads) {
     const resolvedValue = resolveTemplateVariables(item, context);
+    if (resolvedValue === '.agents/rules/' || resolvedValue === '.agents/rules') {
+      reads.push(...buildRuleTargetsForRole(targetDir, dispatch.role.id));
+      continue;
+    }
     if (resolvedValue === 'code' || resolvedValue === 'implementation-notes') {
       reads.push(buildSymbolicTarget(resolvedValue));
     } else {
@@ -426,7 +611,14 @@ function buildExpertTurn(targetDir, status, currentArtifacts) {
     writes.push(convertTargetSpec(targetDir, item, context));
   }
 
-  return {
+  const expectedOutput = Array.isArray(dispatch.execution?.expected_output) && dispatch.execution.expected_output.length > 0
+    ? [...dispatch.execution.expected_output]
+    : [];
+  for (const item of buildExpertExpectedOutput(dispatch, writes, runtimePaths)) {
+    expectedOutput.push(item);
+  }
+
+  return attachActorPresentation({
     kind: 'ai-protocol-turn',
     status: 'ready',
     mode: 'execute',
@@ -451,11 +643,10 @@ function buildExpertTurn(targetDir, status, currentArtifacts) {
       : roleDefinition.preferred_skills,
     reads: dedupeTargets(reads),
     writes: dedupeTargets(writes),
-    expected_output: Array.isArray(dispatch.execution?.expected_output)
-      ? dispatch.execution.expected_output
-      : [],
+    expected_output: [...new Set(expectedOutput)],
+    execution_contract: buildExecutionContract(runtimePaths, dispatch, roleDefinition, writes),
     handoff_to: roleDefinition.handoff_to,
-  };
+  });
 }
 
 function buildProtocolTurn(options = {}) {
@@ -464,7 +655,7 @@ function buildProtocolTurn(options = {}) {
   const userInput = options.userInput || null;
 
   if (status.pending_inputs.length > 0) {
-    return {
+    return attachActorPresentation({
       kind: 'ai-protocol-turn',
       status: 'blocked',
       mode: 'consume-inbox',
@@ -481,7 +672,7 @@ function buildProtocolTurn(options = {}) {
       reads: [],
       writes: [],
       expected_output: [],
-    };
+    });
   }
 
   if (!status.current.run_id) {

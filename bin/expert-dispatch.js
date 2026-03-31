@@ -1,7 +1,11 @@
 #!/usr/bin/env node
 const fs = require('fs');
 const path = require('path');
-const { resolveRuntimePaths, getCandidatePaths } = require('./runtime-paths');
+const {
+  resolveRuntimePaths,
+  getCandidatePaths,
+  shouldPersistHistory,
+} = require('./runtime-paths');
 
 function printUsage() {
   console.log(`Usage:
@@ -157,17 +161,22 @@ function normalizeDispatchPayload(payload) {
 
 function writeDispatchArtifacts(targetDir, payload) {
   const runtimePaths = resolveRuntimePaths(targetDir);
-  const dispatchesDir = path.join(runtimePaths.dispatchesDir.path, payload.run_id);
-  ensureDir(dispatchesDir);
-
   const currentDispatchPath = runtimePaths.currentDispatch.path;
-  const dispatchRecordPath = path.join(dispatchesDir, `${payload.dispatch_id}.json`);
+  const persistHistory = shouldPersistHistory();
+  let dispatchRecordPath = null;
+  if (persistHistory) {
+    const dispatchesDir = path.join(runtimePaths.dispatchesDir.path, payload.run_id);
+    ensureDir(dispatchesDir);
+    dispatchRecordPath = path.join(dispatchesDir, `${payload.dispatch_id}.json`);
+  }
 
   if (runtimePaths.currentDispatch.legacyPath && fs.existsSync(runtimePaths.currentDispatch.legacyPath)) {
     fs.unlinkSync(runtimePaths.currentDispatch.legacyPath);
   }
   writeJson(currentDispatchPath, payload);
-  writeJson(dispatchRecordPath, payload);
+  if (dispatchRecordPath) {
+    writeJson(dispatchRecordPath, payload);
+  }
 
   return {
     current_dispatch: currentDispatchPath,

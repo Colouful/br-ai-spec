@@ -493,6 +493,11 @@ function Invoke-DevDependenciesInstall {
 }
 
 function Get-SourcePackageIdent {
+    return Get-SourcePackageField -Field "ident"
+}
+
+function Get-SourcePackageField {
+    param([Parameter(Mandatory = $true)][string]$Field)
     $packageJson = Join-Path $script:SourceDir "package.json"
     if (-not (Test-Path $packageJson) -or -not (Get-Command node -ErrorAction SilentlyContinue)) {
         return $null
@@ -502,10 +507,20 @@ function Get-SourcePackageIdent {
         $script = @'
 const fs = require("fs");
 const pkg = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
-if (!pkg.name || !pkg.version) process.exit(1);
-process.stdout.write(`${pkg.name}@${pkg.version}`);
+const field = process.argv[2];
+let value = null;
+if (field === "ident") {
+  if (!pkg.name || !pkg.version) process.exit(1);
+  value = `${pkg.name}@${pkg.version}`;
+} else if (field === "name") {
+  value = pkg.name || null;
+} else if (field === "registry") {
+  value = pkg.publishConfig?.registry || null;
+}
+if (!value) process.exit(1);
+process.stdout.write(String(value));
 '@
-        $ident = & node -e $script $packageJson 2>$null
+        $ident = & node -e $script $packageJson $Field 2>$null
         if ($LASTEXITCODE -ne 0 -or -not $ident) { return $null }
         return $ident.Trim()
     } catch {
@@ -533,6 +548,8 @@ function Install-LocalAiSpecCli {
 
     $installSpec = $null
     $installLabel = $null
+    $sourcePkgName = $null
+    $sourcePkgRegistry = $null
     if ($env:BR_AI_SPEC_FORCE_LOCAL_CLI) {
         $installSpec = $script:SourceDir
         $installLabel = "$($script:SourceDir) (forced local path)"
@@ -541,10 +558,42 @@ function Install-LocalAiSpecCli {
         if ($sourcePkgIdent) {
             $installSpec = $sourcePkgIdent
             $installLabel = "$sourcePkgIdent (registry)"
+            $sourcePkgName = Get-SourcePackageField -Field "name"
+            $sourcePkgRegistry = Get-SourcePackageField -Field "registry"
         } else {
             $installSpec = $script:SourceDir
             $installLabel = "$($script:SourceDir) (local path fallback)"
         }
+    }
+
+    $scopeName = $null
+    if ($installSpec -match '^(@[^/]+)/') {
+        $scopeName = $Matches[1]
+    } elseif ($sourcePkgName -and $sourcePkgName -match '^(@[^/]+)/') {
+        $scopeName = $Matches[1]
+    }
+
+    $installArgs = New-Object System.Collections.Generic.List[string]
+    if ($script:PkgManager -eq "pnpm") {
+        $installArgs.Add("add")
+        if (Test-PnpmWorkspacePackageRoot -Target $Target) {
+            $installArgs.Add("-w")
+        }
+        $installArgs.Add("-D")
+        $installArgs.Add($installSpec)
+    } else {
+        $installArgs.Add("install")
+        $installArgs.Add("-D")
+        $installArgs.Add($installSpec)
+    }
+
+    if ($sourcePkgRegistry) {
+        $installArgs.Add("--registry")
+        $installArgs.Add($sourcePkgRegistry)
+        if ($scopeName) {
+            $installArgs.Add("--$($scopeName):registry=$sourcePkgRegistry")
+        }
+        $installLabel = "$installLabel via $sourcePkgRegistry"
     }
 
     $manualCmd = if ($script:PkgManager -eq "pnpm" -and (Test-PnpmWorkspacePackageRoot -Target $Target)) {
@@ -554,11 +603,27 @@ function Install-LocalAiSpecCli {
     } else {
         "cd $Target && npm install -D `"$installSpec`""
     }
+    if ($sourcePkgRegistry) {
+        $manualCmd += " --registry `"$sourcePkgRegistry`""
+        if ($scopeName) {
+            $manualCmd += " --$($scopeName):registry=`"$sourcePkgRegistry`""
+        }
+    }
 
     Write-Info "正在使用 $($script:PkgManager) 安装项目内 ai-spec CLI ..."
     Write-Info "  source: $installLabel"
     try {
-        Invoke-DevDependenciesInstall -Target $Target -Packages @($installSpec)
+        Push-Location $Target
+        try {
+            if ($script:PkgManager -eq "pnpm") {
+                & pnpm @installArgs
+            } else {
+                & npm @installArgs
+            }
+            if ($LASTEXITCODE -ne 0) { throw "install failed" }
+        } finally {
+            Pop-Location
+        }
     } catch {
         Write-Warn "本地 ai-spec CLI 安装失败，请手动执行:"
         Write-Host "  $manualCmd"
@@ -1008,7 +1073,7 @@ function Install-OpenSpec {
             }
             try {
                 Push-Location $Target
-                npx openspec init --tools $toolsArg --force --no-interactive 2>$null
+                npx openspec init --tools $toolsArg --force 2>$null
                 Pop-Location
             } catch { Write-Warn "openspec init 执行失败，请手动运行"; Pop-Location }
         } else {
