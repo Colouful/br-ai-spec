@@ -757,6 +757,22 @@ function Copy-CursorExtras {
     }
 }
 
+function Copy-ClaudeExtras {
+    param([string]$Target)
+    if ($script:IdeFilter -ne "all" -and $script:IdeFilter -ne "default" -and $script:IdeFilter -ne "claude") { return }
+
+    $claudeDst = Join-Path $Target ".claude"
+    New-Item -ItemType Directory -Path $claudeDst -Force | Out-Null
+
+    $cmdsSrc = Join-Path $script:SourceDir ".claude/commands"
+    if (Test-Path $cmdsSrc) {
+        $cmdsDst = Join-Path $claudeDst "commands"
+        New-Item -ItemType Directory -Path $cmdsDst -Force | Out-Null
+        Copy-Item -Path (Join-Path $cmdsSrc "*.md") -Destination $cmdsDst -Force -ErrorAction SilentlyContinue
+        Write-Ok ".claude/commands/ 已同步"
+    }
+}
+
 function Install-Uipro {
     param([string]$Target)
     $skillDir = Join-Path $Target ".agents/skills/ui-ux-pro-max"
@@ -1082,6 +1098,7 @@ function Invoke-Init {
     if ($script:Level -eq "L2" -or $script:Level -eq "L3") {
         New-IdeLinks -Target $target
         Copy-CursorExtras -Target $target
+        Copy-ClaudeExtras -Target $target
     }
     if ($script:Level -eq "L3") { Install-OpenSpec -Target $target }
 
@@ -1112,6 +1129,7 @@ function Invoke-Update {
     if ($script:Level -eq "L2" -or $script:Level -eq "L3") {
         New-IdeLinks -Target $target
         Copy-CursorExtras -Target $target
+        Copy-ClaudeExtras -Target $target
     }
     if ($script:Level -eq "L3") { Install-OpenSpec -Target $target }
 

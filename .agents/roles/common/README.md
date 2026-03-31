@@ -13,6 +13,10 @@
 - `frontend-implementer.md`
 - `code-guardian.md`
 
+另外保留 1 份与主理人配套的路由草案：
+
+- `task-orchestrator-routing.md`
+
 这 4 个角色足够支撑最小闭环：
 
 ```text
@@ -31,6 +35,7 @@
 - `skills` 负责“具体怎么做”
 - `flows` 负责“按什么顺序做”
 - `task-orchestrator` 负责路由和调度，不直接承担具体交付实现
+- `task-orchestrator-routing.md` 负责沉淀动态选专家规则，不作为独立角色参与执行
 
 ## 建议的 frontmatter 字段
 

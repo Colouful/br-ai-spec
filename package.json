@@ -19,6 +19,8 @@
     "configs/",
     "templates/",
     ".cursor/mcp.json",
+    ".cursor/commands/",
+    ".claude/commands/",
     "openspec/",
     "install.sh",
     "install.ps1"

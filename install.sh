@@ -776,6 +776,22 @@ copy_cursor_extras() {
   fi
 }
 
+# ---- 复制 Claude 额外文件 ----
+copy_claude_extras() {
+  local target="$1"
+  [[ "$IDE_FILTER" != "all" && "$IDE_FILTER" != "default" && "$IDE_FILTER" != "claude" ]] && return 0
+
+  local claude_dst="$target/.claude"
+  mkdir -p "$claude_dst"
+
+  local cmds_src="$SOURCE_DIR/.claude/commands"
+  if [ -d "$cmds_src" ]; then
+    local cmds_dst="$claude_dst/commands"
+    mkdir -p "$cmds_dst"
+    cp "$cmds_src"/*.md "$cmds_dst/" 2>/dev/null && ok ".claude/commands/ 已同步" || true
+  fi
+}
+
 # ---- 安装 OpenSpec（L3） ----
 setup_openspec() {
   local target="$1"
@@ -1111,6 +1127,7 @@ cmd_init() {
   if [ "$LEVEL" = "L2" ] || [ "$LEVEL" = "L3" ]; then
     create_ide_links "$target"
     copy_cursor_extras "$target"
+    copy_claude_extras "$target"
   fi
 
   # L3: + OpenSpec
@@ -1147,6 +1164,7 @@ cmd_update() {
   if [ "$LEVEL" = "L2" ] || [ "$LEVEL" = "L3" ]; then
     create_ide_links "$target"
     copy_cursor_extras "$target"
+    copy_claude_extras "$target"
   fi
 
   if [ "$LEVEL" = "L3" ]; then

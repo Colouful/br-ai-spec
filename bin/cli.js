@@ -8,6 +8,21 @@ const env = { ...process.env, BR_AI_SPEC_LOCAL: pkgRoot };
 const opts = { stdio: 'inherit', cwd: process.cwd(), env };
 
 try {
+  if (args[0] === 'runtime-state') {
+    const runtimeState = require('./runtime-state');
+    process.exit(runtimeState.main(args.slice(1)));
+  }
+
+  if (args[0] === 'task-orchestrator-adapter') {
+    const adapter = require('./task-orchestrator-adapter');
+    process.exit(adapter.main(args.slice(1)));
+  }
+
+  if (args[0] === 'task-orchestrator-extractor') {
+    const extractor = require('./task-orchestrator-extractor');
+    process.exit(extractor.main(args.slice(1)));
+  }
+
   if (process.platform === 'win32') {
     const ps1 = path.join(pkgRoot, 'install.ps1');
     execFileSync('powershell', [
