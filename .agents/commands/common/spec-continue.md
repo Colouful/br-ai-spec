@@ -1,4 +1,4 @@
-使用 `task-orchestrator（任务主理人）` **继续推进当前任务**。
+使用 `task-orchestrator（任务主代理）` **继续推进当前任务**。
 
 执行要求：
 
@@ -10,8 +10,8 @@
    - `.agents/roles/common/task-orchestrator-runtime-hooks.md`
 
 2. 这个命令只处理“运行中继续推进”，不要重新建新任务：
-   - 必须产出一个 `task-orchestrator-runtime-action（主理人运行动作载荷）`
-   - 不要产出 `task-orchestrator-bootstrap（主理人首轮桥接载荷）`
+   - 必须产出一个 `task-orchestrator-runtime-action（主代理运行动作载荷）`
+   - 不要产出 `task-orchestrator-bootstrap（主代理首轮桥接载荷）`
 
 3. 根据当前状态和用户输入，只做一个最小动作：
    - `approve（审批）`
@@ -26,7 +26,7 @@
 4. 先准备一份 Markdown（标记文本） 内容：
    - 可以有简短说明
    - 必须包含且只包含一个合法的 `json` 代码块
-   - 代码块内容必须符合 `task-orchestrator-runtime-action（主理人运行动作载荷）`
+   - 代码块内容必须符合 `task-orchestrator-runtime-action（主代理运行动作载荷）`
 
 5. 使用 Bash（命令行） 工具执行：
    - `mkdir -p ./.ai-spec/tmp`

@@ -748,11 +748,9 @@ function Copy-CursorExtras {
         Write-Warn ".cursor/mcp.json 已生成 -> 请在 Cursor「设置 -> MCP」中按需启用服务后，再替换 project-id 与 access-token"
     }
 
-    $cmdsSrc = Join-Path $script:SourceDir ".cursor/commands"
-    if (Test-Path $cmdsSrc) {
-        $cmdsDst = Join-Path $cursorDst "commands"
-        New-Item -ItemType Directory -Path $cmdsDst -Force | Out-Null
-        Copy-Item -Path (Join-Path $cmdsSrc "*.md") -Destination $cmdsDst -Force -ErrorAction SilentlyContinue
+    Copy-CommonCommands -Target $Target -IdeName "cursor"
+    Copy-IdeCommandOverrides -Target $Target -IdeName "cursor"
+    if (Test-Path (Join-Path $cursorDst "commands")) {
         Write-Ok ".cursor/commands/ 已同步"
     }
 }
@@ -764,13 +762,31 @@ function Copy-ClaudeExtras {
     $claudeDst = Join-Path $Target ".claude"
     New-Item -ItemType Directory -Path $claudeDst -Force | Out-Null
 
-    $cmdsSrc = Join-Path $script:SourceDir ".claude/commands"
-    if (Test-Path $cmdsSrc) {
-        $cmdsDst = Join-Path $claudeDst "commands"
-        New-Item -ItemType Directory -Path $cmdsDst -Force | Out-Null
-        Copy-Item -Path (Join-Path $cmdsSrc "*.md") -Destination $cmdsDst -Force -ErrorAction SilentlyContinue
+    Copy-CommonCommands -Target $Target -IdeName "claude"
+    Copy-IdeCommandOverrides -Target $Target -IdeName "claude"
+    if (Test-Path (Join-Path $claudeDst "commands")) {
         Write-Ok ".claude/commands/ 已同步"
     }
+}
+
+function Copy-CommonCommands {
+    param([string]$Target, [string]$IdeName)
+    $cmdsSrc = Join-Path $script:SourceDir ".agents/commands/common"
+    if (-not (Test-Path $cmdsSrc)) { return }
+
+    $cmdsDst = Join-Path (Join-Path $Target ".$IdeName") "commands"
+    New-Item -ItemType Directory -Path $cmdsDst -Force | Out-Null
+    Copy-Item -Path (Join-Path $cmdsSrc "*.md") -Destination $cmdsDst -Force -ErrorAction SilentlyContinue
+}
+
+function Copy-IdeCommandOverrides {
+    param([string]$Target, [string]$IdeName)
+    $cmdsSrc = Join-Path $script:SourceDir ".agents/commands/$IdeName"
+    if (-not (Test-Path $cmdsSrc)) { return }
+
+    $cmdsDst = Join-Path (Join-Path $Target ".$IdeName") "commands"
+    New-Item -ItemType Directory -Path $cmdsDst -Force | Out-Null
+    Copy-Item -Path (Join-Path $cmdsSrc "*.md") -Destination $cmdsDst -Force -ErrorAction SilentlyContinue
 }
 
 function Install-Uipro {

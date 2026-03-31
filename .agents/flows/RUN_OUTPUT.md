@@ -6,14 +6,14 @@
 
 - CLI 可稳定输出
 - OpenClaw 可稳定读取
-- 后续主理人路由和状态机可以在此基础上扩展
+- 后续主代理路由和状态机可以在此基础上扩展
 
 ## 1. 为什么要有这个约定
 
 `ai-spec run` 至少会经过两个阶段：
 
 1. 读取流程模板 frontmatter，得到结构化模板信息
-2. 结合任务输入，由主理人生成本次实际执行计划
+2. 结合任务输入，由主代理生成本次实际执行计划
 
 如果没有统一 JSON 输出：
 
@@ -83,11 +83,11 @@
 
 ## 3. 阶段二：run-plan
 
-这是“主理人生成的执行计划”，在 `flow-descriptor` 之上增加本次任务的动态路由结果。
+这是“主代理生成的执行计划”，在 `flow-descriptor` 之上增加本次任务的动态路由结果。
 
 ### 3.1 输出时机
 
-在主理人完成：
+在主代理完成：
 
 - 模板选择
 - 必选专家确认
@@ -145,7 +145,7 @@
 | `schema_version` | 输出契约版本，当前固定为 `1` |
 | `kind` | `flow-descriptor` 或 `run-plan` |
 | `run_id` | 仅 `run-plan` 需要，表示一次运行实例 ID |
-| `mode` | 主理人运行模式：`auto / suggest / manual` |
+| `mode` | 主代理运行模式：`auto / suggest / manual` |
 | `status` | 当前运行状态，如 `planned / waiting-approval / running / blocked` |
 
 ### 4.2 `task`
@@ -165,7 +165,7 @@
 | 字段 | 说明 |
 | --- | --- |
 | `required_roles` | 本模板本次必须参与的专家 |
-| `activated_optional_roles` | 主理人动态激活的可选专家 |
+| `activated_optional_roles` | 主代理动态激活的可选专家 |
 | `skipped_optional_roles` | 本次未激活的可选专家 |
 | `approval_gates` | 本次实际保留的审批点 |
 | `first_handoff` | 第一位要被启动的专家 |
@@ -188,7 +188,7 @@
 
 支持：
 
-- 主理人根据输入生成 `run-plan`
+- 主代理根据输入生成 `run-plan`
 - 输出 `first_handoff`
 - 输出 `approval_gates`
 - 输出 `missing_inputs`
@@ -211,7 +211,7 @@
 
 ### 6.2 路由错误
 
-若模板能解析，但主理人无法生成可执行计划，返回：
+若模板能解析，但主代理无法生成可执行计划，返回：
 
 ```json
 {

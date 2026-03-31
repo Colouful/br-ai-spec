@@ -1,18 +1,18 @@
 ---
 id: task-orchestrator-runtime-hooks
-name: 主理人运行态钩子规范
+name: 主代理运行态钩子规范
 status: active
 owner: task-orchestrator
 description: 定义 task-orchestrator 在首轮规划、审批阻断、审批放行、专家交接、恢复、完成、失败、取消时应调用的 runtime-state 命令。
 ---
 
-# 主理人运行态钩子规范
+# 主代理运行态钩子规范
 
 ## 1. 目的
 
 这份规范不直接替代真正的运行器代码，它解决的是：
 
-> 当 `task-orchestrator（任务主理人）` 真的开始驱动一条任务链时，每个关键节点应该调用哪条 `runtime-state（运行状态）` 命令。
+> 当 `task-orchestrator（任务主代理）` 真的开始驱动一条任务链时，每个关键节点应该调用哪条 `runtime-state（运行状态）` 命令。
 
 也就是说，它是：
 
@@ -23,7 +23,7 @@ description: 定义 task-orchestrator 在首轮规划、审批阻断、审批放
 
 ### 2.1 首轮计划生成后
 
-当主理人已经拿到：
+当主代理已经拿到：
 
 - `run-plan（运行计划）`
 - 首轮 `task-anchor（任务锚点）`
@@ -125,7 +125,7 @@ ai-spec runtime-state status
 ## 3. 推荐自动链顺序
 
 ```text
-task-orchestrator（任务主理人）
+task-orchestrator（任务主代理）
   -> 生成 run-plan（运行计划） + task-anchor（任务锚点） / runtime-action（运行动作）
   -> task-orchestrator-adapter（自动执行适配层）
   -> bootstrap（首轮桥接）
@@ -148,7 +148,7 @@ task-orchestrator（任务主理人）
 
 但还没有：
 
-- 自动读取主理人输出并逐条调用这些命令的真正运行器
+- 自动读取主代理输出并逐条调用这些命令的真正运行器
 - 自动生成所有中间 `task-anchor（任务锚点）` 文件的执行器
 
 所以这份规范当前的意义是：
@@ -157,4 +157,4 @@ task-orchestrator（任务主理人）
 
 ## 5. 一句话要求
 
-> `task-orchestrator（任务主理人）` 不应只负责“说下一步做什么”，还应优先输出结构化载荷并调用 `task-orchestrator-adapter（自动执行适配层）`，再由适配层统一驱动 `runtime-state（运行状态）`，把运行链稳定落到 `.ai-spec/` 中。
+> `task-orchestrator（任务主代理）` 不应只负责“说下一步做什么”，还应优先输出结构化载荷并调用 `task-orchestrator-adapter（自动执行适配层）`，再由适配层统一驱动 `runtime-state（运行状态）`，把运行链稳定落到 `.ai-spec/` 中。

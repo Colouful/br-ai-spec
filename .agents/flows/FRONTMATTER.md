@@ -76,7 +76,7 @@ artifacts:
 | `name` | string | 流程中文展示名 |
 | `status` | string | 模板状态：`active / draft / planned / deprecated` |
 | `type` | string | 当前固定为 `flow-template` |
-| `owner` | string | 当前负责路由该模板的主理人角色 ID，当前一般为 `task-orchestrator` |
+| `owner` | string | 当前负责路由该模板的主代理角色 ID，当前一般为 `task-orchestrator` |
 | `description` | string | 模板简介，面向人和页面展示 |
 | `triggers` | string[] | 触发该模板的任务信号 |
 | `required_roles` | string[] | 必选专家列表，按默认执行骨架顺序排列 |
@@ -133,7 +133,7 @@ artifacts:
 
 ### 3.4 `owner`
 
-- 应引用已存在的主理人角色 ID
+- 应引用已存在的主代理角色 ID
 - 当前默认使用 `task-orchestrator`
 
 ### 3.5 `required_roles`
@@ -227,7 +227,7 @@ source: .agents/flows/common/prd-to-delivery.md
 - `required_roles`
   - 表示本模板的最小协作骨架
 - `optional_roles`
-  - 表示主理人可按条件动态插入的专家池
+  - 表示主代理可按条件动态插入的专家池
 - `approval_gates`
   - 表示执行过程中可能暂停并等待人工确认的节点
 - `artifacts`
@@ -235,7 +235,7 @@ source: .agents/flows/common/prd-to-delivery.md
 
 重要说明：
 
-> 流程模板只定义“骨架和边界”，真正的激活结果仍由主理人结合输入任务动态决定。
+> 流程模板只定义“骨架和边界”，真正的激活结果仍由主代理结合输入任务动态决定。
 
 ## 6. 推荐校验顺序
 

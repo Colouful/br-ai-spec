@@ -1,0 +1,204 @@
+{
+  "version": 1,
+  "support_files": [
+    ".agents/roles/INDEX.md",
+    ".agents/roles/common/README.md",
+    ".agents/roles/domains/README.md",
+    ".agents/roles/common/runtime-state-handoff-spec.md",
+    ".agents/roles/common/task-anchor-spec.md",
+    ".agents/roles/common/task-orchestrator-adapter-payload.md",
+    ".agents/roles/common/task-orchestrator-bootstrap-payload.md",
+    ".agents/roles/common/task-orchestrator-output-extractor-spec.md",
+    ".agents/roles/common/task-orchestrator-routing.md",
+    ".agents/roles/common/task-orchestrator-run-plan-template.md",
+    ".agents/roles/common/task-orchestrator-runtime-hooks.md"
+  ],
+  "roles": {
+    "task-orchestrator": {
+      "name": "任务主代理",
+      "status": "active",
+      "domains": ["orchestration"],
+      "source": ".agents/roles/common/task-orchestrator.md"
+    },
+    "requirement-analyst": {
+      "name": "需求解析专家",
+      "status": "active",
+      "domains": ["demand-design"],
+      "source": ".agents/roles/common/requirement-analyst.md"
+    },
+    "frontend-implementer": {
+      "name": "前端实现专家",
+      "status": "active",
+      "domains": ["engineering", "delivery"],
+      "source": ".agents/roles/common/frontend-implementer.md"
+    },
+    "code-guardian": {
+      "name": "规范守护者",
+      "status": "active",
+      "domains": ["governance", "testing"],
+      "source": ".agents/roles/common/code-guardian.md"
+    },
+    "design-collaborator": {
+      "name": "设计协作专家",
+      "status": "planned",
+      "domains": ["demand-design"],
+      "source": ".agents/roles/domains/demand-design/design-collaborator.md"
+    },
+    "api-contract-specialist": {
+      "name": "API 契约专家",
+      "status": "planned",
+      "domains": ["demand-design"],
+      "source": ".agents/roles/domains/demand-design/api-contract-specialist.md"
+    },
+    "lint-policy-specialist": {
+      "name": "Lint 规则专家",
+      "status": "planned",
+      "domains": ["governance"],
+      "source": ".agents/roles/domains/governance/lint-policy-specialist.md"
+    },
+    "api-governance-specialist": {
+      "name": "API 规范专家",
+      "status": "planned",
+      "domains": ["governance"],
+      "source": ".agents/roles/domains/governance/api-governance-specialist.md"
+    },
+    "route-governance-specialist": {
+      "name": "路由规范专家",
+      "status": "planned",
+      "domains": ["governance"],
+      "source": ".agents/roles/domains/governance/route-governance-specialist.md"
+    },
+    "build-specialist": {
+      "name": "构建专家",
+      "status": "planned",
+      "domains": ["engineering"],
+      "source": ".agents/roles/domains/engineering/build-specialist.md"
+    },
+    "dependency-governor": {
+      "name": "依赖治理专家",
+      "status": "planned",
+      "domains": ["engineering"],
+      "source": ".agents/roles/domains/engineering/dependency-governor.md"
+    },
+    "architecture-advisor": {
+      "name": "架构顾问专家",
+      "status": "planned",
+      "domains": ["engineering"],
+      "source": ".agents/roles/domains/engineering/architecture-advisor.md"
+    },
+    "unit-test-specialist": {
+      "name": "单元测试专家",
+      "status": "planned",
+      "domains": ["testing"],
+      "source": ".agents/roles/domains/testing/unit-test-specialist.md"
+    },
+    "e2e-test-specialist": {
+      "name": "E2E 测试专家",
+      "status": "planned",
+      "domains": ["testing"],
+      "source": ".agents/roles/domains/testing/e2e-test-specialist.md"
+    },
+    "coverage-analyst": {
+      "name": "覆盖率分析专家",
+      "status": "planned",
+      "domains": ["testing"],
+      "source": ".agents/roles/domains/testing/coverage-analyst.md"
+    },
+    "verification-reviewer": {
+      "name": "验证评审专家",
+      "status": "planned",
+      "domains": ["testing"],
+      "source": ".agents/roles/domains/testing/verification-reviewer.md"
+    },
+    "pipeline-specialist": {
+      "name": "流水线专家",
+      "status": "planned",
+      "domains": ["delivery"],
+      "source": ".agents/roles/domains/delivery/pipeline-specialist.md"
+    },
+    "container-specialist": {
+      "name": "容器专家",
+      "status": "planned",
+      "domains": ["delivery"],
+      "source": ".agents/roles/domains/delivery/container-specialist.md"
+    },
+    "deployment-specialist": {
+      "name": "部署专家",
+      "status": "planned",
+      "domains": ["delivery"],
+      "source": ".agents/roles/domains/delivery/deployment-specialist.md"
+    },
+    "component-doc-specialist": {
+      "name": "组件文档专家",
+      "status": "planned",
+      "domains": ["documentation"],
+      "source": ".agents/roles/domains/documentation/component-doc-specialist.md"
+    },
+    "api-doc-specialist": {
+      "name": "API 文档专家",
+      "status": "planned",
+      "domains": ["documentation"],
+      "source": ".agents/roles/domains/documentation/api-doc-specialist.md"
+    },
+    "technical-writing-specialist": {
+      "name": "技术文档专家",
+      "status": "planned",
+      "domains": ["documentation"],
+      "source": ".agents/roles/domains/documentation/technical-writing-specialist.md"
+    },
+    "performance-auditor": {
+      "name": "性能审计专家",
+      "status": "planned",
+      "domains": ["performance"],
+      "source": ".agents/roles/domains/performance/performance-auditor.md"
+    },
+    "vitals-analyst": {
+      "name": "性能指标专家",
+      "status": "planned",
+      "domains": ["performance"],
+      "source": ".agents/roles/domains/performance/vitals-analyst.md"
+    },
+    "asset-optimizer": {
+      "name": "资源优化专家",
+      "status": "planned",
+      "domains": ["performance"],
+      "source": ".agents/roles/domains/performance/asset-optimizer.md"
+    },
+    "error-tracker": {
+      "name": "错误追踪专家",
+      "status": "planned",
+      "domains": ["observability"],
+      "source": ".agents/roles/domains/observability/error-tracker.md"
+    },
+    "rum-analyst": {
+      "name": "RUM 分析专家",
+      "status": "planned",
+      "domains": ["observability"],
+      "source": ".agents/roles/domains/observability/rum-analyst.md"
+    },
+    "event-instrumentation-specialist": {
+      "name": "埋点方案专家",
+      "status": "planned",
+      "domains": ["observability"],
+      "source": ".agents/roles/domains/observability/event-instrumentation-specialist.md"
+    },
+    "security-reviewer": {
+      "name": "安全审查专家",
+      "status": "planned",
+      "domains": ["security-a11y"],
+      "source": ".agents/roles/domains/security-a11y/security-reviewer.md"
+    },
+    "a11y-auditor": {
+      "name": "可访问性审计专家",
+      "status": "planned",
+      "domains": ["security-a11y"],
+      "source": ".agents/roles/domains/security-a11y/a11y-auditor.md"
+    },
+    "aria-specialist": {
+      "name": "ARIA 专家",
+      "status": "planned",
+      "domains": ["security-a11y"],
+      "source": ".agents/roles/domains/security-a11y/aria-specialist.md"
+    }
+  }
+}

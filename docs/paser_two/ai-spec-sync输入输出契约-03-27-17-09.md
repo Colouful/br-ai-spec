@@ -31,13 +31,23 @@
 
 ## 2. 输入契约
 
-### 2.1 推荐命令形式
+### 2.1 当前实现优先支持的命令形式
+
+当前代码已先支持本地 `manifest.json` 文件：
+
+```bash
+ai-spec sync . --manifest ./manifest.json
+```
+
+远程 URL（链接） 清单仍保留在契约设计中，但当前版本会明确提示“暂未支持”。
+
+### 2.2 推荐命令形式（后续扩展）
 
 ```bash
 ai-spec sync . --manifest https://hub.example.com/manifests/project-abc.json
 ```
 
-### 2.2 当前建议支持的最小参数
+### 2.3 当前建议支持的最小参数
 
 | 参数 | 类型 | 说明 |
 | --- | --- | --- |
@@ -49,7 +59,7 @@ ai-spec sync . --manifest https://hub.example.com/manifests/project-abc.json
 | `--dry-run（试运行）` | boolean | 只解析和求解，不真正安装 |
 | `--force（强制覆盖）` | boolean | 遇到冲突时允许覆盖可覆盖项 |
 
-### 2.3 输入来源优先级
+### 2.4 输入来源优先级
 
 当前建议优先级如下：
 

@@ -1,16 +1,16 @@
 ---
 id: task-orchestrator-run-plan-template
-name: 主理人首轮运行计划模板
+name: 主代理首轮运行计划模板
 status: active
 owner: task-orchestrator
 description: 定义 task-orchestrator 在首次识别任务时必须输出的最小 run-plan 结构，用于统一 IDE、OpenClaw 和后续运行时入口的首轮响应。
 ---
 
-# 主理人首轮运行计划模板
+# 主代理首轮运行计划模板
 
 ## 1. 目的
 
-这份模板用于统一 `task-orchestrator（任务主理人）` 在首次接收任务时的输出格式。
+这份模板用于统一 `task-orchestrator（任务主代理）` 在首次接收任务时的输出格式。
 
 适用场景：
 
@@ -116,7 +116,7 @@ description: 定义 task-orchestrator 在首次识别任务时必须输出的最
 ### 输入
 
 ```text
-@task-orchestrator（任务主理人） 创建一个商品组件
+@task-orchestrator（任务主代理） 创建一个商品组件
 ```
 
 ### 输出
@@ -150,14 +150,14 @@ description: 定义 task-orchestrator 在首次识别任务时必须输出的最
 
 ## 7. 一句话约束
 
-> `task-orchestrator（任务主理人）` 的首轮输出必须先形成结构化 `run-plan（运行计划）`，再决定是否交给下游专家，不允许在信息明显不足时直接进入实现。
+> `task-orchestrator（任务主代理）` 的首轮输出必须先形成结构化 `run-plan（运行计划）`，再决定是否交给下游专家，不允许在信息明显不足时直接进入实现。
 
 ## 8. 与首轮桥接载荷的关系
 
 如果当前运行环境支持本地命令调用，则在生成 `run-plan（运行计划）` 后，应继续：
 
 1. 生成首轮 `task-anchor（任务锚点）`
-2. 组装 `task-orchestrator-bootstrap（主理人首轮桥接载荷）`
+2. 组装 `task-orchestrator-bootstrap（主代理首轮桥接载荷）`
 3. 调用：
 
 ```bash

@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "scenario_packages": {
+    "frontend-basic": {
+      "roles": ["task-orchestrator", "requirement-analyst", "frontend-implementer", "code-guardian"],
+      "skills": ["create-proposal", "design-analysis", "execute-task"],
+      "rules": ["coding-standard", "api-standard", "route-standard", "style-standard", "generic-constraints", "test-standard"],
+      "domains": ["demand-design", "engineering", "governance", "testing"]
+    },
+    "design-to-code": {
+      "roles": ["task-orchestrator", "requirement-analyst", "frontend-implementer", "code-guardian"],
+      "skills": ["design-analysis", "create-component", "ui-verification"],
+      "rules": ["component-standard", "style-standard", "test-standard"],
+      "domains": ["demand-design", "engineering", "testing"]
+    },
+    "quality-governance": {
+      "roles": ["code-guardian"],
+      "skills": ["create-test", "ui-verification", "web-design-guidelines"],
+      "rules": ["test-standard", "format-check-standard", "audit-report-standard"],
+      "domains": ["governance", "testing"]
+    },
+    "enterprise-docs-prd": {
+      "roles": ["task-orchestrator", "requirement-analyst"],
+      "skills": ["create-proposal"],
+      "rules": ["doc-standard"],
+      "domains": ["demand-design", "documentation"]
+    }
+  }
+}

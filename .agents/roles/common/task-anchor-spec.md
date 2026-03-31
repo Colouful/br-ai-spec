@@ -3,7 +3,7 @@ id: task-anchor-spec
 name: 任务锚点规范
 status: active
 owner: task-orchestrator
-description: 定义 run（运行编排） 中 task-anchor（任务锚点） 的最小结构、注入时机和交接规则，供主理人和下游专家长期复用。
+description: 定义 run（运行编排） 中 task-anchor（任务锚点） 的最小结构、注入时机和交接规则，供主代理和下游专家长期复用。
 ---
 
 # task-anchor（任务锚点）注入规范
@@ -16,7 +16,7 @@ description: 定义 run（运行编排） 中 task-anchor（任务锚点） 的�
 
 - 多专家协同时，原始任务意图不能越传越偏
 - 专家之间不应依赖长对话历史来理解任务
-- `task-orchestrator（任务主理人）` 每次交接都应重新注入核心目标和关键约束
+- `task-orchestrator（任务主代理）` 每次交接都应重新注入核心目标和关键约束
 
 一句话：
 
@@ -101,9 +101,9 @@ description: 定义 run（运行编排） 中 task-anchor（任务锚点） 的�
 
 当前阶段建议在以下 4 个节点注入：
 
-### 5.1 主理人首轮生成 `run-plan（运行计划）` 后
+### 5.1 主代理首轮生成 `run-plan（运行计划）` 后
 
-当 `task-orchestrator（任务主理人）` 首次识别任务并输出 `run-plan（运行计划）` 后，应立即生成一份对应的 `task-anchor（任务锚点）`。
+当 `task-orchestrator（任务主代理）` 首次识别任务并输出 `run-plan（运行计划）` 后，应立即生成一份对应的 `task-anchor（任务锚点）`。
 
 ### 5.2 每次交给下一位专家前
 
@@ -112,7 +112,7 @@ description: 定义 run（运行编排） 中 task-anchor（任务锚点） 的�
 例如：
 
 ```text
-task-orchestrator（任务主理人）
+task-orchestrator（任务主代理）
   -> requirement-analyst（需求解析专家）
   -> frontend-implementer（前端实现专家）
   -> code-guardian（规范守护者）
@@ -197,7 +197,7 @@ task-orchestrator（任务主理人）
 
 最小可行做法是：
 
-1. 在主理人交接时显式输出 `task-anchor（任务锚点）`
+1. 在主代理交接时显式输出 `task-anchor（任务锚点）`
 2. 先把字段结构和交接协议定稳
 3. 允许后续再决定是否落到 `.ai-spec/anchors/`
 

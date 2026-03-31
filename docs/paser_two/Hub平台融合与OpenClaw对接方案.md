@@ -375,7 +375,7 @@ flowchart LR
 - Hub 不需要让用户显式选择 `flows（流程模板）`
 - CLI 只负责把当前项目内置的 `flows（流程模板）` 文件装进项目
 - 如果需要审计或状态展示，CLI 可以在 `.ai-spec/lock.json` 里额外记录 `installed_flows（已安装流程模板）`
-- 具体任务本次要走哪条 `flow（流程模板）`，由 `run（运行编排）` 阶段的 `task-orchestrator（任务主理人）` 动态决定
+- 具体任务本次要走哪条 `flow（流程模板）`，由 `run（运行编排）` 阶段的 `task-orchestrator（任务主代理）` 动态决定
 
 这样更符合你现在的产品分工。
 

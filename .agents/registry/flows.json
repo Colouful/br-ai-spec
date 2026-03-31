@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "support_files": [
+    ".agents/flows/FRONTMATTER.md",
+    ".agents/flows/RUN_OUTPUT.md",
+    ".agents/flows/common/README.md"
+  ],
+  "flows": {
+    "prd-to-delivery": {
+      "name": "PRD 到交付",
+      "status": "active",
+      "source": ".agents/flows/common/prd-to-delivery.md"
+    }
+  }
+}

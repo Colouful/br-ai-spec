@@ -13,7 +13,7 @@
 - `frontend-implementer.md`
 - `code-guardian.md`
 
-另外保留 1 份与主理人配套的路由草案：
+另外保留 1 份与主代理配套的路由草案：
 
 - `task-orchestrator-routing.md`
 

@@ -64,7 +64,7 @@ domains:
 
 roles:
   - id: task-orchestrator
-    name: 任务主理人
+    name: 任务主代理
     status: active
     bucket: common
     visibility: internal

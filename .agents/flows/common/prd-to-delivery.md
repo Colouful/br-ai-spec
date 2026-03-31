@@ -5,7 +5,7 @@ name: PRD 到交付
 status: active
 type: flow-template
 owner: task-orchestrator
-description: 面向新需求、设计还原和增量交付的基础协作模板。主理人基于该模板动态选择必选专家和可选专家。
+description: 面向新需求、设计还原和增量交付的基础协作模板。主代理基于该模板动态选择必选专家和可选专家。
 triggers:
   - prd-input
   - design-input
@@ -81,11 +81,11 @@ domains:
 2. `frontend-implementer`
 3. `code-guardian`
 
-这 3 个角色是本模板的必选角色，不应被主理人直接跳过。
+这 3 个角色是本模板的必选角色，不应被主代理直接跳过。
 
 ## 可选专家插入规则
 
-主理人可根据任务特征插入下列专家：
+主代理可根据任务特征插入下列专家：
 
 | 条件 | 建议插入专家 | 作用 |
 | --- | --- | --- |

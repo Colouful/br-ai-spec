@@ -1,0 +1,64 @@
+const assert = require('assert');
+const path = require('path');
+const { spawnSync } = require('child_process');
+
+const repoRoot = path.join(__dirname, '..', '..');
+const cases = [
+  {
+    name: 'invalid-scenario-missing-role',
+    fixtureDir: path.join(__dirname, 'fixtures', 'invalid-scenario-missing-role'),
+    expectedError: 'references unknown role: missing-role',
+  },
+  {
+    name: 'invalid-missing-source',
+    fixtureDir: path.join(__dirname, 'fixtures', 'invalid-missing-source'),
+    expectedError: 'references missing source: .agents/rules/common/missing-source-rule.md',
+  },
+  {
+    name: 'invalid-missing-support-file',
+    fixtureDir: path.join(__dirname, 'fixtures', 'invalid-missing-support-file'),
+    expectedError: 'roles.json support file is missing: .agents/roles/common/missing-support-file.md',
+  },
+  {
+    name: 'invalid-domains-type',
+    fixtureDir: path.join(__dirname, 'fixtures', 'invalid-domains-type'),
+    expectedError: 'rules.json entry "demo-rule" domains must be an array',
+  },
+];
+
+function run(args) {
+  return spawnSync('node', ['./bin/cli.js', ...args], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+  });
+}
+
+function runCase(testCase) {
+  const result = run(['validate-registry', '--source', testCase.fixtureDir, '--json']);
+
+  assert.strictEqual(
+    result.status,
+    1,
+    `expected validate-registry to fail for ${testCase.name}, got ${result.status}\nstderr:\n${result.stderr}`
+  );
+
+  assert.ok(result.stdout.trim(), 'expected validate-registry to print JSON output');
+
+  const report = JSON.parse(result.stdout);
+  assert.strictEqual(report.kind, 'registry-validation-result');
+  assert.strictEqual(report.status, 'failed');
+  assert.ok(
+    report.errors.some((item) => item.includes(testCase.expectedError)),
+    `expected "${testCase.expectedError}" for ${testCase.name}, got:\n${report.errors.join('\n')}`
+  );
+}
+
+function main() {
+  for (const testCase of cases) {
+    runCase(testCase);
+  }
+
+  console.log(`registry test passed: ${cases.length} invalid fixtures are rejected as expected`);
+}
+
+main();

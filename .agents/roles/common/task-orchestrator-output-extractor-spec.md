@@ -1,18 +1,18 @@
 ---
 id: task-orchestrator-output-extractor-spec
-name: 主理人输出抽取规范
+name: 主代理输出抽取规范
 status: active
 owner: task-orchestrator
 description: 定义如何从 task-orchestrator 的自然语言或 Markdown 回复中抽取结构化 JSON 载荷，供自动执行链消费。
 ---
 
-# 主理人输出抽取规范
+# 主代理输出抽取规范
 
 ## 1. 目的
 
 这份规范解决的是：
 
-> `task-orchestrator（任务主理人）` 需要继续输出人能读懂的解释，但系统仍然要自动拿到结构化 `JSON（结构化数据）` 去执行。
+> `task-orchestrator（任务主代理）` 需要继续输出人能读懂的解释，但系统仍然要自动拿到结构化 `JSON（结构化数据）` 去执行。
 
 因此新增一层最小抽取器：
 
@@ -35,13 +35,13 @@ ai-spec task-orchestrator-extractor apply --payload <file>
 
 ## 3. 支持的 payload（载荷） 类型
 
-- `task-orchestrator-bootstrap（主理人首轮桥接载荷）`
-- `task-orchestrator-runtime-action（主理人运行动作载荷）`
-- `task-orchestrator-runtime-event（主理人运行事件载荷）`
+- `task-orchestrator-bootstrap（主代理首轮桥接载荷）`
+- `task-orchestrator-runtime-action（主代理运行动作载荷）`
+- `task-orchestrator-runtime-event（主代理运行事件载荷）`
 
 ## 4. 推荐回复方式
 
-推荐主理人使用“解释 + JSON 代码块”的混合回复：
+推荐主代理使用“解释 + JSON 代码块”的混合回复：
 
 ````md
 我已经完成任务分析，建议先进入 requirement-analyst（需求解析专家）。
@@ -90,4 +90,4 @@ ai-spec task-orchestrator-extractor apply --payload ./.ai-spec/tmp/task-orchestr
 
 ## 7. 一句话约束
 
-> 若主理人希望“既保留可读回复，又进入自动执行链”，应在回复中输出显式 JSON 代码块，再由 `task-orchestrator-extractor（主理人输出抽取器）` 抽取并交给适配层执行。
+> 若主代理希望“既保留可读回复，又进入自动执行链”，应在回复中输出显式 JSON 代码块，再由 `task-orchestrator-extractor（主代理输出抽取器）` 抽取并交给适配层执行。

@@ -27,7 +27,7 @@
   - [.agents/flows/FRONTMATTER.md](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/.agents/flows/FRONTMATTER.md)
 - `run（运行）` 的最小解析器和输出草案
   - [.agents/flows/RUN_OUTPUT.md](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/.agents/flows/RUN_OUTPUT.md)
-- `task-orchestrator（任务主理人）` 角色骨架
+- `task-orchestrator（任务主代理）` 角色骨架
   - [/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/.agents/roles/common/task-orchestrator.md](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/.agents/roles/common/task-orchestrator.md)
 - `prd-to-delivery（需求到交付）` 流程模板骨架
   - [/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/.agents/flows/common/prd-to-delivery.md](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/.agents/flows/common/prd-to-delivery.md)
@@ -38,7 +38,7 @@
 - 当前 [bin/cli.js](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/bin/cli.js#L1) 仍然只是安装脚本代理，不负责 `run（运行）` 路由
 - 还没有完整的 `run-result（运行结果）` 状态机实现
 - 虽然已经补了 `gate-blocked（阻断） / approve（审批） / resume（恢复） / status（状态） / complete（完成） / fail（失败） / cancel（取消）` 的最小命令，但还没有继续覆盖完整的审批、恢复和结束状态机
-- 当前默认的运行入口更适合定义为 `IDE（开发工具） / OpenClaw（远程入口）` 里的 `task-orchestrator（任务主理人）` 触发，而不是 CLI（命令行工具）子命令
+- 当前默认的运行入口更适合定义为 `IDE（开发工具） / OpenClaw（远程入口）` 里的 `task-orchestrator（任务主代理）` 触发，而不是 CLI（命令行工具）子命令
 
 一句话：
 
@@ -46,13 +46,13 @@
 
 补充说明：
 
-> 当前仓库已经提供 `ai-spec runtime-state init` 作为底层写盘工具，并提供 `ai-spec task-orchestrator-adapter apply` 作为主理人自动执行适配入口；如果上游是自然语言/Markdown（标记文本） 回复，则优先先经过 `ai-spec task-orchestrator-extractor apply` 做结构化抽取，再由适配层统一驱动 `runtime-state bootstrap / handoff / gate-blocked / approve / resume / status / complete / fail / cancel`，把运行态稳定落盘并持续更新。
+> 当前仓库已经提供 `ai-spec runtime-state init` 作为底层写盘工具，并提供 `ai-spec task-orchestrator-adapter apply` 作为主代理自动执行适配入口；如果上游是自然语言/Markdown（标记文本） 回复，则优先先经过 `ai-spec task-orchestrator-extractor apply` 做结构化抽取，再由适配层统一驱动 `runtime-state bootstrap / handoff / gate-blocked / approve / resume / status / complete / fail / cancel`，把运行态稳定落盘并持续更新。
 
 ## 2. 运行能力定位
 
 `run（运行编排）` 的职责不是安装资产，而是：
 
-> 在目标项目已经具备 `rules（规则） / skills（技能） / roles（专家角色） / flows（流程模板） / context（上下文）` 的前提下，读取任务输入，选择流程模板，由 `task-orchestrator（任务主理人）` 生成结构化执行计划，并逐步驱动专家协同。
+> 在目标项目已经具备 `rules（规则） / skills（技能） / roles（专家角色） / flows（流程模板） / context（上下文）` 的前提下，读取任务输入，选择流程模板，由 `task-orchestrator（任务主代理）` 生成结构化执行计划，并逐步驱动专家协同。
 
 它最适合的场景是：
 
@@ -85,7 +85,7 @@
 
 - 读取任务输入
 - 读取规则、上下文、流程模板
-- 让 `task-orchestrator（任务主理人）` 做任务路由
+- 让 `task-orchestrator（任务主代理）` 做任务路由
 - 选出本次实际激活的专家
 - 产出结构化执行计划
 - 后续逐步进入专家执行、审批、恢复
@@ -103,10 +103,10 @@ run（运行） = 编排与执行
 
 ## 4. 推荐触发形式
 
-当前阶段更推荐的默认入口，不是 CLI（命令行工具）命令，而是显式触发 `task-orchestrator（任务主理人）`：
+当前阶段更推荐的默认入口，不是 CLI（命令行工具）命令，而是显式触发 `task-orchestrator（任务主代理）`：
 
 ```text
-@task-orchestrator（任务主理人） 创建一个商品组件
+@task-orchestrator（任务主代理） 创建一个商品组件
 ```
 
 或者：
@@ -124,7 +124,7 @@ ai-spec run . \
   --input ./docs/prd.md
 ```
 
-或者让主理人自动选模板：
+或者让主代理自动选模板：
 
 ```bash
 ai-spec run . \
@@ -159,7 +159,7 @@ ai-spec run . \
 说明：
 
 - 若显式传了 `--flow（流程模板）`，优先按指定模板解析
-- 若未显式传 `--flow（流程模板）`，由 `task-orchestrator（任务主理人）` 自动选择基础模板
+- 若未显式传 `--flow（流程模板）`，由 `task-orchestrator（任务主代理）` 自动选择基础模板
 - 若 `openspec/changes/<change-id>/proposal.md`、`tasks.md` 已存在，可跳过部分前置分析
 
 ## 6. 内部处理阶段
@@ -182,7 +182,7 @@ ai-spec run . \
 
 ### 6.3 路由阶段
 
-由 `task-orchestrator（任务主理人）` 完成：
+由 `task-orchestrator（任务主代理）` 完成：
 
 - 判断任务类型
 - 选择基础协作模板
@@ -203,7 +203,7 @@ ai-spec run . \
 
 ### 6.5 锚点生成阶段
 
-在首轮 `run-plan（运行计划）` 之后，主理人应继续为当前第一跳专家生成一份 `task-anchor（任务锚点）`。
+在首轮 `run-plan（运行计划）` 之后，主代理应继续为当前第一跳专家生成一份 `task-anchor（任务锚点）`。
 
 它的作用是：
 
@@ -218,7 +218,7 @@ ai-spec run . \
 
 ### 6.6 首轮桥接写盘阶段
 
-如果当前触发环境允许执行本地命令，则主理人应继续：
+如果当前触发环境允许执行本地命令，则主代理应继续：
 
 1. 组装首轮桥接载荷
 2. 优先调用 `ai-spec task-orchestrator-adapter apply`
@@ -289,9 +289,9 @@ ai-spec run . \
 
 ### 7.2 `run-plan（运行计划）`
 
-这是“主理人生成的执行计划”，是当前阶段最重要的输出对象。
+这是“主代理生成的执行计划”，是当前阶段最重要的输出对象。
 
-当前阶段建议主理人的首轮输出统一遵循：
+当前阶段建议主代理的首轮输出统一遵循：
 
 - [task-orchestrator-run-plan-template.md](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/.agents/roles/common/task-orchestrator-run-plan-template.md)
 
@@ -377,7 +377,7 @@ ai-spec run . \
 | 字段 | 说明 |
 | --- | --- |
 | `required_roles（必选专家）` | 本模板本次必须参与的专家 |
-| `activated_optional_roles（激活的可选专家）` | 主理人动态激活的可选专家 |
+| `activated_optional_roles（激活的可选专家）` | 主代理动态激活的可选专家 |
 | `skipped_optional_roles（跳过的可选专家）` | 本次未激活的可选专家 |
 | `approval_gates（审批点）` | 本次实际保留的人工确认点 |
 | `first_handoff（第一跳交接专家）` | 第一位要被启动的专家 |
@@ -436,7 +436,7 @@ ai-spec run . \
 
 - 让 `IDE（开发工具） AI（智能体）` 或 OpenClaw（远程入口）能稳定触发结构化计划
 - 让 OpenClaw（远程入口）能稳定读取
-- 让团队能看到“主理人是如何选模板、选专家、给出第一跳”的
+- 让团队能看到“主代理是如何选模板、选专家、给出第一跳”的
 
 ### Step 2
 
@@ -474,4 +474,4 @@ ai-spec run . \
 
 ## 14. 一句话收束
 
-> 当前 `run（运行编排）` 还没有必要先落成 CLI（命令行工具）命令，更合理的阶段性做法是把它作为运行时能力，由 `IDE（开发工具） AI（智能体）` 或 OpenClaw（远程入口）中的 `task-orchestrator（任务主理人）` 触发；后续若有需要，再补 CLI（命令行工具）适配器。
+> 当前 `run（运行编排）` 还没有必要先落成 CLI（命令行工具）命令，更合理的阶段性做法是把它作为运行时能力，由 `IDE（开发工具） AI（智能体）` 或 OpenClaw（远程入口）中的 `task-orchestrator（任务主代理）` 触发；后续若有需要，再补 CLI（命令行工具）适配器。

@@ -1,0 +1,65 @@
+{
+  "version": 1,
+  "skills": {
+    "archive-change": {
+      "domains": ["documentation"]
+    },
+    "create-proposal": {
+      "domains": ["demand-design"]
+    },
+    "create-test": {
+      "domains": ["testing"]
+    },
+    "design-analysis": {
+      "domains": ["demand-design"]
+    },
+    "execute-task": {
+      "domains": ["governance"]
+    },
+    "find-skills": {
+      "domains": ["orchestration"]
+    },
+    "project-init": {
+      "domains": ["documentation"]
+    },
+    "skill-creator": {
+      "domains": ["documentation"]
+    },
+    "ui-verification": {
+      "domains": ["testing"]
+    },
+    "using-superpowers": {
+      "domains": ["orchestration"]
+    },
+    "web-design-guidelines": {
+      "domains": ["testing"]
+    },
+    "create-api": {
+      "domains": ["engineering", "governance"]
+    },
+    "create-component": {
+      "domains": ["engineering"]
+    },
+    "create-route": {
+      "domains": ["engineering"]
+    },
+    "create-store": {
+      "domains": ["engineering"]
+    },
+    "create-view": {
+      "domains": ["engineering"]
+    },
+    "theme-variables": {
+      "domains": ["engineering"]
+    },
+    "vercel-composition-patterns": {
+      "domains": ["engineering"]
+    },
+    "vercel-react-best-practices": {
+      "domains": ["engineering"]
+    },
+    "vue-best-practices": {
+      "domains": ["engineering"]
+    }
+  }
+}

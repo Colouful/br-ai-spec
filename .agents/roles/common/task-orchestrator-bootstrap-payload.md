@@ -1,24 +1,24 @@
 ---
 id: task-orchestrator-bootstrap-payload
-name: 主理人首轮桥接载荷规范
+name: 主代理首轮桥接载荷规范
 status: active
 owner: task-orchestrator
 description: 定义 task-orchestrator 在首轮输出后交给 runtime-state（运行状态） 桥接命令消费的最小组合载荷结构。
 ---
 
-# 主理人首轮桥接载荷规范
+# 主代理首轮桥接载荷规范
 
 ## 1. 目的
 
 这份规范用于解决一个很具体的问题：
 
-- `task-orchestrator（任务主理人）` 已经产出了 `run-plan（运行计划）`
+- `task-orchestrator（任务主代理）` 已经产出了 `run-plan（运行计划）`
 - 也已经产出了首轮 `task-anchor（任务锚点）`
 - 需要把这两个对象一次性交给 `ai-spec runtime-state bootstrap`
 
 也就是说，这份载荷是：
 
-> 主理人首轮输出和 `run-state（运行状态）` 写盘之间的桥接对象。
+> 主代理首轮输出和 `run-state（运行状态）` 写盘之间的桥接对象。
 
 ## 2. 最小结构
 
@@ -46,7 +46,7 @@ description: 定义 task-orchestrator 在首轮输出后交给 runtime-state（�
 
 ## 3. 推荐文件位置
 
-当前阶段建议主理人把这份载荷暂存在：
+当前阶段建议主代理把这份载荷暂存在：
 
 ```text
 .ai-spec/tmp/task-orchestrator-first-response.json
@@ -123,4 +123,4 @@ cat ./.ai-spec/tmp/task-orchestrator-first-response.json | ai-spec runtime-state
 
 ## 6. 一句话要求
 
-> 如果 `task-orchestrator（任务主理人）` 需要在首轮产出后立刻初始化 `run-state（运行状态）`，应优先输出这份组合载荷，再调用 `ai-spec runtime-state bootstrap`，而不是让调用方手工拆分 `run-plan（运行计划）` 和 `task-anchor（任务锚点）`。
+> 如果 `task-orchestrator（任务主代理）` 需要在首轮产出后立刻初始化 `run-state（运行状态）`，应优先输出这份组合载荷，再调用 `ai-spec runtime-state bootstrap`，而不是让调用方手工拆分 `run-plan（运行计划）` 和 `task-anchor（任务锚点）`。

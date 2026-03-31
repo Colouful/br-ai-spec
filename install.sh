@@ -752,6 +752,28 @@ create_ide_links() {
   done
 }
 
+# ---- 复制通用命令模板 ----
+copy_common_commands() {
+  local target="$1" ide_name="$2"
+  local cmds_src="$SOURCE_DIR/.agents/commands/common"
+  [ -d "$cmds_src" ] || return 0
+
+  local cmds_dst="$target/.${ide_name}/commands"
+  mkdir -p "$cmds_dst"
+  cp "$cmds_src"/*.md "$cmds_dst/" 2>/dev/null || true
+}
+
+# ---- 复制 IDE 专属命令模板 ----
+copy_ide_command_overrides() {
+  local target="$1" ide_name="$2"
+  local cmds_src="$SOURCE_DIR/.agents/commands/${ide_name}"
+  [ -d "$cmds_src" ] || return 0
+
+  local cmds_dst="$target/.${ide_name}/commands"
+  mkdir -p "$cmds_dst"
+  cp "$cmds_src"/*.md "$cmds_dst/" 2>/dev/null || true
+}
+
 # ---- 复制 Cursor 额外文件 ----
 copy_cursor_extras() {
   local target="$1"
@@ -767,13 +789,9 @@ copy_cursor_extras() {
     pending_config_add ".cursor/mcp.json" "在 Cursor「设置 → MCP」中按需启用服务后，将各条目中的 project-id、access-token 等占位符替换为真实值。"
   fi
 
-  # commands/（复制 *.md）
-  local cmds_src="$SOURCE_DIR/.cursor/commands"
-  if [ -d "$cmds_src" ]; then
-    local cmds_dst="$cursor_dst/commands"
-    mkdir -p "$cmds_dst"
-    cp "$cmds_src"/*.md "$cmds_dst/" 2>/dev/null && ok ".cursor/commands/ 已同步" || true
-  fi
+  copy_common_commands "$target" "cursor"
+  copy_ide_command_overrides "$target" "cursor"
+  [ -d "$cursor_dst/commands" ] && ok ".cursor/commands/ 已同步"
 }
 
 # ---- 复制 Claude 额外文件 ----
@@ -784,12 +802,9 @@ copy_claude_extras() {
   local claude_dst="$target/.claude"
   mkdir -p "$claude_dst"
 
-  local cmds_src="$SOURCE_DIR/.claude/commands"
-  if [ -d "$cmds_src" ]; then
-    local cmds_dst="$claude_dst/commands"
-    mkdir -p "$cmds_dst"
-    cp "$cmds_src"/*.md "$cmds_dst/" 2>/dev/null && ok ".claude/commands/ 已同步" || true
-  fi
+  copy_common_commands "$target" "claude"
+  copy_ide_command_overrides "$target" "claude"
+  [ -d "$claude_dst/commands" ] && ok ".claude/commands/ 已同步"
 }
 
 # ---- 安装 OpenSpec（L3） ----

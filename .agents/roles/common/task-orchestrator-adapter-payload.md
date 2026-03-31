@@ -1,18 +1,18 @@
 ---
 id: task-orchestrator-adapter-payload
-name: 主理人自动执行适配载荷规范
+name: 主代理自动执行适配载荷规范
 status: active
 owner: task-orchestrator
 description: 定义 task-orchestrator 输出给自动执行适配层消费的最小 payload 结构，用于把结构化结果自动翻译成 runtime-state 命令。
 ---
 
-# 主理人自动执行适配载荷规范
+# 主代理自动执行适配载荷规范
 
 ## 1. 目的
 
 这份规范解决的是一个具体问题：
 
-> `task-orchestrator（任务主理人）` 已经产出了结构化结果，但运行环境不想手工拼 `runtime-state（运行状态）` 命令。
+> `task-orchestrator（任务主代理）` 已经产出了结构化结果，但运行环境不想手工拼 `runtime-state（运行状态）` 命令。
 
 因此需要一个稳定的适配入口：
 
@@ -148,4 +148,4 @@ ai-spec task-orchestrator-adapter apply --payload ./.ai-spec/tmp/task-orchestrat
 
 ## 5. 一句话约束
 
-> 主理人若要进入自动执行链，应优先输出结构化 adapter payload（适配层载荷），由 `ai-spec task-orchestrator-adapter apply` 统一翻译为 `runtime-state（运行状态）` 更新，而不是在对话里手写命令。 
+> 主代理若要进入自动执行链，应优先输出结构化 adapter payload（适配层载荷），由 `ai-spec task-orchestrator-adapter apply` 统一翻译为 `runtime-state（运行状态）` 更新，而不是在对话里手写命令。 

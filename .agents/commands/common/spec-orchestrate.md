@@ -1,4 +1,4 @@
-使用 `task-orchestrator（任务主理人）` 的单动作链处理本次任务。
+使用 `task-orchestrator（任务主代理）` 的单动作链处理本次任务。
 
 兼容说明：
 
@@ -18,8 +18,8 @@
    - `.agents/roles/common/task-orchestrator-runtime-hooks.md`
 
 2. 识别这次属于哪种最小动作：
-   - 如果当前项目还没有 `.ai-spec/current-run.json`，或这是一个新任务，产出 `task-orchestrator-bootstrap（主理人首轮桥接载荷）`
-   - 如果当前项目已经有运行态，且用户是在继续、审批、阻断、恢复、完成、失败、取消、查询状态，则只产出一个 `task-orchestrator-runtime-action（主理人运行动作载荷）`
+   - 如果当前项目还没有 `.ai-spec/current-run.json`，或这是一个新任务，产出 `task-orchestrator-bootstrap（主代理首轮桥接载荷）`
+   - 如果当前项目已经有运行态，且用户是在继续、审批、阻断、恢复、完成、失败、取消、查询状态，则只产出一个 `task-orchestrator-runtime-action（主代理运行动作载荷）`
 
 3. 不要在这一步直接写业务代码。当前命令只负责：
    - 收敛任务

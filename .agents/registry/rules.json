@@ -1,0 +1,79 @@
+{
+  "version": 1,
+  "rules": {
+    "project-overview": {
+      "sourceByProfile": {
+        "react": ".agents/rules/profiles/react/01-项目概述.md",
+        "vue": ".agents/rules/profiles/vue/01-项目概述.md"
+      },
+      "domains": ["engineering"]
+    },
+    "coding-standard": {
+      "source": ".agents/rules/common/02-编码规范.md",
+      "domains": ["governance"]
+    },
+    "project-structure": {
+      "sourceByProfile": {
+        "react": ".agents/rules/profiles/react/03-项目结构.md",
+        "vue": ".agents/rules/profiles/vue/03-项目结构.md"
+      },
+      "domains": ["engineering"]
+    },
+    "component-standard": {
+      "sourceByProfile": {
+        "react": ".agents/rules/profiles/react/04-组件规范.md",
+        "vue": ".agents/rules/profiles/vue/04-组件规范.md"
+      },
+      "domains": ["engineering"]
+    },
+    "api-standard": {
+      "source": ".agents/rules/common/05-API规范.md",
+      "domains": ["governance"]
+    },
+    "route-standard": {
+      "sourceByProfile": {
+        "react": ".agents/rules/profiles/react/06-路由规范.md",
+        "vue": ".agents/rules/profiles/vue/06-路由规范.md"
+      },
+      "domains": ["governance", "engineering"]
+    },
+    "store-standard": {
+      "sourceByProfile": {
+        "react": ".agents/rules/profiles/react/07-状态管理.md",
+        "vue": ".agents/rules/profiles/vue/07-状态管理.md"
+      },
+      "domains": ["engineering"]
+    },
+    "generic-constraints": {
+      "source": ".agents/rules/common/08-通用约束.md",
+      "domains": ["governance"]
+    },
+    "style-standard": {
+      "sourceByProfile": {
+        "react": ".agents/rules/profiles/react/09-样式规范.md",
+        "vue": ".agents/rules/profiles/vue/09-样式规范.md"
+      },
+      "domains": ["engineering", "governance"]
+    },
+    "doc-standard": {
+      "source": ".agents/rules/common/10-文档规范.md",
+      "domains": ["documentation"]
+    },
+    "test-standard": {
+      "source": ".agents/rules/common/11-测试规范.md",
+      "domains": ["testing"]
+    },
+    "superpowers-standard": {
+      "source": ".agents/rules/common/12-Superpowers执行规范.md",
+      "domains": ["governance"]
+    },
+    "format-check-standard": {
+      "source": ".agents/rules/common/13-代码格式化与检查.md",
+      "domains": ["governance"]
+    },
+    "audit-report-standard": {
+      "source": ".agents/rules/common/14-审计汇报规范.md",
+      "domains": ["governance", "observability"]
+    }
+  }
+}

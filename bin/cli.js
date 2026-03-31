@@ -13,6 +13,16 @@ try {
     process.exit(runtimeState.main(args.slice(1)));
   }
 
+  if (args[0] === 'sync') {
+    const sync = require('./sync');
+    process.exit(sync.main(args.slice(1)));
+  }
+
+  if (args[0] === 'validate-registry') {
+    const validateRegistry = require('./validate-registry');
+    process.exit(validateRegistry.main(args.slice(1)));
+  }
+
   if (args[0] === 'task-orchestrator-adapter') {
     const adapter = require('./task-orchestrator-adapter');
     process.exit(adapter.main(args.slice(1)));

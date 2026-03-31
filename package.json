@@ -13,14 +13,15 @@
   "publishConfig": {
     "registry": "http://nodejs.100credit.cn/"
   },
+  "scripts": {
+    "test:registry": "node ./tests/registry/validate-registry.test.js"
+  },
   "files": [
     "bin/",
     ".agents/",
     "configs/",
     "templates/",
     ".cursor/mcp.json",
-    ".cursor/commands/",
-    ".claude/commands/",
     "openspec/",
     "install.sh",
     "install.ps1"

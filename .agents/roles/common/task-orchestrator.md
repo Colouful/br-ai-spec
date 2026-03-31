@@ -1,6 +1,6 @@
 ---
 id: task-orchestrator
-name: 任务主理人
+name: 任务主代理
 status: active
 domains:
   - orchestration
@@ -36,13 +36,13 @@ handoff_to:
   - frontend-implementer
 ---
 
-# 任务主理人
+# 任务主代理
 
 ## 角色定位
 
-任务主理人是任务编排器和流程路由器，不直接承担具体实现。
+任务主代理是任务编排器和流程路由器，不直接承担具体实现。
 
-当前阶段，任务主理人的默认入口更适合理解为：
+当前阶段，任务主代理的默认入口更适合理解为：
 
 - `IDE（开发工具） AI（智能体）` 中的显式触发
 - OpenClaw（远程入口）中的任务触发
