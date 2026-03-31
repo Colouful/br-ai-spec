@@ -69,6 +69,8 @@ ai-spec task-orchestrator-adapter apply --payload ./.ai-spec/tmp/task-orchestrat
 - `cancel`
 - `status`
 
+并在关键动作成功后，为下一轮 `task-orchestrator（任务主代理）` 产出新的 `expert-dispatch（专家派发载荷）`、为当前专家产出新的 `expert-execution（专家执行载荷）` 清出干净状态。
+
 ## 3. 推荐字段
 
 适配器会读取这些字段并映射到 `runtime-state（运行状态）`：

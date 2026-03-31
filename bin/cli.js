@@ -33,6 +33,20 @@ try {
     process.exit(extractor.main(args.slice(1)));
   }
 
+  if (args[0] === 'task-orchestrator-runner') {
+    throw new Error('task-orchestrator-runner is an internal runtime module; call it from the AI host layer instead of ai-spec CLI');
+  }
+
+  if (args[0] === 'expert-dispatch') {
+    const expertDispatch = require('./expert-dispatch');
+    process.exit(expertDispatch.main(args.slice(1)));
+  }
+
+  if (args[0] === 'expert-executor') {
+    const expertExecutor = require('./expert-executor');
+    process.exit(expertExecutor.main(args.slice(1)));
+  }
+
   if (process.platform === 'win32') {
     const ps1 = path.join(pkgRoot, 'install.ps1');
     execFileSync('powershell', [
@@ -43,5 +57,8 @@ try {
     execFileSync('bash', [sh, ...args], opts);
   }
 } catch (e) {
+  if (e && e.message && !e.cmd) {
+    console.error(e.message);
+  }
   process.exit(e.status || 1);
 }

@@ -35,7 +35,7 @@
    - `mkdir -p ./.ai-spec/tmp`
    - 将上一步准备好的 Markdown（标记文本） 内容写入 `./.ai-spec/tmp/task-orchestrator-reply.md`
    - 运行：
-     - `ai-spec task-orchestrator-extractor apply --payload ./.ai-spec/tmp/task-orchestrator-reply.md --target .`
+     - `./node_modules/.bin/ai-spec task-orchestrator-extractor apply --payload ./.ai-spec/tmp/task-orchestrator-reply.md --target .`
 
 6. 最终对用户只输出简要结果：
    - `task_type（任务类型）`

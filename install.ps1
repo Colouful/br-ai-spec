@@ -492,6 +492,51 @@ function Invoke-DevDependenciesInstall {
     }
 }
 
+function Install-LocalAiSpecCli {
+    param([string]$Target)
+    if (-not (Test-Path (Join-Path $Target "package.json"))) {
+        Write-Warn "未找到 package.json，跳过本地 ai-spec CLI 安装"; return
+    }
+    if (-not $script:PkgManager) {
+        Write-Warn "无可用的包管理器，跳过本地 ai-spec CLI 安装"; return
+    }
+
+    try {
+        $targetCanon = (Resolve-Path -LiteralPath $Target -ErrorAction Stop).Path
+        $sourceCanon = (Resolve-Path -LiteralPath $script:SourceDir -ErrorAction Stop).Path
+        if ($targetCanon -eq $sourceCanon) {
+            Write-Info "当前就在规范仓库目录，跳过本地 ai-spec CLI 自安装"
+            return
+        }
+    } catch {}
+
+    $manualCmd = if ($script:PkgManager -eq "pnpm" -and (Test-PnpmWorkspacePackageRoot -Target $Target)) {
+        "cd $Target && pnpm add -w -D `"$($script:SourceDir)`""
+    } elseif ($script:PkgManager -eq "pnpm") {
+        "cd $Target && pnpm add -D `"$($script:SourceDir)`""
+    } else {
+        "cd $Target && npm install -D `"$($script:SourceDir)`""
+    }
+
+    Write-Info "正在使用 $($script:PkgManager) 安装项目内 ai-spec CLI ..."
+    Write-Info "  source: $($script:SourceDir)"
+    try {
+        Invoke-DevDependenciesInstall -Target $Target -Packages @($script:SourceDir)
+    } catch {
+        Write-Warn "本地 ai-spec CLI 安装失败，请手动执行:"
+        Write-Host "  $manualCmd"
+        return
+    }
+
+    $localCli = Join-Path $Target "node_modules/.bin/ai-spec"
+    $localCliCmd = Join-Path $Target "node_modules/.bin/ai-spec.cmd"
+    if ((Test-Path $localCli) -or (Test-Path $localCliCmd)) {
+        Write-Ok "项目内 ai-spec CLI 已就绪 (./node_modules/.bin/ai-spec)"
+    } else {
+        Write-Warn "已完成依赖安装，但未检测到 ./node_modules/.bin/ai-spec，请检查包管理器输出"
+    }
+}
+
 # ============================================================================
 # 核心功能
 # ============================================================================
@@ -1097,6 +1142,7 @@ function Invoke-Init {
     Get-SourceDir
 
     Copy-Agents -Target $target
+    Install-LocalAiSpecCli -Target $target
 
     # lint/format 配置（可选）
     if ($script:InstallLint -eq "yes") {
@@ -1133,6 +1179,7 @@ function Invoke-Update {
     Get-PkgManager
     Get-SourceDir
     Copy-Agents -Target $target
+    Install-LocalAiSpecCli -Target $target
     Copy-Configs -Target $target -SkipExisting $true
 
     if ($script:Uipro -eq "yes" -or (Test-Path (Join-Path $target ".agents/skills/ui-ux-pro-max"))) {
@@ -1187,6 +1234,14 @@ function Invoke-Check {
             Write-Info "  UI UX Pro Max: 未安装（可选）。非交互 init 不会自动安装，需要请加 --uipro"
         }
     } else { Write-Err ".agents/ 不存在"; $hasIssue = $true }
+
+    $localCli = Join-Path $target "node_modules/.bin/ai-spec"
+    $localCliCmd = Join-Path $target "node_modules/.bin/ai-spec.cmd"
+    if ((Test-Path $localCli) -or (Test-Path $localCliCmd)) {
+        Write-Ok "./node_modules/.bin/ai-spec 可用"
+    } else {
+        Write-Err "./node_modules/.bin/ai-spec 缺失"; $hasIssue = $true
+    }
 
     foreach ($ide in $IdeDirs) {
         $d = Join-Path $target ".$ide"

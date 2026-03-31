@@ -32,7 +32,7 @@
    - `mkdir -p ./.ai-spec/tmp`
    - 将内容写入 `./.ai-spec/tmp/task-orchestrator-reply.md`
    - 运行：
-     - `ai-spec task-orchestrator-extractor apply --payload ./.ai-spec/tmp/task-orchestrator-reply.md --target .`
+     - `./node_modules/.bin/ai-spec task-orchestrator-extractor apply --payload ./.ai-spec/tmp/task-orchestrator-reply.md --target .`
 
 6. 最终只输出简要结果：
    - `action（动作）`
@@ -41,3 +41,4 @@
    - `status（状态）`
    - `pending_gate（待审批点）`
    - `next_action（下一步）`
+   - 如果状态已经变化，提示应由 `task-orchestrator（任务主代理）` 重新产出新的 `expert-dispatch（专家派发载荷）`，并由当前专家重新产出新的 `expert-execution（专家执行载荷）`

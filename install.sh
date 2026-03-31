@@ -652,6 +652,38 @@ install_dev_dependencies_at() {
   fi
 }
 
+install_local_ai_spec_cli() {
+  local target="$1"
+  local target_canon source_canon manual_hint
+  [ -f "$target/package.json" ] || { warn "未找到 package.json，跳过本地 ai-spec CLI 安装"; return 0; }
+  [ -n "$PKG_MANAGER" ] || { warn "无可用的包管理器，跳过本地 ai-spec CLI 安装"; return 0; }
+
+  target_canon="$(cd "$target" 2>/dev/null && pwd -P)" || return 0
+  source_canon="$(cd "$SOURCE_DIR" 2>/dev/null && pwd -P)" || return 0
+  [ "$target_canon" = "$source_canon" ] && { info "当前就在规范仓库目录，跳过本地 ai-spec CLI 自安装"; return 0; }
+
+  if [ "$PKG_MANAGER" = "pnpm" ] && _is_pnpm_workspace_package_root "$target"; then
+    manual_hint="cd $target && pnpm add -w -D \"$SOURCE_DIR\""
+  elif [ "$PKG_MANAGER" = "pnpm" ]; then
+    manual_hint="cd $target && pnpm add -D \"$SOURCE_DIR\""
+  else
+    manual_hint="cd $target && npm install -D \"$SOURCE_DIR\""
+  fi
+
+  info "正在使用 $PKG_MANAGER 安装项目内 ai-spec CLI ..."
+  info "  source: $SOURCE_DIR"
+  if ! install_dev_dependencies_at "$target" "$SOURCE_DIR"; then
+    install_fail "本地 ai-spec CLI 安装失败" "请手动执行: $manual_hint"
+    return 0
+  fi
+
+  if [ -x "$target/node_modules/.bin/ai-spec" ] || [ -f "$target/node_modules/.bin/ai-spec" ]; then
+    ok "项目内 ai-spec CLI 已就绪 (./node_modules/.bin/ai-spec)"
+  else
+    warn "已完成依赖安装，但未检测到 ./node_modules/.bin/ai-spec，请检查包管理器输出"
+  fi
+}
+
 # ---- 安装提交校验依赖（husky + lint-staged + commitlint） ----
 install_commit_hooks() {
   local target="$1"
@@ -1121,6 +1153,7 @@ cmd_init() {
 
   # L1: 只安装 .agents
   copy_agents "$target"
+  install_local_ai_spec_cli "$target"
 
   # lint/format 配置（可选）
   if [ "$INSTALL_LINT" = "yes" ]; then
@@ -1155,7 +1188,10 @@ cmd_init() {
   retry_failed_global_installs "$target"
   print_report "$target"
   print_pending_summary
-  [ "${INIT_HAS_INSTALL_FAIL:-0}" = 1 ] && exit 1
+  if [ "${INIT_HAS_INSTALL_FAIL:-0}" = 1 ]; then
+    exit 1
+  fi
+  return 0
 }
 
 cmd_update() {
@@ -1167,6 +1203,7 @@ cmd_update() {
   detect_pkg_manager
   detect_source
   copy_agents "$target"
+  install_local_ai_spec_cli "$target"
   copy_configs "$target" "skip_existing"
 
   # UI UX Pro Max：已安装则更新，或用户显式指定 --uipro
@@ -1190,7 +1227,10 @@ cmd_update() {
   retry_failed_global_installs "$target"
   ok "更新完成 (profile: $PROFILE, level: $LEVEL)"
   print_pending_summary
-  [ "${INIT_HAS_INSTALL_FAIL:-0}" = 1 ] && exit 1
+  if [ "${INIT_HAS_INSTALL_FAIL:-0}" = 1 ]; then
+    exit 1
+  fi
+  return 0
 }
 
 cmd_check() {
@@ -1222,6 +1262,12 @@ cmd_check() {
     fi
   else
     err ".agents/ 不存在"; has_issue=true
+  fi
+
+  if [ -x "$target/node_modules/.bin/ai-spec" ] || [ -f "$target/node_modules/.bin/ai-spec" ]; then
+    ok "./node_modules/.bin/ai-spec 可用"
+  else
+    err "./node_modules/.bin/ai-spec 缺失"; has_issue=true
   fi
 
   # IDE 链接

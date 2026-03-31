@@ -26,11 +26,22 @@ reads:
   - .agents/roles/common/task-orchestrator-output-extractor-spec.md
   - .agents/roles/common/runtime-state-handoff-spec.md
   - .agents/roles/common/task-orchestrator-runtime-hooks.md
+  - .agents/roles/common/expert-dispatch-spec.md
+  - .agents/roles/common/expert-executor-spec.md
+  - .agents/roles/common/expert-runtime-action-spec.md
 writes:
   - openspec/changes/<change-id>/proposal.md
   - .ai-spec/tmp/task-orchestrator-first-response.json
   - .ai-spec/current-run.json
   - .ai-spec/runs/<run-id>.json
+  - .ai-spec/current-dispatch.json
+  - .ai-spec/dispatches/<run-id>/<dispatch-id>.json
+  - .ai-spec/current-execution.json
+  - .ai-spec/current-execution.md
+  - .ai-spec/executions/<run-id>/<execution-id>.json
+  - .ai-spec/current-runtime-action.json
+  - .ai-spec/current-runtime-action.md
+  - .ai-spec/runtime-actions/<run-id>/<action-id>.json
 handoff_to:
   - requirement-analyst
   - frontend-implementer
@@ -128,4 +139,7 @@ handoff_to:
 - 若当前环境允许执行本地命令，优先把 `run-plan（运行计划） + task-anchor（任务锚点）` 组装成首轮桥接载荷，再调用 `ai-spec task-orchestrator-adapter apply`
 - 若当前运行环境需要从自然语言/Markdown（标记文本） 回复中自动提取动作，优先遵循 `task-orchestrator-output-extractor-spec.md`
 - 每次专家交接时，优先按 `runtime-state-handoff-spec.md` 更新 `.ai-spec/current-run.json` 与 `.ai-spec/runs/<run-id>.json`
+- 每次状态变化后，优先由 `task-orchestrator（任务主代理）` 重新产出 `expert-dispatch（专家派发载荷）`，再用本地工具落盘
+- 当前阶段若要把“派发”进一步推进到“执行”，优先由当前专家产出 `expert-execution（专家执行载荷）`，再用本地工具落盘
+- 当单轮专家执行结束后，优先由 `task-orchestrator（任务主代理）` 产出标准 `runtime-action（运行动作）` 草案，再决定是否由上层执行
 - 具体运行态调用链优先遵循 `task-orchestrator-runtime-hooks.md`

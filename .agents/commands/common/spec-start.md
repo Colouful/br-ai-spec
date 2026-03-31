@@ -29,7 +29,7 @@
    - `mkdir -p ./.ai-spec/tmp`
    - 将内容写入 `./.ai-spec/tmp/task-orchestrator-reply.md`
    - 运行：
-     - `ai-spec task-orchestrator-extractor apply --payload ./.ai-spec/tmp/task-orchestrator-reply.md --target .`
+     - `./node_modules/.bin/ai-spec task-orchestrator-extractor apply --payload ./.ai-spec/tmp/task-orchestrator-reply.md --target .`
 
 6. 最终只输出简要结果：
    - `task_type（任务类型）`
@@ -38,3 +38,4 @@
    - `run_id（运行 ID）`
    - `status（状态）`
    - `missing_inputs（缺失输入） / next_action（下一步）`
+   - 如需继续推进，提示应由 `task-orchestrator（任务主代理）` 继续产出 `expert-dispatch（专家派发载荷）`

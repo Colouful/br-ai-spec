@@ -12,7 +12,7 @@ description: 定义 task-orchestrator 在首轮规划、审批阻断、审批放
 
 这份规范不直接替代真正的运行器代码，它解决的是：
 
-> 当 `task-orchestrator（任务主代理）` 真的开始驱动一条任务链时，每个关键节点应该调用哪条 `runtime-state（运行状态）` 命令。
+> 当 `task-orchestrator（任务主代理）` 真的开始驱动一条任务链时，每个关键节点应该调用哪条 `runtime-state（运行状态）` 命令，以及何时重新产出新的专家载荷。
 
 也就是说，它是：
 
@@ -30,11 +30,16 @@ description: 定义 task-orchestrator 在首轮规划、审批阻断、审批放
 
 推荐优先调用：
 
-```bash
-ai-spec task-orchestrator-extractor apply --payload ./.ai-spec/tmp/task-orchestrator-reply.md
+```text
+由宿主层调用内部 Runner：
+task-orchestrator-runner.advanceRunner({ target })
 ```
 
-如果当前环境已经直接生成纯结构化 payload（载荷），可回退为：
+其中默认输入应来自：
+
+- `./.ai-spec/tmp/task-orchestrator-reply.md`
+
+如果当前环境尚未接 `Runner（运行器）`，可回退为：
 
 ```bash
 ai-spec task-orchestrator-adapter apply --payload ./.ai-spec/tmp/task-orchestrator-first-response.json
@@ -80,6 +85,43 @@ ai-spec runtime-state handoff \
   --next-role code-guardian \
   --task-anchor ./.ai-spec/tmp/frontend-implementer-anchor.json \
   --status running
+```
+
+当前阶段若已接 `task-orchestrator-adapter（自动执行适配层）`，则在状态更新成功后，会自动清理旧的：
+
+- `.ai-spec/current-dispatch.json`
+- `.ai-spec/current-execution.json`
+- `.ai-spec/current-runtime-action.json`
+
+随后应由 `task-orchestrator（任务主代理）` 根据新的 `run-state（运行状态）` 明确重新产出下一轮：
+
+- `expert-dispatch（专家派发载荷）`
+- `expert-execution（专家执行载荷）`
+
+如果已经接 `Runner（运行器）`，则推荐下一轮统一走：
+
+```text
+task-orchestrator-runner.advanceRunner({ target })
+```
+
+### 2.4.1 单轮专家执行结束后
+
+当前阶段不自动递归推进下一轮，但建议在当前专家完成本轮后，由 `task-orchestrator（任务主代理）` 明确生成标准 `runtime-action（运行动作）` 草案，再由本地工具落盘：
+
+```text
+task-orchestrator-runner.advanceRunner({ target })
+```
+
+其中默认输入可来自：
+
+- `./.ai-spec/tmp/current-runtime-action.json`
+- 或新的 `./.ai-spec/tmp/task-orchestrator-reply.md`
+
+如果暂未接 `Runner（运行器）`，再回退为：
+
+```bash
+ai-spec expert-executor apply-action --payload ./.ai-spec/tmp/current-runtime-action.json
+ai-spec task-orchestrator-adapter apply --payload ./.ai-spec/current-runtime-action.json
 ```
 
 ### 2.5 恢复执行
@@ -145,11 +187,14 @@ task-orchestrator（任务主代理）
 - 最小 `runtime-state（运行状态）` 命令
 - 最小钩子映射规范
 - 最小 `task-orchestrator-adapter（自动执行适配层）`
+- 最小 `task-orchestrator-runner（运行器）` inbox（收件箱） 消费器
 
 但还没有：
 
-- 自动读取主代理输出并逐条调用这些命令的真正运行器
+- 自动从 `AI（智能体）` 会话本身拉取输出的宿主层集成
 - 自动生成所有中间 `task-anchor（任务锚点）` 文件的执行器
+- 由本地脚本替代 `task-orchestrator（任务主代理）` 产出 `expert-dispatch（专家派发载荷） / runtime-action（运行动作）`
+- 由本地脚本替当前专家产出 `expert-execution（专家执行载荷）`
 
 所以这份规范当前的意义是：
 
@@ -157,4 +202,4 @@ task-orchestrator（任务主代理）
 
 ## 5. 一句话要求
 
-> `task-orchestrator（任务主代理）` 不应只负责“说下一步做什么”，还应优先输出结构化载荷并调用 `task-orchestrator-adapter（自动执行适配层）`，再由适配层统一驱动 `runtime-state（运行状态）`，把运行链稳定落到 `.ai-spec/` 中。
+> `task-orchestrator（任务主代理）` 不应只负责“说下一步做什么”，还应优先输出结构化载荷；其中 `expert-dispatch（专家派发载荷） / runtime-action（运行动作）` 由 `task-orchestrator（任务主代理）` 产出，`expert-execution（专家执行载荷）` 由当前专家产出，本地工具只负责落盘与状态应用。

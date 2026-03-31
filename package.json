@@ -1,6 +1,6 @@
 {
-  "name": "@ex/ai-spec",
-  "version": "0.0.30",
+  "name": "@ex/ai-spec-test",
+  "version": "0.0.3",
   "description": "AI Coding 团队规范驱动开发 CLI — 一键安装规范、技能与工具配置",
   "bin": {
     "ai-spec": "./bin/cli.js",
@@ -14,7 +14,8 @@
     "registry": "http://nodejs.100credit.cn/"
   },
   "scripts": {
-    "test:registry": "node ./tests/registry/validate-registry.test.js"
+    "test:registry": "node ./tests/registry/validate-registry.test.js",
+    "test:runtime": "node ./tests/runtime/task-orchestrator-runner.test.js"
   },
   "files": [
     "bin/",

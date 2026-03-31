@@ -48,6 +48,10 @@
 
 > 当前仓库已经提供 `ai-spec runtime-state init` 作为底层写盘工具，并提供 `ai-spec task-orchestrator-adapter apply` 作为主代理自动执行适配入口；如果上游是自然语言/Markdown（标记文本） 回复，则优先先经过 `ai-spec task-orchestrator-extractor apply` 做结构化抽取，再由适配层统一驱动 `runtime-state bootstrap / handoff / gate-blocked / approve / resume / status / complete / fail / cancel`，把运行态稳定落盘并持续更新。
 
+补充说明 2：
+
+> 当前仓库已经补到 Phase B（第二步），但边界已经收回：`expert-dispatch（专家派发） / runtime-action（运行动作）` 由 `task-orchestrator（任务主代理）` 产出，`expert-execution（专家执行）` 由当前专家产出，本地 `bin/` 只负责校验、落盘和状态应用。
+
 ## 2. 运行能力定位
 
 `run（运行编排）` 的职责不是安装资产，而是：
@@ -224,6 +228,7 @@ ai-spec run . \
 2. 优先调用 `ai-spec task-orchestrator-adapter apply`
 3. 立即写入 `.ai-spec/current-run.json`
 4. 同步写入 `.ai-spec/runs/<run-id>.json`
+5. 为下一轮载荷清出干净状态
 
 对应规范见：
 
@@ -239,7 +244,14 @@ ai-spec run . \
 - 生成首轮 `task-anchor（任务锚点）`
 - 自动初始化首轮 `run-state（运行状态）`
 - 专家交接时更新 `run-state（运行状态）`
-- 不直接驱动所有专家真正执行
+- 由 `task-orchestrator（任务主代理）` 产出当前专家的 `expert-dispatch（专家派发载荷）`，本地工具只负责校验与落盘
+
+第二阶段当前保留的最小能力是：
+
+- 当前专家可产出 `expert-execution（专家执行载荷）`
+- `task-orchestrator（任务主代理）` 可产出 `current-runtime-action（当前运行动作草案）`
+- 本地工具负责把这些结构化载荷写入 `.ai-spec/`
+- 由上层显式决定是否把该动作交给 `task-orchestrator-adapter（自动执行适配层）` 消费
 
 ## 7. 输出契约
 
@@ -251,6 +263,7 @@ ai-spec run . \
 并在专家真正启动前补一份：
 
 - `task-anchor（任务锚点）`
+- `expert-dispatch（专家派发载荷）`
 
 ### 7.1 `flow-descriptor（流程模板描述）`
 

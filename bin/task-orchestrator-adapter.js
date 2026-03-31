@@ -2,6 +2,8 @@
 const fs = require('fs');
 const path = require('path');
 const runtimeState = require('./runtime-state');
+const expertDispatch = require('./expert-dispatch');
+const expertExecutor = require('./expert-executor');
 
 function printUsage() {
   console.log(`Usage:
@@ -237,6 +239,32 @@ function applyPayload({ action, payload, options, payloadSource }) {
   }
 }
 
+function shouldClearExpertArtifacts(applied) {
+  return ['bootstrap', 'handoff', 'approve', 'resume', 'gate-blocked', 'complete', 'fail', 'cancel'].includes(applied.adapter_action);
+}
+
+function attachDispatch(applied, options) {
+  if (shouldClearExpertArtifacts(applied)) {
+    const dispatch = expertDispatch.clearDispatch({
+      target: options.target,
+    });
+    const execution = expertExecutor.clearExecution({
+      target: options.target,
+    });
+    const runtimeAction = expertExecutor.clearRuntimeAction({
+      target: options.target,
+    });
+    return {
+      ...applied,
+      dispatch,
+      execution,
+      runtime_action: runtimeAction,
+    };
+  }
+
+  return applied;
+}
+
 function printPretty(applied) {
   console.log('task-orchestrator adapter applied');
   console.log(`  action: ${applied.adapter_action}`);
@@ -276,12 +304,12 @@ function main(argv = process.argv.slice(2)) {
     : readJsonFromStdin('task-orchestrator adapter payload');
 
   const normalized = normalizePayload(rawPayload, payloadSource);
-  const applied = applyPayload({
+  const applied = attachDispatch(applyPayload({
     action: normalized.action,
     payload: normalized.payload,
     options,
     payloadSource,
-  });
+  }), options);
 
   if (options.json) {
     console.log(JSON.stringify(applied, null, 2));
@@ -308,4 +336,5 @@ module.exports = {
   normalizePayload,
   buildRuntimeOptions,
   applyPayload,
+  attachDispatch,
 };

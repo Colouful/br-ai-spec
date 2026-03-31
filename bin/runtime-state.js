@@ -1189,6 +1189,8 @@ module.exports = {
   createRunId,
   inferArtifacts,
   buildRunState,
+  readRunStateFile,
+  resolveRunStatePaths,
   initRunState,
   bootstrapRunState,
   normalizeBootstrapPayload,
