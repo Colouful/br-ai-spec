@@ -2,6 +2,11 @@ const fs = require('fs');
 const path = require('path');
 const runner = require('../bin/task-orchestrator-runner');
 const {
+  inferDeliveryProfile,
+  inferArtifactProfile,
+  inferComplexity,
+} = require('../bin/runtime-state');
+const {
   resolveRuntimePaths,
   getExistingPath,
   getExistingRelPath,
@@ -30,10 +35,6 @@ const DISPATCH_INSTRUCTION_FILES = [
   '.agents/roles/common/expert-dispatch-spec.md',
 ];
 
-const EXPERT_INSTRUCTION_FILES = [
-  '.agents/roles/common/expert-executor-spec.md',
-];
-
 const ROLE_RULE_HINTS = {
   'requirement-analyst': [
     '.agents/rules/01-项目概述.md',
@@ -56,6 +57,120 @@ const ROLE_RULE_HINTS = {
     '.agents/rules/13-代码格式化与检查.md',
     '.agents/rules/14-审计汇报规范.md',
   ],
+};
+
+const ROLE_OPENSPEC_RULE_SECTIONS = {
+  'requirement-analyst': ['proposal', 'tasks'],
+  'frontend-implementer': ['tasks', 'design'],
+  'code-guardian': ['tasks', 'specs'],
+};
+
+const MICRO_ROLE_EXTRAS = {
+  'requirement-analyst': {
+    goal: '用短版 proposal.md 和 tasks.md 收敛需求，不写实现代码。',
+    must_do: [
+      'proposal.md 只保留目标、范围、默认假设、风险四块',
+      'tasks.md 保持 3-5 条可执行任务，覆盖实现与验收',
+    ],
+    must_not: [
+      '不要把微型任务写成长篇方案说明',
+    ],
+  },
+  'frontend-implementer': {
+    goal: '基于短版 proposal/tasks 做最小必要实现，优先复用现有结构。',
+    must_do: [
+      '保持改动最小化，优先就地复用现有页面、组件、样式变量和 mock 约定',
+      '实现说明只保留当前变更、验证结果和残留风险',
+    ],
+    must_not: [
+      '不要为了“看起来完整”而扩展无关范围',
+    ],
+  },
+  'code-guardian': {
+    goal: '用短版 checklist.md 和 iterations.md 完成交付守护，明确阻断项。',
+    must_do: [
+      'checklist.md 使用最小核查清单，直接给出通过/不通过',
+      'iterations.md 只记录问题、修正动作和残留风险',
+    ],
+    must_not: [
+      '不要输出泛泛而谈的长篇审查结论',
+    ],
+  },
+};
+
+const MICRO_OPENSPEC_RULES = {
+  proposal: [
+    '短版 proposal 只保留目标、范围、默认假设、风险/待确认四块。',
+    '若为页面或组件任务，明确落点路径或目录，不写长篇背景说明。',
+    '若为 mock 任务，显式说明不接真实 API。'
+  ],
+  tasks: [
+    '短版 tasks 保持 3-5 条可执行任务，覆盖实现与最小验收。',
+    '每条任务都要可落盘、可验证，避免空标题。',
+    '保持改动最小化，聚焦本次请求。'
+  ],
+  design: [
+    '只保留当前实现真正需要的结构与样式约束。',
+    '继续使用主题变量和既有目录结构。'
+  ],
+  specs: [
+    '只记录关键检查项、阻断项和最终结论。',
+    '保留可测试的验收结论，不展开长篇复盘。'
+  ],
+};
+
+const ROLE_GUIDANCE = {
+  'requirement-analyst': {
+    goal: '把需求收敛成可执行的 proposal.md 和 tasks.md，不写实现代码。',
+    must_do: [
+      '先明确目标、范围、非目标、关键假设和风险',
+      'proposal.md 需要能支撑后续实现和验收',
+      'tasks.md 必须是可执行任务清单，而不是空标题模板',
+    ],
+    must_not: [
+      '不要直接开始写 Vue/TS/CSS 代码',
+      '不要在 proposal.md 和 tasks.md 未落盘前宣称本阶段完成',
+    ],
+  },
+  'frontend-implementer': {
+    goal: '基于 proposal.md 和 tasks.md 完成当前范围内的前端实现。',
+    must_do: [
+      '先读 proposal.md 和 tasks.md 再改代码',
+      '严格在当前变更范围内实现，不顺手扩 scope',
+      '实现完成后写 expert-execution 回执并等待下一轮编排',
+    ],
+    must_not: [
+      '不要重新定义需求边界',
+      '不要跳过实现验证直接宣称交付完成',
+    ],
+  },
+  'code-guardian': {
+    goal: '基于 proposal、tasks 和实现结果做交付前检查，产出 checklist.md 和 iterations.md。',
+    must_do: [
+      '明确区分阻断项和非阻断项',
+      'checklist.md 记录检查项和结论',
+      'iterations.md 记录问题、修正动作和残留风险',
+    ],
+    must_not: [
+      '不要在 checklist.md 和 iterations.md 未落盘前给 complete 结论',
+      '不要把明显问题写成模糊建议',
+    ],
+  },
+};
+
+const SKILL_GUIDANCE = {
+  'create-proposal': '用于快速形成 proposal/tasks 的结构和变更说明。',
+  'design-analysis': '用于整理页面结构、信息层级和交互要点。',
+  'create-view': '用于创建或调整 Vue 页面文件与页面目录结构。',
+  'create-component': '用于拆分和实现 Vue 组件。',
+  'create-route': '用于新增或调整页面路由。',
+  'create-api': '用于创建接口定义与请求封装。',
+  'create-store': '用于新增或调整全局状态。',
+  'theme-variables': '用于处理主题变量与样式约束。',
+  'execute-task': '用于按任务清单逐项推进实现。',
+  'create-test': '用于补充测试文件或测试建议。',
+  'ui-verification': '用于 UI 验收与页面核查。',
+  'web-design-guidelines': '用于规则和体验审查。',
 };
 
 function resolveTargetDir(target) {
@@ -202,6 +317,43 @@ function parseFrontmatter(fileContent) {
   return data;
 }
 
+function parseOpenSpecRules(fileContent) {
+  const lines = fileContent.split('\n');
+  const sections = {};
+  let inRules = false;
+  let currentSection = null;
+
+  for (const rawLine of lines) {
+    const line = rawLine.replace(/\r$/, '');
+
+    if (!inRules) {
+      if (line.trim() === 'rules:') {
+        inRules = true;
+      }
+      continue;
+    }
+
+    if (/^[A-Za-z0-9_-]+:\s*$/.test(line)) {
+      break;
+    }
+
+    const sectionMatch = line.match(/^  ([A-Za-z0-9_-]+):\s*$/);
+    if (sectionMatch) {
+      currentSection = sectionMatch[1];
+      sections[currentSection] = [];
+      continue;
+    }
+
+    const listMatch = line.match(/^    -\s+(.*)$/);
+    if (listMatch && currentSection) {
+      sections[currentSection].push(parseScalar(listMatch[1]));
+      continue;
+    }
+  }
+
+  return sections;
+}
+
 function loadRoleDefinition(targetDir, sourceRelPath) {
   if (!sourceRelPath) {
     return null;
@@ -223,6 +375,30 @@ function loadRoleDefinition(targetDir, sourceRelPath) {
     reads: Array.isArray(frontmatter.reads) ? frontmatter.reads : [],
     writes: Array.isArray(frontmatter.writes) ? frontmatter.writes : [],
     handoff_to: Array.isArray(frontmatter.handoff_to) ? frontmatter.handoff_to : [],
+  };
+}
+
+function loadOpenSpecRuleSections(targetDir) {
+  const candidateTargets = [
+    buildReadableTarget(targetDir, 'openspec/config.yaml'),
+    buildReadableTarget(targetDir, 'openspec/config.yaml.template'),
+  ];
+
+  for (const target of candidateTargets) {
+    if (!target.exists) {
+      continue;
+    }
+
+    const content = fs.readFileSync(target.path, 'utf8');
+    return {
+      source: target.rel_path,
+      sections: parseOpenSpecRules(content),
+    };
+  }
+
+  return {
+    source: null,
+    sections: {},
   };
 }
 
@@ -257,46 +433,100 @@ function loadCurrentArtifacts(targetDir) {
   };
 }
 
-function buildSummary(status) {
+function buildSummary(status, runState = null) {
   return {
     run_id: status.current.run_id || null,
     run_status: status.current.run_status || null,
     current_role: status.current.current_role || null,
     pending_gate: status.current.pending_gate || null,
     next_expected_producer: status.next_expected.producer || null,
+    delivery_profile: runState?.delivery_profile || null,
+    artifact_profile: runState?.artifact_profile || null,
+    complexity: runState?.complexity || runState?.task?.complexity || null,
   };
 }
 
-function buildSkillTargets(targetDir, skills) {
+function buildSkillGuidance(skills) {
   if (!Array.isArray(skills)) {
     return [];
   }
 
   return skills
-    .filter((item) => item && typeof item === 'object' && item.path)
-    .map((item) => buildReadableTarget(targetDir, item.path, {
-      required: Boolean(item.installed),
-      label: item.id ? `${item.id} skill` : 'skill',
+    .filter((item) => item && typeof item === 'object' && item.id)
+    .map((item) => ({
+      id: item.id,
+      guidance: SKILL_GUIDANCE[item.id] || null,
     }));
 }
 
-function buildRuleTargetsForRole(targetDir, roleId) {
-  const relPaths = ROLE_RULE_HINTS[roleId] || [];
-  if (relPaths.length === 0) {
-    return [buildReadableTarget(targetDir, '.agents/rules/')];
+function buildRuleHints(roleId, deliveryProfile) {
+  const hints = (ROLE_RULE_HINTS[roleId] || []).map((relPath) => path.basename(relPath));
+  if (deliveryProfile === 'micro') {
+    return hints.slice(0, 4);
   }
-
-  return relPaths.map((relPath) => buildReadableTarget(targetDir, relPath));
+  return hints;
 }
 
-function buildExecutionContract(runtimePaths, dispatch, roleDefinition, writes) {
+function buildOpenSpecGuidance(targetDir, roleId, deliveryProfile) {
+  const config = loadOpenSpecRuleSections(targetDir);
+  const sectionNames = ROLE_OPENSPEC_RULE_SECTIONS[roleId] || [];
+  const artifactProfile = inferArtifactProfile({
+    deliveryProfile,
+  });
+
+  return {
+    source: config.source,
+    profile: artifactProfile,
+    sections: sectionNames
+      .filter((name) => Array.isArray(config.sections[name]) && config.sections[name].length > 0)
+      .map((name) => ({
+        name,
+        profile: artifactProfile,
+        source_rule_count: config.sections[name].length,
+        rules: deliveryProfile === 'micro'
+          ? MICRO_OPENSPEC_RULES[name] || config.sections[name].slice(0, 3)
+          : config.sections[name],
+      })),
+  };
+}
+
+function buildRoleGuidance(roleId, deliveryProfile) {
+  const base = ROLE_GUIDANCE[roleId];
+  if (!base) {
+    return null;
+  }
+
+  if (deliveryProfile !== 'micro') {
+    return {
+      ...base,
+      delivery_profile: 'standard',
+      artifact_profile: 'full',
+    };
+  }
+
+  const extras = MICRO_ROLE_EXTRAS[roleId] || {};
+  return {
+    goal: extras.goal || base.goal,
+    must_do: [...(base.must_do || []), ...(extras.must_do || [])],
+    must_not: [...(base.must_not || []), ...(extras.must_not || [])],
+    delivery_profile: 'micro',
+    artifact_profile: 'compact',
+  };
+}
+
+function buildExecutionContract(runtimePaths, dispatch, roleDefinition, writes, deliveryProfile) {
   const artifactWrites = writes
     .filter((item) => item.kind === 'file' && item.rel_path !== runtimePaths.tmpCurrentExecution.relPath)
     .map((item) => item.rel_path);
+  const artifactProfile = inferArtifactProfile({
+    deliveryProfile,
+  });
 
   const contract = {
     kind: 'expert-execution',
     write_to: runtimePaths.tmpCurrentExecution.relPath,
+    delivery_profile: deliveryProfile,
+    artifact_profile: artifactProfile,
     required_fields: [
       'kind',
       'run_id',
@@ -326,17 +556,17 @@ function buildExecutionContract(runtimePaths, dispatch, roleDefinition, writes) 
   return contract;
 }
 
-function buildExpertExpectedOutput(dispatch, writes, runtimePaths) {
+function buildExpertExpectedOutput(dispatch, writes, runtimePaths, deliveryProfile = 'standard') {
   const outputs = [];
 
   if (dispatch.role?.id === 'requirement-analyst') {
-    outputs.push('完成 openspec proposal.md');
-    outputs.push('完成 openspec tasks.md');
+    outputs.push(deliveryProfile === 'micro' ? '完成短版 openspec proposal.md' : '完成 openspec proposal.md');
+    outputs.push(deliveryProfile === 'micro' ? '完成短版 openspec tasks.md' : '完成 openspec tasks.md');
   } else if (dispatch.role?.id === 'frontend-implementer') {
     outputs.push('完成当前范围内的代码实现');
   } else if (dispatch.role?.id === 'code-guardian') {
-    outputs.push('完成 openspec checklist.md');
-    outputs.push('完成 openspec iterations.md');
+    outputs.push(deliveryProfile === 'micro' ? '完成短版 openspec checklist.md' : '完成 openspec checklist.md');
+    outputs.push(deliveryProfile === 'micro' ? '完成短版 openspec iterations.md' : '完成 openspec iterations.md');
   }
 
   const artifactWrites = writes
@@ -418,6 +648,20 @@ function attachActorPresentation(turn) {
 
 function buildStartTurn(targetDir, userInput) {
   const runtimePaths = resolveRuntimePaths(targetDir);
+  const deliveryProfile = inferDeliveryProfile({
+    rawInput: userInput,
+    taskType: null,
+    riskLevel: 'low',
+    flowId: 'prd-to-delivery',
+  });
+  const artifactProfile = inferArtifactProfile({
+    deliveryProfile,
+  });
+  const complexity = inferComplexity({
+    deliveryProfile,
+    riskLevel: 'low',
+  });
+
   return attachActorPresentation({
     kind: 'ai-protocol-turn',
     status: userInput ? 'ready' : 'waiting-input',
@@ -436,6 +680,9 @@ function buildStartTurn(targetDir, userInput) {
       current_role: null,
       pending_gate: null,
       next_expected_producer: 'task-orchestrator',
+      delivery_profile: deliveryProfile,
+      artifact_profile: artifactProfile,
+      complexity,
     },
     input: {
       user_request: userInput || null,
@@ -450,8 +697,20 @@ function buildStartTurn(targetDir, userInput) {
     expected_output: [
       '输出 task-orchestrator-bootstrap Markdown reply',
       '在 reply 中包含唯一合法 json 代码块',
+      `在 run-plan 中明确 delivery_profile=${deliveryProfile} 与 artifact_profile=${artifactProfile}`,
       '写入 .ai-spec/internal/tmp/task-orchestrator-reply.md',
     ],
+    guidance: {
+      routing: {
+        selected_flow: 'prd-to-delivery',
+        delivery_profile: deliveryProfile,
+        artifact_profile: artifactProfile,
+        complexity,
+        note: deliveryProfile === 'micro'
+          ? '当前需求更适合微型交付档位：保留三专家，但产物使用短版 compact 规格。'
+          : '当前需求更适合标准交付档位：保留完整门禁与完整 OpenSpec 产物。',
+      },
+    },
   });
 }
 
@@ -467,10 +726,12 @@ function buildDispatchTurn(targetDir, status, currentArtifacts) {
     },
     command: 'task-orchestrator:dispatch',
     reason: status.next_expected.reason,
-    summary: buildSummary(status),
+    summary: buildSummary(status, currentArtifacts.run),
     input: {
       user_request: currentArtifacts.run?.trigger?.raw_input || null,
       flow_id: currentArtifacts.run?.flow?.id || null,
+      delivery_profile: currentArtifacts.run?.delivery_profile || null,
+      artifact_profile: currentArtifacts.run?.artifact_profile || null,
     },
     reads: dedupeTargets([
       ...buildCommandTargets(targetDir, DISPATCH_INSTRUCTION_FILES),
@@ -525,11 +786,13 @@ function buildContinueTurn(targetDir, status, currentArtifacts) {
     },
     command: '/spec-continue',
     reason: status.next_expected.reason,
-    summary: buildSummary(status),
+    summary: buildSummary(status, currentArtifacts.run),
     input: {
       user_request: currentArtifacts.run?.trigger?.raw_input || null,
       current_role: currentArtifacts.run?.current_role || null,
       pending_gate: currentArtifacts.run?.pending_gate || null,
+      delivery_profile: currentArtifacts.run?.delivery_profile || null,
+      artifact_profile: currentArtifacts.run?.artifact_profile || null,
     },
     reads: dedupeTargets(reads),
     writes: [
@@ -564,9 +827,12 @@ function buildExpertTurn(targetDir, status, currentArtifacts) {
     changeId: dispatch.task?.change_id || currentArtifacts.run?.task?.change_id || null,
     runId: dispatch.run_id || currentArtifacts.run?.run_id || null,
   };
+  const deliveryProfile = currentArtifacts.run?.delivery_profile || 'standard';
+  const artifactProfile = currentArtifacts.run?.artifact_profile || inferArtifactProfile({
+    deliveryProfile,
+  });
 
   const reads = [
-    ...buildCommandTargets(targetDir, EXPERT_INSTRUCTION_FILES),
     buildFileTarget(targetDir, path.join('.ai-spec', 'current-run.json'), {
       required: true,
       label: 'current run-state',
@@ -577,26 +843,19 @@ function buildExpertTurn(targetDir, status, currentArtifacts) {
     }),
   ];
 
-  if (roleDefinition.source) {
-    reads.push(buildReadableTarget(targetDir, roleDefinition.source, {
-      required: true,
-      label: `${dispatch.role.id} role definition`,
-    }));
-  }
-
-  const skillTargets = buildSkillTargets(targetDir, dispatch.execution?.skills);
-  reads.push(...skillTargets);
-
   for (const item of roleDefinition.reads) {
     const resolvedValue = resolveTemplateVariables(item, context);
     if (resolvedValue === '.agents/rules/' || resolvedValue === '.agents/rules') {
-      reads.push(...buildRuleTargetsForRole(targetDir, dispatch.role.id));
       continue;
     }
     if (resolvedValue === 'code' || resolvedValue === 'implementation-notes') {
       reads.push(buildSymbolicTarget(resolvedValue));
     } else {
-      reads.push(buildReadableTarget(targetDir, resolvedValue));
+      const isProjectContext = resolvedValue === 'context/PROJECT.md';
+      const isOpenSpecPath = resolvedValue.startsWith('openspec/');
+      if (isProjectContext || isOpenSpecPath) {
+        reads.push(buildReadableTarget(targetDir, resolvedValue));
+      }
     }
   }
 
@@ -614,7 +873,7 @@ function buildExpertTurn(targetDir, status, currentArtifacts) {
   const expectedOutput = Array.isArray(dispatch.execution?.expected_output) && dispatch.execution.expected_output.length > 0
     ? [...dispatch.execution.expected_output]
     : [];
-  for (const item of buildExpertExpectedOutput(dispatch, writes, runtimePaths)) {
+  for (const item of buildExpertExpectedOutput(dispatch, writes, runtimePaths, deliveryProfile)) {
     expectedOutput.push(item);
   }
 
@@ -630,13 +889,15 @@ function buildExpertTurn(targetDir, status, currentArtifacts) {
     },
     command: dispatch.role.id,
     reason: status.next_expected.reason,
-    summary: buildSummary(status),
+    summary: buildSummary(status, currentArtifacts.run),
     input: {
       user_request: dispatch.task?.raw_goal || currentArtifacts.run?.trigger?.raw_input || null,
       change_id: context.changeId,
       flow_id: dispatch.flow?.id || currentArtifacts.run?.flow?.id || null,
       current_role: dispatch.execution?.current_role || dispatch.role.id,
       next_role: dispatch.execution?.next_role || roleDefinition.handoff_to[0] || null,
+      delivery_profile: deliveryProfile,
+      artifact_profile: artifactProfile,
     },
     preferred_skills: Array.isArray(dispatch.execution?.skills) && dispatch.execution.skills.length > 0
       ? dispatch.execution.skills
@@ -644,7 +905,17 @@ function buildExpertTurn(targetDir, status, currentArtifacts) {
     reads: dedupeTargets(reads),
     writes: dedupeTargets(writes),
     expected_output: [...new Set(expectedOutput)],
-    execution_contract: buildExecutionContract(runtimePaths, dispatch, roleDefinition, writes),
+    execution_contract: buildExecutionContract(runtimePaths, dispatch, roleDefinition, writes, deliveryProfile),
+    guidance: {
+      role: buildRoleGuidance(dispatch.role?.id, deliveryProfile),
+      rule_hints: buildRuleHints(dispatch.role?.id, deliveryProfile),
+      skills: buildSkillGuidance(
+        Array.isArray(dispatch.execution?.skills) && dispatch.execution.skills.length > 0
+          ? dispatch.execution.skills
+          : roleDefinition.preferred_skills.map((id) => ({ id })),
+      ),
+      openspec_rules: buildOpenSpecGuidance(targetDir, dispatch.role?.id, deliveryProfile),
+    },
     handoff_to: roleDefinition.handoff_to,
   });
 }

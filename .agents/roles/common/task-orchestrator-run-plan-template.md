@@ -22,17 +22,20 @@ description: 定义 task-orchestrator 在首次识别任务时必须输出的最
 
 ## 2. 必填字段
 
-首轮输出至少必须覆盖下面 9 类信息：
+首轮输出至少必须覆盖下面 12 类信息：
 
 1. `task_identification（任务识别）`
 2. `change_identification（稳定变更 ID）`
 3. `artifact_targets（关键产物路径）`
 4. `mode（运行模式）`
 5. `selected_flow（选中的流程模板）`
-6. `selected_roles（本次激活专家）`
-7. `assumptions（默认假设）`
-8. `missing_inputs（缺失输入）`
-9. `next_action（下一步动作）`
+6. `delivery_profile（交付档位）`
+7. `artifact_profile（产物规格）`
+8. `complexity（复杂度）`
+9. `selected_roles（本次激活专家）`
+10. `assumptions（默认假设）`
+11. `missing_inputs（缺失输入）`
+12. `next_action（下一步动作）`
 
 ## 3. 推荐 Markdown（标记语言）模板
 
@@ -48,6 +51,11 @@ description: 定义 task-orchestrator 在首次识别任务时必须输出的最
 
 ## 运行模式
 - `mode（运行模式）`：auto / suggest / manual
+
+## 交付档位
+- `delivery_profile（交付档位）`：micro / standard
+- `artifact_profile（产物规格）`：compact / full
+- `complexity（复杂度）`：low / medium / high
 
 ## 推荐专家
 - 必选：<required_roles>
@@ -77,22 +85,30 @@ description: 定义 task-orchestrator 在首次识别任务时必须输出的最
   "schema_version": 1,
   "kind": "run-plan",
   "mode": "auto",
+  "delivery_profile": "micro",
+  "artifact_profile": "compact",
+  "complexity": "low",
   "status": "planned",
   "task": {
     "type": "component-development",
     "change_id": "add-product-card",
     "raw_input": "创建一个商品组件",
-    "risk_level": "low"
+    "risk_level": "low",
+    "complexity": "low"
   },
   "flow": {
     "id": "prd-to-delivery",
+    "delivery_profile": "micro",
+    "artifact_profile": "compact",
     "reason": "当前输入属于需求驱动的前端交付任务"
   },
   "plan": {
     "required_roles": ["frontend-implementer", "code-guardian"],
     "activated_optional_roles": ["requirement-analyst"],
     "first_handoff": "requirement-analyst",
-    "approval_gates": []
+    "approval_gates": [],
+    "delivery_profile": "micro",
+    "artifact_profile": "compact"
   },
   "assumptions": [
     "默认沿用项目现有组件目录与命名规范",
@@ -158,7 +174,26 @@ description: 定义 task-orchestrator 在首次识别任务时必须输出的最
 - 继续执行会显著放大返工成本
 - 需要明确业务口径才能决定实现方向
 
-### 5.5 page-development 任务的缺口分类
+### 5.5 delivery_profile 的选择规则
+
+- `micro（微型交付）`
+  - 单页面、单组件、简单 Bug 修复、Mock 数据任务
+  - 不减少专家，但 OpenSpec 产物采用短版 compact 规格
+- `standard（标准交付）`
+  - 多状态联动、真实接口、复杂业务规则、核心模块改造
+  - 使用完整产物与完整门禁
+
+### 5.6 micro 的产物规格
+
+当 `delivery_profile = micro` 时：
+
+- `proposal.md` 使用短版：目标、范围、默认假设、风险
+- `tasks.md` 使用短版：3-5 条可执行任务
+- `checklist.md` 使用短版：关键检查项、阻断项、是否建议通过
+- `iterations.md` 使用短版：问题、修正动作、残留风险
+- 不允许因为是 `micro` 而跳过专家或跳过 OpenSpec 落盘
+
+### 5.7 page-development 任务的缺口分类
 
 对于 `page-development（页面开发）`：
 
@@ -168,7 +203,7 @@ description: 定义 task-orchestrator 在首次识别任务时必须输出的最
 - 认证方式与字段校验：优先从现有代码和 `05-API规范.md` 推断；若仓库无现成认证实现，`auto` 模式下默认可假设为“账号密码登录 + 基础前端校验”
 - 只有“设计稿原稿、品牌主色实际值、后端真实认证协议、必须遵循的业务字段规则”这类无法从规范和代码推断的内容，才应进入 `missing_inputs（缺失输入）`
 
-### 5.6 prd-to-delivery 的强制产物门禁
+### 5.8 prd-to-delivery 的强制产物门禁
 
 对于 `prd-to-delivery（需求到交付）`：
 
@@ -199,6 +234,11 @@ description: 定义 task-orchestrator 在首次识别任务时必须输出的最
 
 ## 运行模式
 - `mode（运行模式）`：auto
+
+## 交付档位
+- `delivery_profile（交付档位）`：micro
+- `artifact_profile（产物规格）`：compact
+- `complexity（复杂度）`：low
 
 ## 推荐专家
 - 必选：frontend-implementer（前端实现专家）、code-guardian（规范守护者）

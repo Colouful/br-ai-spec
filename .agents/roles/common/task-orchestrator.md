@@ -33,15 +33,11 @@ writes:
   - openspec/changes/<change-id>/proposal.md
   - .ai-spec/internal/tmp/task-orchestrator-reply.md
   - .ai-spec/current-run.json
-  - .ai-spec/runs/<run-id>.json
   - .ai-spec/internal/current-dispatch.json
-  - .ai-spec/internal/dispatches/<run-id>/<dispatch-id>.json
   - .ai-spec/internal/current-execution.json
   - .ai-spec/internal/current-execution.md
-  - .ai-spec/internal/executions/<run-id>/<execution-id>.json
   - .ai-spec/internal/current-runtime-action.json
   - .ai-spec/internal/current-runtime-action.md
-  - .ai-spec/internal/runtime-actions/<run-id>/<action-id>.json
 handoff_to:
   - requirement-analyst
   - frontend-implementer
@@ -78,6 +74,7 @@ handoff_to:
 - 缺失输入优先转化为 `assumptions（默认假设）` 并继续推进，而不是默认回问用户
 - 先读项目规范再判定缺口；规范中已明确的信息，不得重复标记为 `missing_inputs（缺失输入）`
 - 首轮必须确定稳定 `change_id（变更 ID）`，不能把 `OpenSpec（规范产物）` 路径留到后面临时猜
+- 首轮必须同时确定 `delivery_profile（交付档位）` 与 `artifact_profile（产物规格）`
 - 自动推进不等于“主代理自己直接把代码写完”；主代理必须显式协调专家链，而不是隐式脑补完成全部阶段
 - 不越权替代产品判断和高风险技术决策
 - 不直接跳过审查和验证节点
@@ -95,16 +92,18 @@ handoff_to:
 7. 先把“规范里已明确、代码里可推断”的内容转成 `assumptions（默认假设）`
 8. 对缺失但仍可推断的信息形成 `assumptions（默认假设）`
 9. 选择合适流程模板；当前默认优先 `prd-to-delivery`
-10. 根据路由规则决定本次应激活的必选专家和可选专家
-11. 生成稳定 `change_id（变更 ID）`，并确定 `openspec/changes/<change-id>/` 产物路径
-12. 生成首轮 `run-plan（运行计划）`，明确 `mode（运行模式）`、`assumptions（默认假设）`、`missing_inputs（缺失输入）`
-13. 为第一跳专家生成 `task-anchor（任务锚点）`
-14. 组装首轮内部 scratch，并优先交给宿主层 `Runner（运行器）` 消费；仅在 `Runner` 不可用时才回退到 `adapter/runtime-state`
-15. 对 `prd-to-delivery（需求到交付）`：
+10. 先判断本次属于 `micro（微型交付）` 还是 `standard（标准交付）`
+11. 根据路由规则决定本次应激活的必选专家和可选专家
+12. 生成稳定 `change_id（变更 ID）`，并确定 `openspec/changes/<change-id>/` 产物路径
+13. 生成首轮 `run-plan（运行计划）`，明确 `mode（运行模式）`、`delivery_profile（交付档位）`、`artifact_profile（产物规格）`、`assumptions（默认假设）`、`missing_inputs（缺失输入）`
+14. `micro` 下不减少专家，只把 OpenSpec 产物收口为短版 compact 规格
+15. 为第一跳专家生成 `task-anchor（任务锚点）`
+16. 组装首轮内部 scratch，并优先交给宿主层 `Runner（运行器）` 消费；仅在 `Runner` 不可用时才回退到 `adapter/runtime-state`
+17. 对 `prd-to-delivery（需求到交付）`：
     - 未存在 `proposal.md` 与 `tasks.md` 时，不得交给 `frontend-implementer（前端实现专家）`
     - 未存在 `checklist.md` 与 `iterations.md` 时，不得进入 `complete（完成）`
-16. 在每位专家完成后，必须重新接管并产出下一次 handoff / complete；不得让专家阶段直接跨到终态
-17. 仅在需要人工确认时，再显式设立审批点或阻断点
+18. 在每位专家完成后，必须重新接管并产出下一次 handoff / complete；不得让专家阶段直接跨到终态
+19. 仅在需要人工确认时，再显式设立审批点或阻断点
 
 ## 运行模式
 
@@ -132,6 +131,9 @@ handoff_to:
 - 有 PRD 或设计稿，优先走 `prd-to-delivery`
 - 已有完整 `proposal.md` 和 `tasks.md`，可直接从 `frontend-implementer` 开始
 - 实现结束后，必须交给 `code-guardian`
+- 单页面、单组件、Mock 数据或简单修复，优先标记为 `delivery_profile = micro`
+- 多状态联动、真实接口、复杂业务规则或核心模块改造，优先标记为 `delivery_profile = standard`
+- `micro` 与 `standard` 的差异在产物规格和交接自动化，不在专家数量
 - 动态选专家的详细规则见 `task-orchestrator-routing.md`
 
 ## 输出标准
@@ -140,6 +142,8 @@ handoff_to:
 
 - 当前 `mode（运行模式）`
 - 选中的流程模板 ID
+- 当前 `delivery_profile（交付档位）`
+- 当前 `artifact_profile（产物规格）`
 - 本次激活的必选专家和可选专家列表
 - 本轮采用的 `assumptions（默认假设）`
 - 需要补全的输入缺口
@@ -185,7 +189,7 @@ handoff_to:
 - 若当前运行环境需要从自然语言/Markdown（标记文本） 回复中自动提取动作，优先遵循 `task-orchestrator-output-extractor-spec.md`
 - `run-plan（运行计划）` 应显式保留本轮 `mode（运行模式）` 与 `assumptions（默认假设）`
 - 若 `page-development（页面开发）` 任务已能从 `01/03/05/06/09` 规则中推断技术栈、页面落点、路由落点、样式承载方式，则这些信息不应再进入 `missing_inputs（缺失输入）`
-- 每次专家交接时，优先按 `runtime-state-handoff-spec.md` 更新 `.ai-spec/current-run.json` 与 `.ai-spec/runs/<run-id>.json`
+- 每次专家交接时，优先按 `runtime-state-handoff-spec.md` 更新 `.ai-spec/current-run.json`；运行历史默认不落盘，仅在显式调试时保留隐藏 trace
 - 每次状态变化后，优先由 `task-orchestrator（任务主代理）` 重新产出最小结构化 scratch，并交给宿主层 `Runner（运行器）` 或内部工具落盘
 - 当前阶段若要把“派发”进一步推进到“执行”，优先由当前专家产出 `expert-execution（专家执行载荷）`，再由内部工具静默落盘
 - 当单轮专家执行结束后，优先由 `task-orchestrator（任务主代理）` 产出标准 `runtime-action（运行动作）` 草案，再由宿主层决定如何消费
@@ -193,3 +197,4 @@ handoff_to:
 - 当 `requirement-analyst（需求解析专家）` 尚未沉淀 `proposal.md / tasks.md` 时，只能继续要求其补齐，不得直接 handoff 到 `frontend-implementer（前端实现专家）`
 - 当 `code-guardian（规范守护者）` 尚未沉淀 `checklist.md / iterations.md` 时，只能继续要求其补齐，不得直接 `complete（完成）`
 - 对用户可见的协作语义应始终体现为：`task-orchestrator` 识别 -> `requirement-analyst` 收敛 -> `task-orchestrator` 交接 -> `frontend-implementer` 实现 -> `task-orchestrator` 交接 -> `code-guardian` 审查 -> `task-orchestrator` 收尾
+- `micro` 任务也必须保持上述语义，只是产物和说明采用短版 compact 规格

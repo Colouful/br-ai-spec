@@ -114,6 +114,8 @@ function printTurn(turn) {
   if (turn.execution_contract) {
     console.log('execution_contract:');
     console.log(`  kind: ${turn.execution_contract.kind || '(none)'}`);
+    console.log(`  delivery_profile: ${turn.execution_contract.delivery_profile || '(none)'}`);
+    console.log(`  artifact_profile: ${turn.execution_contract.artifact_profile || '(none)'}`);
     console.log(`  write_to: ${turn.execution_contract.write_to || '(none)'}`);
     console.log(`  next_advance_command: ${turn.execution_contract.next_advance_command || '(none)'}`);
     console.log('  required_fields:');
@@ -123,6 +125,37 @@ function printTurn(turn) {
     console.log('  required_artifacts:');
     for (const item of turn.execution_contract.required_artifacts || ['(none)']) {
       console.log(`    - ${item}`);
+    }
+  }
+  if (turn.guidance) {
+    if (turn.guidance.routing) {
+      console.log(`guidance.routing.delivery_profile: ${turn.guidance.routing.delivery_profile || '(none)'}`);
+      console.log(`guidance.routing.artifact_profile: ${turn.guidance.routing.artifact_profile || '(none)'}`);
+      console.log(`guidance.routing.complexity: ${turn.guidance.routing.complexity || '(none)'}`);
+    }
+    if (turn.guidance.role?.goal) {
+      console.log(`guidance.goal: ${turn.guidance.role.goal}`);
+    }
+    if (turn.guidance.role?.delivery_profile) {
+      console.log(`guidance.role.delivery_profile: ${turn.guidance.role.delivery_profile}`);
+    }
+    if (turn.guidance.role?.artifact_profile) {
+      console.log(`guidance.role.artifact_profile: ${turn.guidance.role.artifact_profile}`);
+    }
+    if (Array.isArray(turn.guidance.rule_hints) && turn.guidance.rule_hints.length > 0) {
+      console.log('guidance.rule_hints:');
+      for (const item of turn.guidance.rule_hints) {
+        console.log(`  - ${item}`);
+      }
+    }
+    if (turn.guidance.openspec_rules?.source) {
+      console.log(`guidance.openspec_rules.source: ${turn.guidance.openspec_rules.source}`);
+    }
+    if (Array.isArray(turn.guidance.openspec_rules?.sections) && turn.guidance.openspec_rules.sections.length > 0) {
+      console.log('guidance.openspec_rules.sections:');
+      for (const section of turn.guidance.openspec_rules.sections) {
+        console.log(`  - ${section.name}`);
+      }
     }
   }
 }

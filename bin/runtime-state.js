@@ -219,6 +219,117 @@ function deriveChangeId({ explicitChangeId, rawInput, taskType, runId }) {
   return `${normalizedTaskType}-${normalizedRunId}`.slice(0, 96);
 }
 
+const MICRO_TASK_TYPES = new Set([
+  'page-development',
+  'component-development',
+  'bugfix',
+  'bug-fix',
+  'problem-fix',
+  'issue-fix',
+  'style-update',
+  'route-update',
+]);
+
+const MICRO_INPUT_PATTERNS = [
+  /mock/i,
+  /mock数据/,
+  /示例数据/,
+  /静态/,
+  /单页/,
+  /单一页面/,
+  /简单页面/,
+  /简单组件/,
+  /列表页面/,
+  /登录页面/,
+  /注册页面/,
+  /商品列表页面/,
+  /原型/,
+];
+
+const STANDARD_INPUT_PATTERNS = [
+  /重构/,
+  /权限/,
+  /支付/,
+  /认证/,
+  /oauth/i,
+  /短信/,
+  /多步骤/,
+  /多页面/,
+  /复杂/,
+  /真实接口/,
+  /核心模块/,
+  /状态联动/,
+  /合规/,
+  /安全/,
+];
+
+function inferDeliveryProfile({ explicitProfile, flowId, taskType, rawInput, riskLevel }) {
+  const normalizedExplicit = String(explicitProfile || '').trim().toLowerCase();
+  if (normalizedExplicit === 'micro' || normalizedExplicit === 'standard') {
+    return normalizedExplicit;
+  }
+
+  let score = 0;
+
+  if (MICRO_TASK_TYPES.has(String(taskType || '').trim().toLowerCase())) {
+    score += 1;
+  }
+
+  const input = String(rawInput || '');
+  for (const pattern of MICRO_INPUT_PATTERNS) {
+    if (pattern.test(input)) {
+      score += 2;
+      break;
+    }
+  }
+
+  for (const pattern of STANDARD_INPUT_PATTERNS) {
+    if (pattern.test(input)) {
+      score -= 2;
+      break;
+    }
+  }
+
+  const normalizedRisk = String(riskLevel || '').trim().toLowerCase();
+  if (normalizedRisk === 'low') {
+    score += 1;
+  } else if (normalizedRisk === 'high') {
+    score -= 2;
+  }
+
+  if (flowId && flowId !== 'prd-to-delivery') {
+    score -= 1;
+  }
+
+  return score >= 2 ? 'micro' : 'standard';
+}
+
+function inferArtifactProfile({ explicitProfile, deliveryProfile }) {
+  const normalizedExplicit = String(explicitProfile || '').trim().toLowerCase();
+  if (normalizedExplicit === 'compact' || normalizedExplicit === 'full') {
+    return normalizedExplicit;
+  }
+
+  return deliveryProfile === 'micro' ? 'compact' : 'full';
+}
+
+function inferComplexity({ explicitComplexity, deliveryProfile, riskLevel }) {
+  const normalizedExplicit = String(explicitComplexity || '').trim().toLowerCase();
+  if (normalizedExplicit === 'low' || normalizedExplicit === 'medium' || normalizedExplicit === 'high') {
+    return normalizedExplicit;
+  }
+
+  const normalizedRisk = String(riskLevel || '').trim().toLowerCase();
+  if (normalizedRisk === 'high') {
+    return 'high';
+  }
+  if (normalizedRisk === 'medium') {
+    return 'medium';
+  }
+
+  return deliveryProfile === 'micro' ? 'low' : 'medium';
+}
+
 function buildDefaultArtifacts(changeId) {
   if (!changeId) {
     return {
@@ -380,6 +491,22 @@ function buildRunState({ runPlan, taskAnchor, options, now, source }) {
     taskType: runPlan.task?.type || null,
     runId,
   });
+  const deliveryProfile = inferDeliveryProfile({
+    explicitProfile: runPlan.delivery_profile || runPlan.flow?.delivery_profile || runPlan.plan?.delivery_profile || null,
+    flowId: runPlan.flow?.id || null,
+    taskType: runPlan.task?.type || null,
+    rawInput,
+    riskLevel: runPlan.task?.risk_level || null,
+  });
+  const artifactProfile = inferArtifactProfile({
+    explicitProfile: runPlan.artifact_profile || runPlan.plan?.artifact_profile || null,
+    deliveryProfile,
+  });
+  const complexity = inferComplexity({
+    explicitComplexity: runPlan.complexity || runPlan.task?.complexity || null,
+    deliveryProfile,
+    riskLevel: runPlan.task?.risk_level || null,
+  });
   const artifacts = mergeArtifacts(buildDefaultArtifacts(changeId), inferArtifacts(runPlan.artifacts));
   const currentRole = runPlan.plan?.first_handoff || null;
   const approvalGates = Array.isArray(runPlan.plan?.approval_gates)
@@ -406,6 +533,9 @@ function buildRunState({ runPlan, taskAnchor, options, now, source }) {
     kind: 'run-state',
     run_id: runId,
     mode: runPlan.mode || 'auto',
+    delivery_profile: deliveryProfile,
+    artifact_profile: artifactProfile,
+    complexity,
     status: options.status || runPlan.status || 'planned',
     trigger: {
       source: options.triggerSource,
@@ -417,11 +547,14 @@ function buildRunState({ runPlan, taskAnchor, options, now, source }) {
       input_kind: runPlan.task?.input_kind || taskAnchor?.task?.input_kind || 'unknown',
       risk_level: runPlan.task?.risk_level || 'unknown',
       type: runPlan.task?.type || null,
+      complexity,
     },
     flow: {
       id: runPlan.flow?.id || null,
       name: runPlan.flow?.name || null,
       source: runPlan.flow?.source || null,
+      delivery_profile: deliveryProfile,
+      artifact_profile: artifactProfile,
     },
     plan: {
       required_roles: runPlan.plan?.required_roles || [],
@@ -429,6 +562,8 @@ function buildRunState({ runPlan, taskAnchor, options, now, source }) {
       skipped_optional_roles: runPlan.plan?.skipped_optional_roles || [],
       approval_gates: approvalGates,
       first_handoff: currentRole,
+      delivery_profile: deliveryProfile,
+      artifact_profile: artifactProfile,
     },
     current_role: currentRole,
     pending_gate: pendingGate,
@@ -867,6 +1002,9 @@ function statusRunState(options) {
     summary: {
       run_id: state.run_id,
       mode: state.mode || null,
+      delivery_profile: state.delivery_profile || null,
+      artifact_profile: state.artifact_profile || null,
+      complexity: state.complexity || state.task?.complexity || null,
       status: state.status || null,
       flow_id: state.flow?.id || null,
       current_role: state.current_role || null,
@@ -1197,6 +1335,9 @@ function printPretty(result, action = 'init') {
     console.log(`  history: ${result.artifacts.run_history}`);
   }
   console.log(`  mode: ${result.state.mode || 'n/a'}`);
+  console.log(`  delivery_profile: ${result.state.delivery_profile || 'n/a'}`);
+  console.log(`  artifact_profile: ${result.state.artifact_profile || 'n/a'}`);
+  console.log(`  complexity: ${result.state.complexity || result.state.task?.complexity || 'n/a'}`);
   if (action === 'status') {
     console.log(`  status: ${result.state.status || 'n/a'}`);
     console.log(`  current_role: ${result.state.current_role || 'n/a'}`);
@@ -1385,6 +1526,9 @@ module.exports = {
   main,
   parseArgs,
   createRunId,
+  inferDeliveryProfile,
+  inferArtifactProfile,
+  inferComplexity,
   inferArtifacts,
   buildRunState,
   readRunStateFile,
