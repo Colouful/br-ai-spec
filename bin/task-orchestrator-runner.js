@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const extractor = require('./task-orchestrator-extractor');
 const adapter = require('./task-orchestrator-adapter');
 const expertDispatch = require('./expert-dispatch');
@@ -36,6 +37,58 @@ const INBOX_SPECS = [
 ];
 
 const TERMINAL_STATUSES = new Set(['success', 'failed', 'cancelled']);
+const AUTO_ADVANCE_EXECUTION_STATUSES = new Set(['done', 'success', 'completed']);
+const FLOW_RUNTIME_TRANSITIONS = {
+  'prd-to-delivery': {
+    'requirement-analyst': {
+      action: 'handoff',
+      to_role: 'frontend-implementer',
+      next_role: 'code-guardian',
+      message: 'handoff to frontend-implementer after requirement convergence',
+    },
+    'frontend-implementer': {
+      action: 'handoff',
+      to_role: 'code-guardian',
+      next_role: null,
+      message: 'handoff to code-guardian after implementation delivery',
+    },
+    'code-guardian': {
+      action: 'complete',
+      to_role: 'code-guardian',
+      next_role: null,
+      message: 'run completed after code-guardian final review',
+    },
+  },
+};
+const AUTO_DISPATCH_ALLOWED_ACTIONS = new Set(['bootstrap', 'handoff', 'approve', 'resume']);
+const ROLE_METADATA = {
+  'requirement-analyst': {
+    name: '需求解析专家',
+    source: '.agents/roles/common/requirement-analyst.md',
+  },
+  'frontend-implementer': {
+    name: '前端实现专家',
+    source: '.agents/roles/common/frontend-implementer.md',
+  },
+  'code-guardian': {
+    name: '规范守护者',
+    source: '.agents/roles/common/code-guardian.md',
+  },
+};
+const ROLE_EXPECTED_OUTPUTS = {
+  'requirement-analyst': {
+    compact: ['完成短版 proposal.md', '完成短版 tasks.md'],
+    full: ['完成 proposal.md', '完成 tasks.md'],
+  },
+  'frontend-implementer': {
+    compact: ['完成最小必要实现', '保持改动最小化并记录验证结果'],
+    full: ['完成当前范围内代码实现', '记录实现说明与验证结果'],
+  },
+  'code-guardian': {
+    compact: ['完成短版 checklist.md', '完成短版 iterations.md', '给出交付结论'],
+    full: ['完成 checklist.md', '完成 iterations.md', '给出交付结论'],
+  },
+};
 
 function printUsage() {
   console.log(`Internal usage:
@@ -117,6 +170,144 @@ function loadJsonIfExists(filePath, label) {
     return null;
   }
   return readJsonFile(filePath, label);
+}
+
+function parseScalar(value) {
+  const trimmed = value.trim();
+  if (trimmed === '') {
+    return '';
+  }
+  if (trimmed === '[]') {
+    return [];
+  }
+  if (
+    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+    (trimmed.startsWith("'") && trimmed.endsWith("'"))
+  ) {
+    return trimmed.slice(1, -1);
+  }
+  return trimmed;
+}
+
+function parseFrontmatter(fileContent) {
+  const lines = fileContent.split('\n');
+  if (lines[0] !== '---') {
+    return {};
+  }
+
+  const endIndex = lines.indexOf('---', 1);
+  if (endIndex === -1) {
+    return {};
+  }
+
+  const frontmatterLines = lines.slice(1, endIndex);
+  const data = {};
+  let currentKey = null;
+
+  for (const line of frontmatterLines) {
+    const listMatch = line.match(/^\s*-\s+(.*)$/);
+    if (listMatch && currentKey) {
+      if (!Array.isArray(data[currentKey])) {
+        data[currentKey] = [];
+      }
+      data[currentKey].push(parseScalar(listMatch[1]));
+      continue;
+    }
+
+    const keyMatch = line.match(/^([A-Za-z0-9_-]+):\s*(.*)$/);
+    if (!keyMatch) {
+      currentKey = null;
+      continue;
+    }
+
+    const [, key, rawValue] = keyMatch;
+    if (rawValue.trim() === '') {
+      data[key] = [];
+      currentKey = key;
+      continue;
+    }
+
+    data[key] = parseScalar(rawValue);
+    currentKey = null;
+  }
+
+  return data;
+}
+
+function loadRoleMetadata(targetDir, roleId) {
+  const fallback = ROLE_METADATA[roleId] || {
+    name: roleId,
+    source: null,
+  };
+
+  if (!fallback.source) {
+    return {
+      id: roleId,
+      name: fallback.name,
+      source: null,
+      preferred_skills: [],
+    };
+  }
+
+  const sourcePath = path.join(targetDir, fallback.source);
+  if (!fs.existsSync(sourcePath)) {
+    return {
+      id: roleId,
+      name: fallback.name,
+      source: fallback.source,
+      preferred_skills: [],
+    };
+  }
+
+  const frontmatter = parseFrontmatter(fs.readFileSync(sourcePath, 'utf8'));
+  return {
+    id: roleId,
+    name: frontmatter.name || fallback.name,
+    source: fallback.source,
+    preferred_skills: Array.isArray(frontmatter.preferred_skills) ? frontmatter.preferred_skills : [],
+  };
+}
+
+function inferProjectProfile(targetDir) {
+  const manifestCandidates = [
+    path.join(targetDir, '.ai-spec', 'manifest.json'),
+    path.join(targetDir, 'manifest.json'),
+  ];
+
+  for (const filePath of manifestCandidates) {
+    if (!fs.existsSync(filePath)) {
+      continue;
+    }
+    try {
+      const json = readJsonFile(filePath, 'manifest');
+      if (json.profile) {
+        return json.profile;
+      }
+    } catch (error) {
+      // ignore malformed local manifest during runtime inference
+    }
+  }
+
+  const packagePath = path.join(targetDir, 'package.json');
+  if (fs.existsSync(packagePath)) {
+    try {
+      const pkg = readJsonFile(packagePath, 'package.json');
+      const deps = {
+        ...(pkg.dependencies || {}),
+        ...(pkg.devDependencies || {}),
+      };
+      if (deps.vue) {
+        return 'vue';
+      }
+      if (deps.react) {
+        return 'react';
+      }
+    } catch (error) {
+      // ignore
+    }
+  }
+
+  return 'unknown';
 }
 
 function resolvePendingInputs(targetDir) {
@@ -277,6 +468,243 @@ function summarizeAppliedState(applied) {
   };
 }
 
+function readCurrentRun(targetDir) {
+  const runtimePaths = resolveRuntimePaths(targetDir);
+  return loadJsonIfExists(runtimePaths.currentRun.path, 'current run-state');
+}
+
+function listMarkdownBullets(content) {
+  return content
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => /^[-*]\s+/.test(line) || /^\d+\.\s+/.test(line));
+}
+
+function validatePreImplementationGate(targetDir, currentRun, executionPayload) {
+  if (!currentRun || currentRun.flow?.id !== 'prd-to-delivery') {
+    return { ok: true, reasons: [] };
+  }
+
+  if (executionPayload.role?.id !== 'requirement-analyst') {
+    return { ok: true, reasons: [] };
+  }
+
+  const deliveryProfile = currentRun.delivery_profile || 'standard';
+  const proposalPath = currentRun.artifacts?.proposal
+    ? path.join(targetDir, currentRun.artifacts.proposal)
+    : null;
+  const tasksPath = currentRun.artifacts?.tasks
+    ? path.join(targetDir, currentRun.artifacts.tasks)
+    : null;
+  const reasons = [];
+
+  if (!proposalPath || !fs.existsSync(proposalPath)) {
+    reasons.push('proposal.md 缺失');
+  }
+  if (!tasksPath || !fs.existsSync(tasksPath)) {
+    reasons.push('tasks.md 缺失');
+  }
+
+  if (reasons.length > 0) {
+    return { ok: false, reasons };
+  }
+
+  const proposalContent = fs.readFileSync(proposalPath, 'utf8').trim();
+  const tasksContent = fs.readFileSync(tasksPath, 'utf8').trim();
+  const taskItems = listMarkdownBullets(tasksContent);
+
+  if (deliveryProfile === 'micro') {
+    if (proposalContent.length < 60) {
+      reasons.push('proposal.md 过短，未达到 compact 最小信息量');
+    }
+    if (taskItems.length < 3) {
+      reasons.push('tasks.md 任务条目不足 3 条');
+    }
+  } else {
+    const headingCount = proposalContent
+      .split('\n')
+      .filter((line) => /^#{1,6}\s+/.test(line.trim()))
+      .length;
+    if (proposalContent.length < 120) {
+      reasons.push('proposal.md 过短，未达到 standard 最小信息量');
+    }
+    if (headingCount < 2) {
+      reasons.push('proposal.md 缺少足够的小节结构');
+    }
+    if (taskItems.length < 4) {
+      reasons.push('tasks.md 任务条目不足 4 条');
+    }
+  }
+
+  return {
+    ok: reasons.length === 0,
+    reasons,
+  };
+}
+
+function buildAutoRuntimeAction(targetDir, executionPayload) {
+  const currentRun = readCurrentRun(targetDir);
+  if (!currentRun) {
+    return null;
+  }
+
+  if (!AUTO_ADVANCE_EXECUTION_STATUSES.has(String(executionPayload.status || '').toLowerCase())) {
+    return null;
+  }
+
+  if (currentRun.pending_gate) {
+    return null;
+  }
+
+  const flowId = currentRun.flow?.id || null;
+  const roleId = executionPayload.role?.id || null;
+  if (!flowId || !roleId) {
+    return null;
+  }
+
+  const transition = FLOW_RUNTIME_TRANSITIONS[flowId]?.[roleId] || null;
+  if (!transition) {
+    return null;
+  }
+
+  if (transition.action === 'handoff' && roleId === 'requirement-analyst') {
+    const gateCheck = validatePreImplementationGate(targetDir, currentRun, executionPayload);
+    if (!gateCheck.ok) {
+      return {
+        schema_version: 1,
+        kind: 'task-orchestrator-runtime-action',
+        action: 'gate-blocked',
+        run_id: executionPayload.run_id,
+        from_role: roleId,
+        to_role: roleId,
+        next_role: transition.to_role,
+        pending_gate: 'before-implementation',
+        status: 'waiting-approval',
+        clear_pending_gate: false,
+        message: `requirement gate blocked: ${gateCheck.reasons.join('；')}`,
+        source: 'runner-auto-gate',
+      };
+    }
+  }
+
+  const nextRole = executionPayload.next_role !== undefined
+    ? executionPayload.next_role
+    : transition.next_role;
+  const toRole = executionPayload.next_role || transition.to_role || null;
+
+  return {
+    schema_version: 1,
+    kind: 'task-orchestrator-runtime-action',
+    action: transition.action,
+    run_id: executionPayload.run_id,
+    from_role: roleId,
+    to_role: transition.action === 'handoff' ? toRole : transition.to_role || roleId,
+    next_role: nextRole,
+    status: transition.action === 'complete' ? 'success' : 'running',
+    clear_pending_gate: true,
+    message: executionPayload.next_action || transition.message,
+    source: 'runner-auto-transition',
+  };
+}
+
+function buildTaskAnchorForRole(currentRun, currentRole, nextRole) {
+  const anchor = currentRun.anchor || {};
+  return {
+    schema_version: 1,
+    kind: 'task-anchor',
+    task: {
+      ...(anchor.task || {}),
+      raw_goal: anchor.task?.raw_goal || currentRun.trigger?.raw_input || null,
+      change_id: anchor.task?.change_id || currentRun.task?.change_id || null,
+      input_kind: anchor.task?.input_kind || currentRun.task?.input_kind || 'natural-language',
+    },
+    stage: {
+      ...(anchor.stage || {}),
+      flow_id: anchor.stage?.flow_id || currentRun.flow?.id || null,
+      current_role: currentRole,
+      next_role: nextRole,
+    },
+    constraints: anchor.constraints || null,
+    artifacts: anchor.artifacts || currentRun.artifacts || null,
+    expected_output: anchor.expected_output || [],
+  };
+}
+
+function buildAutoDispatch(targetDir, currentRun) {
+  if (!currentRun || !currentRun.current_role || TERMINAL_STATUSES.has(currentRun.status)) {
+    return null;
+  }
+  if (currentRun.pending_gate) {
+    return null;
+  }
+
+  const roleId = currentRun.current_role;
+  const transition = FLOW_RUNTIME_TRANSITIONS[currentRun.flow?.id || '']?.[roleId] || null;
+  const role = loadRoleMetadata(targetDir, roleId);
+  const artifactProfile = currentRun.artifact_profile || 'full';
+  const expectedOutput = ROLE_EXPECTED_OUTPUTS[roleId]?.[artifactProfile] || ROLE_EXPECTED_OUTPUTS[roleId]?.full || [];
+  const nextRole = currentRun.anchor?.stage?.next_role !== undefined
+    ? currentRun.anchor?.stage?.next_role
+    : transition?.next_role || null;
+
+  return {
+    schema_version: 1,
+    kind: 'expert-dispatch',
+    run_id: currentRun.run_id,
+    status: currentRun.status === 'planned' ? 'planned' : 'running',
+    role,
+    task: {
+      raw_goal: currentRun.anchor?.task?.raw_goal || currentRun.trigger?.raw_input || null,
+      change_id: currentRun.task?.change_id || currentRun.anchor?.task?.change_id || null,
+    },
+    flow: {
+      id: currentRun.flow?.id || null,
+    },
+    execution: {
+      profile: inferProjectProfile(targetDir),
+      delivery_profile: currentRun.delivery_profile || null,
+      artifact_profile: currentRun.artifact_profile || null,
+      current_role: roleId,
+      next_role: nextRole,
+      pending_gate: currentRun.pending_gate || null,
+      expected_output: expectedOutput,
+      skills: role.preferred_skills.map((id) => ({ id })),
+    },
+    anchor: buildTaskAnchorForRole(currentRun, roleId, nextRole),
+    instructions: {
+      source: role.source,
+      markdown: `# ${roleId}`,
+    },
+  };
+}
+
+function maybeAutoDispatchCurrentRole(targetDir, applied) {
+  if (!applied || !AUTO_DISPATCH_ALLOWED_ACTIONS.has(applied.adapter_action)) {
+    return null;
+  }
+
+  const currentRun = readCurrentRun(targetDir);
+  if (!currentRun || !currentRun.current_role || currentRun.pending_gate || TERMINAL_STATUSES.has(currentRun.status)) {
+    return null;
+  }
+
+  const currentArtifacts = loadCurrentArtifacts(targetDir);
+  if (currentArtifacts.dispatch) {
+    return null;
+  }
+
+  const payload = buildAutoDispatch(targetDir, currentRun);
+  if (!payload) {
+    return null;
+  }
+
+  return expertDispatch.applyDispatch({
+    target: targetDir,
+    payloadData: payload,
+    source: 'runner-auto-dispatch',
+  });
+}
+
 function advanceRunner(options) {
   const targetDir = path.resolve(process.cwd(), options.target || '.');
   const pendingInputs = resolvePendingInputs(targetDir);
@@ -342,6 +770,20 @@ function advanceRunner(options) {
         payload: pending.path,
       }),
     };
+    const autoRuntimeAction = buildAutoRuntimeAction(targetDir, recorded.execution.payload);
+    if (autoRuntimeAction) {
+      recorded.runtime_action = expertExecutor.applyRuntimeActionData({
+        target: targetDir,
+        payloadData: autoRuntimeAction,
+        source: 'runner-auto-transition',
+      });
+      applied = adapter.attachDispatch(adapter.applyPayload({
+        action: recorded.runtime_action.payload.action,
+        payload: recorded.runtime_action.payload,
+        options: { target: targetDir },
+        payloadSource: 'runner-auto-transition',
+      }), { target: targetDir });
+    }
   } else if (pending.kind === 'task-orchestrator-runtime-action') {
     recorded = {
       runtime_action: expertExecutor.applyRuntimeAction({
@@ -357,6 +799,17 @@ function advanceRunner(options) {
     }), { target: targetDir });
   } else {
     throw new Error(`unsupported runner input kind: ${pending.kind}`);
+  }
+
+  if (!recorded) {
+    recorded = {};
+  }
+
+  if (applied) {
+    const autoDispatch = maybeAutoDispatchCurrentRole(targetDir, applied);
+    if (autoDispatch) {
+      recorded.dispatch = autoDispatch;
+    }
   }
 
   const archivedTo = archiveConsumedInput(targetDir, pending.path, pending.kind);

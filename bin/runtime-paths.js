@@ -1,13 +1,16 @@
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
+const crypto = require('crypto');
 
 function buildEntry(targetDir, relPath, legacyRelPath = null) {
   const legacyRelPaths = Array.isArray(legacyRelPath)
     ? legacyRelPath.filter(Boolean)
     : [legacyRelPath].filter(Boolean);
+  const isAbsolute = path.isAbsolute(relPath);
   return {
     relPath,
-    path: path.join(targetDir, relPath),
+    path: isAbsolute ? relPath : path.join(targetDir, relPath),
     legacyRelPath: legacyRelPaths[0] || null,
     legacyPath: legacyRelPaths[0] ? path.join(targetDir, legacyRelPaths[0]) : null,
     legacyRelPaths,
@@ -15,14 +18,24 @@ function buildEntry(targetDir, relPath, legacyRelPath = null) {
   };
 }
 
+function buildHistoryEntry(targetDir, relPathSegments, legacyRelPath = null) {
+  const explicitRoot = process.env.AI_SPEC_HISTORY_DIR || process.env.BR_AI_SPEC_HISTORY_DIR || null;
+  const targetHash = crypto.createHash('sha1').update(path.resolve(targetDir)).digest('hex').slice(0, 12);
+  const historyRoot = explicitRoot
+    ? path.resolve(explicitRoot)
+    : path.join(os.homedir(), '.cache', 'ex-ai-spec', 'history', targetHash);
+  const absolutePath = path.join(historyRoot, ...relPathSegments);
+  return buildEntry(targetDir, absolutePath, legacyRelPath);
+}
+
 function resolveRuntimePaths(targetDir) {
   return {
     aiSpecDir: buildEntry(targetDir, path.join('.ai-spec')),
     internalDir: buildEntry(targetDir, path.join('.ai-spec', 'internal')),
     currentRun: buildEntry(targetDir, path.join('.ai-spec', 'current-run.json')),
-    runsDir: buildEntry(
+    runsDir: buildHistoryEntry(
       targetDir,
-      path.join('.ai-spec', '.history', 'runs'),
+      ['runs'],
       [path.join('.ai-spec', 'internal', 'history', 'runs'), path.join('.ai-spec', 'runs')],
     ),
     tmpDir: buildEntry(targetDir, path.join('.ai-spec', 'internal', 'tmp'), path.join('.ai-spec', 'tmp')),
@@ -51,9 +64,9 @@ function resolveRuntimePaths(targetDir) {
       path.join('.ai-spec', 'internal', 'current-dispatch.json'),
       path.join('.ai-spec', 'current-dispatch.json'),
     ),
-    dispatchesDir: buildEntry(
+    dispatchesDir: buildHistoryEntry(
       targetDir,
-      path.join('.ai-spec', '.history', 'dispatches'),
+      ['dispatches'],
       [
         path.join('.ai-spec', 'internal', 'history', 'dispatches'),
         path.join('.ai-spec', 'internal', 'dispatches'),
@@ -70,9 +83,9 @@ function resolveRuntimePaths(targetDir) {
       path.join('.ai-spec', 'internal', 'current-execution.md'),
       path.join('.ai-spec', 'current-execution.md'),
     ),
-    executionsDir: buildEntry(
+    executionsDir: buildHistoryEntry(
       targetDir,
-      path.join('.ai-spec', '.history', 'executions'),
+      ['executions'],
       [
         path.join('.ai-spec', 'internal', 'history', 'executions'),
         path.join('.ai-spec', 'internal', 'executions'),
@@ -89,18 +102,18 @@ function resolveRuntimePaths(targetDir) {
       path.join('.ai-spec', 'internal', 'current-runtime-action.md'),
       path.join('.ai-spec', 'current-runtime-action.md'),
     ),
-    runtimeActionsDir: buildEntry(
+    runtimeActionsDir: buildHistoryEntry(
       targetDir,
-      path.join('.ai-spec', '.history', 'runtime-actions'),
+      ['runtime-actions'],
       [
         path.join('.ai-spec', 'internal', 'history', 'runtime-actions'),
         path.join('.ai-spec', 'internal', 'runtime-actions'),
         path.join('.ai-spec', 'runtime-actions'),
       ],
     ),
-    runnerConsumedDir: buildEntry(
+    runnerConsumedDir: buildHistoryEntry(
       targetDir,
-      path.join('.ai-spec', 'internal', 'runner', 'consumed'),
+      ['runner', 'consumed'],
       path.join('.ai-spec', 'runner', 'consumed'),
     ),
   };

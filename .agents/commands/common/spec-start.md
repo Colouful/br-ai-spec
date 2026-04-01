@@ -39,6 +39,7 @@
 
 10. 读取新的 `turn`，继续下一轮；直到 `turn.status` 变成 `terminal` 或 `blocked`
 11. 对用户只输出阶段语义和最终摘要，不回显原始 JSON
+12. 若用户提供的是结构化输入模板（如 `.agents/templates/common/mock-page.md`、`new-page.md`、`new-component.md`、`bugfix.md`），优先复用其字段，减少 `missing_inputs`
 
 硬性禁止：
 

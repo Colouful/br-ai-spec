@@ -226,6 +226,25 @@ function applyDispatch(options) {
   };
 }
 
+function applyDispatchData(options) {
+  const targetDir = path.resolve(options.target || '.');
+  const sourcePath = options.source || 'memory-payload';
+  const rawPayload = options.payloadData;
+
+  const hydratedPayload = hydrateDispatchPayload(targetDir, rawPayload);
+  validateDispatchPayload(hydratedPayload, sourcePath);
+  const payload = normalizeDispatchPayload(hydratedPayload);
+  const artifacts = writeDispatchArtifacts(targetDir, payload);
+
+  return {
+    status: 'success',
+    target: targetDir,
+    source: sourcePath,
+    artifacts,
+    payload,
+  };
+}
+
 function clearDispatch(options) {
   const targetDir = path.resolve(options.target || '.');
   const runtimePaths = resolveRuntimePaths(targetDir);
@@ -299,6 +318,7 @@ function main(argv = process.argv.slice(2)) {
 module.exports = {
   main,
   applyDispatch,
+  applyDispatchData,
   clearDispatch,
   validateDispatchPayload,
   normalizeDispatchPayload,
