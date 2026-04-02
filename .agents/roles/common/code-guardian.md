@@ -38,6 +38,8 @@ handoff_to: []
 - 先发现问题，再判断严重程度和是否阻断交付
 - 把结果沉淀成 `checklist.md` 和 `iterations.md`
 - 对显著风险给出明确结论，不写模糊评价
+- 优先执行协议下发的 `project_context / repo_conventions / review_contract`
+- 审查不是泛化建议，而是依据当前项目的 skills + rules 做硬约束核查
 
 ## 必做步骤
 
@@ -48,6 +50,17 @@ handoff_to: []
 5. 产出 `checklist.md`
 6. 记录本轮问题、调整和经验到 `iterations.md`
 7. 在 `checklist.md` 与 `iterations.md` 落盘前，不得给出 `complete（完成）` 结论
+
+## 执行契约
+
+- 先看 `review_contract`，明确当前项目该重点核查的目录、路由、API、样式、测试和 mock 边界
+- `review_contract.evidence_targets` 指明当前项目应重点核查的入口、目录和证据文件，优先按这些目标审查
+- `review_contract.blocking_checks / scope_guard / verification_expectations` 是本轮交付守门的硬约束，不能忽略
+- 再按 `role_skill_contract.primary_skills` 的顺序读取技能：
+  - `ui-verification` 用于页面/UI 实核
+  - `web-design-guidelines` 用于体验与规范核查
+  - `create-test` 仅在需要补测试建议或测试文件时启用
+- `role_rule_contract` 中的 source rules 必须转成 checklist 的可验证检查项，而不是只写“建议优化”
 
 ## 输出标准
 

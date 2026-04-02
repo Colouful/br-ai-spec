@@ -45,7 +45,8 @@ description: 技能目录索引。安装到目标项目后此目录为扁平结�
 | 技能 | 用途 | 配合规范 |
 |------|------|----------|
 | `create-component` | 创建 SFC 组件 | `04-组件规范` |
-| `create-view` | 创建 Vue 页面模块 | `06-路由规范` |
+| `create-view` | 创建 Vue 页面模块 | `03-项目结构` |
+| `create-route` | 创建 Vue 路由模块与入口注册 | `06-路由规范` |
 | `create-store` | 创建 Pinia Store | `07-状态管理` |
 | `create-api` | 创建 API 接口封装 | `05-API规范` |
 | `theme-variables` | 组件库主题 token 使用 | `09-样式规范` |
@@ -97,7 +98,7 @@ description: 技能目录索引。安装到目标项目后此目录为扁平结�
 | 归档变更时 | `.agents/skills/common/archive-change/SKILL.md`（规范合并 + 归档校验） |
 | 新增接口 | `.agents/skills/profiles/<stack>/create-api/SKILL.md` |
 | 创建/拆分组件 | `.agents/skills/profiles/<stack>/create-component/SKILL.md` |
-| 新增页面路由 | React 用 `.agents/skills/profiles/react/create-route/SKILL.md`；Vue 用 `.agents/skills/profiles/vue/create-view/SKILL.md` |
+| 新增页面路由 | React 用 `.agents/skills/profiles/react/create-route/SKILL.md`；Vue 用 `.agents/skills/profiles/vue/create-route/SKILL.md` |
 | 新增全局状态 | `.agents/skills/profiles/<stack>/create-store/SKILL.md` |
 | 编写样式/主题适配 | `.agents/skills/profiles/<stack>/theme-variables/SKILL.md` |
 | 开始执行 tasks.md | `.agents/skills/common/execute-task/SKILL.md` |

@@ -55,6 +55,7 @@ handoff_to:
 - 决定本次激活哪些专家
 - 控制交接顺序和人工确认点
 - 在每位专家完成后重新接管，并显式发起下一次交接
+- 为每位专家编译当前项目的 `skills + rules` 执行契约，而不是只给通用角色说明
 
 ## 工作原则
 
@@ -95,6 +96,7 @@ handoff_to:
     - 未存在 `checklist.md` 与 `iterations.md` 时，不得进入 `complete（完成）`
 18. 在每位专家完成后，必须重新接管并产出下一次 handoff / complete；不得让专家阶段直接跨到终态
 19. 仅在需要人工确认时，再显式设立审批点或阻断点
+20. 给每位专家下发项目级执行契约：至少包含 `project_context`、`repo_conventions`、`role_rule_contract`、`role_skill_contract`，并按角色补 `analysis_contract / implementation_contract / review_contract`
 
 ## 运行模式
 

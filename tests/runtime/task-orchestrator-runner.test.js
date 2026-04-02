@@ -42,6 +42,33 @@ function listTurnTargets(turn) {
 
 function main() {
   const targetDir = fs.mkdtempSync(path.join(os.tmpdir(), 'br-ai-spec-runner-test-'));
+  writeProjectFile(targetDir, 'package.json', JSON.stringify({
+    name: 'runner-smoke',
+    scripts: {
+      build: 'vite build',
+      lint: 'eslint .',
+      test: 'vitest run',
+    },
+    dependencies: {
+      vue: '^3.5.0',
+      'vue-router': '^4.4.0',
+      pinia: '^3.0.0',
+      vite: '^6.0.0',
+    },
+    devDependencies: {
+      typescript: '^5.0.0',
+    },
+  }, null, 2));
+  writeProjectFile(targetDir, 'pnpm-lock.yaml', 'lockfileVersion: 9.0');
+  writeProjectFile(targetDir, 'src/router/index.ts', 'export const router = {}');
+  writeProjectFile(targetDir, 'src/router/modules/demo.ts', 'export default []');
+  writeProjectFile(targetDir, 'src/views/demo/index.vue', '<template><div /></template>');
+  writeProjectFile(targetDir, 'src/api/order.ts', 'export function getOrderListApi() {}');
+  writeProjectFile(targetDir, 'src/api/types/order.ts', 'export interface Order {}');
+  writeProjectFile(targetDir, 'src/mock/order.ts', 'export const orderMock = [];');
+  writeProjectFile(targetDir, 'src/store/modules/demo/index.ts', 'export const useDemoStore = () => ({})');
+  writeProjectFile(targetDir, 'src/styles/variables.scss', ':root {}');
+  writeProjectFile(targetDir, 'context/PROJECT.md', '# PROJECT');
 
   let workflow = step(targetDir, '创建一个商品组件');
   assert.strictEqual(workflow.advanced, null);
@@ -63,14 +90,39 @@ function main() {
   assert.strictEqual(workflow.turn.mode, 'execute');
   assert.strictEqual(workflow.turn.actor.id, 'requirement-analyst');
   assert.strictEqual(workflow.turn.command, 'requirement-analyst');
+  assert.strictEqual(workflow.turn.guidance.project_context.framework, 'vue');
+  assert.strictEqual(workflow.turn.guidance.project_context.language, 'TypeScript');
+  assert.strictEqual(workflow.turn.guidance.repo_conventions.route_modules_dir, 'src/router/modules');
+  assert.ok(Array.isArray(workflow.turn.guidance.role_rule_contract.source_rules));
+  assert.ok(workflow.turn.guidance.role_rule_contract.source_rules.some((item) => item.path.includes('05-API规范.md')));
+  assert.ok(Array.isArray(workflow.turn.guidance.role_skill_contract.primary_skills));
+  assert.ok(workflow.turn.guidance.role_skill_contract.primary_skills.includes('create-proposal'));
+  assert.ok(workflow.turn.guidance.analysis_contract);
   assert.deepStrictEqual(listTurnTargets(workflow.turn), [
     '.ai-spec/internal/tmp/current-execution.json',
     'openspec/changes/runtime-smoke-demo/proposal.md',
     'openspec/changes/runtime-smoke-demo/tasks.md',
   ]);
 
-  writeProjectFile(targetDir, 'openspec/changes/runtime-smoke-demo/proposal.md', '# proposal');
-  writeProjectFile(targetDir, 'openspec/changes/runtime-smoke-demo/tasks.md', '# tasks');
+  writeProjectFile(targetDir, 'openspec/changes/runtime-smoke-demo/proposal.md', [
+    '# 变更提案：runtime-smoke-demo',
+    '',
+    '## 目标',
+    '- 新增一个商品组件演示页，验证协议链与页面落点约定。',
+    '',
+    '## 范围',
+    '- 页面放在 src/views，保留最小 mock 数据与组件结构。',
+    '',
+    '## 风险',
+    '- 当前仅演示协议流，不接真实 API。',
+  ].join('\n'));
+  writeProjectFile(targetDir, 'openspec/changes/runtime-smoke-demo/tasks.md', [
+    '# 实施任务',
+    '',
+    '- [ ] 创建页面与基础组件结构',
+    '- [ ] 补齐路由入口与懒加载配置',
+    '- [ ] 保持 mock 数据与样式变量约定',
+  ].join('\n'));
   copyFixture(targetDir, 'current-execution-requirement-analyst.json', 'current-execution.json');
   report = advance(targetDir);
   assert.strictEqual(report.consumed.kind, 'expert-execution');
@@ -85,6 +137,11 @@ function main() {
   assert.strictEqual(workflow.turn.mode, 'execute');
   assert.strictEqual(workflow.turn.actor.id, 'frontend-implementer');
   assert.strictEqual(workflow.turn.command, 'frontend-implementer');
+  assert.ok(workflow.turn.guidance.implementation_contract);
+  assert.ok(workflow.turn.guidance.role_skill_contract.primary_skills.includes('create-route'));
+  assert.ok(
+    workflow.turn.guidance.role_skill_contract.read_targets.some((item) => item.rel_path === '.agents/skills/profiles/vue/create-route/SKILL.md' && item.exists),
+  );
   assert.deepStrictEqual(listTurnTargets(workflow.turn), [
     '.ai-spec/internal/tmp/current-execution.json',
     'code',
@@ -104,6 +161,13 @@ function main() {
   assert.strictEqual(workflow.turn.mode, 'execute');
   assert.strictEqual(workflow.turn.actor.id, 'code-guardian');
   assert.strictEqual(workflow.turn.command, 'code-guardian');
+  assert.ok(workflow.turn.guidance.review_contract);
+  assert.ok(workflow.turn.guidance.role_rule_contract.source_rules.some((item) => item.path.includes('14-审计汇报规范.md')));
+  assert.ok(workflow.turn.guidance.review_contract.evidence_targets.includes('src/router/index.ts'));
+  assert.ok(workflow.turn.guidance.review_contract.evidence_targets.includes('src/api'));
+  assert.ok(workflow.turn.guidance.review_contract.blocking_checks.some((item) => item.includes('src/api')));
+  assert.ok(workflow.turn.guidance.review_contract.scope_guard.some((item) => item.includes('proposal/tasks')));
+  assert.ok(workflow.turn.guidance.review_contract.verification_expectations.includes('pnpm run build'));
   assert.deepStrictEqual(listTurnTargets(workflow.turn), [
     '.ai-spec/internal/tmp/current-execution.json',
     'openspec/changes/runtime-smoke-demo/checklist.md',

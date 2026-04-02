@@ -175,6 +175,51 @@ function printTurn(turn) {
         console.log(`  - ${item}`);
       }
     }
+    if (turn.guidance.project_context) {
+      console.log(`guidance.project_context.framework: ${turn.guidance.project_context.framework || '(none)'}`);
+      console.log(`guidance.project_context.language: ${turn.guidance.project_context.language || '(none)'}`);
+      console.log(`guidance.project_context.routing: ${turn.guidance.project_context.routing || '(none)'}`);
+      console.log(`guidance.project_context.api_layer: ${turn.guidance.project_context.api_layer || '(none)'}`);
+    }
+    if (turn.guidance.repo_conventions) {
+      console.log(`guidance.repo_conventions.views_dir: ${turn.guidance.repo_conventions.views_dir || '(none)'}`);
+      console.log(`guidance.repo_conventions.route_modules_dir: ${turn.guidance.repo_conventions.route_modules_dir || '(none)'}`);
+      console.log(`guidance.repo_conventions.api_dir: ${turn.guidance.repo_conventions.api_dir || '(none)'}`);
+      console.log(`guidance.repo_conventions.style_entry: ${turn.guidance.repo_conventions.style_entry || '(none)'}`);
+    }
+    if (turn.guidance.role_rule_contract) {
+      console.log('guidance.role_rule_contract.source_rules:');
+      for (const item of turn.guidance.role_rule_contract.source_rules || []) {
+        console.log(`  - ${item.path}`);
+      }
+    }
+    if (turn.guidance.role_skill_contract) {
+      console.log('guidance.role_skill_contract.primary_skills:');
+      for (const item of turn.guidance.role_skill_contract.primary_skills || []) {
+        console.log(`  - ${item}`);
+      }
+    }
+    if (turn.guidance.review_contract) {
+      console.log(`guidance.review_contract.summary: ${turn.guidance.review_contract.summary || '(none)'}`);
+      if (Array.isArray(turn.guidance.review_contract.evidence_targets) && turn.guidance.review_contract.evidence_targets.length > 0) {
+        console.log('guidance.review_contract.evidence_targets:');
+        for (const item of turn.guidance.review_contract.evidence_targets) {
+          console.log(`  - ${item}`);
+        }
+      }
+      if (Array.isArray(turn.guidance.review_contract.blocking_checks) && turn.guidance.review_contract.blocking_checks.length > 0) {
+        console.log('guidance.review_contract.blocking_checks:');
+        for (const item of turn.guidance.review_contract.blocking_checks) {
+          console.log(`  - ${item}`);
+        }
+      }
+      if (Array.isArray(turn.guidance.review_contract.verification_expectations) && turn.guidance.review_contract.verification_expectations.length > 0) {
+        console.log('guidance.review_contract.verification_expectations:');
+        for (const item of turn.guidance.review_contract.verification_expectations) {
+          console.log(`  - ${item}`);
+        }
+      }
+    }
     if (turn.guidance.openspec_rules?.source) {
       console.log(`guidance.openspec_rules.source: ${turn.guidance.openspec_rules.source}`);
     }

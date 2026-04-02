@@ -39,12 +39,118 @@ const ROLE_RULE_HINTS = {
     '.agents/rules/11-测试规范.md',
   ],
   'code-guardian': [
-    '.agents/rules/02-编码规范.md',
+    '.agents/rules/05-API规范.md',
+    '.agents/rules/06-路由规范.md',
     '.agents/rules/09-样式规范.md',
     '.agents/rules/11-测试规范.md',
     '.agents/rules/13-代码格式化与检查.md',
     '.agents/rules/14-审计汇报规范.md',
   ],
+};
+
+const RULE_FILE_CANDIDATES = {
+  overview: {
+    vue: ['.agents/rules/01-项目概述.md', '.agents/rules/profiles/vue/01-项目概述.md'],
+    react: ['.agents/rules/01-项目概述.md', '.agents/rules/profiles/react/01-项目概述.md'],
+    default: ['.agents/rules/01-项目概述.md'],
+  },
+  structure: {
+    vue: ['.agents/rules/03-项目结构.md', '.agents/rules/profiles/vue/03-项目结构.md'],
+    react: ['.agents/rules/03-项目结构.md', '.agents/rules/profiles/react/03-项目结构.md'],
+    default: ['.agents/rules/03-项目结构.md'],
+  },
+  component: {
+    vue: ['.agents/rules/04-组件规范.md', '.agents/rules/profiles/vue/04-组件规范.md'],
+    react: ['.agents/rules/04-组件规范.md', '.agents/rules/profiles/react/04-组件规范.md'],
+    default: ['.agents/rules/04-组件规范.md'],
+  },
+  api: {
+    default: ['.agents/rules/05-API规范.md', '.agents/rules/common/05-API规范.md'],
+  },
+  route: {
+    vue: ['.agents/rules/06-路由规范.md', '.agents/rules/profiles/vue/06-路由规范.md'],
+    react: ['.agents/rules/06-路由规范.md', '.agents/rules/profiles/react/06-路由规范.md'],
+    default: ['.agents/rules/06-路由规范.md'],
+  },
+  state: {
+    vue: ['.agents/rules/07-状态管理.md', '.agents/rules/profiles/vue/07-状态管理.md'],
+    react: ['.agents/rules/07-状态管理.md', '.agents/rules/profiles/react/07-状态管理.md'],
+    default: ['.agents/rules/07-状态管理.md'],
+  },
+  style: {
+    vue: ['.agents/rules/09-样式规范.md', '.agents/rules/profiles/vue/09-样式规范.md'],
+    react: ['.agents/rules/09-样式规范.md', '.agents/rules/profiles/react/09-样式规范.md'],
+    default: ['.agents/rules/09-样式规范.md'],
+  },
+  coding: {
+    default: ['.agents/rules/02-编码规范.md', '.agents/rules/common/02-编码规范.md'],
+  },
+  test: {
+    default: ['.agents/rules/11-测试规范.md', '.agents/rules/common/11-测试规范.md'],
+  },
+  format: {
+    default: ['.agents/rules/13-代码格式化与检查.md', '.agents/rules/common/13-代码格式化与检查.md'],
+  },
+  audit: {
+    default: ['.agents/rules/14-审计汇报规范.md', '.agents/rules/common/14-审计汇报规范.md'],
+  },
+};
+
+const ROLE_RULE_FILE_KEYS = {
+  'requirement-analyst': ['overview', 'structure', 'api', 'route', 'style'],
+  'frontend-implementer': ['structure', 'component', 'route', 'api', 'state', 'style'],
+  'code-guardian': ['coding', 'api', 'route', 'style', 'test', 'format', 'audit'],
+};
+
+const SKILL_FILE_CANDIDATES = {
+  'create-proposal': {
+    default: ['.agents/skills/common/create-proposal/SKILL.md'],
+  },
+  'design-analysis': {
+    default: ['.agents/skills/common/design-analysis/SKILL.md'],
+  },
+  'create-view': {
+    vue: ['.agents/skills/profiles/vue/create-view/SKILL.md'],
+  },
+  'create-component': {
+    vue: ['.agents/skills/profiles/vue/create-component/SKILL.md'],
+    react: ['.agents/skills/profiles/react/create-component/SKILL.md'],
+    default: ['.agents/skills/profiles/vue/create-component/SKILL.md'],
+  },
+  'create-route': {
+    vue: ['.agents/skills/profiles/vue/create-route/SKILL.md'],
+    react: ['.agents/skills/profiles/react/create-route/SKILL.md'],
+  },
+  'create-api': {
+    vue: ['.agents/skills/profiles/vue/create-api/SKILL.md'],
+    react: ['.agents/skills/profiles/react/create-api/SKILL.md'],
+  },
+  'create-store': {
+    vue: ['.agents/skills/profiles/vue/create-store/SKILL.md'],
+    react: ['.agents/skills/profiles/react/create-store/SKILL.md'],
+  },
+  'theme-variables': {
+    vue: ['.agents/skills/profiles/vue/theme-variables/SKILL.md'],
+    react: ['.agents/skills/profiles/react/theme-variables/SKILL.md'],
+  },
+  'execute-task': {
+    default: ['.agents/skills/common/execute-task/SKILL.md'],
+  },
+  'create-test': {
+    default: ['.agents/skills/common/create-test/SKILL.md'],
+  },
+  'ui-verification': {
+    default: ['.agents/skills/common/ui-verification/SKILL.md'],
+  },
+  'web-design-guidelines': {
+    default: ['.agents/skills/common/web-design-guidelines/SKILL.md'],
+  },
+};
+
+const ROLE_SKILL_PRIORITY = {
+  'requirement-analyst': ['create-proposal', 'design-analysis'],
+  'frontend-implementer': ['create-view', 'create-route', 'create-api', 'theme-variables', 'create-component', 'create-store', 'execute-task'],
+  'code-guardian': ['ui-verification', 'web-design-guidelines', 'create-test'],
 };
 
 const ROLE_OPENSPEC_RULE_SECTIONS = {
@@ -161,6 +267,77 @@ const SKILL_GUIDANCE = {
   'web-design-guidelines': '用于规则和体验审查。',
 };
 
+const ROLE_RULE_CONSTRAINTS = {
+  default: {
+    'requirement-analyst': {
+      must_follow: [
+        '先把项目定位、目录落点、路由/API/样式约定吸收到 proposal/tasks，不要把规范已明确的信息重复写成 missing_inputs。',
+        '需求收敛必须落到当前仓库可实施的页面、路由、接口或 mock 落点，而不是抽象方案。',
+      ],
+      blocked_when: [
+        '高风险领域的流程、安全、合规、风控或权限边界仍未确认时，必须维持 before-implementation 门禁。',
+      ],
+    },
+    'frontend-implementer': {
+      must_follow: [
+        '优先复用现有目录、路由、请求封装、状态管理和样式变量约定。',
+        '实现前先对齐 proposal/tasks 的范围与落点，不要自行扩 scope。',
+      ],
+      blocked_when: [
+        'proposal/tasks 未落盘或仍处于 before-implementation 审批门禁时，禁止改业务代码。',
+      ],
+    },
+    'code-guardian': {
+      must_follow: [
+        '以 proposal/tasks 和项目规则为准检查实现，而不是只做泛化 lint。',
+        '必须给出阻断项、非阻断项和交付建议，不能写成模糊建议列表。',
+      ],
+      blocked_when: [
+        '存在与项目规范冲突的目录、路由、API、样式或测试问题时，不得给 complete 结论。',
+      ],
+    },
+  },
+  vue: {
+    'requirement-analyst': {
+      must_follow: [
+        '页面任务优先对齐 src/views/<page>/index.vue 与 src/router/modules/<module>.ts 的落点约定。',
+        '若为 mock 或占位页，明确写清 src/mock 或本地 mock 方案，以及“不接真实 API”的边界。',
+        '样式和视觉约束需对齐主题 CSS 变量，不要把硬编码颜色或自由样式当默认方案。',
+      ],
+      repo_specific: (facts) => [
+        facts.routeModulesDir ? `当前仓库已有路由模块目录 ${facts.routeModulesDir}，proposal/tasks 需要按该目录组织。` : '若项目尚未接入 vue-router，需要在 proposal/tasks 明确是补路由还是保持占位入口。',
+        facts.viewsDir ? `页面目录以 ${facts.viewsDir} 为准，任务拆解要写清页面落点。` : null,
+      ].filter(Boolean),
+    },
+    'frontend-implementer': {
+      must_follow: [
+        'Vue 视图优先落在 src/views/<page>/index.vue；页面专用组件落在 src/views/<page>/components/。',
+        '路由统一放在 src/router/modules/，页面路由必须懒加载，并补齐 meta.title / requiresAuth 等项目约定。',
+        '接口统一走 src/api/<module>.ts 与 src/api/types/<module>.ts，组件或页面里禁止直接调 request。',
+        '状态管理统一走 Pinia 和 src/store/modules/；mock-first 场景优先本地状态，不预建复杂 store。',
+        '样式必须使用主题变量和 scoped/CSS Modules，禁止硬编码颜色值。',
+      ],
+      repo_specific: (facts) => [
+        facts.routeEntry ? `当前路由入口为 ${facts.routeEntry}。` : '仓库尚未检测到路由入口，若需新增路由必须先补路由骨架。',
+        facts.requestConfig ? `当前请求层配置入口为 ${facts.requestConfig}。` : facts.apiDir ? `当前 API 目录为 ${facts.apiDir}，新增接口时保持模块化拆分。` : '仓库尚未检测到 API 封装入口，如需真实接口需先补请求层约定。',
+        facts.styleEntry ? `当前样式入口为 ${facts.styleEntry}，新增样式要沿用主题变量。` : null,
+      ].filter(Boolean),
+    },
+    'code-guardian': {
+      must_follow: [
+        '核查页面是否落在 src/views、路由是否落在 src/router/modules，并保持动态导入。',
+        '核查 API 是否通过 src/api 封装、类型是否放在 src/api/types，页面中未直接调 request。',
+        '核查样式是否使用主题变量、scoped 或 CSS Modules，而不是硬编码全局样式。',
+        '核查 Pinia/store、mock 与 proposal/tasks 的边界是否一致，避免“演示页写成生产页”。',
+      ],
+      repo_specific: (facts) => [
+        facts.routeModulesDir ? `重点核对 ${facts.routeModulesDir} 下的路由模块是否与页面落点一致。` : null,
+        facts.mockDir ? `重点核对 ${facts.mockDir} 中的 mock 是否与演示范围一致。` : null,
+      ].filter(Boolean),
+    },
+  },
+};
+
 const MICRO_ROLE_SKILL_ALLOWLIST = {
   'requirement-analyst': ['create-proposal', 'design-analysis'],
   'frontend-implementer': ['create-view', 'create-component', 'create-route', 'theme-variables'],
@@ -222,6 +399,44 @@ function buildReadableTarget(targetDir, relPath, options = {}) {
   };
 }
 
+function buildReadableTargetFromCandidates(targetDir, candidates, options = {}) {
+  const normalized = Array.isArray(candidates) ? candidates.filter(Boolean) : [];
+  if (normalized.length === 0) {
+    return null;
+  }
+
+  for (const candidate of normalized) {
+    const targetPath = path.join(targetDir, candidate);
+    if (fs.existsSync(targetPath)) {
+      return {
+        ...buildFileTarget(targetDir, candidate, options),
+        origin: 'target',
+      };
+    }
+  }
+
+  for (const candidate of normalized) {
+    const packagePath = path.join(PACKAGE_ROOT, candidate);
+    if (fs.existsSync(packagePath)) {
+      const isDirectory = candidate.endsWith('/') || fs.statSync(packagePath).isDirectory();
+      return {
+        kind: isDirectory ? 'directory' : 'file',
+        path: packagePath,
+        rel_path: candidate,
+        exists: true,
+        required: Boolean(options.required),
+        label: options.label || null,
+        origin: 'package',
+      };
+    }
+  }
+
+  return {
+    ...buildFileTarget(targetDir, normalized[0], options),
+    origin: 'target',
+  };
+}
+
 function buildSymbolicTarget(value, options = {}) {
   return {
     kind: 'symbolic',
@@ -229,6 +444,202 @@ function buildSymbolicTarget(value, options = {}) {
     required: Boolean(options.required),
     label: options.label || null,
   };
+}
+
+function loadPackageManifest(targetDir) {
+  const packagePath = path.join(targetDir, 'package.json');
+  if (!fs.existsSync(packagePath)) {
+    return null;
+  }
+
+  return JSON.parse(fs.readFileSync(packagePath, 'utf8'));
+}
+
+function hasDependency(pkg, names) {
+  if (!pkg) {
+    return false;
+  }
+
+  const deps = {
+    ...(pkg.dependencies || {}),
+    ...(pkg.devDependencies || {}),
+    ...(pkg.peerDependencies || {}),
+  };
+
+  return names.some((name) => Object.prototype.hasOwnProperty.call(deps, name));
+}
+
+function detectProjectProfile(targetDir) {
+  const pkg = loadPackageManifest(targetDir);
+  if (hasDependency(pkg, ['vue', 'vue-router', 'pinia'])) {
+    return 'vue';
+  }
+  if (hasDependency(pkg, ['react', 'react-dom', 'react-router-dom'])) {
+    return 'react';
+  }
+  return 'default';
+}
+
+function detectProjectLanguage(targetDir, pkg) {
+  if (hasDependency(pkg, ['typescript']) || fs.existsSync(path.join(targetDir, 'tsconfig.json'))) {
+    return 'TypeScript';
+  }
+  return 'JavaScript';
+}
+
+function detectBuildTool(pkg) {
+  if (hasDependency(pkg, ['vite'])) {
+    return 'Vite';
+  }
+  if (hasDependency(pkg, ['next'])) {
+    return 'Next.js';
+  }
+  if (hasDependency(pkg, ['nuxt'])) {
+    return 'Nuxt';
+  }
+  if (hasDependency(pkg, ['webpack'])) {
+    return 'Webpack';
+  }
+  return 'unknown';
+}
+
+function detectPackageManager(targetDir) {
+  if (fs.existsSync(path.join(targetDir, 'pnpm-lock.yaml'))) {
+    return 'pnpm';
+  }
+  if (fs.existsSync(path.join(targetDir, 'yarn.lock'))) {
+    return 'yarn';
+  }
+  if (fs.existsSync(path.join(targetDir, 'package-lock.json'))) {
+    return 'npm';
+  }
+  return 'unknown';
+}
+
+function findExistingRelPath(targetDir, candidates) {
+  for (const candidate of candidates) {
+    if (fs.existsSync(path.join(targetDir, candidate))) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
+function collectRepoConventions(targetDir, projectProfile) {
+  const routeEntry = findExistingRelPath(targetDir, ['src/router/index.ts', 'src/router/index.js']);
+  const routeModulesDir = findExistingRelPath(targetDir, ['src/router/modules']);
+  const viewsDir = findExistingRelPath(targetDir, ['src/views']);
+  const apiDir = findExistingRelPath(targetDir, ['src/api']);
+  const apiTypesDir = findExistingRelPath(targetDir, ['src/api/types']);
+  const mockDir = findExistingRelPath(targetDir, ['src/mock', 'src/mocks']);
+  const storeModulesDir = findExistingRelPath(targetDir, ['src/store/modules', 'src/stores/modules', 'src/store']);
+  const styleEntry = findExistingRelPath(targetDir, ['src/styles', 'src/style.css', 'src/style.scss', 'src/styles/variables.scss']);
+  const requestConfig = findExistingRelPath(targetDir, [
+    'src/config/requestConfig.ts',
+    'src/config/requestConfig.js',
+    'src/lib/request.ts',
+    'src/libs/request.ts',
+    'src/utils/request.ts',
+  ]);
+  const appEntry = findExistingRelPath(targetDir, ['src/App.vue', 'src/App.tsx', 'src/App.jsx']);
+  const mainEntry = findExistingRelPath(targetDir, ['src/main.ts', 'src/main.js', 'src/main.tsx', 'src/main.jsx']);
+  const projectContextPath = findExistingRelPath(targetDir, ['context/PROJECT.md']);
+
+  return {
+    project_profile: projectProfile,
+    projectContextPath,
+    routeEntry,
+    routeModulesDir,
+    viewsDir,
+    apiDir,
+    apiTypesDir,
+    mockDir,
+    storeModulesDir,
+    styleEntry,
+    requestConfig,
+    appEntry,
+    mainEntry,
+  };
+}
+
+function buildProjectContextGuidance(targetDir, projectProfile, runState = null) {
+  const pkg = loadPackageManifest(targetDir);
+  const facts = collectRepoConventions(targetDir, projectProfile);
+  const routing = facts.routeEntry
+    ? `${projectProfile === 'vue' ? 'vue-router' : 'router'} @ ${facts.routeEntry}${facts.routeModulesDir ? ` + ${facts.routeModulesDir}` : ''}`
+    : '仓库未检测到显式路由入口';
+  const stateManagement = facts.storeModulesDir
+    ? `${projectProfile === 'vue' ? 'Pinia/store' : 'store'} @ ${facts.storeModulesDir}`
+    : '未检测到全局状态目录';
+  const apiLayer = facts.apiDir
+    ? `${facts.apiDir}${facts.apiTypesDir ? ` + ${facts.apiTypesDir}` : ''}${facts.requestConfig ? `；请求入口 ${facts.requestConfig}` : ''}`
+    : '未检测到 src/api 目录';
+  const mockStrategy = facts.mockDir
+    ? `mock 数据目录 ${facts.mockDir}`
+    : '未检测到独立 mock 目录';
+
+  return {
+    framework: projectProfile === 'default' ? 'unknown' : projectProfile,
+    language: detectProjectLanguage(targetDir, pkg),
+    build_tool: detectBuildTool(pkg),
+    package_manager: detectPackageManager(targetDir),
+    delivery_profile: runState?.delivery_profile || null,
+    artifact_profile: runState?.artifact_profile || null,
+    routing,
+    state_management: stateManagement,
+    api_layer: apiLayer,
+    mock_strategy: mockStrategy,
+    style_system: facts.styleEntry ? `样式入口 ${facts.styleEntry}` : '未检测到显式样式入口',
+    context_source: facts.projectContextPath || null,
+  };
+}
+
+function buildCodeGuardianEvidenceTargets(targetDir, repoConventions) {
+  const relPaths = [
+    repoConventions.projectContextPath,
+    repoConventions.appEntry,
+    repoConventions.mainEntry,
+    repoConventions.routeEntry,
+    repoConventions.routeModulesDir,
+    repoConventions.apiDir,
+    repoConventions.apiTypesDir,
+    repoConventions.requestConfig,
+    repoConventions.mockDir,
+    repoConventions.storeModulesDir,
+    repoConventions.styleEntry,
+  ].filter(Boolean);
+
+  return relPaths.map((relPath) => buildReadableTarget(targetDir, relPath, {
+    label: `review evidence: ${relPath}`,
+  }));
+}
+
+function buildVerificationExpectations(targetDir, projectContextGuidance) {
+  const pkg = loadPackageManifest(targetDir);
+  const scripts = pkg && typeof pkg.scripts === 'object' ? pkg.scripts : {};
+  const packageManager = projectContextGuidance?.package_manager || detectPackageManager(targetDir);
+  const commands = [];
+
+  if (typeof scripts.typecheck === 'string') {
+    commands.push(`${packageManager} run typecheck`);
+  } else if (
+    projectContextGuidance?.framework === 'vue' &&
+    projectContextGuidance?.language === 'TypeScript'
+  ) {
+    commands.push(`${packageManager} exec vue-tsc --noEmit`);
+  }
+
+  if (typeof scripts.lint === 'string') {
+    commands.push(`${packageManager} run lint`);
+  }
+  if (typeof scripts.test === 'string') {
+    commands.push(`${packageManager} run test`);
+  }
+  if (typeof scripts.build === 'string') {
+    commands.push(`${packageManager} run build`);
+  }
+
+  return [...new Set(commands)];
 }
 
 function dedupeTargets(targets) {
@@ -554,8 +965,137 @@ function selectRoleSkills(roleId, skills, deliveryProfile) {
   return skills.filter((item) => allowlist.includes(item?.id || item));
 }
 
-function buildRuleHints(roleId, deliveryProfile) {
-  const hints = (ROLE_RULE_HINTS[roleId] || []).map((relPath) => path.basename(relPath));
+function getRuleCandidates(ruleKey, projectProfile) {
+  const config = RULE_FILE_CANDIDATES[ruleKey];
+  if (!config) {
+    return [];
+  }
+  return config[projectProfile] || config.default || [];
+}
+
+function buildRoleRuleContract(targetDir, roleId, deliveryProfile, projectProfile, repoConventions) {
+  const ruleKeys = ROLE_RULE_FILE_KEYS[roleId] || [];
+  const sourceRules = ruleKeys
+    .map((key) => {
+      const target = buildReadableTargetFromCandidates(targetDir, getRuleCandidates(key, projectProfile), {
+        required: true,
+        label: `${roleId} rule: ${key}`,
+      });
+      if (!target) {
+        return null;
+      }
+      return {
+        id: key,
+        path: target.rel_path,
+        target,
+        focus: key,
+      };
+    })
+    .filter(Boolean);
+
+  const scopedConstraints = ROLE_RULE_CONSTRAINTS[projectProfile]?.[roleId] || {};
+  const fallbackConstraints = ROLE_RULE_CONSTRAINTS.default[roleId] || {};
+  const mustFollow = [
+    ...(fallbackConstraints.must_follow || []),
+    ...(scopedConstraints.must_follow || []),
+  ];
+  const blockedWhen = [
+    ...(fallbackConstraints.blocked_when || []),
+    ...(scopedConstraints.blocked_when || []),
+  ];
+  const repoSpecific = [
+    ...((typeof fallbackConstraints.repo_specific === 'function' ? fallbackConstraints.repo_specific(repoConventions) : fallbackConstraints.repo_specific) || []),
+    ...((typeof scopedConstraints.repo_specific === 'function' ? scopedConstraints.repo_specific(repoConventions) : scopedConstraints.repo_specific) || []),
+  ].filter(Boolean);
+
+  return {
+    source_rules: sourceRules.map((item) => ({
+      id: item.id,
+      path: item.path,
+      focus: item.focus,
+    })),
+    read_targets: sourceRules.map((item) => item.target),
+    must_follow: mustFollow,
+    repo_specific: repoSpecific,
+    blocked_when: blockedWhen,
+    profile: projectProfile,
+    delivery_profile: deliveryProfile,
+  };
+}
+
+function buildSkillTarget(targetDir, skillId, projectProfile) {
+  const config = SKILL_FILE_CANDIDATES[skillId];
+  if (!config) {
+    return null;
+  }
+  return buildReadableTargetFromCandidates(targetDir, config[projectProfile] || config.default || [], {
+    required: true,
+    label: `skill: ${skillId}`,
+  });
+}
+
+function normalizeSkillIds(skills) {
+  if (!Array.isArray(skills)) {
+    return [];
+  }
+  return skills
+    .map((item) => (typeof item === 'string' ? item : item?.id))
+    .filter(Boolean);
+}
+
+function choosePrimarySkillIds(roleId, selectedSkills, repoConventions, userRequest = null) {
+  const ordered = ROLE_SKILL_PRIORITY[roleId] || [];
+  const selected = new Set(normalizeSkillIds(selectedSkills));
+  const requestText = String(userRequest || '');
+
+  return ordered.filter((skillId) => {
+    if (!selected.has(skillId)) {
+      return false;
+    }
+    if (skillId === 'create-route') {
+      return Boolean(repoConventions.routeEntry || repoConventions.routeModulesDir || /路由|route|页面|page/i.test(requestText));
+    }
+    if (skillId === 'create-api') {
+      return Boolean(repoConventions.apiDir || repoConventions.requestConfig || /接口|api|请求|支付|订单|列表/i.test(requestText));
+    }
+    if (skillId === 'create-store') {
+      return Boolean(repoConventions.storeModulesDir || /store|状态|pinia/i.test(requestText));
+    }
+    return true;
+  }).slice(0, roleId === 'frontend-implementer' ? 4 : 3);
+}
+
+function buildRoleSkillContract(targetDir, roleId, selectedSkills, deliveryProfile, projectProfile, repoConventions, userRequest = null) {
+  const normalized = normalizeSkillIds(selectedSkills);
+  const primaryIds = choosePrimarySkillIds(roleId, selectedSkills, repoConventions, userRequest);
+  const targetIds = primaryIds.length > 0 ? primaryIds : normalized.slice(0, roleId === 'frontend-implementer' ? 4 : 3);
+  const readTargets = targetIds
+    .map((id) => buildSkillTarget(targetDir, id, projectProfile))
+    .filter(Boolean);
+
+  return {
+    selected: normalized.map((id) => {
+      const target = buildSkillTarget(targetDir, id, projectProfile);
+      return {
+        id,
+        path: target?.rel_path || null,
+        purpose: SKILL_GUIDANCE[id] || null,
+        mode: targetIds.includes(id) ? 'primary' : 'secondary',
+      };
+    }),
+    primary_skills: targetIds,
+    read_targets: readTargets,
+    execution_order: targetIds,
+    delivery_profile: deliveryProfile,
+    note: '优先按 primary_skills 的顺序阅读并调用技能；其余技能仅在当前实现范围明确需要时再展开。',
+  };
+}
+
+function buildRuleHints(roleId, deliveryProfile, roleRuleContract = null) {
+  const contractHints = Array.isArray(roleRuleContract?.source_rules)
+    ? roleRuleContract.source_rules.map((item) => path.basename(item.path))
+    : [];
+  const hints = (contractHints.length > 0 ? contractHints : (ROLE_RULE_HINTS[roleId] || []).map((relPath) => path.basename(relPath)));
   if (deliveryProfile === 'micro') {
     return hints.slice(0, 3);
   }
@@ -583,6 +1123,113 @@ function buildOpenSpecGuidance(targetDir, roleId, deliveryProfile) {
           : config.sections[name],
       })),
   };
+}
+
+function buildRepoConventionGuidance(repoConventions) {
+  return {
+    project_context: repoConventions.projectContextPath || null,
+    app_entry: repoConventions.appEntry || null,
+    main_entry: repoConventions.mainEntry || null,
+    views_dir: repoConventions.viewsDir || null,
+    route_entry: repoConventions.routeEntry || null,
+    route_modules_dir: repoConventions.routeModulesDir || null,
+    api_dir: repoConventions.apiDir || null,
+    api_types_dir: repoConventions.apiTypesDir || null,
+    request_config: repoConventions.requestConfig || null,
+    mock_dir: repoConventions.mockDir || null,
+    store_modules_dir: repoConventions.storeModulesDir || null,
+    style_entry: repoConventions.styleEntry || null,
+  };
+}
+
+function buildRoleSpecificContract(
+  roleId,
+  roleRuleContract,
+  roleSkillContract,
+  repoConventions,
+  deliveryProfile,
+  targetDir = null,
+  projectContextGuidance = null,
+) {
+  const base = {
+    delivery_profile: deliveryProfile,
+    primary_skills: roleSkillContract.primary_skills,
+    required_rules: roleRuleContract.source_rules.map((item) => item.path),
+    repo_alignment: roleRuleContract.repo_specific,
+  };
+
+  if (roleId === 'requirement-analyst') {
+    return {
+      ...base,
+      summary: '先按项目规则把需求收敛成 proposal/tasks，再把高风险缺口转成门禁或待确认项。',
+      expected_outputs: ['proposal.md', 'tasks.md'],
+      must_resolve: [
+        '页面/路由/API/mock/样式落点需和仓库约定一致',
+        '能从项目规则与代码推断的信息优先转成 assumptions',
+      ],
+    };
+  }
+
+  if (roleId === 'frontend-implementer') {
+    return {
+      ...base,
+      summary: '按 proposal/tasks 与项目目录、路由、API、样式约定完成实现，不擅自扩 scope。',
+      implementation_focus: [
+        repoConventions.viewsDir ? `页面落点优先对齐 ${repoConventions.viewsDir}` : '页面落点需与仓库 views 约定一致',
+        repoConventions.routeModulesDir ? `路由修改优先对齐 ${repoConventions.routeModulesDir}` : '若新增路由，需先确认路由入口与模块组织方式',
+        repoConventions.apiDir ? `接口封装优先对齐 ${repoConventions.apiDir}` : '若涉及真实接口，需先确认 API 封装入口',
+      ],
+    };
+  }
+
+  if (roleId === 'code-guardian') {
+    const verificationExpectations = targetDir
+      ? buildVerificationExpectations(targetDir, projectContextGuidance)
+      : [];
+    const evidenceTargets = [
+      repoConventions.projectContextPath,
+      repoConventions.appEntry,
+      repoConventions.mainEntry,
+      repoConventions.routeEntry,
+      repoConventions.routeModulesDir,
+      repoConventions.apiDir,
+      repoConventions.apiTypesDir,
+      repoConventions.requestConfig,
+      repoConventions.mockDir,
+      repoConventions.storeModulesDir,
+      repoConventions.styleEntry,
+    ].filter(Boolean);
+
+    return {
+      ...base,
+      summary: '按 proposal/tasks 和项目规范核查目录落点、路由/API/样式/Test 合规性，再给交付结论。',
+      review_focus: [
+        '页面/组件/路由/API/mock/store 是否落到正确目录',
+        '实现边界是否仍符合 proposal/tasks 与审批限制',
+        '样式是否继续使用主题变量与作用域样式',
+      ],
+      evidence_targets: evidenceTargets,
+      blocking_checks: [
+        repoConventions.viewsDir ? `页面或组件是否落在 ${repoConventions.viewsDir} 约定范围` : '页面或组件落点是否符合仓库结构约定',
+        repoConventions.routeModulesDir ? `路由是否落在 ${repoConventions.routeModulesDir} 并保持懒加载/meta 约定` : '新增路由是否先补齐路由骨架并符合模块组织方式',
+        repoConventions.apiDir ? `接口是否经由 ${repoConventions.apiDir} 封装，页面/组件未直接调 request` : '涉及真实接口时是否先建立统一 API 封装入口',
+        repoConventions.styleEntry ? `样式是否沿用 ${repoConventions.styleEntry} 及主题变量，不存在硬编码颜色或全局污染` : '样式是否继续使用主题变量和作用域样式',
+        '实现是否越过 proposal/tasks 或审批约束，把演示页扩成生产能力',
+      ],
+      scope_guard: [
+        '只按 proposal/tasks 与已批准范围审查，不接受静默扩 scope',
+        '高风险领域未批准的真实支付、敏感采集、风控/权限逻辑必须继续阻断',
+        'mock / 占位实现不得伪装成可直接上线的真实交付',
+      ],
+      verification_expectations: verificationExpectations,
+      output_requirements: [
+        'checklist.md 需要区分通过、未通过、阻断项与建议放行结论',
+        'iterations.md 需要沉淀问题、修正动作、残留风险与下轮提醒',
+      ],
+    };
+  }
+
+  return base;
 }
 
 function looksLikeApprovalInput(input) {
@@ -1155,6 +1802,9 @@ function buildExpertTurn(targetDir, status, currentArtifacts) {
   const artifactProfile = currentArtifacts.run?.artifact_profile || inferArtifactProfile({
     deliveryProfile,
   });
+  const projectProfile = detectProjectProfile(targetDir);
+  const repoConventions = collectRepoConventions(targetDir, projectProfile);
+  const projectContextGuidance = buildProjectContextGuidance(targetDir, projectProfile, currentArtifacts.run);
 
   const reads = [
     buildFileTarget(targetDir, path.join('.ai-spec', 'current-run.json'), {
@@ -1207,6 +1857,52 @@ function buildExpertTurn(targetDir, status, currentArtifacts) {
       : roleDefinition.preferred_skills,
     deliveryProfile,
   );
+  const roleRuleContract = buildRoleRuleContract(
+    targetDir,
+    dispatch.role?.id,
+    deliveryProfile,
+    projectProfile,
+    repoConventions,
+  );
+  const roleSkillContract = buildRoleSkillContract(
+    targetDir,
+    dispatch.role?.id,
+    selectedSkills,
+    deliveryProfile,
+    projectProfile,
+    repoConventions,
+    dispatch.task?.raw_goal || currentArtifacts.run?.trigger?.raw_input || null,
+  );
+  const roleSpecificContract = dispatch.role?.id
+    ? buildRoleSpecificContract(
+        dispatch.role?.id,
+        roleRuleContract,
+        roleSkillContract,
+        repoConventions,
+        deliveryProfile,
+        targetDir,
+        projectContextGuidance,
+      )
+    : null;
+  const projectContextRead = repoConventions.projectContextPath
+    ? buildReadableTarget(targetDir, repoConventions.projectContextPath, {
+        label: 'project stable context',
+      })
+    : null;
+  if (projectContextRead) {
+    reads.push(projectContextRead);
+  }
+  for (const item of roleRuleContract.read_targets) {
+    reads.push(item);
+  }
+  for (const item of roleSkillContract.read_targets) {
+    reads.push(item);
+  }
+  if (dispatch.role?.id === 'code-guardian') {
+    for (const item of buildCodeGuardianEvidenceTargets(targetDir, repoConventions)) {
+      reads.push(item);
+    }
+  }
 
   return attachProtocolContracts(attachActorPresentation({
     kind: 'ai-protocol-turn',
@@ -1236,8 +1932,21 @@ function buildExpertTurn(targetDir, status, currentArtifacts) {
     expected_output: [...new Set(expectedOutput)],
     execution_contract: buildExecutionContract(runtimePaths, dispatch, roleDefinition, writes, deliveryProfile),
     guidance: {
+      project_context: projectContextGuidance,
+      repo_conventions: buildRepoConventionGuidance(repoConventions),
       role: buildRoleGuidance(dispatch.role?.id, deliveryProfile),
-      rule_hints: buildRuleHints(dispatch.role?.id, deliveryProfile),
+      role_rule_contract: roleRuleContract,
+      role_skill_contract: roleSkillContract,
+      analysis_contract: dispatch.role?.id === 'requirement-analyst'
+        ? roleSpecificContract
+        : null,
+      implementation_contract: dispatch.role?.id === 'frontend-implementer'
+        ? roleSpecificContract
+        : null,
+      review_contract: dispatch.role?.id === 'code-guardian'
+        ? roleSpecificContract
+        : null,
+      rule_hints: buildRuleHints(dispatch.role?.id, deliveryProfile, roleRuleContract),
       skills: buildSkillGuidance(
         selectedSkills.map((item) => (typeof item === 'string' ? { id: item } : item)),
       ),

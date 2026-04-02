@@ -37,6 +37,8 @@ handoff_to:
 - 优先暴露不确定项，不用模糊语言掩盖问题
 - 输出应服务后续实现和验收，而不是写成空泛汇报材料
 - 能落到当前仓库结构的内容，必须写清楚
+- 优先执行协议下发的 `project_context / repo_conventions / role_rule_contract / role_skill_contract`
+- 专家不是单独发明做法，而是通过对应 skills + rules 在当前项目中收敛需求
 
 ## 必做步骤
 
@@ -47,6 +49,15 @@ handoff_to:
 5. 生成首版 `tasks.md`，任务粒度要能支撑实现
 6. 列出关键假设、依赖项和待确认问题
 7. 在 `openspec/changes/<change-id>/` 下落盘完成前，不得把本轮标记为 done
+
+## 执行契约
+
+- 优先读取协议下发的 `project_context（项目事实）` 与 `repo_conventions（仓库约定）`
+- 按 `role_rule_contract` 理解当前项目允许的页面、路由、API、mock、样式落点
+- 按 `role_skill_contract.primary_skills` 决定先读哪个技能：
+  - `create-proposal` 负责 proposal/tasks 的结构化产出
+  - `design-analysis` 仅在存在 UI/页面结构需求时辅助梳理
+- 对于项目规则中已经明确的事实，应直接写入 proposal/tasks 或 assumptions，而不是重复标为 missing_inputs
 
 ## 输出标准
 

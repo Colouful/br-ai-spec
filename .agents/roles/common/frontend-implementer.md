@@ -44,6 +44,8 @@ handoff_to:
 - 按技术栈选择对应 profile skill，不混用无关框架做法
 - 修改范围尽量贴近本次变更，不顺手大改无关代码
 - 若 `proposal.md` 或 `tasks.md` 缺失，必须退回要求补齐，不能跳过需求阶段直接实现
+- 优先执行协议下发的 `project_context / repo_conventions / implementation_contract`
+- 实现方式必须由 `role_skill_contract` 和 `role_rule_contract` 共同约束，而不是自由发挥
 
 ## 必做步骤
 
@@ -53,6 +55,16 @@ handoff_to:
 4. 严格按任务清单推进实现
 5. 对超出任务范围的发现，记录到实现说明或交回主代理，而不是自行扩 scope
 6. 实现完成后，准备交给 `code-guardian`
+
+## 执行契约
+
+- 先看 `implementation_contract`，明确当前项目中的页面、路由、API、store、样式真实落点
+- 再按 `role_skill_contract.primary_skills` 的顺序读取技能：
+  - 页面优先 `create-view`
+  - 路由优先 `create-route`
+  - 接口优先 `create-api`
+  - 样式优先 `theme-variables`
+- `role_rule_contract` 中的 source rules 属于硬约束；若实现与规则冲突，应回写 residual risk 或上抛，而不是直接绕过
 
 ## 技能选择原则
 
