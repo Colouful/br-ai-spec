@@ -5,6 +5,7 @@ const {
   inferDeliveryProfile,
   inferArtifactProfile,
   inferComplexity,
+  recordRunInputUpdate,
 } = require('../bin/runtime-state');
 const {
   resolveRuntimePaths,
@@ -443,6 +444,49 @@ function buildSummary(status, runState = null) {
     delivery_profile: runState?.delivery_profile || null,
     artifact_profile: runState?.artifact_profile || null,
     complexity: runState?.complexity || runState?.task?.complexity || null,
+    pending_input_update: Boolean(runState?.pending_input_update),
+    input_update_count: Array.isArray(runState?.input_updates) ? runState.input_updates.length : 0,
+  };
+}
+
+function shellQuote(value) {
+  return `'${String(value || '').replace(/'/g, `'\\''`)}'`;
+}
+
+function buildProtocolCommands(userInput = null) {
+  const advance = './node_modules/.bin/ai-spec protocol-advance --target . --json';
+  const step = userInput
+    ? `./node_modules/.bin/ai-spec protocol-step --target . --user-input ${shellQuote(userInput)} --json`
+    : './node_modules/.bin/ai-spec protocol-step --target . --json';
+  const update = userInput
+    ? `./node_modules/.bin/ai-spec protocol-update --target . --user-input ${shellQuote(userInput)} --json`
+    : './node_modules/.bin/ai-spec protocol-update --target . --user-input "<补充需求>" --json';
+
+  return {
+    step,
+    advance,
+    update,
+  };
+}
+
+function attachProtocolContracts(turn, options = {}) {
+  const commands = buildProtocolCommands(options.userInput || turn.input?.latest_user_input || turn.input?.user_request || null);
+  commands.current = turn.mode === 'start' ? commands.step : commands.advance;
+  const requiresAdvance = turn.status === 'ready';
+
+  return {
+    ...turn,
+    commands,
+    requires_advance: requiresAdvance,
+    finalize_contract: turn.status === 'ready'
+      ? {
+          required: true,
+          advance_command: commands.advance,
+          update_command: commands.update,
+          when: '完成当前轮次的所有 writes 后，必须先执行 advance，再对用户汇报',
+          user_report: '只输出阶段语义和最终摘要，不回显 scratch JSON',
+        }
+      : null,
   };
 }
 
@@ -662,7 +706,7 @@ function buildStartTurn(targetDir, userInput) {
     riskLevel: 'low',
   });
 
-  return attachActorPresentation({
+  return attachProtocolContracts(attachActorPresentation({
     kind: 'ai-protocol-turn',
     status: userInput ? 'ready' : 'waiting-input',
     mode: 'start',
@@ -711,12 +755,12 @@ function buildStartTurn(targetDir, userInput) {
           : '当前需求更适合标准交付档位：保留完整门禁与完整 OpenSpec 产物。',
       },
     },
-  });
+  }), { userInput });
 }
 
 function buildDispatchTurn(targetDir, status, currentArtifacts) {
   const runtimePaths = resolveRuntimePaths(targetDir);
-  return attachActorPresentation({
+  return attachProtocolContracts(attachActorPresentation({
     kind: 'ai-protocol-turn',
     status: 'ready',
     mode: 'dispatch',
@@ -750,6 +794,8 @@ function buildDispatchTurn(targetDir, status, currentArtifacts) {
       '根据 current-run 选择当前专家并产出 expert-dispatch',
       '将当前任务锚点和期望输出裁剪到当前专家可执行粒度',
     ],
+  }), {
+    userInput: currentArtifacts.run?.trigger?.latest_user_input || currentArtifacts.run?.trigger?.raw_input || null,
   });
 }
 
@@ -776,7 +822,7 @@ function buildContinueTurn(targetDir, status, currentArtifacts) {
     );
   }
 
-  return attachActorPresentation({
+  return attachProtocolContracts(attachActorPresentation({
     kind: 'ai-protocol-turn',
     status: 'ready',
     mode: 'continue',
@@ -802,6 +848,76 @@ function buildContinueTurn(targetDir, status, currentArtifacts) {
       }),
     ],
     expected_output: expectedOutput,
+  }), {
+    userInput: currentArtifacts.run?.trigger?.latest_user_input || currentArtifacts.run?.trigger?.raw_input || null,
+  });
+}
+
+function buildUpdateReviewTurn(targetDir, status, currentArtifacts) {
+  const runtimePaths = resolveRuntimePaths(targetDir);
+  const recentUpdates = Array.isArray(currentArtifacts.run?.input_updates)
+    ? currentArtifacts.run.input_updates.slice(-3)
+    : [];
+  const reads = [
+    ...buildCommandTargets(targetDir, CONTINUE_INSTRUCTION_FILES),
+    buildFileTarget(targetDir, path.join('.ai-spec', 'current-run.json'), {
+      required: true,
+      label: 'current run-state',
+    }),
+  ];
+
+  if (currentArtifacts.dispatch) {
+    reads.push(
+      buildFileTarget(targetDir, getExistingRelPath(runtimePaths.currentDispatch), {
+        required: true,
+        label: 'current expert dispatch',
+      }),
+    );
+  }
+
+  if (currentArtifacts.execution) {
+    reads.push(
+      buildFileTarget(targetDir, getExistingRelPath(runtimePaths.currentExecutionJson), {
+        required: true,
+        label: 'current expert execution',
+      }),
+    );
+  }
+
+  return attachProtocolContracts(attachActorPresentation({
+    kind: 'ai-protocol-turn',
+    status: 'ready',
+    mode: 'update-review',
+    actor: {
+      id: 'task-orchestrator',
+      type: 'orchestrator',
+    },
+    command: '/spec-continue',
+    reason: 'new user input has been appended; task-orchestrator must reconcile it before normal progression',
+    summary: buildSummary(status, currentArtifacts.run),
+    input: {
+      user_request: currentArtifacts.run?.trigger?.raw_input || null,
+      latest_user_input: currentArtifacts.run?.trigger?.latest_user_input || null,
+      input_updates: recentUpdates,
+      current_role: currentArtifacts.run?.current_role || null,
+      pending_gate: currentArtifacts.run?.pending_gate || null,
+      delivery_profile: currentArtifacts.run?.delivery_profile || null,
+      artifact_profile: currentArtifacts.run?.artifact_profile || null,
+    },
+    reads: dedupeTargets(reads),
+    writes: [
+      buildFileTarget(targetDir, runtimePaths.tmpTaskOrchestratorReply.relPath, {
+        required: true,
+        label: 'task-orchestrator reply inbox',
+      }),
+    ],
+    expected_output: [
+      '吸收新的用户输入并更新当前假设、边界或交接策略',
+      '若补充输入会影响当前阶段，优先产出最小 runtime-action 或 gate 结论',
+      '处理完成后清除 pending_input_update 标记',
+    ],
+  }), {
+    userInput: currentArtifacts.run?.trigger?.latest_user_input || null,
   });
 }
 
@@ -877,7 +993,7 @@ function buildExpertTurn(targetDir, status, currentArtifacts) {
     expectedOutput.push(item);
   }
 
-  return attachActorPresentation({
+  return attachProtocolContracts(attachActorPresentation({
     kind: 'ai-protocol-turn',
     status: 'ready',
     mode: 'execute',
@@ -917,6 +1033,8 @@ function buildExpertTurn(targetDir, status, currentArtifacts) {
       openspec_rules: buildOpenSpecGuidance(targetDir, dispatch.role?.id, deliveryProfile),
     },
     handoff_to: roleDefinition.handoff_to,
+  }), {
+    userInput: currentArtifacts.run?.trigger?.latest_user_input || currentArtifacts.run?.trigger?.raw_input || null,
   });
 }
 
@@ -926,7 +1044,7 @@ function buildProtocolTurn(options = {}) {
   const userInput = options.userInput || null;
 
   if (status.pending_inputs.length > 0) {
-    return attachActorPresentation({
+    return attachProtocolContracts(attachActorPresentation({
       kind: 'ai-protocol-turn',
       status: 'blocked',
       mode: 'consume-inbox',
@@ -943,7 +1061,7 @@ function buildProtocolTurn(options = {}) {
       reads: [],
       writes: [],
       expected_output: [],
-    });
+    }), { userInput });
   }
 
   if (!status.current.run_id) {
@@ -955,7 +1073,7 @@ function buildProtocolTurn(options = {}) {
       return buildStartTurn(targetDir, userInput);
     }
 
-    return {
+    return attachProtocolContracts({
       kind: 'ai-protocol-turn',
       status: 'terminal',
       mode: 'terminal',
@@ -969,10 +1087,14 @@ function buildProtocolTurn(options = {}) {
       reads: [],
       writes: [],
       expected_output: [],
-    };
+    }, { userInput });
   }
 
   const currentArtifacts = loadCurrentArtifacts(targetDir);
+
+  if (currentArtifacts.run?.pending_input_update) {
+    return buildUpdateReviewTurn(targetDir, status, currentArtifacts);
+  }
 
   if (status.current.execution_role) {
     return buildContinueTurn(targetDir, status, currentArtifacts);
@@ -1012,9 +1134,35 @@ function advanceProtocolStep(options = {}) {
   };
 }
 
+function updateProtocolInput(options = {}) {
+  const targetDir = resolveTargetDir(options.target);
+  const userInput = options.userInput || null;
+  if (!userInput) {
+    throw new Error('Missing required argument: --user-input <text>');
+  }
+
+  const updated = recordRunInputUpdate({
+    target: targetDir,
+    userInput,
+    source: 'protocol-update',
+  });
+
+  return {
+    kind: 'ai-protocol-input-update',
+    target: targetDir,
+    updated,
+    runner_status: runner.buildStatus(targetDir),
+    turn: buildProtocolTurn({
+      target: targetDir,
+      userInput,
+    }),
+  };
+}
+
 module.exports = {
   buildProtocolTurn,
   advanceProtocolStep,
+  updateProtocolInput,
   loadRoleDefinition,
   parseFrontmatter,
 };

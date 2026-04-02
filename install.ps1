@@ -1184,9 +1184,11 @@ function Write-Report {
         Write-Host "     -> 先在 设置 -> MCP 中按需打开目标服务，再编辑 JSON" -ForegroundColor Yellow
         Write-Host "     -> 将 ApiFox 等条目的 project-id、access-token 等占位符换成真实值" -ForegroundColor Yellow
         Write-Host "     -> 不需要的服务保持关闭即可；若条目含 disabled，启用前请先完成凭证配置" -ForegroundColor Yellow
+        Write-Host "  4. 首次运行 /spec-start 或 /spec-continue 时，如 Cursor 提示执行 ai-spec 命令" 
+        Write-Host "     -> 请选择 Always allow for this workspace，避免宿主桥命令被权限弹窗打断" -ForegroundColor Yellow
     }
     if ($script:Level -eq "L3") {
-        Write-Host "  4. 使用 /opsx-propose              开始第一个变更提案"
+        Write-Host "  5. 使用 /opsx-propose              开始第一个变更提案"
     }
     Write-Host "  *  在 AI IDE 中输入 `"初始化项目规范`" 让 AI 自动生成 01/03"
     Write-Host ""

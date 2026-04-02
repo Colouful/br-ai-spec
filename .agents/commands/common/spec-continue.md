@@ -10,6 +10,7 @@
 
 1. 读取返回的 `turn.actor`、`turn.mode`、`turn.summary.delivery_profile`、`turn.summary.artifact_profile`、`turn.announcements.enter`、`turn.announcements.exit`、`reads`、`writes`、`expected_output`
    若存在 `turn.guidance` 或 `turn.execution_contract`，直接按它完成当前轮次；不要再主动搜索 `.agents/roles/`、整目录 `.agents/rules/`、`openspec/config.yaml` 或 scratch 规范
+   若存在 `turn.commands`、`turn.requires_advance`、`turn.finalize_contract`，以它们为最终执行契约，不要自行拼命令
 2. 在执行当前轮次前，先原样向用户播报 `turn.announcements.enter`
 3. 只完成当前 `actor` 的职责，不允许越权
 4. 若 `turn.guidance.openspec_rules.sections` 存在，直接按这些规则补全当前 OpenSpec 产物；不要再次打开 `openspec/config.yaml`
@@ -23,14 +24,11 @@
 6. 若当前轮次存在 `turn.execution_contract`：
    - 必须先完成 `turn.execution_contract.required_artifacts`
    - 必须把合法的 `expert-execution` JSON 写到 `turn.execution_contract.write_to`
-7. 完成本轮输出后，先原样向用户播报 `turn.announcements.exit`，再执行一次：
-
-```bash
-./node_modules/.bin/ai-spec protocol-advance --target . --json
-```
+7. 完成本轮输出后，先原样向用户播报 `turn.announcements.exit`；若 `turn.requires_advance = true`，再执行 `turn.finalize_contract.advance_command`
 
 8. 重复上述步骤，直到 `turn.status` 变成 `terminal` 或 `blocked`
 9. 对用户只输出阶段语义和最终摘要，不回显原始 JSON
+10. 若用户在流程中补充新的业务要求，优先执行 `turn.finalize_contract.update_command` 或 `turn.commands.update`，让主代理先复核
 
 硬性禁止：
 

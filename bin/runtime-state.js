@@ -541,6 +541,8 @@ function buildRunState({ runPlan, taskAnchor, options, now, source }) {
       source: options.triggerSource,
       entry: options.entry,
       raw_input: rawInput,
+      latest_user_input: rawInput,
+      latest_input_at: rawInput ? createdAt : null,
     },
     task: {
       change_id: changeId,
@@ -566,12 +568,14 @@ function buildRunState({ runPlan, taskAnchor, options, now, source }) {
       artifact_profile: artifactProfile,
     },
     current_role: currentRole,
+    pending_input_update: false,
     pending_gate: pendingGate,
     artifacts,
     assumptions: Array.isArray(runPlan.assumptions) ? runPlan.assumptions : [],
     missing_inputs: runPlan.missing_inputs || [],
     warnings: runPlan.warnings || [],
     errors: runPlan.errors || [],
+    input_updates: [],
     anchor,
     events: [
       {
@@ -672,6 +676,74 @@ function saveUpdatedRunState({ historyRunPath, currentRunPath, syncCurrent, stat
   if (syncCurrent) {
     writeJsonFile(currentRunPath, state);
   }
+}
+
+function recordRunInputUpdate(options) {
+  if (!options.userInput || !String(options.userInput).trim()) {
+    throw new Error('Missing required argument: userInput');
+  }
+
+  const targetDir = path.resolve(process.cwd(), options.target || '.');
+  const { currentRunPath, historyRunPath, state, syncCurrent } = resolveRunStatePaths(targetDir, options.runId);
+
+  if (['success', 'failed', 'cancelled'].includes(String(state.status || '').toLowerCase())) {
+    throw new Error(`Cannot update terminal run: ${state.run_id}`);
+  }
+
+  const now = new Date();
+  const userInput = String(options.userInput).trim();
+  const update = {
+    at: now.toISOString(),
+    text: userInput,
+    source: options.source || 'protocol-update',
+  };
+
+  const nextInputUpdates = [...(Array.isArray(state.input_updates) ? state.input_updates : []), update].slice(-20);
+  const event = buildStateEvent({
+    state,
+    options: {
+      ...options,
+      toRole: state.current_role || state.plan?.first_handoff || null,
+      clearPendingGate: false,
+      message: `user input updated: ${userInput}`,
+    },
+    now,
+    defaults: {
+      status: state.status || 'running',
+      eventType: 'user-input-updated',
+      message: `user input updated: ${userInput}`,
+      pendingGate: state.pending_gate ?? null,
+    },
+  });
+
+  const updatedState = {
+    ...state,
+    pending_input_update: true,
+    trigger: {
+      ...(state.trigger || {}),
+      latest_user_input: userInput,
+      latest_input_at: now.toISOString(),
+    },
+    input_updates: nextInputUpdates,
+    events: [...(Array.isArray(state.events) ? state.events : []), event],
+    timestamps: {
+      ...(state.timestamps || {}),
+      updated_at: now.toISOString(),
+    },
+  };
+
+  saveUpdatedRunState({ historyRunPath, currentRunPath, syncCurrent, state: updatedState });
+
+  return {
+    status: 'success',
+    target: targetDir,
+    artifacts: {
+      current_run: syncCurrent ? currentRunPath : null,
+      run_history: historyRunPath,
+    },
+    state: updatedState,
+    update,
+  };
 }
 
 function writeRunState({ targetDir, runPlan, taskAnchor, options, source }) {
@@ -841,6 +913,7 @@ function handoffRunState(options) {
     ...state,
     status: options.status || 'running',
     current_role: options.toRole,
+    pending_input_update: false,
     pending_gate: options.clearPendingGate
       ? null
       : (Object.prototype.hasOwnProperty.call(options, 'pendingGate') ? options.pendingGate || null : state.pending_gate || null),
@@ -909,6 +982,7 @@ function approveRunState(options) {
     ...state,
     status: options.status || 'running',
     current_role: toRole,
+    pending_input_update: false,
     pending_gate: null,
     anchor,
     events: [...(Array.isArray(state.events) ? state.events : []), event],
@@ -961,6 +1035,7 @@ function resumeRunState(options) {
     ...state,
     status: options.status || 'running',
     current_role: toRole,
+    pending_input_update: false,
     pending_gate: options.clearPendingGate === false ? state.pending_gate || null : null,
     anchor,
     events: [...(Array.isArray(state.events) ? state.events : []), event],
@@ -1008,6 +1083,8 @@ function statusRunState(options) {
       status: state.status || null,
       flow_id: state.flow?.id || null,
       current_role: state.current_role || null,
+      pending_input_update: Boolean(state.pending_input_update),
+      input_update_count: Array.isArray(state.input_updates) ? state.input_updates.length : 0,
       pending_gate: state.pending_gate || null,
       updated_at: state.timestamps?.updated_at || null,
       last_event: lastEvent,
@@ -1046,6 +1123,7 @@ function gateBlockedRunState(options) {
     ...state,
     status: nextStatus,
     current_role: toRole,
+    pending_input_update: false,
     pending_gate: requestedGate,
     anchor,
     events: [...(Array.isArray(state.events) ? state.events : []), event],
@@ -1099,6 +1177,7 @@ function completeRunState(options) {
     ...state,
     status: options.status || 'success',
     current_role: toRole,
+    pending_input_update: false,
     pending_gate: null,
     anchor,
     events: [...(Array.isArray(state.events) ? state.events : []), event],
@@ -1157,6 +1236,7 @@ function failRunState(options) {
     ...state,
     status: options.status || 'failed',
     current_role: toRole,
+    pending_input_update: false,
     pending_gate: null,
     anchor,
     errors: updatedErrors,
@@ -1212,6 +1292,7 @@ function cancelRunState(options) {
     ...state,
     status: options.status || 'cancelled',
     current_role: toRole,
+    pending_input_update: false,
     pending_gate: null,
     anchor,
     events: [...(Array.isArray(state.events) ? state.events : []), event],
@@ -1531,6 +1612,7 @@ module.exports = {
   inferComplexity,
   inferArtifacts,
   buildRunState,
+  recordRunInputUpdate,
   readRunStateFile,
   resolveRunStatePaths,
   initRunState,

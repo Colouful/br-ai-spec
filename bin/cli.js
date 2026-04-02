@@ -47,6 +47,11 @@ try {
     process.exit(protocolWorkflow.main('advance', args.slice(1)));
   }
 
+  if (args[0] === 'protocol-update') {
+    const protocolWorkflow = require('./protocol-workflow');
+    process.exit(protocolWorkflow.main('update', args.slice(1)));
+  }
+
   if (args[0] === 'expert-dispatch') {
     const expertDispatch = require('./expert-dispatch');
     process.exit(expertDispatch.main(args.slice(1)));

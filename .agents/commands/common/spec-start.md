@@ -10,6 +10,7 @@
 
 1. 读取返回的 `turn.actor`、`turn.mode`、`turn.summary.delivery_profile`、`turn.summary.artifact_profile`、`turn.announcements.enter`、`turn.announcements.exit`、`reads`、`writes`、`expected_output`
    如果存在 `turn.guidance` 或 `turn.execution_contract`，以它们为准；不要再主动搜索 `.agents/roles/`、整目录 `.agents/rules/`、`openspec/config.yaml` 或 scratch 规范文件
+   如果存在 `turn.commands`、`turn.requires_advance`、`turn.finalize_contract`，以它们为最终执行契约，不要自行拼命令
 2. 在执行当前轮次前，先原样向用户播报 `turn.announcements.enter`
 3. 只完成当前 `actor` 的职责：
    - `task-orchestrator`：只做编排、假设、交接、收尾，不写业务代码
@@ -31,15 +32,12 @@
    - 必须先完成 `turn.execution_contract.required_artifacts`
    - 完成后直接执行 `turn.execution_contract.next_advance_command`
 8. 完成本轮输出后，立刻原样向用户播报 `turn.announcements.exit`
-9. 然后执行：
-
-```bash
-./node_modules/.bin/ai-spec protocol-advance --target . --json
-```
+9. 若 `turn.requires_advance = true`，优先执行 `turn.finalize_contract.advance_command`
 
 10. 读取新的 `turn`，继续下一轮；直到 `turn.status` 变成 `terminal` 或 `blocked`
 11. 对用户只输出阶段语义和最终摘要，不回显原始 JSON
 12. 若用户提供的是结构化输入模板（如 `.agents/templates/common/mock-page.md`、`new-page.md`、`new-component.md`、`bugfix.md`），优先复用其字段，减少 `missing_inputs`
+13. 若用户在执行过程中补充新的业务要求，必须优先执行 `turn.finalize_contract.update_command` 或 `turn.commands.update`，不要把新输入直接混入当前专家回执
 
 硬性禁止：
 

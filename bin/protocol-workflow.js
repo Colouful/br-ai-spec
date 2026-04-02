@@ -47,7 +47,11 @@ function parseArgs(argv) {
 }
 
 function printUsage(mode) {
-  const command = mode === 'advance' ? 'protocol-advance' : 'protocol-step';
+  const command = mode === 'advance'
+    ? 'protocol-advance'
+    : mode === 'update'
+    ? 'protocol-update'
+    : 'protocol-step';
   console.log(`Usage:
   ai-spec ${command} [target] [options]
 
@@ -110,6 +114,20 @@ function printTurn(turn) {
   console.log('expected_output:');
   for (const item of turn.expected_output || ['(none)']) {
     console.log(`  - ${item}`);
+  }
+  if (turn.commands) {
+    console.log('commands:');
+    for (const [key, value] of Object.entries(turn.commands)) {
+      console.log(`  ${key}: ${value}`);
+    }
+  }
+  console.log(`requires_advance: ${turn.requires_advance ? 'yes' : 'no'}`);
+  if (turn.finalize_contract) {
+    console.log('finalize_contract:');
+    console.log(`  required: ${turn.finalize_contract.required ? 'yes' : 'no'}`);
+    console.log(`  advance_command: ${turn.finalize_contract.advance_command || '(none)'}`);
+    console.log(`  update_command: ${turn.finalize_contract.update_command || '(none)'}`);
+    console.log(`  when: ${turn.finalize_contract.when || '(none)'}`);
   }
   if (turn.execution_contract) {
     console.log('execution_contract:');
@@ -177,6 +195,16 @@ function printStep(result) {
   printTurn(result.turn);
 }
 
+function printUpdate(result) {
+  console.log(`kind: ${result.kind}`);
+  console.log(`target: ${result.target}`);
+  console.log(`updated: ${result.updated?.status || '(none)'}`);
+  console.log(`run_id: ${result.updated?.state?.run_id || '(none)'}`);
+  console.log(`latest_user_input: ${result.updated?.state?.trigger?.latest_user_input || '(none)'}`);
+  console.log('turn:');
+  printTurn(result.turn);
+}
+
 function buildStepPreview(options) {
   return {
     kind: 'ai-protocol-step-preview',
@@ -201,6 +229,11 @@ function main(mode, argv) {
       target: options.target,
       userInput: options.userInput || null,
     })
+    : mode === 'update'
+    ? workflow.updateProtocolInput({
+      target: options.target,
+      userInput: options.userInput || null,
+    })
     : buildStepPreview(options);
 
   if (options.json) {
@@ -208,6 +241,8 @@ function main(mode, argv) {
   } else {
     if (mode === 'advance') {
       printStep(result);
+    } else if (mode === 'update') {
+      printUpdate(result);
     } else {
       printTurn(result.turn);
     }

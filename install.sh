@@ -1152,9 +1152,11 @@ print_report() {
     echo -e "     ${YELLOW}→${NC} 先在 ${BOLD}设置 → MCP${NC} 中按需打开目标服务，再编辑 JSON"
     echo -e "     ${YELLOW}→${NC} 将 ApiFox 等条目的 ${BOLD}project-id${NC}、${BOLD}access-token${NC} 等占位符换成真实值"
     echo -e "     ${YELLOW}→${NC} 不需要的服务保持关闭即可；若条目含 ${BOLD}disabled${NC}，启用前请先完成凭证配置"
+    echo -e "  4. 首次运行 ${BOLD}/spec-start${NC} / ${BOLD}/spec-continue${NC} 时，若 Cursor 提示执行 ${BOLD}ai-spec${NC} 命令"
+    echo -e "     ${YELLOW}→${NC} 请选择 ${BOLD}Always allow for this workspace${NC}，避免宿主桥命令被权限弹窗打断"
   fi
   if [ "$LEVEL" = "L3" ]; then
-    echo -e "  4. 使用 ${BOLD}/opsx-propose${NC}              开始第一个变更提案"
+    echo -e "  5. 使用 ${BOLD}/opsx-propose${NC}              开始第一个变更提案"
   fi
   echo -e "  *  在 AI IDE 中输入 \"初始化项目规范\" 让 AI 自动生成 01/03"
   echo ""

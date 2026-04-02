@@ -106,6 +106,14 @@ cd ex-ai-spec
 
 若使用 **`--level L3`**，确认已生成 **`openspec/`**（含 `config.yaml`、`changes/` 等），并阅读 [openspec-guide.md](openspec-guide.md) 跑通最小工作流。`create-proposal` 委托的 **`/opsx:propose`** 等命令依赖该目录与 OpenSpec CLI。
 
+### 4. 首次放行宿主桥命令
+
+`/spec-start`、`/spec-continue` 会在 IDE 内静默执行 `ai-spec protocol-step`、`ai-spec protocol-advance`、`ai-spec protocol-update`。
+
+- 首次弹出终端权限确认时，请选择 **Always allow for this workspace**
+- 如果误点拒绝，请到 IDE 的终端权限设置里重置该工作区授权
+- AI 侧默认走 `--json` 协议输出，不需要人工去解析终端文本
+
 ### L3 最简操作流程（命令速查）
 
 1. **创建提案**：**Cursor** 用 `/opsx-propose [名称或描述]`；**Claude Code** 等用 `/opsx:propose [名称或描述]`。自然语言如「帮我创建一个变更提案」会先走 `create-proposal` 前置分析，再委托上述命令生成产物。
