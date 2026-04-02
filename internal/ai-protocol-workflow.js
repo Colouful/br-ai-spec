@@ -24,6 +24,13 @@ const CONTINUE_INSTRUCTION_FILES = [];
 const DISPATCH_INSTRUCTION_FILES = [];
 
 const ROLE_RULE_HINTS = {
+  'task-orchestrator': [
+    '.agents/rules/01-项目概述.md',
+    '.agents/rules/03-项目结构.md',
+    '.agents/rules/05-API规范.md',
+    '.agents/rules/06-路由规范.md',
+    '.agents/rules/09-样式规范.md',
+  ],
   'requirement-analyst': [
     '.agents/rules/01-项目概述.md',
     '.agents/rules/03-项目结构.md',
@@ -97,6 +104,7 @@ const RULE_FILE_CANDIDATES = {
 };
 
 const ROLE_RULE_FILE_KEYS = {
+  'task-orchestrator': ['overview', 'structure', 'api', 'route', 'style'],
   'requirement-analyst': ['overview', 'structure', 'api', 'route', 'style'],
   'frontend-implementer': ['structure', 'component', 'route', 'api', 'state', 'style'],
   'code-guardian': ['coding', 'api', 'route', 'style', 'test', 'format', 'audit'],
@@ -160,6 +168,16 @@ const ROLE_OPENSPEC_RULE_SECTIONS = {
 };
 
 const MICRO_ROLE_EXTRAS = {
+  'task-orchestrator': {
+    goal: '用最小 run-plan 编排微型任务，保留三专家但收口产物和说明。',
+    must_do: [
+      '明确 delivery_profile=micro 与 artifact_profile=compact',
+      '优先按仓库现状复用目录、路由、mock 和样式承载方式',
+    ],
+    must_not: [
+      '不要为了微型任务扩展额外专家或发明新流程',
+    ],
+  },
   'requirement-analyst': {
     goal: '用短版 proposal.md 和 tasks.md 收敛需求，不写实现代码。',
     must_do: [
@@ -214,6 +232,18 @@ const MICRO_OPENSPEC_RULES = {
 };
 
 const ROLE_GUIDANCE = {
+  'task-orchestrator': {
+    goal: '基于项目事实编排流程、门禁和专家交接，不直接承担具体实现。',
+    must_do: [
+      '先看项目现状、规则和风险，再决定交付档位、门禁和第一跳专家',
+      '将仓库可推断的事实转成 assumptions 或 routing constraints，而不是重复回问用户',
+      '对高风险和审批场景明确给出下一步，不允许隐式放行',
+    ],
+    must_not: [
+      '不要越权替代 requirement-analyst、frontend-implementer 或 code-guardian 的职责',
+      '不要在 proposal/tasks/checklist/iterations 缺失时跳过门禁直接推进',
+    ],
+  },
   'requirement-analyst': {
     goal: '把需求收敛成可执行的 proposal.md 和 tasks.md，不写实现代码。',
     must_do: [
@@ -269,6 +299,15 @@ const SKILL_GUIDANCE = {
 
 const ROLE_RULE_CONSTRAINTS = {
   default: {
+    'task-orchestrator': {
+      must_follow: [
+        '首轮编排必须优先吸收仓库现状与规则，再决定 flow、delivery_profile 和人工确认点。',
+        '能从仓库结构、项目规则推断的路由/API/mock/样式事实，优先转成 assumptions 或 routing constraints。',
+      ],
+      blocked_when: [
+        '高风险领域的流程、安全、合规、风控或权限边界仍未确认时，不得放行到 frontend-implementer。',
+      ],
+    },
     'requirement-analyst': {
       must_follow: [
         '先把项目定位、目录落点、路由/API/样式约定吸收到 proposal/tasks，不要把规范已明确的信息重复写成 missing_inputs。',
@@ -298,6 +337,18 @@ const ROLE_RULE_CONSTRAINTS = {
     },
   },
   vue: {
+    'task-orchestrator': {
+      must_follow: [
+        'Vue 页面类任务优先以 src/views、src/router/modules、src/api、src/api/types、src/style.css 等当前仓库落点编排。',
+        '若仓库缺少 vue-router 或请求层骨架，要先把“补骨架还是保持占位入口”写进编排约束。',
+        'mock-first、真实接口、Pinia/store 与主题变量策略需要在首轮编排时明确，不留到实现阶段临时猜。'
+      ],
+      repo_specific: (facts) => [
+        facts.routeEntry ? `当前路由入口为 ${facts.routeEntry}，优先按现有路由骨架编排。` : '仓库尚未检测到路由入口；页面类任务需先明确补路由骨架还是保留占位入口。',
+        facts.apiDir ? `当前 API 目录为 ${facts.apiDir}${facts.apiTypesDir ? `，类型目录为 ${facts.apiTypesDir}` : ''}。` : '仓库尚未检测到 API 模块目录；真实接口任务需先明确请求层承载方式。',
+        facts.styleEntry ? `当前样式入口为 ${facts.styleEntry}，需沿用主题变量与现有样式承载方式。` : null,
+      ].filter(Boolean),
+    },
     'requirement-analyst': {
       must_follow: [
         '页面任务优先对齐 src/views/<page>/index.vue 与 src/router/modules/<module>.ts 的落点约定。',
@@ -591,6 +642,191 @@ function buildProjectContextGuidance(targetDir, projectProfile, runState = null)
     mock_strategy: mockStrategy,
     style_system: facts.styleEntry ? `样式入口 ${facts.styleEntry}` : '未检测到显式样式入口',
     context_source: facts.projectContextPath || null,
+  };
+}
+
+function inferRoutingStrategy(repoConventions, rawInput) {
+  const text = String(rawInput || '');
+  if (repoConventions.routeEntry) {
+    return repoConventions.routeModulesDir
+      ? `复用现有路由入口 ${repoConventions.routeEntry} 与模块目录 ${repoConventions.routeModulesDir}`
+      : `复用现有路由入口 ${repoConventions.routeEntry}`;
+  }
+  if (/页面|列表|详情|欢迎|登录|路由|router|page/i.test(text)) {
+    return '仓库未检测到显式路由入口；页面类任务需先补路由骨架或在 proposal/tasks 中明确占位入口方案';
+  }
+  return '当前任务不强依赖新增路由，优先保持现有入口结构';
+}
+
+function inferApiStrategy(repoConventions, rawInput) {
+  const text = String(rawInput || '');
+  if (repoConventions.requestConfig) {
+    return `复用请求入口 ${repoConventions.requestConfig}${repoConventions.apiDir ? `，并沿用 ${repoConventions.apiDir}` : ''} 进行模块拆分`;
+  }
+  if (repoConventions.apiDir) {
+    return `沿用 ${repoConventions.apiDir}${repoConventions.apiTypesDir ? ` + ${repoConventions.apiTypesDir}` : ''} 进行接口与类型拆分`;
+  }
+  if (/接口|api|请求|分页|搜索|筛选|状态|重试|支付|订单|用户/i.test(text)) {
+    return '仓库尚未检测到稳定 API 封装入口；真实接口任务需先建立请求层或在 proposal/tasks 中明确占位方案';
+  }
+  return '当前任务不强依赖真实接口，优先保持最小数据流';
+}
+
+function inferMockStrategy(repoConventions, rawInput) {
+  const text = String(rawInput || '');
+  if (repoConventions.mockDir) {
+    return /mock|演示|占位/i.test(text)
+      ? `优先沿用 ${repoConventions.mockDir} 承载演示数据`
+      : `${repoConventions.mockDir} 可作为 mock-first 兜底方案`;
+  }
+  if (/mock|演示|占位/i.test(text)) {
+    return '仓库未检测到独立 mock 目录；若采用演示版，需要在 proposal/tasks 中明确本地 mock 或页面内占位方案';
+  }
+  return '未显式声明 mock-first，按真实接口交付评估';
+}
+
+function inferStateStrategy(repoConventions) {
+  if (repoConventions.storeModulesDir) {
+    return `全局状态沿用 ${repoConventions.storeModulesDir}，避免重复造轮子`;
+  }
+  return '未检测到全局状态目录；优先本地状态，避免预建复杂 store';
+}
+
+function inferStyleStrategy(repoConventions) {
+  if (repoConventions.styleEntry) {
+    return `样式沿用 ${repoConventions.styleEntry} 与主题变量体系`;
+  }
+  return '仓库未检测到显式样式入口；需先确认主题变量与样式承载方式';
+}
+
+function inferRiskDrivers(rawInput, repoConventions) {
+  const text = String(rawInput || '');
+  const drivers = [];
+  const patterns = [
+    { pattern: /支付|收款|交易|退款|psp/i, label: '支付/交易域' },
+    { pattern: /登录|认证|oauth|权限|短信|验证码|token/i, label: '认证/权限域' },
+    { pattern: /安全|风控|合规|敏感|审计/i, label: '安全/风控/合规域' },
+    { pattern: /先不说|暂未|未确定|待定|后续补/i, label: '关键约束尚未确认' },
+  ];
+  for (const item of patterns) {
+    if (item.pattern.test(text)) {
+      drivers.push(item.label);
+    }
+  }
+  if (!repoConventions.routeEntry && /页面|列表|详情|欢迎|登录|路由|router|page/i.test(text)) {
+    drivers.push('页面任务但仓库未检测到显式路由入口');
+  }
+  if (!repoConventions.requestConfig && !repoConventions.apiDir && /接口|api|请求|分页|搜索|筛选|状态|重试/i.test(text)) {
+    drivers.push('接口任务但仓库未检测到稳定 API 封装入口');
+  }
+  return [...new Set(drivers)];
+}
+
+function buildOrchestratorGuidance(targetDir, runState = null, userInput = null) {
+  const projectProfile = detectProjectProfile(targetDir);
+  const repoConventions = collectRepoConventions(targetDir, projectProfile);
+  const rawInput = userInput || runState?.trigger?.latest_user_input || runState?.trigger?.raw_input || null;
+  const riskLevel = runState?.task?.risk_level || inferRiskLevel({
+    rawInput,
+    taskType: null,
+    deliveryProfile: runState?.delivery_profile || null,
+    flowId: runState?.flow?.id || 'prd-to-delivery',
+  });
+  const deliveryProfile = runState?.delivery_profile || inferDeliveryProfile({
+    rawInput,
+    taskType: null,
+    riskLevel,
+    flowId: 'prd-to-delivery',
+  });
+  const artifactProfile = runState?.artifact_profile || inferArtifactProfile({
+    deliveryProfile,
+  });
+  const complexity = runState?.complexity || runState?.task?.complexity || inferComplexity({
+    deliveryProfile,
+    riskLevel,
+  });
+  const projectContextGuidance = buildProjectContextGuidance(targetDir, projectProfile, {
+    ...(runState || {}),
+    delivery_profile: deliveryProfile,
+    artifact_profile: artifactProfile,
+  });
+  const roleRuleContract = buildRoleRuleContract(
+    targetDir,
+    'task-orchestrator',
+    deliveryProfile,
+    projectProfile,
+    repoConventions,
+  );
+  const riskDrivers = inferRiskDrivers(rawInput, repoConventions);
+  const pendingGate = runState?.pending_gate || null;
+  const expectedGate = pendingGate || (riskLevel === 'high' ? 'before-implementation' : null);
+  const requiredArtifacts = ['proposal.md', 'tasks.md', 'checklist.md', 'iterations.md'];
+
+  return {
+    project_context: projectContextGuidance,
+    repo_conventions: buildRepoConventionGuidance(repoConventions),
+    role: buildRoleGuidance('task-orchestrator', deliveryProfile),
+    role_rule_contract: roleRuleContract,
+    routing_constraints: {
+      selected_flow: runState?.flow?.id || 'prd-to-delivery',
+      required_experts: ['requirement-analyst', 'frontend-implementer', 'code-guardian'],
+      first_handoff: 'requirement-analyst',
+      route_strategy: inferRoutingStrategy(repoConventions, rawInput),
+      api_strategy: inferApiStrategy(repoConventions, rawInput),
+      mock_strategy: inferMockStrategy(repoConventions, rawInput),
+      state_strategy: inferStateStrategy(repoConventions),
+      style_strategy: inferStyleStrategy(repoConventions),
+      route_bootstrap_required: Boolean(!repoConventions.routeEntry && /页面|列表|详情|欢迎|登录|路由|router|page/i.test(String(rawInput || ''))),
+    },
+    risk_contract: {
+      risk_level: riskLevel,
+      complexity,
+      drivers: riskDrivers,
+      before_implementation_gate: riskLevel === 'high' ? 'before-implementation' : null,
+      manual_confirmation_required: riskLevel === 'high',
+      escalation_rule: riskLevel === 'high'
+        ? '需求收敛后必须进入 before-implementation 审批门禁，再决定是否放行实现'
+        : '按三专家协同自动推进，必要时仅在异常或门禁场景下阻断',
+    },
+    approval_contract: {
+      gates: ['before-implementation', 'before-delivery'],
+      pending_gate: pendingGate,
+      expected_gate: expectedGate,
+      required_when: [
+        '支付、认证、权限、安全、风控、合规等高风险领域',
+        '关键流程或约束仍未确认，继续实现会显著放大返工成本',
+      ],
+      approve_resume_to_role: expectedGate === 'before-implementation' ? 'frontend-implementer' : null,
+      approval_examples: [
+        '我同意按当前 proposal 的范围继续实现',
+        '按演示版范围继续推进',
+        '批准当前提案，继续到实现阶段',
+      ],
+    },
+    orchestration_contract: {
+      selected_flow: runState?.flow?.id || 'prd-to-delivery',
+      delivery_profile: deliveryProfile,
+      artifact_profile: artifactProfile,
+      change_id: runState?.task?.change_id || null,
+      required_experts: ['requirement-analyst', 'frontend-implementer', 'code-guardian'],
+      required_artifacts: requiredArtifacts,
+      assumptions_policy: [
+        '仓库结构、项目规则和现有代码可推断的信息优先转成 assumptions',
+        '只在高风险、不可逆或规则冲突时把缺口升级为审批或阻断',
+      ],
+      missing_inputs_policy: [
+        '规范中已明确、仓库中已存在的事实不要重复标成 missing_inputs',
+        '高风险且无法可靠推断的边界必须显式升级为审批点',
+      ],
+      handoff_policy: 'task-orchestrator -> requirement-analyst -> frontend-implementer -> code-guardian -> terminal',
+      completion_policy: 'proposal/tasks/checklist/iterations 四类核心产物缺一不可',
+      repo_alignment: [
+        repoConventions.viewsDir ? `页面目录优先对齐 ${repoConventions.viewsDir}` : '页面目录需先与仓库结构对齐',
+        repoConventions.routeEntry ? `路由入口优先对齐 ${repoConventions.routeEntry}` : '未检测到路由入口时，页面任务需先明确骨架方案',
+        repoConventions.apiDir ? `API 模块优先对齐 ${repoConventions.apiDir}` : '真实接口任务需先明确 API 承载方式',
+        repoConventions.styleEntry ? `样式入口优先对齐 ${repoConventions.styleEntry}` : '样式承载方式需先明确',
+      ],
+    },
   };
 }
 
@@ -1422,6 +1658,17 @@ function buildStartTurn(targetDir, userInput) {
     deliveryProfile,
     riskLevel,
   });
+  const orchestratorGuidance = buildOrchestratorGuidance(targetDir, {
+    delivery_profile: deliveryProfile,
+    artifact_profile: artifactProfile,
+    complexity,
+    task: {
+      risk_level: riskLevel,
+    },
+    flow: {
+      id: 'prd-to-delivery',
+    },
+  }, userInput);
 
   return attachProtocolContracts(attachActorPresentation({
     kind: 'ai-protocol-turn',
@@ -1462,6 +1709,7 @@ function buildStartTurn(targetDir, userInput) {
       `写入 ${runtimePaths.tmpTaskOrchestratorTurn.relPath}`,
     ],
     guidance: {
+      ...orchestratorGuidance,
       routing: {
         selected_flow: 'prd-to-delivery',
         delivery_profile: deliveryProfile,
@@ -1533,6 +1781,11 @@ function buildDispatchTurn(targetDir, status, currentArtifacts) {
 
 function buildContinueTurn(targetDir, status, currentArtifacts) {
   const runtimePaths = resolveRuntimePaths(targetDir);
+  const orchestratorGuidance = buildOrchestratorGuidance(
+    targetDir,
+    currentArtifacts.run,
+    currentArtifacts.run?.trigger?.latest_user_input || currentArtifacts.run?.trigger?.raw_input || null,
+  );
   const expectedOutput = currentArtifacts.run?.pending_gate
     ? ['基于当前审批点产出最小 runtime-action']
     : ['基于当前专家执行结果产出最小 runtime-action'];
@@ -1581,6 +1834,7 @@ function buildContinueTurn(targetDir, status, currentArtifacts) {
     ],
     expected_output: expectedOutput,
     guidance: {
+      ...orchestratorGuidance,
       orchestrator_contract: {
         kind: 'task-orchestrator-runtime-action',
         write_to: runtimePaths.tmpTaskOrchestratorTurn.relPath,
@@ -1599,6 +1853,11 @@ function buildContinueTurn(targetDir, status, currentArtifacts) {
 
 function buildApprovalGateTurn(targetDir, status, currentArtifacts) {
   const pendingGate = currentArtifacts.run?.pending_gate || null;
+  const orchestratorGuidance = buildOrchestratorGuidance(
+    targetDir,
+    currentArtifacts.run,
+    currentArtifacts.run?.trigger?.latest_user_input || currentArtifacts.run?.trigger?.raw_input || null,
+  );
   const resumeRole = pendingGate === 'before-implementation'
     ? 'frontend-implementer'
     : currentArtifacts.run?.current_role || null;
@@ -1650,6 +1909,7 @@ function buildApprovalGateTurn(targetDir, status, currentArtifacts) {
       `收到明确批准意见后，先记录审批说明，再让用户重新执行 /spec-continue 恢复到 ${resumeRole || '下一位专家'}`,
     ],
     guidance: {
+      ...orchestratorGuidance,
       approval_gate: {
         gate: pendingGate,
         status: 'waiting-approval',
@@ -1682,6 +1942,7 @@ function buildUpdateReviewTurn(targetDir, status, currentArtifacts) {
     ? currentArtifacts.run.input_updates.slice(-3)
     : [];
   const latestInput = currentArtifacts.run?.trigger?.latest_user_input || null;
+  const orchestratorGuidance = buildOrchestratorGuidance(targetDir, currentArtifacts.run, latestInput);
   const pendingGate = currentArtifacts.run?.pending_gate || null;
   const approvalIntent = pendingGate ? looksLikeApprovalInput(latestInput) : false;
   const reads = [
@@ -1747,8 +2008,9 @@ function buildUpdateReviewTurn(targetDir, status, currentArtifacts) {
           '吸收新的用户输入并更新当前假设、边界或交接策略',
           '若补充输入会影响当前阶段，优先产出最小 runtime-action 或 gate 结论',
           '处理完成后清除 pending_input_update 标记',
-        ],
+    ],
     guidance: {
+      ...orchestratorGuidance,
       approval_gate: pendingGate
         ? {
             gate: pendingGate,

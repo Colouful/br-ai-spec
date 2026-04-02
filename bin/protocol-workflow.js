@@ -160,6 +160,31 @@ function printTurn(turn) {
       console.log(`guidance.routing.artifact_profile: ${turn.guidance.routing.artifact_profile || '(none)'}`);
       console.log(`guidance.routing.complexity: ${turn.guidance.routing.complexity || '(none)'}`);
     }
+    if (turn.guidance.routing_constraints) {
+      console.log(`guidance.routing_constraints.first_handoff: ${turn.guidance.routing_constraints.first_handoff || '(none)'}`);
+      console.log(`guidance.routing_constraints.route_strategy: ${turn.guidance.routing_constraints.route_strategy || '(none)'}`);
+      console.log(`guidance.routing_constraints.api_strategy: ${turn.guidance.routing_constraints.api_strategy || '(none)'}`);
+    }
+    if (turn.guidance.risk_contract) {
+      console.log(`guidance.risk_contract.risk_level: ${turn.guidance.risk_contract.risk_level || '(none)'}`);
+      if (Array.isArray(turn.guidance.risk_contract.drivers) && turn.guidance.risk_contract.drivers.length > 0) {
+        console.log('guidance.risk_contract.drivers:');
+        for (const item of turn.guidance.risk_contract.drivers) {
+          console.log(`  - ${item}`);
+        }
+      }
+    }
+    if (turn.guidance.approval_contract) {
+      console.log(`guidance.approval_contract.expected_gate: ${turn.guidance.approval_contract.expected_gate || '(none)'}`);
+      console.log(`guidance.approval_contract.pending_gate: ${turn.guidance.approval_contract.pending_gate || '(none)'}`);
+    }
+    if (turn.guidance.orchestration_contract) {
+      console.log(`guidance.orchestration_contract.handoff_policy: ${turn.guidance.orchestration_contract.handoff_policy || '(none)'}`);
+      console.log('guidance.orchestration_contract.required_experts:');
+      for (const item of turn.guidance.orchestration_contract.required_experts || []) {
+        console.log(`  - ${item}`);
+      }
+    }
     if (turn.guidance.role?.goal) {
       console.log(`guidance.goal: ${turn.guidance.role.goal}`);
     }

@@ -75,6 +75,12 @@ function main() {
   assert.strictEqual(workflow.turn.mode, 'start');
   assert.strictEqual(workflow.turn.actor.id, 'task-orchestrator');
   assert.strictEqual(workflow.turn.command, '/spec-start');
+  assert.strictEqual(workflow.turn.guidance.project_context.framework, 'vue');
+  assert.strictEqual(workflow.turn.guidance.repo_conventions.route_modules_dir, 'src/router/modules');
+  assert.strictEqual(workflow.turn.guidance.routing_constraints.first_handoff, 'requirement-analyst');
+  assert.ok(workflow.turn.guidance.routing_constraints.route_strategy.includes('src/router/index.ts'));
+  assert.ok(workflow.turn.guidance.orchestration_contract.required_experts.includes('code-guardian'));
+  assert.ok(workflow.turn.guidance.role_rule_contract.source_rules.some((item) => item.path.includes('01-项目概述.md')));
   assert.deepStrictEqual(listTurnTargets(workflow.turn), ['.ai-spec/internal/tmp/task-orchestrator-turn.json']);
 
   copyFixture(targetDir, 'task-orchestrator-bootstrap-reply.md', 'task-orchestrator-turn.json');
