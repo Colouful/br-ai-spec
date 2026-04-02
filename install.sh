@@ -15,6 +15,7 @@ RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; BLUE='\033[0;34m'; BO
 IDE_DIRS=(claude cursor opencode trae)
 PROJECT_SPECIFIC_RULES=("01-项目概述.md" "03-项目结构.md")
 AVAILABLE_PROFILES=("react" "vue")
+IDE_AUTOLINK_EXCLUDED_SKILLS=("using-superpowers")
 
 NODE_MIN_VERSION=18
 PKG_MANAGER=""
@@ -138,6 +139,15 @@ retry_failed_global_installs() {
 # ---- 平台检测 ----
 is_windows() {
   [[ "${OSTYPE:-}" == msys* || "${OSTYPE:-}" == cygwin* || "${OSTYPE:-}" == mingw* ]]
+}
+
+ide_skill_excluded() {
+  local skill_name="$1"
+  local excluded
+  for excluded in "${IDE_AUTOLINK_EXCLUDED_SKILLS[@]}"; do
+    [ "$excluded" = "$skill_name" ] && return 0
+  done
+  return 1
 }
 
 # ---- 创建目录链接（跨平台） ----
@@ -838,8 +848,13 @@ create_ide_links() {
       [ -d "$skill_dir" ] || continue
       local skill_name; skill_name="$(basename "$skill_dir")"
       [ "$skill_name" = "common" ] || [ "$skill_name" = "profiles" ] && continue
-      local link_target="../../.agents/skills/$skill_name"
       local link_path="$ide_dir/skills/$skill_name"
+      if ide_skill_excluded "$skill_name"; then
+        [ -L "$link_path" ] && rm -f "$link_path"
+        [ -e "$link_path" ] && rm -rf "$link_path"
+        continue
+      fi
+      local link_target="../../.agents/skills/$skill_name"
       if [ -L "$link_path" ]; then
         local current_target; current_target="$(readlink "$link_path")" || true
         [ "$current_target" = "$link_target" ] && continue

@@ -129,6 +129,15 @@ function printTurn(turn) {
     console.log(`  update_command: ${turn.finalize_contract.update_command || '(none)'}`);
     console.log(`  when: ${turn.finalize_contract.when || '(none)'}`);
   }
+  if (turn.guidance?.approval_gate) {
+    console.log('approval_gate:');
+    console.log(`  gate: ${turn.guidance.approval_gate.gate || '(none)'}`);
+    console.log(`  status: ${turn.guidance.approval_gate.status || '(none)'}`);
+    console.log(`  required_user_action: ${turn.guidance.approval_gate.required_user_action || '(none)'}`);
+    console.log(`  blocked_rule: ${turn.guidance.approval_gate.blocked_rule || '(none)'}`);
+    console.log(`  resume_to_role: ${turn.guidance.approval_gate.resume_to_role || '(none)'}`);
+    console.log(`  resume_rule: ${turn.guidance.approval_gate.resume_rule || turn.guidance.approval_gate.next_step || '(none)'}`);
+  }
   if (turn.execution_contract) {
     console.log('execution_contract:');
     console.log(`  kind: ${turn.execution_contract.kind || '(none)'}`);

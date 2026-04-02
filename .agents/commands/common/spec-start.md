@@ -14,7 +14,8 @@
 
 然后只按返回的 `turn` 执行：
 
-1. 若存在 `turn.enforcement`，先完全遵守它；尤其是 `execute_current_command_first`、`allowed_actor`、`allow_code_write`、`forbidden_skills`
+1. 若存在 `turn.enforcement`，先完全遵守它；尤其是 `allowed_actor`、`allow_code_write`、`forbidden_skills`
+   若 `execute_current_command_first = true`，才需要先执行 `turn.enforcement.current_command`
 2. 原样向用户播报 `turn.announcements.enter`
 3. 只读取 `turn.reads`，只写 `turn.writes`
 4. 若存在 `turn.guidance`、`turn.execution_contract`、`turn.commands`、`turn.finalize_contract`，以它们为最终执行契约，不要自行拼命令，不要自行补流程
@@ -28,4 +29,16 @@
 12. `advance` 返回后，直接读取返回结果里的下一个 `turn` 并继续；不要 `sleep`、`tail`、`timeout`、`cat` 日志，也不要额外重跑 `protocol-step`
 13. 重复直到 `turn.status = terminal | blocked`
 
+若 `turn.status = blocked` 且存在 `turn.summary.pending_gate`：
+- 明确告诉用户：当前停在该审批门禁，尚未批准，不能继续实现
+- 若存在 `turn.guidance.approval_gate.user_report_contract`，严格按它输出极简摘要：
+  只保留“当前状态 / 关键原因 / 下一步”，不要写长篇阶段说明，不要罗列 proposal/tasks 或仓库文件路径
+- 不要继续执行 `advance`
+- 若用户随后给出明确批准意见，先执行 `turn.commands.update` 记录审批说明，再让用户重新执行 `/spec-continue`
+
 对用户只输出阶段语义和最终摘要，不回显 scratch JSON。
+若 `delivery_profile = micro`，最终摘要严格服从 `turn.finalize_contract.user_report` 与 `turn.finalize_contract.user_report_contract`：
+- 不超过 6 行
+- 只保留交付结论、验证结果、残留风险
+- 不重复转述 `checklist.md`、`iterations.md`
+- 不逐条罗列 created/updated 文件或 OpenSpec 文件名

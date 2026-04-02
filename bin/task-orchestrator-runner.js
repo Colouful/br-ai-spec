@@ -438,6 +438,10 @@ function buildStatus(targetDir) {
 }
 
 function archiveConsumedInput(targetDir, filePath, kind) {
+  if (!fs.existsSync(filePath)) {
+    return null;
+  }
+
   if (!shouldPersistHistory()) {
     fs.unlinkSync(filePath);
     return null;
@@ -634,6 +638,8 @@ function validatePreImplementationGate(targetDir, currentRun, executionPayload) 
   }
 
   const deliveryProfile = currentRun.delivery_profile || 'standard';
+  const riskLevel = String(currentRun.task?.risk_level || '').trim().toLowerCase();
+  const rawInput = String(currentRun.trigger?.raw_input || '');
   const proposalPath = currentRun.artifacts?.proposal
     ? path.join(targetDir, currentRun.artifacts.proposal)
     : null;
@@ -656,6 +662,24 @@ function validatePreImplementationGate(targetDir, currentRun, executionPayload) 
   const proposalContent = fs.readFileSync(proposalPath, 'utf8').trim();
   const tasksContent = fs.readFileSync(tasksPath, 'utf8').trim();
   const taskItems = listMarkdownBullets(tasksContent);
+
+  if (riskLevel === 'high') {
+    reasons.push('当前任务涉及支付/认证/安全/合规等高风险领域，进入实现前必须人工审批');
+  }
+
+  if (/先不说|先不提供|暂不说|暂不提供|暂未确定|未明确|待定|后续再说|后面再说/.test(rawInput)) {
+    reasons.push('原始需求已明确存在未说明的关键流程或安全约束，进入实现前必须人工审批');
+  }
+
+  const missingInputs = Array.isArray(currentRun.missing_inputs)
+    ? currentRun.missing_inputs.map((item) => String(item || ''))
+    : [];
+  if (
+    riskLevel === 'high' &&
+    missingInputs.some((item) => /支付|认证|oauth|短信|权限|安全|合规|风控|收款|交易/.test(item))
+  ) {
+    reasons.push('高风险任务仍存在关键缺失输入，进入实现前必须人工审批');
+  }
 
   if (deliveryProfile === 'micro') {
     if (proposalContent.length < 60) {
@@ -786,10 +810,27 @@ function buildAutoDispatch(targetDir, currentRun) {
   const transition = FLOW_RUNTIME_TRANSITIONS[currentRun.flow?.id || '']?.[roleId] || null;
   const role = loadRoleMetadata(targetDir, roleId);
   const artifactProfile = currentRun.artifact_profile || 'full';
+  const deliveryProfile = currentRun.delivery_profile || null;
   const expectedOutput = ROLE_EXPECTED_OUTPUTS[roleId]?.[artifactProfile] || ROLE_EXPECTED_OUTPUTS[roleId]?.full || [];
+  const immediateNextRole = transition?.action === 'handoff'
+    ? transition.to_role || null
+    : transition?.next_role || null;
   const nextRole = currentRun.anchor?.stage?.next_role !== undefined
     ? currentRun.anchor?.stage?.next_role
-    : transition?.next_role || null;
+    : immediateNextRole;
+  const preferredSkills = Array.isArray(role.preferred_skills)
+    ? role.preferred_skills.filter((id) => {
+        if (deliveryProfile !== 'micro') {
+          return true;
+        }
+        const microAllowlist = {
+          'requirement-analyst': new Set(['create-proposal', 'design-analysis']),
+          'frontend-implementer': new Set(['create-view', 'create-component', 'create-route', 'theme-variables']),
+          'code-guardian': new Set(['ui-verification', 'web-design-guidelines']),
+        };
+        return microAllowlist[roleId]?.has(id) ?? true;
+      })
+    : [];
 
   return {
     schema_version: 1,
@@ -806,13 +847,13 @@ function buildAutoDispatch(targetDir, currentRun) {
     },
     execution: {
       profile: inferProjectProfile(targetDir),
-      delivery_profile: currentRun.delivery_profile || null,
+      delivery_profile: deliveryProfile,
       artifact_profile: currentRun.artifact_profile || null,
       current_role: roleId,
       next_role: nextRole,
       pending_gate: currentRun.pending_gate || null,
       expected_output: expectedOutput,
-      skills: role.preferred_skills.map((id) => ({ id })),
+      skills: preferredSkills.map((id) => ({ id })),
     },
     anchor: buildTaskAnchorForRole(currentRun, roleId, nextRole),
     instructions: {

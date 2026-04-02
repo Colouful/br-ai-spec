@@ -219,6 +219,36 @@ function deriveChangeId({ explicitChangeId, rawInput, taskType, runId }) {
   return `${normalizedTaskType}-${normalizedRunId}`.slice(0, 96);
 }
 
+const FLOW_APPROVAL_RESUME_ROLE_HINTS = {
+  'prd-to-delivery': {
+    'requirement-analyst': 'frontend-implementer',
+    'frontend-implementer': 'code-guardian',
+    'code-guardian': 'code-guardian',
+  },
+};
+
+function inferApprovalResumeRole(state, options = {}) {
+  if (options.toRole || options.nextRole) {
+    return options.toRole || options.nextRole;
+  }
+
+  const anchorNextRole = state.anchor?.stage?.next_role || null;
+  if (anchorNextRole) {
+    return anchorNextRole;
+  }
+
+  const flowId = state.flow?.id || null;
+  const currentRole = state.current_role || null;
+  const hintedRole = flowId && currentRole
+    ? FLOW_APPROVAL_RESUME_ROLE_HINTS[flowId]?.[currentRole] || null
+    : null;
+  if (hintedRole) {
+    return hintedRole;
+  }
+
+  return state.current_role || state.anchor?.stage?.current_role || state.plan?.first_handoff || null;
+}
+
 const MICRO_TASK_TYPES = new Set([
   'page-development',
   'component-development',
@@ -262,6 +292,72 @@ const STANDARD_INPUT_PATTERNS = [
   /合规/,
   /安全/,
 ];
+
+const HIGH_RISK_INPUT_PATTERNS = [
+  /支付/,
+  /认证/,
+  /oauth/i,
+  /短信/,
+  /权限/,
+  /安全/,
+  /合规/,
+  /风控/,
+  /收款/,
+  /交易/,
+];
+
+const DEFERRED_DETAIL_PATTERNS = [
+  /先不说/,
+  /先不提供/,
+  /暂不说/,
+  /暂不提供/,
+  /暂未确定/,
+  /未明确/,
+  /待定/,
+  /后续再说/,
+  /后面再说/,
+];
+
+function inferRiskLevel({ explicitRiskLevel, rawInput, taskType, deliveryProfile }) {
+  const normalizedExplicit = String(explicitRiskLevel || '').trim().toLowerCase();
+  if (normalizedExplicit === 'low' || normalizedExplicit === 'medium' || normalizedExplicit === 'high') {
+    return normalizedExplicit;
+  }
+
+  let score = 0;
+  const input = String(rawInput || '');
+  const normalizedTaskType = String(taskType || '').trim().toLowerCase();
+
+  if (deliveryProfile === 'standard') {
+    score += 1;
+  }
+
+  if (normalizedTaskType.includes('payment') || normalizedTaskType.includes('auth') || normalizedTaskType.includes('security')) {
+    score += 2;
+  }
+
+  for (const pattern of HIGH_RISK_INPUT_PATTERNS) {
+    if (pattern.test(input)) {
+      score += 2;
+      break;
+    }
+  }
+
+  for (const pattern of DEFERRED_DETAIL_PATTERNS) {
+    if (pattern.test(input)) {
+      score += 2;
+      break;
+    }
+  }
+
+  if (score >= 4) {
+    return 'high';
+  }
+  if (score >= 2) {
+    return 'medium';
+  }
+  return 'low';
+}
 
 function inferDeliveryProfile({ explicitProfile, flowId, taskType, rawInput, riskLevel }) {
   const normalizedExplicit = String(explicitProfile || '').trim().toLowerCase();
@@ -498,6 +594,12 @@ function buildRunState({ runPlan, taskAnchor, options, now, source }) {
     rawInput,
     riskLevel: runPlan.task?.risk_level || null,
   });
+  const riskLevel = inferRiskLevel({
+    explicitRiskLevel: runPlan.task?.risk_level || null,
+    rawInput,
+    taskType: runPlan.task?.type || null,
+    deliveryProfile,
+  });
   const artifactProfile = inferArtifactProfile({
     explicitProfile: runPlan.artifact_profile || runPlan.plan?.artifact_profile || null,
     deliveryProfile,
@@ -505,14 +607,18 @@ function buildRunState({ runPlan, taskAnchor, options, now, source }) {
   const complexity = inferComplexity({
     explicitComplexity: runPlan.complexity || runPlan.task?.complexity || null,
     deliveryProfile,
-    riskLevel: runPlan.task?.risk_level || null,
+    riskLevel,
   });
   const artifacts = mergeArtifacts(buildDefaultArtifacts(changeId), inferArtifacts(runPlan.artifacts));
   const currentRole = runPlan.plan?.first_handoff || null;
   const approvalGates = Array.isArray(runPlan.plan?.approval_gates)
     ? runPlan.plan.approval_gates
     : [];
-  const pendingGate = approvalGates.length > 0 ? approvalGates[0] : null;
+  const pendingGate =
+    options.pendingGate ||
+    runPlan.pending_gate ||
+    runPlan.plan?.pending_gate ||
+    null;
   const sanitizedAnchor = sanitizeAnchor(taskAnchor);
   const anchor = sanitizedAnchor
     ? {
@@ -547,7 +653,7 @@ function buildRunState({ runPlan, taskAnchor, options, now, source }) {
     task: {
       change_id: changeId,
       input_kind: runPlan.task?.input_kind || taskAnchor?.task?.input_kind || 'unknown',
-      risk_level: runPlan.task?.risk_level || 'unknown',
+      risk_level: riskLevel,
       type: runPlan.task?.type || null,
       complexity,
     },
@@ -962,7 +1068,7 @@ function approveRunState(options) {
     throw new Error(`Pending gate mismatch: current is "${activeGate}", requested "${options.gate}"`);
   }
 
-  const toRole = options.toRole || options.nextRole || state.anchor?.stage?.next_role || state.current_role || null;
+  const toRole = inferApprovalResumeRole(state, options);
   const taskAnchor = loadTaskAnchor(taskAnchorPath, options.taskAnchorData || null);
   const anchor = updateAnchorForRole(state.anchor || null, taskAnchor, toRole, options.nextRole);
   const now = new Date();
@@ -1006,6 +1112,11 @@ function approveRunState(options) {
       task_anchor: taskAnchorPath,
       gate: requestedGate,
     },
+    handoff: {
+      from_role: event.from_role || null,
+      to_role: toRole,
+      next_role: options.nextRole || null,
+    },
   };
 }
 
@@ -1015,7 +1126,9 @@ function resumeRunState(options) {
     ? path.resolve(process.cwd(), options.taskAnchor)
     : null;
   const { currentRunPath, historyRunPath, state, syncCurrent } = resolveRunStatePaths(targetDir, options.runId);
-  const toRole = options.toRole || state.current_role || state.anchor?.stage?.current_role || state.plan?.first_handoff || null;
+  const toRole = state.pending_gate
+    ? inferApprovalResumeRole(state, options)
+    : (options.toRole || state.current_role || state.anchor?.stage?.current_role || state.plan?.first_handoff || null);
   const taskAnchor = loadTaskAnchor(taskAnchorPath, options.taskAnchorData || null);
   const anchor = updateAnchorForRole(state.anchor || null, taskAnchor, toRole, options.nextRole);
   const now = new Date();
@@ -1610,6 +1723,7 @@ module.exports = {
   inferDeliveryProfile,
   inferArtifactProfile,
   inferComplexity,
+  inferRiskLevel,
   inferArtifacts,
   buildRunState,
   recordRunInputUpdate,

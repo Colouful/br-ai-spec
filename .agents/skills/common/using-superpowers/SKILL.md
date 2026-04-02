@@ -1,12 +1,46 @@
 ---
 name: using-superpowers
-description: 技能调度核心规范。在每次对话开始前强制检查是否有适用技能，确保 AI 按规范化工作流执行任务而非直出代码。所有对话启动时读取此技能。
+description: 技能调度核心规范。默认在对话开始前检查适用技能；若当前已进入 br-ai-spec 协议驱动轮次，则切换为轻量豁免模式，避免重复展开重型技能检查。
 version: 1.0.0
 ---
 
 # Superpowers 技能调度规范
 
 > 核心原则：**在执行任何操作之前，先检查是否有适用的技能。**
+
+## 协议驱动轮次的轻量豁免
+
+当满足以下任一条件时，立即进入**轻量豁免模式**，不要再把本技能当作重型总规范展开：
+
+- 用户触发了 `/spec-start`
+- 用户触发了 `/spec-continue`
+- 用户触发了 `/spec-orchestrate`
+- 当前上下文已经拿到了 `protocol-step / protocol-advance` 返回的 `turn`
+- 当前上下文已经存在 `turn.enforcement`、`turn.guidance`、`turn.execution_contract`、`turn.finalize_contract`
+
+进入轻量豁免模式后，必须遵守：
+
+1. **协议优先**
+   - 当前 `turn` 就是最终执行契约
+   - 先执行当前轮次命令，再决定后续动作
+   - 不要在协议轮次开始前再做一轮完整技能扫描
+
+2. **不重复展开本技能**
+   - 不要再长篇复述“先检查技能、再看上下文”这套总流程
+   - 不要因为本技能被自动加载，就额外宣布或重复读取大量技能规则
+
+3. **只消费协议明确给出的技能**
+   - 仅在 `turn.preferred_skills`、`turn.guidance.skills`、`turn.enforcement.forbidden_skills` 范围内做最小技能判断
+   - 若协议未显式要求，不要主动扩展读取其它技能
+
+4. **禁止抢协议控制权**
+   - 不要把协议轮次改写成“自由任务”
+   - 不要在 `task-orchestrator` 或审批门禁阶段提前调用实现技能
+   - 不要因为本技能存在，就跳过 `protocol-step / protocol-advance / protocol-update`
+
+一句话：
+
+> **通用对话靠 using-superpowers 调度；协议驱动任务靠 turn 执行。**
 
 ## 子代理豁免
 
@@ -38,6 +72,8 @@ version: 1.0.0
 | **其他环境** | 使用 Read 工具读取 `.agents/skills/<name>/SKILL.md` 文件并遵循其指令 |
 
 ## 技能检查流程
+
+若当前不属于“协议驱动轮次的轻量豁免”，再执行下面的完整技能检查流程：
 
 收到用户消息后，按以下流程执行：
 

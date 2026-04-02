@@ -5,6 +5,7 @@ const {
   inferDeliveryProfile,
   inferArtifactProfile,
   inferComplexity,
+  inferRiskLevel,
   recordRunInputUpdate,
 } = require('../bin/runtime-state');
 const {
@@ -15,21 +16,12 @@ const {
 const PACKAGE_ROOT = path.resolve(__dirname, '..');
 
 const START_INSTRUCTION_FILES = [
-  '.agents/commands/common/spec-start.md',
-  '.agents/roles/common/task-orchestrator.md',
   '.agents/roles/common/task-orchestrator-run-plan-template.md',
-  '.agents/roles/common/task-anchor-spec.md',
 ];
 
-const CONTINUE_INSTRUCTION_FILES = [
-  '.agents/commands/common/spec-continue.md',
-  '.agents/roles/common/task-orchestrator.md',
-];
+const CONTINUE_INSTRUCTION_FILES = [];
 
-const DISPATCH_INSTRUCTION_FILES = [
-  '.agents/roles/common/task-orchestrator.md',
-  '.agents/roles/common/expert-dispatch-spec.md',
-];
+const DISPATCH_INSTRUCTION_FILES = [];
 
 const ROLE_RULE_HINTS = {
   'requirement-analyst': [
@@ -167,6 +159,12 @@ const SKILL_GUIDANCE = {
   'create-test': '用于补充测试文件或测试建议。',
   'ui-verification': '用于 UI 验收与页面核查。',
   'web-design-guidelines': '用于规则和体验审查。',
+};
+
+const MICRO_ROLE_SKILL_ALLOWLIST = {
+  'requirement-analyst': ['create-proposal', 'design-analysis'],
+  'frontend-implementer': ['create-view', 'create-component', 'create-route', 'theme-variables'],
+  'code-guardian': ['ui-verification', 'web-design-guidelines'],
 };
 
 function resolveTargetDir(target) {
@@ -469,6 +467,8 @@ function attachProtocolContracts(turn, options = {}) {
   commands.current = turn.mode === 'start' ? commands.step : commands.advance;
   const requiresAdvance = turn.status === 'ready';
   const actorId = turn.actor?.id || null;
+  const deliveryProfile = turn.summary?.delivery_profile || turn.input?.delivery_profile || null;
+  const compactUserReport = deliveryProfile === 'micro';
   const allowCodeWrite = actorId === 'frontend-implementer';
   const forbiddenSkills = allowCodeWrite
     ? []
@@ -478,8 +478,10 @@ function attachProtocolContracts(turn, options = {}) {
     ...turn,
     commands,
     enforcement: {
-      execute_current_command_first: true,
-      current_command: commands.current,
+      execute_current_command_first: false,
+      current_command: null,
+      current_command_already_executed: true,
+      entry_command: commands.current,
       allowed_actor: actorId,
       auto_continue_same_session: true,
       must_consume_returned_turn: true,
@@ -487,23 +489,36 @@ function attachProtocolContracts(turn, options = {}) {
       announce_before_work: turn.announcements?.enter || null,
       announce_after_work: turn.announcements?.exit || null,
       allow_code_write: allowCodeWrite,
-      forbidden_before_current_command: [
-        'project_search',
-        'project_file_read',
-        'skill_invocation',
-        'code_modification',
-      ],
+      forbidden_before_current_command: [],
       forbidden_skills: forbiddenSkills,
     },
     requires_advance: requiresAdvance,
-      finalize_contract: turn.status === 'ready'
+    finalize_contract: turn.status === 'ready'
       ? {
           required: true,
           advance_command: commands.advance,
           update_command: commands.update,
           when: '完成当前轮次的所有 writes 后，必须先执行 advance，再对用户汇报',
           continue_rule: 'advance 返回后，直接消费返回结果中的 turn；不要 sleep、tail、timeout、cat 日志或重复执行 step/advance',
-          user_report: '只输出阶段语义和最终摘要，不回显 scratch JSON',
+          user_report: compactUserReport
+            ? '微型任务最终摘要保持极简：不超过 6 行；只输出交付结论、验证结果、残留风险。不要重复 checklist.md、iterations.md、OpenSpec 文件名或逐条文件清单。'
+            : '只输出阶段语义和最终摘要，不回显 scratch JSON',
+          user_report_contract: compactUserReport
+            ? {
+                style: 'compact',
+                max_lines: 6,
+                required_sections: ['交付结论', '验证结果', '残留风险'],
+                forbidden_items: [
+                  '重复转述 checklist.md 内容',
+                  '重复转述 iterations.md 内容',
+                  '逐条罗列 created/updated 文件',
+                  '逐条罗列 OpenSpec 文件名',
+                ],
+              }
+            : {
+                style: 'standard',
+                required_sections: ['交付结论', '验证结果', '残留风险'],
+              },
         }
       : null,
   };
@@ -522,10 +537,27 @@ function buildSkillGuidance(skills) {
     }));
 }
 
+function selectRoleSkills(roleId, skills, deliveryProfile) {
+  if (!Array.isArray(skills)) {
+    return [];
+  }
+
+  if (deliveryProfile !== 'micro') {
+    return skills;
+  }
+
+  const allowlist = MICRO_ROLE_SKILL_ALLOWLIST[roleId];
+  if (!Array.isArray(allowlist) || allowlist.length === 0) {
+    return skills;
+  }
+
+  return skills.filter((item) => allowlist.includes(item?.id || item));
+}
+
 function buildRuleHints(roleId, deliveryProfile) {
   const hints = (ROLE_RULE_HINTS[roleId] || []).map((relPath) => path.basename(relPath));
   if (deliveryProfile === 'micro') {
-    return hints.slice(0, 4);
+    return hints.slice(0, 3);
   }
   return hints;
 }
@@ -551,6 +583,28 @@ function buildOpenSpecGuidance(targetDir, roleId, deliveryProfile) {
           : config.sections[name],
       })),
   };
+}
+
+function looksLikeApprovalInput(input) {
+  const text = String(input || '').trim();
+  if (!text) {
+    return false;
+  }
+
+  return [
+    /同意/,
+    /批准/,
+    /通过审批/,
+    /可以继续/,
+    /继续\b/,
+    /继续实现/,
+    /继续开发/,
+    /开始\b/,
+    /愿意/,
+    /按 proposal 继续/,
+    /按提案继续/,
+    /审批通过/,
+  ].some((pattern) => pattern.test(text));
 }
 
 function buildRoleGuidance(roleId, deliveryProfile) {
@@ -632,14 +686,6 @@ function buildExpertExpectedOutput(dispatch, writes, runtimePaths, deliveryProfi
     outputs.push(deliveryProfile === 'micro' ? '完成短版 openspec iterations.md' : '完成 openspec iterations.md');
   }
 
-  const artifactWrites = writes
-    .filter((item) => item.kind === 'file' && item.rel_path !== runtimePaths.tmpCurrentExecution.relPath)
-    .map((item) => item.rel_path);
-
-  for (const relPath of artifactWrites) {
-    outputs.push(`写入 ${relPath}`);
-  }
-
   outputs.push(`写入 ${runtimePaths.tmpCurrentExecution.relPath}`);
   outputs.push('产出合法的 expert-execution JSON 回执');
   outputs.push('完成后立即执行 protocol-advance 推进下一轮');
@@ -711,10 +757,15 @@ function attachActorPresentation(turn) {
 
 function buildStartTurn(targetDir, userInput) {
   const runtimePaths = resolveRuntimePaths(targetDir);
+  const riskLevel = inferRiskLevel({
+    rawInput: userInput,
+    taskType: null,
+    deliveryProfile: null,
+  });
   const deliveryProfile = inferDeliveryProfile({
     rawInput: userInput,
     taskType: null,
-    riskLevel: 'low',
+    riskLevel,
     flowId: 'prd-to-delivery',
   });
   const artifactProfile = inferArtifactProfile({
@@ -722,7 +773,7 @@ function buildStartTurn(targetDir, userInput) {
   });
   const complexity = inferComplexity({
     deliveryProfile,
-    riskLevel: 'low',
+    riskLevel,
   });
 
   return attachProtocolContracts(attachActorPresentation({
@@ -746,6 +797,7 @@ function buildStartTurn(targetDir, userInput) {
       delivery_profile: deliveryProfile,
       artifact_profile: artifactProfile,
       complexity,
+      risk_level: riskLevel,
     },
     input: {
       user_request: userInput || null,
@@ -768,9 +820,12 @@ function buildStartTurn(targetDir, userInput) {
         delivery_profile: deliveryProfile,
         artifact_profile: artifactProfile,
         complexity,
-        note: deliveryProfile === 'micro'
-          ? '当前需求更适合微型交付档位：保留三专家，但产物使用短版 compact 规格。'
-          : '当前需求更适合标准交付档位：保留完整门禁与完整 OpenSpec 产物。',
+        risk_level: riskLevel,
+        note: riskLevel === 'high'
+          ? '当前需求涉及高风险领域：仍按三专家协同推进，但 requirement 阶段后将进入 before-implementation 审批门禁。'
+          : deliveryProfile === 'micro'
+            ? '当前需求更适合微型交付档位：保留三专家，但产物使用短版 compact 规格。'
+            : '当前需求更适合标准交付档位：保留完整门禁与完整 OpenSpec 产物。',
       },
       orchestrator_contract: {
         kind: 'run-plan',
@@ -895,11 +950,93 @@ function buildContinueTurn(targetDir, status, currentArtifacts) {
   });
 }
 
+function buildApprovalGateTurn(targetDir, status, currentArtifacts) {
+  const pendingGate = currentArtifacts.run?.pending_gate || null;
+  const resumeRole = pendingGate === 'before-implementation'
+    ? 'frontend-implementer'
+    : currentArtifacts.run?.current_role || null;
+  const blockedReason = pendingGate === 'before-implementation'
+    ? '支付/认证/安全/风控等关键约束未获人工确认，当前不能进入实现阶段。'
+    : '当前审批门禁尚未解除，流程不能继续推进。';
+  const reads = [
+    buildFileTarget(targetDir, path.join('.ai-spec', 'current-run.json'), {
+      required: true,
+      label: 'current run-state',
+    }),
+  ];
+
+  if (currentArtifacts.run?.artifacts?.proposal) {
+    reads.push(buildReadableTarget(targetDir, currentArtifacts.run.artifacts.proposal, {
+      label: 'proposal for approval review',
+    }));
+  }
+
+  if (currentArtifacts.run?.artifacts?.tasks) {
+    reads.push(buildReadableTarget(targetDir, currentArtifacts.run.artifacts.tasks, {
+      label: 'tasks for approval review',
+    }));
+  }
+
+  return attachProtocolContracts(attachActorPresentation({
+    kind: 'ai-protocol-turn',
+    status: 'blocked',
+    mode: 'approval-gate',
+    actor: {
+      id: 'task-orchestrator',
+      type: 'orchestrator',
+    },
+    command: '/spec-continue',
+    reason: `run is waiting at approval gate "${pendingGate}"`,
+    summary: buildSummary(status, currentArtifacts.run),
+    input: {
+      user_request: currentArtifacts.run?.trigger?.raw_input || null,
+      pending_gate: pendingGate,
+      current_role: currentArtifacts.run?.current_role || null,
+      delivery_profile: currentArtifacts.run?.delivery_profile || null,
+      artifact_profile: currentArtifacts.run?.artifact_profile || null,
+    },
+    reads: dedupeTargets(reads),
+    writes: [],
+    expected_output: [
+      `当前停在 ${pendingGate}，等待人工确认`,
+      '只用简洁摘要告诉用户当前状态、关键原因、下一步',
+      `收到明确批准意见后，先记录审批说明，再让用户重新执行 /spec-continue 恢复到 ${resumeRole || '下一位专家'}`,
+    ],
+    guidance: {
+      approval_gate: {
+        gate: pendingGate,
+        status: 'waiting-approval',
+        required_user_action: '明确批准或拒绝当前 proposal / tasks 的实现范围与限制条件',
+        blocked_rule: '在人工确认前，禁止继续实现或调用 protocol-advance 推进到下一专家',
+        blocked_reason: blockedReason,
+        resume_to_role: resumeRole,
+        resume_rule: `收到明确批准意见后，先执行 turn.commands.update 记录审批说明，再由用户重新执行 /spec-continue 恢复到 ${resumeRole || '下一位专家'}`,
+        user_report_contract: {
+          style: 'approval-compact',
+          max_lines: 5,
+          required_sections: ['当前状态', '关键原因', '下一步'],
+          forbidden_items: [
+            '长篇阶段说明',
+            '逐条罗列 proposal.md / tasks.md 内容',
+            '逐条列现有仓库文件路径',
+            '输出交付结论 / 验证结果 / 残留风险三段式',
+          ],
+        },
+      },
+    },
+  }), {
+    userInput: currentArtifacts.run?.trigger?.latest_user_input || currentArtifacts.run?.trigger?.raw_input || null,
+  });
+}
+
 function buildUpdateReviewTurn(targetDir, status, currentArtifacts) {
   const runtimePaths = resolveRuntimePaths(targetDir);
   const recentUpdates = Array.isArray(currentArtifacts.run?.input_updates)
     ? currentArtifacts.run.input_updates.slice(-3)
     : [];
+  const latestInput = currentArtifacts.run?.trigger?.latest_user_input || null;
+  const pendingGate = currentArtifacts.run?.pending_gate || null;
+  const approvalIntent = pendingGate ? looksLikeApprovalInput(latestInput) : false;
   const reads = [
     ...buildCommandTargets(targetDir, CONTINUE_INSTRUCTION_FILES),
     buildFileTarget(targetDir, path.join('.ai-spec', 'current-run.json'), {
@@ -953,12 +1090,35 @@ function buildUpdateReviewTurn(targetDir, status, currentArtifacts) {
         label: 'task-orchestrator turn inbox',
       }),
     ],
-    expected_output: [
-      '吸收新的用户输入并更新当前假设、边界或交接策略',
-      '若补充输入会影响当前阶段，优先产出最小 runtime-action 或 gate 结论',
-      '处理完成后清除 pending_input_update 标记',
-    ],
+    expected_output: approvalIntent
+      ? [
+          '将用户的审批意见吸收到运行态',
+          `针对 ${pendingGate} 产出 action=approve 的最小 runtime-action`,
+          '审批通过后恢复到下一位可执行专家，而不是继续停在 waiting-approval',
+        ]
+      : [
+          '吸收新的用户输入并更新当前假设、边界或交接策略',
+          '若补充输入会影响当前阶段，优先产出最小 runtime-action 或 gate 结论',
+          '处理完成后清除 pending_input_update 标记',
+        ],
     guidance: {
+      approval_gate: pendingGate
+        ? {
+            gate: pendingGate,
+            approval_intent_detected: approvalIntent,
+            latest_user_input: latestInput,
+            resume_to_role: pendingGate === 'before-implementation'
+              ? 'frontend-implementer'
+              : currentArtifacts.run?.current_role || null,
+            next_step: approvalIntent
+              ? `生成 action=approve 的 runtime-action，清除 pending_gate，并恢复到 ${
+                pendingGate === 'before-implementation'
+                  ? 'frontend-implementer'
+                  : (currentArtifacts.run?.current_role || '当前角色')
+              }`
+              : '若未获得明确批准，保持 waiting-approval，不要放行到实现阶段',
+          }
+        : null,
       orchestrator_contract: {
         write_to: runtimePaths.tmpTaskOrchestratorTurn.relPath,
         allowed_kinds: ['run-plan', 'task-orchestrator-runtime-action'],
@@ -1040,6 +1200,13 @@ function buildExpertTurn(targetDir, status, currentArtifacts) {
   for (const item of buildExpertExpectedOutput(dispatch, writes, runtimePaths, deliveryProfile)) {
     expectedOutput.push(item);
   }
+  const selectedSkills = selectRoleSkills(
+    dispatch.role?.id,
+    Array.isArray(dispatch.execution?.skills) && dispatch.execution.skills.length > 0
+      ? dispatch.execution.skills
+      : roleDefinition.preferred_skills,
+    deliveryProfile,
+  );
 
   return attachProtocolContracts(attachActorPresentation({
     kind: 'ai-protocol-turn',
@@ -1063,9 +1230,7 @@ function buildExpertTurn(targetDir, status, currentArtifacts) {
       delivery_profile: deliveryProfile,
       artifact_profile: artifactProfile,
     },
-    preferred_skills: Array.isArray(dispatch.execution?.skills) && dispatch.execution.skills.length > 0
-      ? dispatch.execution.skills
-      : roleDefinition.preferred_skills,
+    preferred_skills: selectedSkills,
     reads: dedupeTargets(reads),
     writes: dedupeTargets(writes),
     expected_output: [...new Set(expectedOutput)],
@@ -1074,9 +1239,7 @@ function buildExpertTurn(targetDir, status, currentArtifacts) {
       role: buildRoleGuidance(dispatch.role?.id, deliveryProfile),
       rule_hints: buildRuleHints(dispatch.role?.id, deliveryProfile),
       skills: buildSkillGuidance(
-        Array.isArray(dispatch.execution?.skills) && dispatch.execution.skills.length > 0
-          ? dispatch.execution.skills
-          : roleDefinition.preferred_skills.map((id) => ({ id })),
+        selectedSkills.map((item) => (typeof item === 'string' ? { id: item } : item)),
       ),
       openspec_rules: buildOpenSpecGuidance(targetDir, dispatch.role?.id, deliveryProfile),
     },
@@ -1153,7 +1316,7 @@ function buildProtocolTurn(options = {}) {
   }
 
   if (status.current.pending_gate) {
-    return buildContinueTurn(targetDir, status, currentArtifacts);
+    return buildApprovalGateTurn(targetDir, status, currentArtifacts);
   }
 
   return buildDispatchTurn(targetDir, status, currentArtifacts);

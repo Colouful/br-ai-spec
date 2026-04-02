@@ -6,6 +6,7 @@ const path = require('path');
 const SUPPORTED_IDES = ['cursor', 'claude', 'opencode', 'trae'];
 const DEFAULT_IDES = ['cursor', 'claude'];
 const ALL_IDES = [...SUPPORTED_IDES];
+const IDE_AUTOLINK_EXCLUDED_SKILLS = new Set(['using-superpowers']);
 
 function printUsage() {
   console.log(`Usage:
@@ -96,6 +97,10 @@ function targetRel(targetDir, filePath) {
 
 function ensureDir(dirPath) {
   fs.mkdirSync(dirPath, { recursive: true });
+}
+
+function shouldExposeSkillToIde(skillId) {
+  return !IDE_AUTOLINK_EXCLUDED_SKILLS.has(skillId);
 }
 
 function readJsonFile(filePath, label) {
@@ -532,6 +537,23 @@ function ensureSymlinkTracked(targetDir, linkPath, linkTarget, changes) {
   }
 }
 
+function removePathTracked(targetDir, targetPath, changes) {
+  const rel = targetRel(targetDir, targetPath);
+  try {
+    const stat = fs.lstatSync(targetPath);
+    if (stat.isSymbolicLink()) {
+      fs.unlinkSync(targetPath);
+    } else {
+      fs.rmSync(targetPath, { recursive: true, force: true });
+    }
+    if (!changes.updated.includes(rel) && !changes.created.includes(rel)) {
+      changes.updated.push(rel);
+    }
+  } catch (error) {
+    // Already absent; nothing to do.
+  }
+}
+
 function installRoles(sourceDir, targetDir, resolvedRoles, roleRegistry, changes) {
   for (const supportFile of roleRegistry.support_files || []) {
     copyFileTracked(sourceDir, targetDir, supportFile, supportFile, changes);
@@ -589,6 +611,10 @@ function installIdeAssets(sourceDir, targetDir, ides, resolvedSkills, changes) {
 
     for (const skill of resolvedSkills) {
       const linkPath = path.join(ideDir, 'skills', skill.id);
+      if (!shouldExposeSkillToIde(skill.id)) {
+        removePathTracked(targetDir, linkPath, changes);
+        continue;
+      }
       const linkTarget = `../../.agents/skills/${skill.id}`;
       ensureSymlinkTracked(targetDir, linkPath, linkTarget, changes);
     }
