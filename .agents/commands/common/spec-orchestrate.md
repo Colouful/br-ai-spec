@@ -22,5 +22,6 @@
 - 未轮到 `frontend-implementer` 前禁止写业务代码
 - 未执行当前轮次命令前禁止调用 `create-view`、`create-component`、`theme-variables`、`execute-task`
 - 对用户只展示阶段进度与最终结果，不回显 scratch JSON
-- 若 `delivery_profile = micro`，最终摘要严格服从 `turn.finalize_contract.user_report` 与 `turn.finalize_contract.user_report_contract`：
-  不超过 6 行；只保留交付结论、验证结果、残留风险；不重复转述 `checklist.md`、`iterations.md`；不逐条罗列 created/updated 文件或 OpenSpec 文件名
+- 若存在 `turn.finalize_contract.user_report_contract`，最终摘要严格服从它：
+  `micro`：压成三句式，只保留交付结论、验证结果、残留风险；不要文件路径、实现结构细节、命令名
+  `standard`：只保留关键结果、验证结果、残留风险，必要时补一句下一步；不要协议细节、路径、OpenSpec 文件名或长篇实现说明

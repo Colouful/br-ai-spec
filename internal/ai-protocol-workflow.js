@@ -1121,6 +1121,23 @@ function attachProtocolContracts(turn, options = {}) {
     ? []
     : ['create-view', 'create-component', 'theme-variables', 'create-route', 'create-api', 'create-store', 'execute-task'];
 
+  const standardUserReportContract = {
+    style: 'standard-concise',
+    max_lines: 8,
+    required_sections: ['交付结论', '验证结果', '残留风险'],
+    optional_sections: ['下一步'],
+    max_bullets_per_section: 1,
+    preferred_sentence_count: 4,
+    forbidden_items: [
+      '协议推进细节（如 protocol-step / protocol-advance / protocol-update / approve）',
+      'scratch JSON、current-run/current-dispatch/current-execution 等运行态文件名',
+      '逐条罗列 OpenSpec 文件名',
+      '逐条罗列 created/updated 文件清单',
+      '过细的实现结构描述或组件内部实现细节',
+      '无必要的绝对/相对文件路径',
+    ],
+  };
+
   return {
     ...turn,
     commands,
@@ -1148,24 +1165,27 @@ function attachProtocolContracts(turn, options = {}) {
           when: '完成当前轮次的所有 writes 后，必须先执行 advance，再对用户汇报',
           continue_rule: 'advance 返回后，直接消费返回结果中的 turn；不要 sleep、tail、timeout、cat 日志或重复执行 step/advance',
           user_report: compactUserReport
-            ? '微型任务最终摘要保持极简：不超过 6 行；只输出交付结论、验证结果、残留风险。不要重复 checklist.md、iterations.md、OpenSpec 文件名或逐条文件清单。'
-            : '只输出阶段语义和最终摘要，不回显 scratch JSON',
+            ? '微型任务最终摘要改为三句式：交付结论、验证结果、残留风险，各一句；不要写文件路径、实现结构细节或命令名。'
+            : '标准任务最终摘要保持简洁：只保留关键结果、验证结果、残留风险，必要时补一句下一步；不要写协议细节、文件路径或长篇实现说明。',
           user_report_contract: compactUserReport
             ? {
                 style: 'compact',
-                max_lines: 6,
+                max_lines: 5,
                 required_sections: ['交付结论', '验证结果', '残留风险'],
+                one_sentence_per_section: true,
+                max_bullets_per_section: 1,
+                preferred_sentence_count: 3,
                 forbidden_items: [
                   '重复转述 checklist.md 内容',
                   '重复转述 iterations.md 内容',
                   '逐条罗列 created/updated 文件',
                   '逐条罗列 OpenSpec 文件名',
+                  '任何文件路径',
+                  '组件/页面内部实现结构细节',
+                  '具体命令名或协议推进细节',
                 ],
               }
-            : {
-                style: 'standard',
-                required_sections: ['交付结论', '验证结果', '残留风险'],
-              },
+            : standardUserReportContract,
         }
       : null,
   };
@@ -1920,13 +1940,18 @@ function buildApprovalGateTurn(targetDir, status, currentArtifacts) {
         resume_rule: `收到明确批准意见后，先执行 turn.commands.update 记录审批说明，再由用户重新执行 /spec-continue 恢复到 ${resumeRole || '下一位专家'}`,
         user_report_contract: {
           style: 'approval-compact',
-          max_lines: 5,
+          max_lines: 4,
           required_sections: ['当前状态', '关键原因', '下一步'],
+          one_sentence_per_section: true,
+          max_bullets_per_section: 1,
+          preferred_sentence_count: 3,
           forbidden_items: [
             '长篇阶段说明',
             '逐条罗列 proposal.md / tasks.md 内容',
             '逐条列现有仓库文件路径',
             '输出交付结论 / 验证结果 / 残留风险三段式',
+            '协议执行过程描述',
+            '命令行细节或多步操作解释',
           ],
         },
       },
