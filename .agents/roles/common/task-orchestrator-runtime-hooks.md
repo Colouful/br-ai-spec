@@ -37,7 +37,7 @@ task-orchestrator-runner.advanceRunner({ target })
 
 其中默认输入应来自：
 
-- `./.ai-spec/internal/tmp/task-orchestrator-reply.md`
+- `./.ai-spec/internal/tmp/task-orchestrator-turn.json`
 
 如果当前环境尚未接 `Runner（运行器）`，且当前主代理已经直接产出了结构化 bootstrap JSON，可回退为：
 
@@ -115,7 +115,7 @@ task-orchestrator-runner.advanceRunner({ target })
 其中默认输入可来自：
 
 - `./.ai-spec/internal/tmp/current-runtime-action.json`
-- 或新的 `./.ai-spec/internal/tmp/task-orchestrator-reply.md`
+- 或新的 `./.ai-spec/internal/tmp/task-orchestrator-turn.json`
 
 如果暂未接 `Runner（运行器）`，再回退为：
 

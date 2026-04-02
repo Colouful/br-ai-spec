@@ -39,6 +39,14 @@ function resolveRuntimePaths(targetDir) {
       [path.join('.ai-spec', 'internal', 'history', 'runs'), path.join('.ai-spec', 'runs')],
     ),
     tmpDir: buildEntry(targetDir, path.join('.ai-spec', 'internal', 'tmp'), path.join('.ai-spec', 'tmp')),
+    tmpTaskOrchestratorTurn: buildEntry(
+      targetDir,
+      path.join('.ai-spec', 'internal', 'tmp', 'task-orchestrator-turn.json'),
+      [
+        path.join('.ai-spec', 'internal', 'tmp', 'task-orchestrator-reply.md'),
+        path.join('.ai-spec', 'tmp', 'task-orchestrator-reply.md'),
+      ],
+    ),
     tmpTaskOrchestratorReply: buildEntry(
       targetDir,
       path.join('.ai-spec', 'internal', 'tmp', 'task-orchestrator-reply.md'),

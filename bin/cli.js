@@ -24,13 +24,11 @@ try {
   }
 
   if (args[0] === 'task-orchestrator-adapter') {
-    const adapter = require('./task-orchestrator-adapter');
-    process.exit(adapter.main(args.slice(1)));
+    throw new Error('task-orchestrator-adapter is a legacy internal fallback; use ai-spec protocol-step / protocol-advance / protocol-update instead');
   }
 
   if (args[0] === 'task-orchestrator-extractor') {
-    const extractor = require('./task-orchestrator-extractor');
-    process.exit(extractor.main(args.slice(1)));
+    throw new Error('task-orchestrator-extractor is a legacy internal fallback; use ai-spec protocol-step / protocol-advance / protocol-update instead');
   }
 
   if (args[0] === 'task-orchestrator-runner') {

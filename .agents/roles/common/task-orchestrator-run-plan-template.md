@@ -270,7 +270,7 @@ description: 定义 task-orchestrator 在首次识别任务时必须输出的最
 如果当前运行环境支持宿主层推进，则在生成 `run-plan（运行计划）` 后，应继续：
 
 1. 生成首轮 `task-anchor（任务锚点）`
-2. 优先产出 `task-orchestrator-reply.md` 交给宿主 `Runner（运行器）`
+2. 优先产出 `task-orchestrator-turn.json` 交给宿主 `Runner（运行器）`
 3. 若宿主 `Runner` 不可用，再回退到 `task-orchestrator-bootstrap（主代理首轮桥接载荷）`
 4. 回退时调用：
 

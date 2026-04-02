@@ -19,16 +19,11 @@ const START_INSTRUCTION_FILES = [
   '.agents/roles/common/task-orchestrator.md',
   '.agents/roles/common/task-orchestrator-run-plan-template.md',
   '.agents/roles/common/task-anchor-spec.md',
-  '.agents/roles/common/task-orchestrator-bootstrap-payload.md',
-  '.agents/roles/common/task-orchestrator-output-extractor-spec.md',
 ];
 
 const CONTINUE_INSTRUCTION_FILES = [
   '.agents/commands/common/spec-continue.md',
   '.agents/roles/common/task-orchestrator.md',
-  '.agents/roles/common/task-orchestrator-adapter-payload.md',
-  '.agents/roles/common/task-orchestrator-output-extractor-spec.md',
-  '.agents/roles/common/task-orchestrator-runtime-hooks.md',
 ];
 
 const DISPATCH_INSTRUCTION_FILES = [
@@ -473,10 +468,30 @@ function attachProtocolContracts(turn, options = {}) {
   const commands = buildProtocolCommands(options.userInput || turn.input?.latest_user_input || turn.input?.user_request || null);
   commands.current = turn.mode === 'start' ? commands.step : commands.advance;
   const requiresAdvance = turn.status === 'ready';
+  const actorId = turn.actor?.id || null;
+  const allowCodeWrite = actorId === 'frontend-implementer';
+  const forbiddenSkills = allowCodeWrite
+    ? []
+    : ['create-view', 'create-component', 'theme-variables', 'create-route', 'create-api', 'create-store', 'execute-task'];
 
   return {
     ...turn,
     commands,
+    enforcement: {
+      execute_current_command_first: true,
+      current_command: commands.current,
+      allowed_actor: actorId,
+      announce_before_work: turn.announcements?.enter || null,
+      announce_after_work: turn.announcements?.exit || null,
+      allow_code_write: allowCodeWrite,
+      forbidden_before_current_command: [
+        'project_search',
+        'project_file_read',
+        'skill_invocation',
+        'code_modification',
+      ],
+      forbidden_skills: forbiddenSkills,
+    },
     requires_advance: requiresAdvance,
     finalize_contract: turn.status === 'ready'
       ? {
@@ -733,16 +748,15 @@ function buildStartTurn(targetDir, userInput) {
     },
     reads: buildCommandTargets(targetDir, START_INSTRUCTION_FILES),
     writes: [
-      buildFileTarget(targetDir, runtimePaths.tmpTaskOrchestratorReply.relPath, {
+      buildFileTarget(targetDir, runtimePaths.tmpTaskOrchestratorTurn.relPath, {
         required: true,
-        label: 'task-orchestrator reply inbox',
+        label: 'task-orchestrator turn inbox',
       }),
     ],
     expected_output: [
-      '输出 task-orchestrator-bootstrap Markdown reply',
-      '在 reply 中包含唯一合法 json 代码块',
+      '输出最小 run-plan JSON',
       `在 run-plan 中明确 delivery_profile=${deliveryProfile} 与 artifact_profile=${artifactProfile}`,
-      '写入 .ai-spec/internal/tmp/task-orchestrator-reply.md',
+      `写入 ${runtimePaths.tmpTaskOrchestratorTurn.relPath}`,
     ],
     guidance: {
       routing: {
@@ -753,6 +767,18 @@ function buildStartTurn(targetDir, userInput) {
         note: deliveryProfile === 'micro'
           ? '当前需求更适合微型交付档位：保留三专家，但产物使用短版 compact 规格。'
           : '当前需求更适合标准交付档位：保留完整门禁与完整 OpenSpec 产物。',
+      },
+      orchestrator_contract: {
+        kind: 'run-plan',
+        write_to: runtimePaths.tmpTaskOrchestratorTurn.relPath,
+        required_fields: [
+          'kind',
+          'flow.id',
+          'plan.first_handoff',
+          'delivery_profile',
+          'artifact_profile',
+        ],
+        allowed_kinds: ['run-plan', 'task-orchestrator-bootstrap'],
       },
     },
   }), { userInput });
@@ -842,12 +868,24 @@ function buildContinueTurn(targetDir, status, currentArtifacts) {
     },
     reads: dedupeTargets(reads),
     writes: [
-      buildFileTarget(targetDir, runtimePaths.tmpTaskOrchestratorReply.relPath, {
+      buildFileTarget(targetDir, runtimePaths.tmpTaskOrchestratorTurn.relPath, {
         required: true,
-        label: 'task-orchestrator reply inbox',
+        label: 'task-orchestrator turn inbox',
       }),
     ],
     expected_output: expectedOutput,
+    guidance: {
+      orchestrator_contract: {
+        kind: 'task-orchestrator-runtime-action',
+        write_to: runtimePaths.tmpTaskOrchestratorTurn.relPath,
+        required_fields: [
+          'kind',
+          'action',
+          'run_id',
+        ],
+        allowed_actions: ['handoff', 'approve', 'resume', 'gate-blocked', 'complete', 'fail', 'cancel'],
+      },
+    },
   }), {
     userInput: currentArtifacts.run?.trigger?.latest_user_input || currentArtifacts.run?.trigger?.raw_input || null,
   });
@@ -906,9 +944,9 @@ function buildUpdateReviewTurn(targetDir, status, currentArtifacts) {
     },
     reads: dedupeTargets(reads),
     writes: [
-      buildFileTarget(targetDir, runtimePaths.tmpTaskOrchestratorReply.relPath, {
+      buildFileTarget(targetDir, runtimePaths.tmpTaskOrchestratorTurn.relPath, {
         required: true,
-        label: 'task-orchestrator reply inbox',
+        label: 'task-orchestrator turn inbox',
       }),
     ],
     expected_output: [
@@ -916,6 +954,12 @@ function buildUpdateReviewTurn(targetDir, status, currentArtifacts) {
       '若补充输入会影响当前阶段，优先产出最小 runtime-action 或 gate 结论',
       '处理完成后清除 pending_input_update 标记',
     ],
+    guidance: {
+      orchestrator_contract: {
+        write_to: runtimePaths.tmpTaskOrchestratorTurn.relPath,
+        allowed_kinds: ['run-plan', 'task-orchestrator-runtime-action'],
+      },
+    },
   }), {
     userInput: currentArtifacts.run?.trigger?.latest_user_input || null,
   });

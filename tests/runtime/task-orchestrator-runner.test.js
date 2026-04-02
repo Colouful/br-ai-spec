@@ -48,12 +48,12 @@ function main() {
   assert.strictEqual(workflow.turn.mode, 'start');
   assert.strictEqual(workflow.turn.actor.id, 'task-orchestrator');
   assert.strictEqual(workflow.turn.command, '/spec-start');
-  assert.deepStrictEqual(listTurnTargets(workflow.turn), ['.ai-spec/internal/tmp/task-orchestrator-reply.md']);
+  assert.deepStrictEqual(listTurnTargets(workflow.turn), ['.ai-spec/internal/tmp/task-orchestrator-turn.json']);
 
-  copyFixture(targetDir, 'task-orchestrator-bootstrap-reply.md', 'task-orchestrator-reply.md');
+  copyFixture(targetDir, 'task-orchestrator-bootstrap-reply.md', 'task-orchestrator-turn.json');
   let report = advance(targetDir);
   assert.strictEqual(report.kind, 'task-orchestrator-runner-advance-result');
-  assert.strictEqual(report.consumed.kind, 'task-orchestrator-reply');
+  assert.strictEqual(report.consumed.kind, 'task-orchestrator-turn');
   assert.strictEqual(report.applied.adapter_action, 'bootstrap');
   assert.strictEqual(report.applied.run_id, 'run_20260331_160700_smoke');
   assert.strictEqual(report.recorded.dispatch.role, 'requirement-analyst');

@@ -2,8 +2,8 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const runtimeState = require('./runtime-state');
 const extractor = require('./task-orchestrator-extractor');
-const adapter = require('./task-orchestrator-adapter');
 const expertDispatch = require('./expert-dispatch');
 const expertExecutor = require('./expert-executor');
 const {
@@ -15,8 +15,8 @@ const {
 
 const INBOX_SPECS = [
   {
-    kind: 'task-orchestrator-reply',
-    pathKey: 'tmpTaskOrchestratorReply',
+    kind: 'task-orchestrator-turn',
+    pathKey: 'tmpTaskOrchestratorTurn',
     producer: 'task-orchestrator',
   },
   {
@@ -360,8 +360,8 @@ function buildNextExpected(targetDir) {
   if (!current.run) {
     return {
       producer: 'task-orchestrator',
-      files: [runtimePaths.tmpTaskOrchestratorReply.relPath],
-      reason: 'no current run-state yet; waiting for task-orchestrator bootstrap or runtime reply',
+      files: [runtimePaths.tmpTaskOrchestratorTurn.relPath],
+      reason: 'no current run-state yet; waiting for task-orchestrator bootstrap turn',
     };
   }
 
@@ -377,7 +377,7 @@ function buildNextExpected(targetDir) {
     return {
       producer: 'task-orchestrator',
       files: [
-        runtimePaths.tmpTaskOrchestratorReply.relPath,
+        runtimePaths.tmpTaskOrchestratorTurn.relPath,
         runtimePaths.tmpCurrentRuntimeAction.relPath,
       ],
       reason: 'expert execution has been recorded; waiting for task-orchestrator runtime action',
@@ -396,7 +396,7 @@ function buildNextExpected(targetDir) {
     return {
       producer: 'task-orchestrator',
       files: [
-        runtimePaths.tmpTaskOrchestratorReply.relPath,
+        runtimePaths.tmpTaskOrchestratorTurn.relPath,
         runtimePaths.tmpCurrentRuntimeAction.relPath,
       ],
       reason: `run is waiting at approval gate "${current.run.pending_gate}"`,
@@ -465,6 +465,150 @@ function summarizeAppliedState(applied) {
     status: applied.result.state.status || null,
     current_role: applied.result.state.current_role || null,
     pending_gate: applied.result.state.pending_gate || null,
+  };
+}
+
+function buildRuntimeOptionsFromPayload(payload, targetDir) {
+  const options = {
+    target: targetDir,
+  };
+  const mappings = [
+    ['runId', ['run_id', 'runId']],
+    ['toRole', ['to_role', 'toRole']],
+    ['nextRole', ['next_role', 'nextRole']],
+    ['fromRole', ['from_role', 'fromRole']],
+    ['gate', ['gate']],
+    ['pendingGate', ['pending_gate', 'pendingGate']],
+    ['message', ['message']],
+    ['error', ['error']],
+    ['eventType', ['event_type', 'eventType']],
+    ['status', ['status']],
+  ];
+
+  for (const [targetKey, sourceKeys] of mappings) {
+    for (const sourceKey of sourceKeys) {
+      if (Object.prototype.hasOwnProperty.call(payload, sourceKey)) {
+        options[targetKey] = payload[sourceKey];
+        break;
+      }
+    }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(payload, 'clear_pending_gate') || Object.prototype.hasOwnProperty.call(payload, 'clearPendingGate')) {
+    options.clearPendingGate = Boolean(
+      Object.prototype.hasOwnProperty.call(payload, 'clear_pending_gate')
+        ? payload.clear_pending_gate
+        : payload.clearPendingGate,
+    );
+  }
+
+  if (payload.task_anchor || payload.taskAnchor) {
+    options.taskAnchorData = payload.task_anchor || payload.taskAnchor;
+  }
+
+  return options;
+}
+
+function clearCurrentExpertArtifacts(targetDir) {
+  return {
+    dispatch: expertDispatch.clearDispatch({ target: targetDir }),
+    execution: expertExecutor.clearExecution({ target: targetDir }),
+    runtime_action: expertExecutor.clearRuntimeAction({ target: targetDir }),
+  };
+}
+
+function applyRuntimeMutation({ targetDir, action, payload, payloadSource }) {
+  const normalizedAction = String(action || '').toLowerCase();
+  let result = null;
+
+  if (normalizedAction === 'bootstrap') {
+    result = runtimeState.bootstrapRunState({
+      target: targetDir,
+      payloadData: payload,
+    });
+  } else {
+    const runtimeOptions = buildRuntimeOptionsFromPayload(payload, targetDir);
+    switch (normalizedAction) {
+      case 'handoff':
+        result = runtimeState.handoffRunState(runtimeOptions);
+        break;
+      case 'approve':
+        result = runtimeState.approveRunState(runtimeOptions);
+        break;
+      case 'resume':
+        result = runtimeState.resumeRunState(runtimeOptions);
+        break;
+      case 'gate-blocked':
+      case 'blocked':
+        result = runtimeState.gateBlockedRunState(runtimeOptions);
+        break;
+      case 'status':
+        result = runtimeState.statusRunState(runtimeOptions);
+        break;
+      case 'complete':
+      case 'completed':
+        result = runtimeState.completeRunState(runtimeOptions);
+        break;
+      case 'fail':
+      case 'failed':
+        result = runtimeState.failRunState(runtimeOptions);
+        break;
+      case 'cancel':
+      case 'cancelled':
+        result = runtimeState.cancelRunState(runtimeOptions);
+        break;
+      default:
+        throw new Error(`Unsupported runtime action: ${action}`);
+    }
+  }
+
+  const applied = {
+    adapter_action: normalizedAction === 'completed' ? 'complete' : normalizedAction,
+    adapter_source: payloadSource,
+    result,
+  };
+
+  if (['bootstrap', 'handoff', 'approve', 'resume', 'gate-blocked', 'complete', 'fail', 'cancel'].includes(applied.adapter_action)) {
+    return {
+      ...applied,
+      ...clearCurrentExpertArtifacts(targetDir),
+    };
+  }
+
+  return applied;
+}
+
+function tryReadJsonValue(filePath) {
+  try {
+    return readJsonFile(filePath, 'task-orchestrator turn');
+  } catch (error) {
+    return null;
+  }
+}
+
+function resolveTaskOrchestratorTurn(filePath) {
+  const parsed = tryReadJsonValue(filePath);
+  if (parsed && typeof parsed === 'object') {
+    if (parsed.kind === 'run-plan' || parsed.kind === 'task-orchestrator-bootstrap' || parsed.run_plan || parsed.runPlan) {
+      return {
+        action: 'bootstrap',
+        payload: parsed,
+      };
+    }
+
+    if (parsed.kind === 'task-orchestrator-runtime-action' || parsed.kind === 'task-orchestrator-runtime-event') {
+      return {
+        action: parsed.action || parsed.event,
+        payload: parsed,
+      };
+    }
+  }
+
+  const replyText = readTextFile(filePath, 'task-orchestrator turn');
+  const extracted = extractor.extractPayloadFromText(replyText, filePath);
+  return {
+    action: extracted.action,
+    payload: extracted.payload,
   };
 }
 
@@ -698,7 +842,7 @@ function maybeAutoDispatchCurrentRole(targetDir, applied) {
     return null;
   }
 
-  return expertDispatch.applyDispatch({
+  return expertDispatch.applyDispatchData({
     target: targetDir,
     payloadData: payload,
     source: 'runner-auto-dispatch',
@@ -730,32 +874,22 @@ function advanceRunner(options) {
   let recorded = null;
   let applied = null;
 
-  if (pending.kind === 'task-orchestrator-reply') {
-    const replyText = readTextFile(pending.path, 'task-orchestrator reply');
-    const extracted = extractor.extractPayloadFromText(replyText, pending.path);
-
-    if (extracted.action === 'bootstrap') {
-      applied = adapter.attachDispatch(adapter.applyPayload({
-        action: extracted.action,
-        payload: extracted.payload,
-        options: { target: targetDir },
-        payloadSource: pending.path,
-      }), { target: targetDir });
-    } else {
+  if (pending.kind === 'task-orchestrator-turn') {
+    const orchestratorTurn = resolveTaskOrchestratorTurn(pending.path);
+    if (orchestratorTurn.action !== 'bootstrap') {
       recorded = {
-        runtime_action: expertExecutor.applyRuntimeActionData({
-          target: targetDir,
-          payloadData: extracted.payload,
+        runtime_action: {
+          payload: orchestratorTurn.payload,
           source: pending.path,
-        }),
+        },
       };
-      applied = adapter.attachDispatch(adapter.applyPayload({
-        action: recorded.runtime_action.payload.action,
-        payload: recorded.runtime_action.payload,
-        options: { target: targetDir },
-        payloadSource: pending.path,
-      }), { target: targetDir });
     }
+    applied = applyRuntimeMutation({
+      targetDir,
+      action: orchestratorTurn.action,
+      payload: orchestratorTurn.payload,
+      payloadSource: pending.path,
+    });
   } else if (pending.kind === 'expert-dispatch') {
     recorded = {
       dispatch: expertDispatch.applyDispatch({
@@ -772,31 +906,31 @@ function advanceRunner(options) {
     };
     const autoRuntimeAction = buildAutoRuntimeAction(targetDir, recorded.execution.payload);
     if (autoRuntimeAction) {
-      recorded.runtime_action = expertExecutor.applyRuntimeActionData({
-        target: targetDir,
-        payloadData: autoRuntimeAction,
+      recorded.runtime_action = {
+        payload: autoRuntimeAction,
         source: 'runner-auto-transition',
-      });
-      applied = adapter.attachDispatch(adapter.applyPayload({
-        action: recorded.runtime_action.payload.action,
-        payload: recorded.runtime_action.payload,
-        options: { target: targetDir },
+      };
+      applied = applyRuntimeMutation({
+        targetDir,
+        action: autoRuntimeAction.action,
+        payload: autoRuntimeAction,
         payloadSource: 'runner-auto-transition',
-      }), { target: targetDir });
+      });
     }
   } else if (pending.kind === 'task-orchestrator-runtime-action') {
+    const runtimeActionPayload = readJsonFile(pending.path, 'runtime action');
     recorded = {
-      runtime_action: expertExecutor.applyRuntimeAction({
-        target: targetDir,
-        payload: pending.path,
-      }),
+      runtime_action: {
+        payload: runtimeActionPayload,
+        source: pending.path,
+      },
     };
-    applied = adapter.attachDispatch(adapter.applyPayload({
-      action: recorded.runtime_action.payload.action,
-      payload: recorded.runtime_action.payload,
-      options: { target: targetDir },
+    applied = applyRuntimeMutation({
+      targetDir,
+      action: runtimeActionPayload.action,
+      payload: runtimeActionPayload,
       payloadSource: pending.path,
-    }), { target: targetDir });
+    });
   } else {
     throw new Error(`unsupported runner input kind: ${pending.kind}`);
   }
@@ -861,24 +995,19 @@ function replayReplies(options) {
 
   for (let index = 0; index < options.replies.length; index += 1) {
     const replyPath = path.resolve(process.cwd(), options.replies[index]);
-    const replyText = readTextFile(replyPath, 'task-orchestrator reply');
-    const extracted = extractor.extractPayloadFromText(replyText, replyPath);
-    const applied = adapter.attachDispatch(adapter.applyPayload({
-      action: extracted.action,
-      payload: extracted.payload,
-      options: {
-        target: targetDir,
-      },
+    const orchestratorTurn = resolveTaskOrchestratorTurn(replyPath);
+    const applied = applyRuntimeMutation({
+      targetDir,
+      action: orchestratorTurn.action,
+      payload: orchestratorTurn.payload,
       payloadSource: replyPath,
-    }), {
-      target: targetDir,
     });
 
     lastApplied = applied;
     steps.push({
       index: index + 1,
       reply: replyPath,
-      extraction: extracted.extraction,
+      action_source: orchestratorTurn.payload.kind || null,
       action: applied.adapter_action,
       run_id: applied.result?.state?.run_id || null,
       status: applied.result?.state?.status || null,

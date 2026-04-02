@@ -21,23 +21,14 @@ reads:
   - .agents/roles/common/task-orchestrator-routing.md
   - .agents/roles/common/task-orchestrator-run-plan-template.md
   - .agents/roles/common/task-anchor-spec.md
-  - .agents/roles/common/task-orchestrator-bootstrap-payload.md
-  - .agents/roles/common/task-orchestrator-adapter-payload.md
-  - .agents/roles/common/task-orchestrator-output-extractor-spec.md
   - .agents/roles/common/runtime-state-handoff-spec.md
-  - .agents/roles/common/task-orchestrator-runtime-hooks.md
-  - .agents/roles/common/expert-dispatch-spec.md
-  - .agents/roles/common/expert-executor-spec.md
-  - .agents/roles/common/expert-runtime-action-spec.md
 writes:
   - openspec/changes/<change-id>/proposal.md
-  - .ai-spec/internal/tmp/task-orchestrator-reply.md
+  - .ai-spec/internal/tmp/task-orchestrator-turn.json
   - .ai-spec/current-run.json
   - .ai-spec/internal/current-dispatch.json
   - .ai-spec/internal/current-execution.json
-  - .ai-spec/internal/current-execution.md
   - .ai-spec/internal/current-runtime-action.json
-  - .ai-spec/internal/current-runtime-action.md
 handoff_to:
   - requirement-analyst
   - frontend-implementer
@@ -98,7 +89,7 @@ handoff_to:
 13. 生成首轮 `run-plan（运行计划）`，明确 `mode（运行模式）`、`delivery_profile（交付档位）`、`artifact_profile（产物规格）`、`assumptions（默认假设）`、`missing_inputs（缺失输入）`
 14. `micro` 下不减少专家，只把 OpenSpec 产物收口为短版 compact 规格
 15. 为第一跳专家生成 `task-anchor（任务锚点）`
-16. 组装首轮内部 scratch，并优先交给宿主层 `Runner（运行器）` 消费；仅在 `Runner` 不可用时才回退到 `adapter/runtime-state`
+16. 组装首轮最小 JSON scratch，并优先交给宿主层 `Runner（运行器）` 消费；仅在 legacy 回放或诊断时才回退到 `extractor/adapter/runtime-state`
 17. 对 `prd-to-delivery（需求到交付）`：
     - 未存在 `proposal.md` 与 `tasks.md` 时，不得交给 `frontend-implementer（前端实现专家）`
     - 未存在 `checklist.md` 与 `iterations.md` 时，不得进入 `complete（完成）`
@@ -161,7 +152,7 @@ handoff_to:
 - 先形成结构化 `run-plan（运行计划）`
 - 在 `auto` 模式下先写清楚 `assumptions（默认假设）`
 - 再形成当前第一跳专家的 `task-anchor（任务锚点）`
-- 如运行环境允许，优先产出首轮内部 scratch 并由宿主层 `Runner（运行器）` 消费；仅在无法接 `Runner` 时再回退到 `adapter/runtime-state`
+- 如运行环境允许，优先产出首轮最小 JSON scratch 并由宿主层 `Runner（运行器）` 消费；仅在无法接 `Runner` 时再回退到 legacy 兼容链
 - 再决定是否交给下一位专家
 - 信息明显不足时，不直接进入实现；但若缺口可由仓库上下文合理推断，则先按默认假设继续推进
 
@@ -186,7 +177,6 @@ handoff_to:
 - 选定流程模板并完成本次专家激活后，先生成本轮 `task-anchor（任务锚点）`，再启动对应第一位专家
 - 若需要首轮需求收敛，默认先交给 `requirement-analyst`
 - 若当前环境允许执行本地命令，优先把 `run-plan（运行计划） + task-anchor（任务锚点）` 转成内部 scratch，并由宿主层 `Runner（运行器）` 统一消费
-- 若当前运行环境需要从自然语言/Markdown（标记文本） 回复中自动提取动作，优先遵循 `task-orchestrator-output-extractor-spec.md`
 - `run-plan（运行计划）` 应显式保留本轮 `mode（运行模式）` 与 `assumptions（默认假设）`
 - 若 `page-development（页面开发）` 任务已能从 `01/03/05/06/09` 规则中推断技术栈、页面落点、路由落点、样式承载方式，则这些信息不应再进入 `missing_inputs（缺失输入）`
 - 每次专家交接时，优先按 `runtime-state-handoff-spec.md` 更新 `.ai-spec/current-run.json`；运行历史默认不落盘，仅在显式调试时保留隐藏 trace

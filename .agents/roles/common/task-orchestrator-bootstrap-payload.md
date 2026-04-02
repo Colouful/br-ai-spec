@@ -136,7 +136,7 @@ cat ./.ai-spec/internal/tmp/task-orchestrator-bootstrap.json | ai-spec runtime-s
 
 ## 6. 一句话要求
 
-> 如果宿主环境暂未直接消费 `task-orchestrator-reply.md`，可回退到这份组合载荷；其中 `run-plan（运行计划）` 在 `auto（自动）` 模式下应先保留 `mode（运行模式）` 与 `assumptions（默认假设）`，再调用 `runtime-state bootstrap`，而不是让调用方手工拆分 `run-plan（运行计划）` 和 `task-anchor（任务锚点）`。
+> 当前主路径应优先直接消费 `task-orchestrator-turn.json`；若宿主环境仍停留在旧版 Markdown 抽取链，可回退到这份组合载荷。其中 `run-plan（运行计划）` 在 `auto（自动）` 模式下应先保留 `mode（运行模式）` 与 `assumptions（默认假设）`，再调用 `runtime-state bootstrap`，而不是让调用方手工拆分 `run-plan（运行计划）` 和 `task-anchor（任务锚点）`。
 
 补充约束：
 

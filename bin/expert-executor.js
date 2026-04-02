@@ -112,6 +112,10 @@ function normalizeList(value) {
   return [String(value)].filter(Boolean);
 }
 
+function shouldWriteRuntimeMarkdown() {
+  return shouldPersistHistory() || process.env.AI_SPEC_WRITE_RUNTIME_MD === '1';
+}
+
 function readJsonIfExists(filePath) {
   if (!fs.existsSync(filePath)) {
     return null;
@@ -263,7 +267,11 @@ function normalizeExecutionPayload(payload) {
   normalized.kind = 'expert-execution';
   normalized.execution_id = normalized.execution_id || createStampedId('execution', normalized.role.id);
   normalized.generated_at = normalized.generated_at || new Date().toISOString();
-  normalized.markdown = renderExecutionMarkdown(normalized);
+  if (normalized.markdown || shouldWriteRuntimeMarkdown()) {
+    normalized.markdown = renderExecutionMarkdown(normalized);
+  } else {
+    delete normalized.markdown;
+  }
   return normalized;
 }
 
@@ -273,7 +281,11 @@ function normalizeRuntimeActionPayload(payload) {
   normalized.kind = 'task-orchestrator-runtime-action';
   normalized.action_id = normalized.action_id || createStampedId('action', normalized.action);
   normalized.generated_at = normalized.generated_at || new Date().toISOString();
-  normalized.markdown = renderRuntimeActionMarkdown(normalized);
+  if (normalized.markdown || shouldWriteRuntimeMarkdown()) {
+    normalized.markdown = renderRuntimeActionMarkdown(normalized);
+  } else {
+    delete normalized.markdown;
+  }
   return normalized;
 }
 
@@ -282,6 +294,7 @@ function writeExecutionArtifacts(targetDir, payload) {
   const currentExecutionJson = runtimePaths.currentExecutionJson.path;
   const currentExecutionMd = runtimePaths.currentExecutionMd.path;
   const persistHistory = shouldPersistHistory();
+  const writeCurrentMarkdown = shouldWriteRuntimeMarkdown();
   let recordJson = null;
   let recordMd = null;
   if (persistHistory) {
@@ -298,17 +311,21 @@ function writeExecutionArtifacts(targetDir, payload) {
     fs.unlinkSync(runtimePaths.currentExecutionMd.legacyPath);
   }
   writeJson(currentExecutionJson, payload);
-  writeText(currentExecutionMd, payload.markdown);
-  if (recordJson && recordMd) {
+  if (writeCurrentMarkdown && payload.markdown) {
+    writeText(currentExecutionMd, payload.markdown);
+  }
+  if (recordJson && recordMd && payload.markdown) {
     writeJson(recordJson, payload);
     writeText(recordMd, payload.markdown);
+  } else if (recordJson) {
+    writeJson(recordJson, payload);
   }
 
   return {
     current_execution_json: currentExecutionJson,
-    current_execution_md: currentExecutionMd,
+    current_execution_md: writeCurrentMarkdown && payload.markdown ? currentExecutionMd : null,
     execution_record_json: recordJson,
-    execution_record_md: recordMd,
+    execution_record_md: recordMd && payload.markdown ? recordMd : null,
   };
 }
 
@@ -317,6 +334,7 @@ function writeRuntimeActionArtifacts(targetDir, payload) {
   const currentActionJson = runtimePaths.currentRuntimeActionJson.path;
   const currentActionMd = runtimePaths.currentRuntimeActionMd.path;
   const persistHistory = shouldPersistHistory();
+  const writeCurrentMarkdown = shouldWriteRuntimeMarkdown();
   let recordJson = null;
   let recordMd = null;
   if (persistHistory) {
@@ -333,17 +351,21 @@ function writeRuntimeActionArtifacts(targetDir, payload) {
     fs.unlinkSync(runtimePaths.currentRuntimeActionMd.legacyPath);
   }
   writeJson(currentActionJson, payload);
-  writeText(currentActionMd, payload.markdown);
-  if (recordJson && recordMd) {
+  if (writeCurrentMarkdown && payload.markdown) {
+    writeText(currentActionMd, payload.markdown);
+  }
+  if (recordJson && recordMd && payload.markdown) {
     writeJson(recordJson, payload);
     writeText(recordMd, payload.markdown);
+  } else if (recordJson) {
+    writeJson(recordJson, payload);
   }
 
   return {
     current_runtime_action_json: currentActionJson,
-    current_runtime_action_md: currentActionMd,
+    current_runtime_action_md: writeCurrentMarkdown && payload.markdown ? currentActionMd : null,
     runtime_action_record_json: recordJson,
-    runtime_action_record_md: recordMd,
+    runtime_action_record_md: recordMd && payload.markdown ? recordMd : null,
   };
 }
 
