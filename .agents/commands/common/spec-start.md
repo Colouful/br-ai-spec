@@ -25,6 +25,7 @@
 9. 完成当前轮次后，原样播报 `turn.announcements.exit`
 10. 若 `turn.requires_advance = true`，立即执行 `turn.finalize_contract.advance_command`
 11. 若用户中途补充新要求，优先执行 `turn.finalize_contract.update_command` 或 `turn.commands.update`
-12. 重复直到 `turn.status = terminal | blocked`
+12. `advance` 返回后，直接读取返回结果里的下一个 `turn` 并继续；不要 `sleep`、`tail`、`timeout`、`cat` 日志，也不要额外重跑 `protocol-step`
+13. 重复直到 `turn.status = terminal | blocked`
 
 对用户只输出阶段语义和最终摘要，不回显 scratch JSON。

@@ -21,6 +21,7 @@
 5. 完成当前轮次后，原样播报 `turn.announcements.exit`
 6. 若 `turn.requires_advance = true`，立即执行 `turn.finalize_contract.advance_command`
 7. 若用户中途补充新要求，优先执行 `turn.finalize_contract.update_command` 或 `turn.commands.update`
-8. 重复直到 `turn.status = terminal | blocked`
+8. `advance` 返回后，直接读取返回结果里的下一个 `turn` 并继续；不要 `sleep`、`tail`、`timeout`、`cat` 日志，也不要额外重跑 `protocol-step`
+9. 重复直到 `turn.status = terminal | blocked`
 
 `proposal.md`、`tasks.md`、`checklist.md`、`iterations.md` 门禁必须真实落盘。

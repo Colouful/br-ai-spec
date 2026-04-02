@@ -10,6 +10,7 @@
 - 每进入新 `turn` 前，必须原样播报 `turn.announcements.enter`
 - 每完成当前轮次后，必须原样播报 `turn.announcements.exit`
 - 每完成一轮，都必须按 `turn.finalize_contract.advance_command` 执行推进；若用户补充了新需求，使用 `turn.finalize_contract.update_command`
+- `advance` 返回后，必须直接消费返回结果里的下一个 `turn`；禁止 `sleep`、`tail`、`timeout`、`cat` 日志或额外重跑 `protocol-step`
 - 直到 `turn.status` 变成 `terminal` 或 `blocked`
 
 硬性要求：

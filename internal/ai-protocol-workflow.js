@@ -481,6 +481,9 @@ function attachProtocolContracts(turn, options = {}) {
       execute_current_command_first: true,
       current_command: commands.current,
       allowed_actor: actorId,
+      auto_continue_same_session: true,
+      must_consume_returned_turn: true,
+      no_natural_language_handoff: true,
       announce_before_work: turn.announcements?.enter || null,
       announce_after_work: turn.announcements?.exit || null,
       allow_code_write: allowCodeWrite,
@@ -493,12 +496,13 @@ function attachProtocolContracts(turn, options = {}) {
       forbidden_skills: forbiddenSkills,
     },
     requires_advance: requiresAdvance,
-    finalize_contract: turn.status === 'ready'
+      finalize_contract: turn.status === 'ready'
       ? {
           required: true,
           advance_command: commands.advance,
           update_command: commands.update,
           when: '完成当前轮次的所有 writes 后，必须先执行 advance，再对用户汇报',
+          continue_rule: 'advance 返回后，直接消费返回结果中的 turn；不要 sleep、tail、timeout、cat 日志或重复执行 step/advance',
           user_report: '只输出阶段语义和最终摘要，不回显 scratch JSON',
         }
       : null,
