@@ -17,6 +17,7 @@ reads:
   - context/PROJECT.md
   - .agents/rules/
   - openspec/changes/<change-id>/proposal.md
+  - openspec/changes/<change-id>/specs/ui/spec.md
   - openspec/changes/<change-id>/tasks.md
 writes:
   - openspec/changes/<change-id>/checklist.md
@@ -49,7 +50,8 @@ handoff_to: []
 4. 必要时执行 UI 验收或补充测试建议
 5. 产出 `checklist.md`
 6. 记录本轮问题、调整和经验到 `iterations.md`
-7. 在 `checklist.md` 与 `iterations.md` 落盘前，不得给出 `complete（完成）` 结论
+7. 在 `checklist.md` 与 `iterations.md` 落盘前，不得给出交付完成结论
+8. 若检查通过，等待用户决定是否执行归档
 
 ## 执行契约
 
@@ -66,6 +68,7 @@ handoff_to: []
 
 `checklist.md` 至少应包含：
 
+- 中文标题：通过项、未通过项、阻断项、是否建议继续推进
 - 已检查项
 - 未通过项
 - 阻断项和非阻断项
@@ -73,6 +76,7 @@ handoff_to: []
 
 `iterations.md` 至少应包含：
 
+- 中文标题：本轮问题、修正动作、残留风险、下轮提醒
 - 本轮发现的问题
 - 修正动作
 - 仍需关注的残留风险
@@ -84,6 +88,7 @@ handoff_to: []
 
 - `checklist.md` 使用短版：关键检查项、阻断项、是否建议通过
 - `iterations.md` 使用短版：问题、修正动作、残留风险
+- 标题统一使用中文，不混入英文章节名
 - 输出可以短，但不能省略阻断判断
 
 ## 禁止事项
@@ -95,5 +100,5 @@ handoff_to: []
 
 ## 交接
 
-- 当前 MVP 阶段到此结束
+- 默认交给 `task-orchestrator` 进入归档确认
 - 如存在阻断项，退回 `frontend-implementer` 或上抛 `task-orchestrator`

@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const runtimeState = require('./runtime-state');
 const expertDispatch = require('./expert-dispatch');
+const { archiveChange } = require('./archive-change');
 const {
   getRoleArtifactRequirements,
   inferExecutionOpenSpecAction,
@@ -153,6 +154,7 @@ function buildOpenSpecArtifactMap(changeId, artifacts = {}) {
   if (!changeId) {
     return {
       proposal: null,
+      specs: null,
       tasks: null,
       checklist: null,
       iterations: null,
@@ -162,6 +164,7 @@ function buildOpenSpecArtifactMap(changeId, artifacts = {}) {
   const baseDir = `openspec/changes/${changeId}`;
   return {
     proposal: artifacts.proposal || `${baseDir}/proposal.md`,
+    specs: artifacts.specs || `${baseDir}/specs/ui/spec.md`,
     tasks: artifacts.tasks || `${baseDir}/tasks.md`,
     checklist: artifacts.checklist || `${baseDir}/checklist.md`,
     iterations: artifacts.iterations || `${baseDir}/iterations.md`,
@@ -259,6 +262,23 @@ function validateExecutionArtifacts(targetDir, payload) {
     required_outputs: requiredOutputs.map((key) => artifactMap[key]),
     artifact_map: artifactMap,
   };
+}
+
+function shouldTriggerArchiveChange(payload) {
+  const roleId = payload?.role?.id || null;
+  const status = String(payload?.status || '').trim().toLowerCase();
+  return roleId === 'archive-change' && ['done', 'success', 'completed'].includes(status);
+}
+
+function maybeApplyArchiveChange(targetDir, payload) {
+  if (!shouldTriggerArchiveChange(payload)) {
+    return null;
+  }
+
+  return archiveChange({
+    target: targetDir,
+    changeId: payload.task?.change_id || null,
+  });
 }
 
 function renderExecutionMarkdown(payload) {
@@ -533,6 +553,16 @@ function applyRuntimeMutation(targetDir, payload, payloadSource) {
     error: payload.error,
     eventType: payload.event_type || payload.eventType,
     status: payload.status,
+    artifactsData: payload.artifacts || null,
+    skipArtifactCheck:
+      Object.prototype.hasOwnProperty.call(payload, 'skip_artifact_check') ||
+      Object.prototype.hasOwnProperty.call(payload, 'skipArtifactCheck')
+        ? Boolean(
+          Object.prototype.hasOwnProperty.call(payload, 'skip_artifact_check')
+            ? payload.skip_artifact_check
+            : payload.skipArtifactCheck
+        )
+        : undefined,
     clearPendingGate:
       Object.prototype.hasOwnProperty.call(payload, 'clear_pending_gate') ||
       Object.prototype.hasOwnProperty.call(payload, 'clearPendingGate')
@@ -603,12 +633,17 @@ function applyExecution(options) {
   const hydrated = hydrateExecutionPayload(targetDir, rawPayload);
   validateExecutionPayload(hydrated.payload, sourcePath, hydrated.context);
   const validation = validateExecutionArtifacts(targetDir, hydrated.payload);
+  const archive_result = maybeApplyArchiveChange(targetDir, hydrated.payload);
   const payload = normalizeExecutionPayload(hydrated.payload);
   const artifacts = writeExecutionArtifacts(targetDir, payload);
   let runtime_transition = null;
   if (shouldAdvanceRuntime(options)) {
     const runtimeActionPayload = buildAutoRuntimeAction(targetDir, payload);
     if (runtimeActionPayload) {
+      if (archive_result?.archived_artifacts) {
+        runtimeActionPayload.artifacts = archive_result.archived_artifacts;
+        runtimeActionPayload.skip_artifact_check = true;
+      }
       const runtimePayload = normalizeRuntimeActionPayload(runtimeActionPayload);
       const runtimeArtifacts = writeRuntimeActionArtifacts(targetDir, runtimePayload);
       const applied = applyRuntimeMutation(targetDir, runtimePayload, 'expert-executor:auto-runtime');
@@ -643,6 +678,7 @@ function applyExecution(options) {
     },
     payload,
     validation,
+    archive_result,
     runtime_transition,
     cleaned_source: cleanedSource,
   };
@@ -654,12 +690,17 @@ function applyExecutionData(options) {
   const hydrated = hydrateExecutionPayload(targetDir, options.payloadData);
   validateExecutionPayload(hydrated.payload, sourcePath, hydrated.context);
   const validation = validateExecutionArtifacts(targetDir, hydrated.payload);
+  const archive_result = maybeApplyArchiveChange(targetDir, hydrated.payload);
   const payload = normalizeExecutionPayload(hydrated.payload);
   const artifacts = writeExecutionArtifacts(targetDir, payload);
   let runtime_transition = null;
   if (shouldAdvanceRuntime(options)) {
     const runtimeActionPayload = buildAutoRuntimeAction(targetDir, payload);
     if (runtimeActionPayload) {
+      if (archive_result?.archived_artifacts) {
+        runtimeActionPayload.artifacts = archive_result.archived_artifacts;
+        runtimeActionPayload.skip_artifact_check = true;
+      }
       const runtimePayload = normalizeRuntimeActionPayload(runtimeActionPayload);
       const runtimeArtifacts = writeRuntimeActionArtifacts(targetDir, runtimePayload);
       const applied = applyRuntimeMutation(targetDir, runtimePayload, 'expert-executor:auto-runtime');
@@ -693,6 +734,7 @@ function applyExecutionData(options) {
     },
     payload,
     validation,
+    archive_result,
     runtime_transition,
   };
 }

@@ -223,7 +223,8 @@ const FLOW_APPROVAL_RESUME_ROLE_HINTS = {
   'prd-to-delivery': {
     'requirement-analyst': 'frontend-implementer',
     'frontend-implementer': 'code-guardian',
-    'code-guardian': 'code-guardian',
+    'code-guardian': 'archive-change',
+    'archive-change': 'archive-change',
   },
 };
 
@@ -430,6 +431,7 @@ function buildDefaultArtifacts(changeId) {
   if (!changeId) {
     return {
       proposal: null,
+      specs: null,
       tasks: null,
       checklist: null,
       iterations: null,
@@ -440,6 +442,7 @@ function buildDefaultArtifacts(changeId) {
   const baseDir = `openspec/changes/${changeId}`;
   return {
     proposal: `${baseDir}/proposal.md`,
+    specs: `${baseDir}/specs/ui/spec.md`,
     tasks: `${baseDir}/tasks.md`,
     checklist: `${baseDir}/checklist.md`,
     iterations: `${baseDir}/iterations.md`,
@@ -455,6 +458,7 @@ function mergeArtifacts(baseArtifacts, inferredArtifacts) {
 
   const merged = {
     proposal: inferredArtifacts?.proposal || baseArtifacts?.proposal || null,
+    specs: inferredArtifacts?.specs || baseArtifacts?.specs || null,
     tasks: inferredArtifacts?.tasks || baseArtifacts?.tasks || null,
     checklist: inferredArtifacts?.checklist || baseArtifacts?.checklist || null,
     iterations: inferredArtifacts?.iterations || baseArtifacts?.iterations || null,
@@ -471,6 +475,7 @@ function mergeArtifacts(baseArtifacts, inferredArtifacts) {
 function inferArtifacts(artifacts) {
   const normalized = {
     proposal: null,
+    specs: null,
     tasks: null,
     checklist: null,
     iterations: null,
@@ -482,7 +487,7 @@ function inferArtifacts(artifacts) {
   }
 
   if (artifacts && typeof artifacts === 'object' && !Array.isArray(artifacts)) {
-    const directKeys = ['proposal', 'tasks', 'checklist', 'iterations'];
+    const directKeys = ['proposal', 'specs', 'tasks', 'checklist', 'iterations'];
     for (const key of directKeys) {
       if (typeof artifacts[key] === 'string' && artifacts[key].trim()) {
         normalized[key] = artifacts[key];
@@ -513,6 +518,10 @@ function inferArtifacts(artifacts) {
     }
     if (item.endsWith('/proposal.md')) {
       normalized.proposal = item;
+      continue;
+    }
+    if (/\/specs\/.+\.md$/.test(item)) {
+      normalized.specs = item;
       continue;
     }
     if (item.endsWith('/tasks.md')) {
@@ -732,9 +741,9 @@ function assertRequiredOpenSpecArtifacts(targetDir, state, action, toRole) {
 
   let requiredArtifacts = [];
   if (action === 'handoff' && toRole === 'frontend-implementer') {
-    requiredArtifacts = ['proposal', 'tasks'];
+    requiredArtifacts = ['proposal', 'specs', 'tasks'];
   } else if (action === 'complete') {
-    requiredArtifacts = ['proposal', 'tasks', 'checklist', 'iterations'];
+    requiredArtifacts = ['proposal', 'specs', 'tasks', 'checklist', 'iterations'];
   }
 
   if (requiredArtifacts.length === 0) {
@@ -1269,10 +1278,18 @@ function completeRunState(options) {
     ? path.resolve(process.cwd(), options.taskAnchor)
     : null;
   const { currentRunPath, historyRunPath, state, syncCurrent } = resolveRunStatePaths(targetDir, options.runId);
-  assertRequiredOpenSpecArtifacts(targetDir, state, 'complete', options.toRole || state.current_role || null);
+  if (options.skipArtifactCheck !== true) {
+    assertRequiredOpenSpecArtifacts(targetDir, state, 'complete', options.toRole || state.current_role || null);
+  }
   const toRole = options.toRole || state.current_role || null;
   const taskAnchor = loadTaskAnchor(taskAnchorPath, options.taskAnchorData || null);
   const anchor = updateAnchorForRole(state.anchor || null, taskAnchor, toRole, options.nextRole);
+  const nextArtifacts = options.artifactsData
+    ? mergeArtifacts(
+        mergeArtifacts(buildDefaultArtifacts(state.task?.change_id || state.anchor?.task?.change_id || null), inferArtifacts(state.artifacts || null)),
+        inferArtifacts(options.artifactsData),
+      )
+    : state.artifacts;
   const now = new Date();
   const event = buildStateEvent({
     state,
@@ -1292,6 +1309,7 @@ function completeRunState(options) {
     current_role: toRole,
     pending_input_update: false,
     pending_gate: null,
+    artifacts: nextArtifacts,
     anchor,
     events: [...(Array.isArray(state.events) ? state.events : []), event],
     timestamps: {

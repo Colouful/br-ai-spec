@@ -13,6 +13,7 @@
   "execution_plan": {
     "execution_steps": [
       "补齐 proposal",
+      "输出 spec",
       "输出 tasks"
     ]
   },

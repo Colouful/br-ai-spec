@@ -18,16 +18,16 @@ function main() {
   assert.strictEqual(result.turns.requirement_analyst.actor, 'requirement-analyst');
   assert.strictEqual(result.turns.frontend_implementer.actor, 'frontend-implementer');
   assert.strictEqual(result.turns.code_guardian.actor, 'code-guardian');
+  assert.strictEqual(result.turns.archive_gate.status, 'blocked');
+  assert.strictEqual(result.turns.archive_gate.gate, 'before-archive');
+  assert.strictEqual(result.turns.archive_change.actor, 'archive-change');
   assert.strictEqual(result.turns.terminal.status, 'terminal');
 
   const requiredOutputs = [
     '.ai-spec/current-run.json',
     'openspec/config.yaml',
     'openspec/schemas/expert-delivery/schema.yaml',
-    'openspec/changes/runtime-smoke-demo/proposal.md',
-    'openspec/changes/runtime-smoke-demo/tasks.md',
-    'openspec/changes/runtime-smoke-demo/checklist.md',
-    'openspec/changes/runtime-smoke-demo/iterations.md',
+    'openspec/specs/ui/spec.md',
     'src/views/products/mock/index.vue',
     'src/router/modules/products.ts',
     'src/mock/products.ts',
@@ -41,6 +41,8 @@ function main() {
   assert.strictEqual(currentRun.status, 'success');
   assert.strictEqual(currentRun.run_id, 'run_20260408_100000_demo');
   assert.strictEqual(currentRun.task.change_id, 'runtime-smoke-demo');
+  assert.strictEqual(currentRun.current_role, 'archive-change');
+  assert.ok(currentRun.artifacts.proposal.includes('openspec/changes/archive/'));
 
   console.log('demo runtime smoke test passed: minimal expert-delivery example reaches success');
 }

@@ -2,6 +2,7 @@
 const fs = require('fs');
 const path = require('path');
 const protocolWorkflow = require('../internal/ai-protocol-workflow');
+const { archiveChange } = require('./archive-change');
 const runner = require('./task-orchestrator-runner');
 
 const pkgRoot = path.join(__dirname, '..');
@@ -186,6 +187,7 @@ function createBootstrapPayload(runId, userInput, changeId) {
       },
       artifacts: [
         `openspec/changes/${changeId}/proposal.md`,
+        `openspec/changes/${changeId}/specs/ui/spec.md`,
         `openspec/changes/${changeId}/tasks.md`,
         'code',
         `openspec/changes/${changeId}/checklist.md`,
@@ -200,7 +202,7 @@ function createBootstrapPayload(runId, userInput, changeId) {
         activated_optional_roles: [],
         skipped_optional_roles: [],
         first_handoff: 'requirement-analyst',
-        approval_gates: [],
+        approval_gates: ['before-implementation', 'before-archive'],
       },
       missing_inputs: [
         '组件目录位置未明确，采用最小 mock 页面默认结构',
@@ -229,10 +231,12 @@ function createBootstrapPayload(runId, userInput, changeId) {
       },
       artifacts: {
         proposal: `openspec/changes/${changeId}/proposal.md`,
+        specs: `openspec/changes/${changeId}/specs/ui/spec.md`,
         tasks: `openspec/changes/${changeId}/tasks.md`,
       },
       expected_output: [
         '补齐 proposal',
+        '输出 spec',
         '输出 tasks',
         '列出缺失输入',
       ],
@@ -278,6 +282,20 @@ function writeRequirementArtifacts(targetDir, changeId) {
     '',
     '## 风险',
     '- 当前演示为确定性 replay，不代表真实 AI IDE 全自动执行。',
+  ].join('\n'));
+
+  writeFile(targetDir, `openspec/changes/${changeId}/specs/ui/spec.md`, [
+    '## 新增需求',
+    '',
+    '### 需求：商品 mock 页面',
+    '',
+    '系统必须提供一个商品 mock 页面，用于验证 expert-delivery 主链可运行。',
+    '',
+    '#### 场景：进入商品 mock 页面',
+    '',
+    '- **已知** 当前场景只使用本地 mock 数据',
+    '- **当** 用户进入商品 mock 页面',
+    '- **则** 页面展示本地商品列表，不请求真实接口',
   ].join('\n'));
 
   writeFile(targetDir, `openspec/changes/${changeId}/tasks.md`, [
@@ -342,7 +360,7 @@ function writeImplementationArtifacts(targetDir) {
 
 function writeGuardianArtifacts(targetDir, changeId) {
   writeFile(targetDir, `openspec/changes/${changeId}/checklist.md`, [
-    '# Checklist',
+    '# 检查清单',
     '',
     '- [x] proposal.md 已存在',
     '- [x] tasks.md 已存在',
@@ -352,7 +370,7 @@ function writeGuardianArtifacts(targetDir, changeId) {
   ].join('\n'));
 
   writeFile(targetDir, `openspec/changes/${changeId}/iterations.md`, [
-    '# Iterations',
+    '# 迭代记录',
     '',
     '## 当前结论',
     '- 当前为确定性最小示例，主链已闭环。',
@@ -394,7 +412,7 @@ function runDemoRuntimeSmoke(options = {}) {
     runId,
     'requirement-analyst',
     '需求解析专家',
-    ['补齐 proposal', '输出 tasks'],
+    ['补齐 proposal', '输出 spec', '输出 tasks'],
   ));
   const afterRequirement = runner.advanceRunner({ target: targetDir });
 
@@ -414,9 +432,27 @@ function runDemoRuntimeSmoke(options = {}) {
     runId,
     'code-guardian',
     '规范守护者',
-    ['检查范围与产物', '输出 checklist 与 iterations', '确认交付完成'],
+    ['检查范围与产物', '输出 checklist 与 iterations', '等待归档确认'],
   ));
   const afterGuardian = runner.advanceRunner({ target: targetDir });
+
+  const archiveGate = protocolWorkflow.advanceProtocolStep({ target: targetDir });
+  writeJson(targetDir, '.ai-spec/internal/tmp/current-runtime-action.json', {
+    schema_version: 1,
+    kind: 'task-orchestrator-runtime-action',
+    action: 'approve',
+    gate: 'before-archive',
+    to_role: 'archive-change',
+    message: 'demo archive approved',
+  });
+  const afterArchiveApproval = runner.advanceRunner({ target: targetDir });
+
+  const archiveTurn = protocolWorkflow.advanceProtocolStep({ target: targetDir });
+  const afterArchive = archiveChange({
+    target: targetDir,
+    changeId,
+    completeRun: true,
+  });
 
   const terminal = protocolWorkflow.advanceProtocolStep({ target: targetDir });
   const currentRun = JSON.parse(fs.readFileSync(path.join(targetDir, '.ai-spec', 'current-run.json'), 'utf8'));
@@ -445,6 +481,14 @@ function runDemoRuntimeSmoke(options = {}) {
         actor: guardianTurn.turn.actor?.id || null,
         command: guardianTurn.turn.command || null,
       },
+      archive_gate: {
+        status: archiveGate.turn.status || null,
+        gate: archiveGate.turn.guidance?.approval_gate?.gate || null,
+      },
+      archive_change: {
+        actor: archiveTurn.turn.actor?.id || null,
+        command: archiveTurn.turn.command || null,
+      },
       terminal: {
         status: terminal.turn.status || null,
         actor: terminal.turn.actor?.id || null,
@@ -455,18 +499,18 @@ function runDemoRuntimeSmoke(options = {}) {
       requirement: afterRequirement.applied.adapter_action,
       implementation: afterImplementation.applied.adapter_action,
       guardian: afterGuardian.applied.adapter_action,
+      archive_approval: afterArchiveApproval.applied.adapter_action,
+      archive: afterArchive.runtime_transition?.state?.status || afterArchive.status,
     },
     current_run: {
       status: currentRun.status,
       current_role: currentRun.current_role,
       events: Array.isArray(currentRun.events) ? currentRun.events.length : 0,
+      artifacts: currentRun.artifacts || null,
     },
     outputs: [
       '.ai-spec/current-run.json',
-      `openspec/changes/${changeId}/proposal.md`,
-      `openspec/changes/${changeId}/tasks.md`,
-      `openspec/changes/${changeId}/checklist.md`,
-      `openspec/changes/${changeId}/iterations.md`,
+      'openspec/specs/ui/spec.md',
       'src/views/products/mock/index.vue',
       'src/router/modules/products.ts',
       'src/mock/products.ts',

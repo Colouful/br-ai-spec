@@ -23,6 +23,7 @@
     "pending_gate": null,
     "expected_output": [
       "补齐 proposal",
+      "输出 spec",
       "输出 tasks"
     ],
     "skills": []

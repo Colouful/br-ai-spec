@@ -139,16 +139,17 @@ const FALLBACK_ROLE_SKILL_PRIORITY = {
 };
 
 const FALLBACK_ROLE_OPENSPEC_RULE_SECTIONS = {
-  'requirement-analyst': ['proposal', 'tasks'],
-  'frontend-implementer': ['tasks', 'design'],
+  'requirement-analyst': ['proposal', 'specs', 'tasks'],
+  'frontend-implementer': ['specs', 'tasks', 'design'],
   'code-guardian': ['tasks', 'specs', 'checklist', 'iterations'],
+  'archive-change': ['specs', 'checklist', 'iterations'],
 };
 
 const DEFAULT_FLOW_ID = 'prd-to-delivery';
 const DEFAULT_FLOW_CONSTRAINTS = {
   required_roles: ['requirement-analyst', 'frontend-implementer', 'code-guardian'],
-  approval_gates: ['before-implementation', 'before-delivery'],
-  required_artifacts: ['proposal.md', 'tasks.md', 'checklist.md', 'iterations.md'],
+  approval_gates: ['before-implementation', 'before-archive'],
+  required_artifacts: ['proposal.md', 'specs/ui/spec.md', 'tasks.md', 'checklist.md', 'iterations.md'],
 };
 
 const MICRO_ROLE_EXTRAS = {
@@ -163,9 +164,10 @@ const MICRO_ROLE_EXTRAS = {
     ],
   },
   'requirement-analyst': {
-    goal: '用短版 proposal.md 和 tasks.md 收敛需求，不写实现代码。',
+    goal: '用短版 proposal.md、spec.md 和 tasks.md 收敛需求，不写实现代码。',
     must_do: [
       'proposal.md 只保留目标、范围、默认假设、风险四块',
+      'spec.md 只保留当前变更需要的增量规范和场景',
       'tasks.md 保持 3-5 条可执行任务，覆盖实现与验收',
     ],
     must_not: [
@@ -1111,6 +1113,9 @@ function resolveRoleOpenSpecSections(targetDir, roleId) {
 
 function resolveNextRole(targetDir, flowId, roleId, roleDefinition = null) {
   const transition = getRuntimeTransition(targetDir, flowId, roleId);
+  if (transition?.action === 'gate-blocked' && transition?.next_role) {
+    return transition.next_role;
+  }
   if (transition?.to_role) {
     return transition.to_role;
   }
@@ -1129,6 +1134,41 @@ function inferApprovalResumeRoleFromFlow(targetDir, runState, flowDefinition) {
   }
 
   return resolveNextRole(targetDir, flowDefinition.id, currentRole, null);
+}
+
+function inferPendingGateResumeRole(targetDir, runState, flowDefinition, pendingGate) {
+  if (pendingGate === 'before-implementation') {
+    return inferApprovalResumeRoleFromFlow(targetDir, runState, flowDefinition);
+  }
+
+  if (pendingGate === 'before-archive') {
+    const currentRole = runState?.current_role || null;
+    if (currentRole) {
+      return resolveNextRole(targetDir, flowDefinition.id, currentRole, null) || runState?.anchor?.stage?.next_role || null;
+    }
+  }
+
+  return runState?.anchor?.stage?.next_role || runState?.current_role || null;
+}
+
+function describeApprovalGate(pendingGate, resumeRole) {
+  if (pendingGate === 'before-archive') {
+    return {
+      blockedReason: '当前交付检查已完成，是否归档尚未得到你的明确决定，流程先停在归档确认门禁。',
+      requiredUserAction: '明确告诉系统是否执行归档；同意则进入归档专家，不归档则直接结束本次运行。',
+      blockedRule: '在你明确选择之前，禁止合并增量规范或移动 change 目录。',
+      resumeRule: `若你同意归档，先记录归档意见，再恢复到 ${resumeRole || '归档专家'}；若你选择暂不归档，则直接结束当前运行。`,
+      nextOutput: `收到明确归档意见后，再决定是恢复到 ${resumeRole || '归档专家'} 还是直接结束当前运行`,
+    };
+  }
+
+  return {
+    blockedReason: '支付/认证/安全/风控等关键约束未获人工确认，当前不能进入实现阶段。',
+    requiredUserAction: '明确批准或拒绝当前 proposal / tasks 的实现范围与限制条件',
+    blockedRule: '在人工确认前，禁止继续实现或调用 protocol-advance 推进到下一专家',
+    resumeRule: `收到明确批准意见后，先执行 turn.commands.update 记录审批说明，再由用户重新执行 /spec-continue 恢复到 ${resumeRole || '下一位专家'}`,
+    nextOutput: `收到明确批准意见后，先记录审批说明，再让用户重新执行 /spec-continue 恢复到 ${resumeRole || '下一位专家'}`,
+  };
 }
 
 function loadOpenSpecRuleSections(targetDir) {
@@ -1221,11 +1261,27 @@ function buildProtocolCommands(userInput = null) {
   };
 }
 
+function buildRoleCurrentCommand(turn) {
+  const actorId = turn.actor?.id || null;
+  if (actorId !== 'archive-change') {
+    return null;
+  }
+
+  const changeId = turn.input?.change_id || null;
+  if (!changeId) {
+    return './node_modules/.bin/ai-spec archive-change --target . --complete-run --json';
+  }
+
+  return `./node_modules/.bin/ai-spec archive-change --target . --change-id ${shellQuote(changeId)} --complete-run --json`;
+}
+
 function attachProtocolContracts(turn, options = {}) {
   const commands = buildProtocolCommands(options.userInput || turn.input?.latest_user_input || turn.input?.user_request || null);
   commands.current = turn.mode === 'start' ? commands.step : commands.advance;
-  const requiresAdvance = turn.status === 'ready';
   const actorId = turn.actor?.id || null;
+  const currentCommand = buildRoleCurrentCommand(turn);
+  const currentCommandFinalizesRun = actorId === 'archive-change' && Boolean(currentCommand);
+  const requiresAdvance = turn.status === 'ready' && !currentCommandFinalizesRun;
   const deliveryProfile = turn.summary?.delivery_profile || turn.input?.delivery_profile || null;
   const compactUserReport = deliveryProfile === 'micro';
   const allowCodeWrite = actorId === 'frontend-implementer';
@@ -1247,6 +1303,8 @@ function attachProtocolContracts(turn, options = {}) {
       '逐条罗列 created/updated 文件清单',
       '过细的实现结构描述或组件内部实现细节',
       '无必要的绝对/相对文件路径',
+      'proposal.md / spec.md / tasks.md / checklist.md / iterations.md 等文件名',
+      'terminal / success / waiting-approval 等运行态状态词',
       '阶段说明（语义）式回放或逐角色完成播报',
       '对内说明、内部注释或实现者自述',
       '默认附加本地执行提示（如 pnpm dev、浏览器打开路径等）',
@@ -1257,9 +1315,10 @@ function attachProtocolContracts(turn, options = {}) {
     ...turn,
     commands,
     enforcement: {
-      execute_current_command_first: false,
-      current_command: null,
-      current_command_already_executed: true,
+      execute_current_command_first: Boolean(currentCommand),
+      current_command: currentCommand,
+      current_command_already_executed: !currentCommand,
+      current_command_finalizes_run: currentCommandFinalizesRun,
       entry_command: commands.current,
       allowed_actor: actorId,
       auto_continue_same_session: true,
@@ -1268,20 +1327,27 @@ function attachProtocolContracts(turn, options = {}) {
       announce_before_work: turn.announcements?.enter || null,
       announce_after_work: turn.announcements?.exit || null,
       allow_code_write: allowCodeWrite,
-      forbidden_before_current_command: [],
+      forbidden_before_current_command: currentCommand
+        ? ['不要手工执行 mkdir/cp/mv 合并或迁移归档目录']
+        : [],
       forbidden_skills: forbiddenSkills,
     },
     requires_advance: requiresAdvance,
     finalize_contract: turn.status === 'ready'
       ? {
-          required: true,
-          advance_command: commands.advance,
+          required: !currentCommandFinalizesRun,
+          advance_command: currentCommandFinalizesRun ? null : commands.advance,
           update_command: commands.update,
-          when: '完成当前轮次的所有 writes 后，必须先执行 advance，再对用户汇报',
-          continue_rule: 'advance 返回后，直接消费返回结果中的 turn；不要 sleep、tail、timeout、cat 日志或重复执行 step/advance',
+          when: currentCommandFinalizesRun
+            ? '当前 current_command 会直接完成归档与运行收尾；命令成功后不要再写 expert-execution 或执行 advance。'
+            : '完成当前轮次的所有 writes 后，必须先执行 advance，再对用户汇报',
+          continue_rule: currentCommandFinalizesRun
+            ? 'current_command 成功后直接读取 current-run.json 或命令返回结果确认终态，再输出最终摘要；不要补写 runtime-state complete，不要恢复目录，不要额外执行 step/advance'
+            : 'advance 返回后，直接消费返回结果中的 turn；不要 sleep、tail、timeout、cat 日志或重复执行 step/advance',
+          current_command_terminal: currentCommandFinalizesRun,
           user_report: compactUserReport
-            ? '微型任务最终摘要改为三句式：交付结论、验证结果、残留风险，各一句；不要写文件路径、实现结构细节或命令名。'
-            : '标准任务最终摘要保持简洁：只保留关键结果、验证结果、残留风险，必要时补一句下一步；不要写协议细节、文件路径或长篇实现说明。',
+            ? '微型任务最终摘要改为三句式：交付结论、验证结果、残留风险，各一句；不要写文件路径、实现结构细节、命令名或任何内部协议词。'
+            : '标准任务最终摘要保持简洁：只保留关键结果、验证结果、残留风险，必要时补一句下一步；不要写协议细节、文件路径、内部文件名或运行态状态词。',
           user_report_contract: compactUserReport
             ? {
                 style: 'compact',
@@ -1295,7 +1361,9 @@ function attachProtocolContracts(turn, options = {}) {
                   '重复转述 iterations.md 内容',
                   '逐条罗列 created/updated 文件',
                   '逐条罗列 OpenSpec 文件名',
+                  'proposal.md / spec.md / tasks.md / checklist.md / iterations.md 等文件名',
                   '任何文件路径',
+                  'terminal / success / waiting-approval 等运行态状态词',
                   '组件/页面内部实现结构细节',
                   '具体命令名或协议推进细节',
                   '阶段说明（语义）式回放或逐角色完成播报',
@@ -1622,8 +1690,8 @@ function buildRoleSpecificContract(
   if (roleId === 'requirement-analyst') {
     return {
       ...base,
-      summary: '先按项目规则把需求收敛成 proposal/tasks，再把高风险缺口转成门禁或待确认项。',
-      expected_outputs: ['proposal.md', 'tasks.md'],
+      summary: '先按项目规则把需求收敛成 proposal/specs/tasks，再把高风险缺口转成门禁或待确认项。',
+      expected_outputs: ['proposal.md', 'specs/ui/spec.md', 'tasks.md'],
       must_resolve: [
         '页面/路由/API/mock/样式落点需和仓库约定一致',
         '能从项目规则与代码推断的信息优先转成 assumptions',
@@ -1634,7 +1702,7 @@ function buildRoleSpecificContract(
   if (roleId === 'frontend-implementer') {
     return {
       ...base,
-      summary: '按 proposal/tasks 与项目目录、路由、API、样式约定完成实现，不擅自扩 scope。',
+      summary: '按 proposal/specs/tasks 与项目目录、路由、API、样式约定完成实现，不擅自扩 scope。',
       implementation_focus: [
         repoConventions.viewsDir ? `页面落点优先对齐 ${repoConventions.viewsDir}` : '页面落点需与仓库 views 约定一致',
         repoConventions.routeModulesDir ? `路由修改优先对齐 ${repoConventions.routeModulesDir}` : '若新增路由，需先确认路由入口与模块组织方式',
@@ -1663,7 +1731,7 @@ function buildRoleSpecificContract(
 
     return {
       ...base,
-      summary: '按 proposal/tasks 和项目规范核查目录落点、路由/API/样式/Test 合规性，再给交付结论。',
+      summary: '按 proposal/specs/tasks 和项目规范核查目录落点、路由/API/样式/Test 合规性，再给交付结论。',
       review_focus: [
         '页面/组件/路由/API/mock/store 是否落到正确目录',
         '实现边界是否仍符合 proposal/tasks 与审批限制',
@@ -1684,8 +1752,23 @@ function buildRoleSpecificContract(
       ],
       verification_expectations: verificationExpectations,
       output_requirements: [
-        'checklist.md 需要区分通过、未通过、阻断项与建议放行结论',
-        'iterations.md 需要沉淀问题、修正动作、残留风险与下轮提醒',
+        'checklist.md 需要区分通过、未通过、阻断项与建议放行结论，并使用中文标题',
+        'iterations.md 需要沉淀问题、修正动作、残留风险与下轮提醒，并使用中文标题',
+      ],
+    };
+  }
+
+  if (roleId === 'archive-change') {
+    return {
+      ...base,
+      summary: '在用户明确同意后合并增量规范并归档 change 目录，不跳过任何收尾步骤。',
+      archive_command: './node_modules/.bin/ai-spec archive-change --target . --change-id <change-id> --complete-run --json',
+      must_use_internal_command: true,
+      archive_focus: [
+        '优先执行 ai-spec archive-change --complete-run 内置命令，不手工 mkdir/cp/mv',
+        '先把 openspec/changes/<change-id>/specs/ 合并到 openspec/specs/',
+        '再把 change 目录迁移到 openspec/changes/archive/YYYY-MM-DD-<change-id>/',
+        '归档命令成功后直接结束本次运行，不再补写 runtime-state complete 或额外执行 protocol-advance',
       ],
     };
   }
@@ -1715,6 +1798,22 @@ function looksLikeApprovalInput(input) {
   ].some((pattern) => pattern.test(text));
 }
 
+function looksLikeArchiveSkipInput(input) {
+  const text = String(input || '').trim();
+  if (!text) {
+    return false;
+  }
+
+  return [
+    /不归档/,
+    /先不归档/,
+    /暂不归档/,
+    /跳过归档/,
+    /不用归档/,
+    /无需归档/,
+  ].some((pattern) => pattern.test(text));
+}
+
 function buildRoleGuidance(roleId, deliveryProfile) {
   const base = ROLE_GUIDANCE[roleId];
   if (!base) {
@@ -1740,6 +1839,10 @@ function buildRoleGuidance(roleId, deliveryProfile) {
 }
 
 function buildExecutionContract(targetDir, runtimePaths, dispatch, roleDefinition, writes, deliveryProfile) {
+  if (dispatch.role?.id === 'archive-change') {
+    return null;
+  }
+
   const artifactWrites = writes
     .filter((item) => item.kind === 'file' && item.rel_path !== runtimePaths.tmpCurrentExecution.relPath)
     .map((item) => item.rel_path);
@@ -1788,12 +1891,17 @@ function buildExpertExpectedOutput(dispatch, writes, runtimePaths, deliveryProfi
 
   if (dispatch.role?.id === 'requirement-analyst') {
     outputs.push(deliveryProfile === 'micro' ? '完成短版 openspec proposal.md' : '完成 openspec proposal.md');
+    outputs.push(deliveryProfile === 'micro' ? '完成短版 openspec specs/ui/spec.md' : '完成 openspec specs/ui/spec.md');
     outputs.push(deliveryProfile === 'micro' ? '完成短版 openspec tasks.md' : '完成 openspec tasks.md');
   } else if (dispatch.role?.id === 'frontend-implementer') {
     outputs.push('完成当前范围内的代码实现');
   } else if (dispatch.role?.id === 'code-guardian') {
     outputs.push(deliveryProfile === 'micro' ? '完成短版 openspec checklist.md' : '完成 openspec checklist.md');
     outputs.push(deliveryProfile === 'micro' ? '完成短版 openspec iterations.md' : '完成 openspec iterations.md');
+  } else if (dispatch.role?.id === 'archive-change') {
+    outputs.push('执行当前归档命令完成规范合并');
+    outputs.push('执行当前归档命令完成变更归档并结束本次运行');
+    return [...new Set(outputs)];
   }
 
   outputs.push(`写入 ${runtimePaths.tmpCurrentExecution.relPath}`);
@@ -1817,19 +1925,25 @@ function buildActorPresentation(actorId, mode) {
       return {
         label: '需求解析专家',
         enter: '当前阶段：需求解析专家（requirement-analyst）',
-        exit: '需求解析专家已完成 proposal 与 tasks',
+        exit: '需求收敛已完成',
       };
     case 'frontend-implementer':
       return {
         label: '前端实现专家',
         enter: '当前阶段：前端实现专家（frontend-implementer）',
-        exit: '前端实现专家已完成代码实现',
+        exit: '当前范围实现已完成',
       };
     case 'code-guardian':
       return {
         label: '规范守护专家',
         enter: '当前阶段：规范守护专家（code-guardian）',
-        exit: '规范守护专家已完成 checklist 与 iterations',
+        exit: '交付检查已完成',
+      };
+    case 'archive-change':
+      return {
+        label: '归档专家',
+        enter: '当前阶段：归档专家（archive-change）',
+        exit: '归档收尾已完成',
       };
     case 'runner':
       return {
@@ -2087,12 +2201,8 @@ function buildApprovalGateTurn(targetDir, status, currentArtifacts) {
     currentArtifacts.run,
     currentArtifacts.run?.trigger?.latest_user_input || currentArtifacts.run?.trigger?.raw_input || null,
   );
-  const resumeRole = pendingGate === 'before-implementation'
-    ? inferApprovalResumeRoleFromFlow(targetDir, currentArtifacts.run, flowDefinition)
-    : currentArtifacts.run?.current_role || null;
-  const blockedReason = pendingGate === 'before-implementation'
-    ? '支付/认证/安全/风控等关键约束未获人工确认，当前不能进入实现阶段。'
-    : '当前审批门禁尚未解除，流程不能继续推进。';
+  const resumeRole = inferPendingGateResumeRole(targetDir, currentArtifacts.run, flowDefinition, pendingGate);
+  const gateDescription = describeApprovalGate(pendingGate, resumeRole);
   const reads = [
     buildFileTarget(targetDir, path.join('.ai-spec', 'current-run.json'), {
       required: true,
@@ -2110,6 +2220,23 @@ function buildApprovalGateTurn(targetDir, status, currentArtifacts) {
     reads.push(buildReadableTarget(targetDir, currentArtifacts.run.artifacts.tasks, {
       label: 'tasks for approval review',
     }));
+  }
+  if (currentArtifacts.run?.artifacts?.specs) {
+    reads.push(buildReadableTarget(targetDir, currentArtifacts.run.artifacts.specs, {
+      label: 'spec for approval review',
+    }));
+  }
+  if (pendingGate === 'before-archive') {
+    if (currentArtifacts.run?.artifacts?.checklist) {
+      reads.push(buildReadableTarget(targetDir, currentArtifacts.run.artifacts.checklist, {
+        label: 'checklist for archive review',
+      }));
+    }
+    if (currentArtifacts.run?.artifacts?.iterations) {
+      reads.push(buildReadableTarget(targetDir, currentArtifacts.run.artifacts.iterations, {
+        label: 'iterations for archive review',
+      }));
+    }
   }
 
   return attachProtocolContracts(attachActorPresentation({
@@ -2135,18 +2262,18 @@ function buildApprovalGateTurn(targetDir, status, currentArtifacts) {
     expected_output: [
       `当前停在 ${pendingGate}，等待人工确认`,
       '只用简洁摘要告诉用户当前状态、关键原因、下一步',
-      `收到明确批准意见后，先记录审批说明，再让用户重新执行 /spec-continue 恢复到 ${resumeRole || '下一位专家'}`,
+      gateDescription.nextOutput,
     ],
     guidance: {
       ...orchestratorGuidance,
       approval_gate: {
         gate: pendingGate,
         status: 'waiting-approval',
-        required_user_action: '明确批准或拒绝当前 proposal / tasks 的实现范围与限制条件',
-        blocked_rule: '在人工确认前，禁止继续实现或调用 protocol-advance 推进到下一专家',
-        blocked_reason: blockedReason,
+        required_user_action: gateDescription.requiredUserAction,
+        blocked_rule: gateDescription.blockedRule,
+        blocked_reason: gateDescription.blockedReason,
         resume_to_role: resumeRole,
-        resume_rule: `收到明确批准意见后，先执行 turn.commands.update 记录审批说明，再由用户重新执行 /spec-continue 恢复到 ${resumeRole || '下一位专家'}`,
+        resume_rule: gateDescription.resumeRule,
         user_report_contract: {
           style: 'approval-compact',
           max_lines: 4,
@@ -2156,7 +2283,7 @@ function buildApprovalGateTurn(targetDir, status, currentArtifacts) {
           preferred_sentence_count: 3,
           forbidden_items: [
             '长篇阶段说明',
-            '逐条罗列 proposal.md / tasks.md 内容',
+            '逐条罗列 proposal.md / spec.md / tasks.md 内容',
             '逐条列现有仓库文件路径',
             '输出交付结论 / 验证结果 / 残留风险三段式',
             '协议执行过程描述',
@@ -2182,6 +2309,8 @@ function buildUpdateReviewTurn(targetDir, status, currentArtifacts) {
   const orchestratorGuidance = buildOrchestratorGuidance(targetDir, currentArtifacts.run, latestInput);
   const pendingGate = currentArtifacts.run?.pending_gate || null;
   const approvalIntent = pendingGate ? looksLikeApprovalInput(latestInput) : false;
+  const archiveSkipIntent = pendingGate === 'before-archive' ? looksLikeArchiveSkipInput(latestInput) : false;
+  const resumeRole = inferPendingGateResumeRole(targetDir, currentArtifacts.run, flowDefinition, pendingGate);
   const reads = [
     ...buildCommandTargets(targetDir, CONTINUE_INSTRUCTION_FILES),
     buildFileTarget(targetDir, path.join('.ai-spec', 'current-run.json'), {
@@ -2241,6 +2370,12 @@ function buildUpdateReviewTurn(targetDir, status, currentArtifacts) {
           `针对 ${pendingGate} 产出 action=approve 的最小 runtime-action`,
           '审批通过后恢复到下一位可执行专家，而不是继续停在 waiting-approval',
         ]
+      : archiveSkipIntent
+      ? [
+          '将用户的“不归档”决定吸收到运行态',
+          '针对 before-archive 产出 action=complete 的最小 runtime-action',
+          '不进入归档专家，直接结束当前运行',
+        ]
       : [
           '吸收新的用户输入并更新当前假设、边界或交接策略',
           '若补充输入会影响当前阶段，优先产出最小 runtime-action 或 gate 结论',
@@ -2252,16 +2387,13 @@ function buildUpdateReviewTurn(targetDir, status, currentArtifacts) {
         ? {
             gate: pendingGate,
       approval_intent_detected: approvalIntent,
+      archive_skip_intent_detected: archiveSkipIntent,
       latest_user_input: latestInput,
-      resume_to_role: pendingGate === 'before-implementation'
-              ? inferApprovalResumeRoleFromFlow(targetDir, currentArtifacts.run, flowDefinition)
-              : currentArtifacts.run?.current_role || null,
+      resume_to_role: resumeRole,
             next_step: approvalIntent
-              ? `生成 action=approve 的 runtime-action，清除 pending_gate，并恢复到 ${
-                pendingGate === 'before-implementation'
-                  ? (inferApprovalResumeRoleFromFlow(targetDir, currentArtifacts.run, flowDefinition) || '下一位专家')
-                  : (currentArtifacts.run?.current_role || '当前角色')
-              }`
+              ? `生成 action=approve 的 runtime-action，清除 pending_gate，并恢复到 ${resumeRole || '下一位专家'}`
+              : archiveSkipIntent
+              ? '生成 action=complete 的 runtime-action，保持现有交付结果并结束当前运行'
               : '若未获得明确批准，保持 waiting-approval，不要放行到实现阶段',
           }
         : null,
@@ -2333,12 +2465,14 @@ function buildExpertTurn(targetDir, status, currentArtifacts) {
     }
   }
 
-  const writes = [
-    buildFileTarget(targetDir, runtimePaths.tmpCurrentExecution.relPath, {
-      required: true,
-      label: 'expert execution inbox',
-    }),
-  ];
+  const writes = dispatch.role?.id === 'archive-change'
+    ? []
+    : [
+        buildFileTarget(targetDir, runtimePaths.tmpCurrentExecution.relPath, {
+          required: true,
+          label: 'expert execution inbox',
+        }),
+      ];
 
   for (const item of roleDefinition.writes) {
     writes.push(convertTargetSpec(targetDir, item, context));

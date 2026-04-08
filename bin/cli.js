@@ -65,6 +65,11 @@ try {
     process.exit(demoRuntimeSmoke.main(args.slice(1)));
   }
 
+  if (args[0] === 'archive-change') {
+    const archiveChange = require('./archive-change');
+    process.exit(archiveChange.main(args.slice(1)));
+  }
+
   if (process.platform === 'win32') {
     const ps1 = path.join(pkgRoot, 'install.ps1');
     execFileSync('powershell', [

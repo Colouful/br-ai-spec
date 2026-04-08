@@ -55,11 +55,15 @@ const ROLE_METADATA = {
     name: '规范守护者',
     source: '.agents/roles/common/code-guardian.md',
   },
+  'archive-change': {
+    name: '归档专家',
+    source: '.agents/roles/common/archive-change.md',
+  },
 };
 const ROLE_EXPECTED_OUTPUTS = {
   'requirement-analyst': {
-    compact: ['完成短版 proposal.md', '完成短版 tasks.md'],
-    full: ['完成 proposal.md', '完成 tasks.md'],
+    compact: ['完成短版 proposal.md', '完成短版 spec.md', '完成短版 tasks.md'],
+    full: ['完成 proposal.md', '完成 spec.md', '完成 tasks.md'],
   },
   'frontend-implementer': {
     compact: ['完成最小必要实现', '保持改动最小化并记录验证结果'],
@@ -68,6 +72,10 @@ const ROLE_EXPECTED_OUTPUTS = {
   'code-guardian': {
     compact: ['完成短版 checklist.md', '完成短版 iterations.md', '给出交付结论'],
     full: ['完成 checklist.md', '完成 iterations.md', '给出交付结论'],
+  },
+  'archive-change': {
+    compact: ['合并当前增量规范', '完成变更归档', '结束本次运行'],
+    full: ['合并当前增量规范到 openspec/specs', '完成变更归档', '结束本次运行'],
   },
 };
 
@@ -490,6 +498,16 @@ function buildRuntimeOptionsFromPayload(payload, targetDir) {
   if (payload.task_anchor || payload.taskAnchor) {
     options.taskAnchorData = payload.task_anchor || payload.taskAnchor;
   }
+  if (payload.artifacts && typeof payload.artifacts === 'object') {
+    options.artifactsData = payload.artifacts;
+  }
+  if (Object.prototype.hasOwnProperty.call(payload, 'skip_artifact_check') || Object.prototype.hasOwnProperty.call(payload, 'skipArtifactCheck')) {
+    options.skipArtifactCheck = Boolean(
+      Object.prototype.hasOwnProperty.call(payload, 'skip_artifact_check')
+        ? payload.skip_artifact_check
+        : payload.skipArtifactCheck
+    );
+  }
 
   return options;
 }
@@ -774,6 +792,10 @@ function advanceRunner(options) {
     };
     const autoRuntimeAction = buildAutoRuntimeAction(targetDir, recorded.execution.payload);
     if (autoRuntimeAction) {
+      if (recorded.execution.archive_result?.archived_artifacts) {
+        autoRuntimeAction.artifacts = recorded.execution.archive_result.archived_artifacts;
+        autoRuntimeAction.skip_artifact_check = true;
+      }
       recorded.runtime_action = {
         payload: autoRuntimeAction,
         source: 'runner-auto-transition',

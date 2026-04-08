@@ -4,7 +4,7 @@ name: 需求解析专家
 status: active
 domains:
   - demand-design
-description: 负责把 PRD、设计稿或自然语言需求收敛为本次变更的 proposal、tasks 和关键假设，作为实现前置输入。
+description: 负责把 PRD、设计稿或自然语言需求收敛为本次变更的 proposal、specs、tasks 和关键假设，作为实现前置输入。
 triggers:
   - prd-input
   - design-input
@@ -18,6 +18,7 @@ reads:
   - openspec/changes/<change-id>/
 writes:
   - openspec/changes/<change-id>/proposal.md
+  - openspec/changes/<change-id>/specs/ui/spec.md
   - openspec/changes/<change-id>/tasks.md
 handoff_to:
   - frontend-implementer
@@ -46,16 +47,17 @@ handoff_to:
 2. 识别需求目标、交付范围和非目标项
 3. 如果有设计稿，使用 `design-analysis` 梳理 UI 结构与交互重点
 4. 生成或补全 `proposal.md`
-5. 生成首版 `tasks.md`，任务粒度要能支撑实现
-6. 列出关键假设、依赖项和待确认问题
-7. 在 `openspec/changes/<change-id>/` 下落盘完成前，不得把本轮标记为 done
+5. 生成增量规范 `specs/ui/spec.md`
+6. 生成首版 `tasks.md`，任务粒度要能支撑实现
+7. 列出关键假设、依赖项和待确认问题
+8. 在 `openspec/changes/<change-id>/` 下落盘完成前，不得把本轮标记为 done
 
 ## 执行契约
 
 - 优先读取协议下发的 `project_context（项目事实）` 与 `repo_conventions（仓库约定）`
 - 按 `role_rule_contract` 理解当前项目允许的页面、路由、API、mock、样式落点
 - 按 `role_skill_contract.primary_skills` 决定先读哪个技能：
-  - `create-proposal` 负责 proposal/tasks 的结构化产出
+  - `create-proposal` 负责 proposal/specs/tasks 的结构化产出
   - `design-analysis` 仅在存在 UI/页面结构需求时辅助梳理
 - 对于项目规则中已经明确的事实，应直接写入 proposal/tasks 或 assumptions，而不是重复标为 missing_inputs
 
@@ -63,6 +65,7 @@ handoff_to:
 
 `proposal.md` 至少应包含：
 
+- 中文标题：目标、范围、非目标、默认假设、风险与待确认项
 - 变更目标
 - 用户价值或业务背景
 - 范围和非范围
@@ -71,16 +74,25 @@ handoff_to:
 
 `tasks.md` 至少应包含：
 
+- 中文标题：任务清单
 - 可执行任务清单
 - 依赖关系
 - 验收关注点
+
+`specs/ui/spec.md` 至少应包含：
+
+- 中文标题：新增需求、更新需求、删除需求
+- 与当前 proposal 一致的增量规范
+- 至少一个可验证场景
 
 ### micro（微型交付）补充要求
 
 当 `delivery_profile = micro` 时：
 
 - `proposal.md` 使用短版：目标、范围、默认假设、风险
+- `specs/ui/spec.md` 使用短版：只写当前变更需要的增量规范与场景
 - `tasks.md` 使用短版：3-5 条可执行任务
+- 标题统一使用中文，不混入英文章节名
 - 仍需真实落盘，不允许省略
 - 不要把轻量任务写成长篇方案文档
 
@@ -89,7 +101,7 @@ handoff_to:
 - 不直接跳过需求澄清进入编码
 - 不把显著风险写成“后续再看”
 - 不输出只有标题、没有约束和边界的空模板
-- 不在未生成 `proposal.md` 和 `tasks.md` 时宣称需求阶段完成
+- 不在未生成 `proposal.md`、`specs/ui/spec.md` 和 `tasks.md` 时宣称需求阶段完成
 
 ## 交接
 

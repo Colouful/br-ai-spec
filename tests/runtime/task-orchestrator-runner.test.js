@@ -3,6 +3,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const protocolWorkflow = require('../../internal/ai-protocol-workflow');
+const { archiveChange } = require('../../bin/archive-change');
 const runner = require('../../bin/task-orchestrator-runner');
 
 const fixturesDir = path.join(__dirname, 'fixtures');
@@ -38,6 +39,14 @@ function step(targetDir, userInput = null) {
 
 function listTurnTargets(turn) {
   return turn.writes.map((item) => item.rel_path || item.value);
+}
+
+function writeRuntimeActionInbox(targetDir, value) {
+  writeProjectFile(targetDir, '.ai-spec/internal/tmp/current-runtime-action.json', JSON.stringify(value, null, 2));
+}
+
+function writeExecutionInbox(targetDir, value) {
+  writeProjectFile(targetDir, '.ai-spec/internal/tmp/current-execution.json', JSON.stringify(value, null, 2));
 }
 
 function main() {
@@ -107,6 +116,7 @@ function main() {
   assert.deepStrictEqual(listTurnTargets(workflow.turn), [
     '.ai-spec/internal/tmp/current-execution.json',
     'openspec/changes/runtime-smoke-demo/proposal.md',
+    'openspec/changes/runtime-smoke-demo/specs/ui/spec.md',
     'openspec/changes/runtime-smoke-demo/tasks.md',
   ]);
 
@@ -121,6 +131,19 @@ function main() {
     '',
     '## 风险',
     '- 当前仅演示协议流，不接真实 API。',
+  ].join('\n'));
+  writeProjectFile(targetDir, 'openspec/changes/runtime-smoke-demo/specs/ui/spec.md', [
+    '## 新增需求',
+    '',
+    '### 需求：商品演示页',
+    '',
+    '系统必须提供一个最小商品演示页，用于协议链验证。',
+    '',
+    '#### 场景：查看商品演示页',
+    '',
+    '- **已知** 当前仅提供 mock 数据',
+    '- **当** 用户进入商品演示页',
+    '- **则** 页面展示本地 mock 列表且不请求真实接口',
   ].join('\n'));
   writeProjectFile(targetDir, 'openspec/changes/runtime-smoke-demo/tasks.md', [
     '# 实施任务',
@@ -186,11 +209,53 @@ function main() {
   report = advance(targetDir);
   assert.strictEqual(report.consumed.kind, 'expert-execution');
   assert.strictEqual(report.recorded.execution.role, 'code-guardian');
-  assert.strictEqual(report.recorded.runtime_action.action, 'complete');
-  assert.strictEqual(report.applied.adapter_action, 'complete');
-  assert.strictEqual(report.applied.status, 'success');
-  assert.strictEqual(report.next_expected.producer, null);
-  assert.deepStrictEqual(report.next_expected.files, []);
+  assert.strictEqual(report.recorded.runtime_action.action, 'gate-blocked');
+  assert.strictEqual(report.applied.adapter_action, 'gate-blocked');
+  assert.strictEqual(report.applied.status, 'waiting-approval');
+  assert.strictEqual(report.applied.pending_gate, 'before-archive');
+  assert.strictEqual(report.next_expected.producer, 'task-orchestrator');
+
+  workflow = step(targetDir);
+  assert.strictEqual(workflow.turn.status, 'blocked');
+  assert.strictEqual(workflow.turn.mode, 'approval-gate');
+  assert.strictEqual(workflow.turn.guidance.approval_gate.gate, 'before-archive');
+  assert.strictEqual(workflow.turn.guidance.approval_gate.resume_to_role, 'archive-change');
+
+  writeRuntimeActionInbox(targetDir, {
+    schema_version: 1,
+    kind: 'task-orchestrator-runtime-action',
+    action: 'approve',
+    gate: 'before-archive',
+    to_role: 'archive-change',
+    message: 'archive approved',
+  });
+  report = advance(targetDir);
+  assert.strictEqual(report.recorded.runtime_action.action, 'approve');
+  assert.strictEqual(report.applied.adapter_action, 'approve');
+  assert.strictEqual(report.applied.current_role, 'archive-change');
+  assert.strictEqual(report.recorded.dispatch.role, 'archive-change');
+
+  workflow = step(targetDir);
+  assert.strictEqual(workflow.turn.mode, 'execute');
+  assert.strictEqual(workflow.turn.actor.id, 'archive-change');
+  assert.ok(workflow.turn.guidance.role_skill_contract.primary_skills.includes('archive-change'));
+  assert.strictEqual(workflow.turn.enforcement.execute_current_command_first, true);
+  assert.strictEqual(workflow.turn.enforcement.current_command_finalizes_run, true);
+  assert.ok(workflow.turn.enforcement.current_command.includes('ai-spec archive-change --target . --change-id'));
+  assert.ok(workflow.turn.enforcement.current_command.includes('--complete-run'));
+  assert.ok(workflow.turn.enforcement.current_command.includes('runtime-smoke-demo'));
+  assert.strictEqual(workflow.turn.requires_advance, false);
+  assert.strictEqual(workflow.turn.execution_contract, null);
+  assert.ok(!listTurnTargets(workflow.turn).includes('.ai-spec/internal/tmp/current-execution.json'));
+
+  const archiveResult = archiveChange({
+    target: targetDir,
+    changeId: 'runtime-smoke-demo',
+    completeRun: true,
+  });
+  assert.strictEqual(archiveResult.status, 'success');
+  assert.strictEqual(archiveResult.runtime_transition.state.status, 'success');
+  assert.strictEqual(archiveResult.runtime_transition.state.current_role, 'archive-change');
 
   workflow = step(targetDir);
   assert.strictEqual(workflow.turn.status, 'terminal');
@@ -203,8 +268,10 @@ function main() {
   const currentRun = JSON.parse(fs.readFileSync(currentRunPath, 'utf8'));
   assert.strictEqual(currentRun.run_id, 'run_20260331_160700_smoke');
   assert.strictEqual(currentRun.status, 'success');
-  assert.strictEqual(currentRun.current_role, 'code-guardian');
-  assert.strictEqual(currentRun.events.length, 4);
+  assert.strictEqual(currentRun.current_role, 'archive-change');
+  assert.strictEqual(currentRun.events.length, 6);
+  assert.ok(currentRun.artifacts.proposal.includes('openspec/changes/archive/'));
+  assert.ok(fs.existsSync(path.join(targetDir, 'openspec/specs/ui/spec.md')));
 
   const runnerStatus = status(targetDir);
   assert.strictEqual(runnerStatus.kind, 'task-orchestrator-runner-status');
@@ -218,7 +285,7 @@ function main() {
     assert.ok(consumedFiles.length >= 0);
   }
 
-  console.log('task-orchestrator runner test passed: AI protocol flow reaches code delivery terminal success');
+  console.log('task-orchestrator runner test passed: AI protocol flow reaches archive confirmation and terminal success');
 }
 
 main();

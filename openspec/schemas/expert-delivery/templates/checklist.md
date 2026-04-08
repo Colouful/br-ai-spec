@@ -1,17 +1,17 @@
-## Passed
+## 通过项
 
-- [ ] Proposal, specs, design, and implementation remain aligned
-- [ ] Completed tasks are reflected in code and supporting files
-- [ ] Project rules for structure, routing, API, style, and tests are satisfied
+- [ ] proposal、specs、design 与实现结果保持一致
+- [ ] 已完成任务已真实反映在代码和配套文件中
+- [ ] 项目的目录、路由、接口、样式、测试等规则已满足
 
-## Failed
+## 未通过项
 
-- [ ] List items that do not meet requirements or project rules
+- [ ] 记录未满足需求或项目规则的项
 
-## Blocking Items
+## 阻断项
 
-- [ ] List items that must be resolved before release or archive
+- [ ] 记录在继续交付、放行或归档前必须解决的项
 
-## Recommendation
+## 是否建议继续推进
 
-<!-- State whether the change is ready to proceed, ready with warnings, or blocked. -->
+<!-- 说明当前变更是可以继续推进、带风险推进，还是必须阻断。 -->

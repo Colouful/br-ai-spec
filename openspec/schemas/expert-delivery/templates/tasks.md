@@ -1,4 +1,4 @@
-- [ ] Confirm implementation entry points and affected files
-- [ ] Implement the scoped change according to design.md and specs
-- [ ] Add or update tests and verification evidence as needed
-- [ ] Review the result against proposal.md, specs, and project rules
+- [ ] 确认实现入口与受影响文件
+- [ ] 按 design.md 和 specs 落地当前范围内的变更
+- [ ] 按需补充测试与验证证据
+- [ ] 结合 proposal.md、specs 和项目规则复核结果

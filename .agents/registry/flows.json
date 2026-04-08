@@ -14,11 +14,11 @@
       "artifact_profile": "full",
       "required_roles": ["requirement-analyst", "frontend-implementer", "code-guardian"],
       "first_handoff": "requirement-analyst",
-      "approval_gates": ["before-implementation", "before-delivery"],
-      "core_artifacts": ["proposal", "tasks", "checklist", "iterations"],
-      "required_artifacts": ["proposal.md", "tasks.md", "checklist.md", "iterations.md"],
-      "handoff_policy": "task-orchestrator -> requirement-analyst -> frontend-implementer -> code-guardian -> terminal",
-      "completion_policy": "proposal.md, tasks.md, checklist.md, iterations.md 缺一不可"
+      "approval_gates": ["before-implementation", "before-archive"],
+      "core_artifacts": ["proposal", "specs", "tasks", "checklist", "iterations"],
+      "required_artifacts": ["proposal.md", "specs/ui/spec.md", "tasks.md", "checklist.md", "iterations.md"],
+      "handoff_policy": "task-orchestrator -> requirement-analyst -> frontend-implementer -> code-guardian -> before-archive -> archive-change(可选) -> terminal",
+      "completion_policy": "proposal.md、specs/ui/spec.md、tasks.md、checklist.md、iterations.md 缺一不可；若用户同意归档，再执行 archive-change"
     }
   }
 }

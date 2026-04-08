@@ -23,10 +23,18 @@ const FLOW_RUNTIME_TRANSITIONS = {
       message: 'handoff to code-guardian after implementation delivery',
     },
     'code-guardian': {
-      action: 'complete',
+      action: 'gate-blocked',
       to_role: 'code-guardian',
+      next_role: 'archive-change',
+      pending_gate: 'before-archive',
+      status: 'waiting-approval',
+      message: 'waiting for user decision before archive-change closeout',
+    },
+    'archive-change': {
+      action: 'complete',
+      to_role: 'archive-change',
       next_role: null,
-      message: 'run completed after code-guardian final review',
+      message: 'run completed after archive-change closeout',
     },
   },
 };
@@ -39,11 +47,13 @@ const ROLE_OPENSPEC_ACTIONS = {
 };
 
 const ROLE_REQUIRED_INPUTS = {
-  'frontend-implementer': ['proposal', 'tasks'],
+  'frontend-implementer': ['proposal', 'specs', 'tasks'],
+  'code-guardian': ['proposal', 'specs', 'tasks'],
+  'archive-change': ['proposal', 'specs', 'tasks', 'checklist', 'iterations'],
 };
 
 const ROLE_REQUIRED_OUTPUTS = {
-  'requirement-analyst': ['proposal', 'tasks'],
+  'requirement-analyst': ['proposal', 'specs', 'tasks'],
   'code-guardian': ['checklist', 'iterations'],
 };
 
@@ -133,6 +143,9 @@ function validatePreImplementationGate(targetDir, currentRun, executionPayload) 
   const proposalPath = currentRun.artifacts?.proposal
     ? path.join(targetDir, currentRun.artifacts.proposal)
     : null;
+  const specsPath = currentRun.artifacts?.specs
+    ? path.join(targetDir, currentRun.artifacts.specs)
+    : null;
   const tasksPath = currentRun.artifacts?.tasks
     ? path.join(targetDir, currentRun.artifacts.tasks)
     : null;
@@ -140,6 +153,9 @@ function validatePreImplementationGate(targetDir, currentRun, executionPayload) 
 
   if (!proposalPath || !fs.existsSync(proposalPath)) {
     reasons.push('proposal.md 缺失');
+  }
+  if (!specsPath || !fs.existsSync(specsPath)) {
+    reasons.push('spec.md 缺失');
   }
   if (!tasksPath || !fs.existsSync(tasksPath)) {
     reasons.push('tasks.md 缺失');
@@ -150,6 +166,7 @@ function validatePreImplementationGate(targetDir, currentRun, executionPayload) 
   }
 
   const proposalContent = fs.readFileSync(proposalPath, 'utf8').trim();
+  const specsContent = fs.readFileSync(specsPath, 'utf8').trim();
   const tasksContent = fs.readFileSync(tasksPath, 'utf8').trim();
   const taskItems = listMarkdownBullets(tasksContent);
 
@@ -175,6 +192,9 @@ function validatePreImplementationGate(targetDir, currentRun, executionPayload) 
     if (proposalContent.length < 60) {
       reasons.push('proposal.md 过短，未达到 compact 最小信息量');
     }
+    if (specsContent.length < 40) {
+      reasons.push('spec.md 过短，未达到 compact 最小信息量');
+    }
     if (taskItems.length < 3) {
       reasons.push('tasks.md 任务条目不足 3 条');
     }
@@ -185,6 +205,9 @@ function validatePreImplementationGate(targetDir, currentRun, executionPayload) 
       .length;
     if (proposalContent.length < 120) {
       reasons.push('proposal.md 过短，未达到 standard 最小信息量');
+    }
+    if (specsContent.length < 80) {
+      reasons.push('spec.md 过短，未达到 standard 最小信息量');
     }
     if (headingCount < 2) {
       reasons.push('proposal.md 缺少足够的小节结构');
@@ -261,6 +284,23 @@ function buildAutoRuntimeAction(targetDir, executionPayload) {
     }
   }
 
+  if (transition.action === 'gate-blocked') {
+    return {
+      schema_version: 1,
+      kind: 'task-orchestrator-runtime-action',
+      action: 'gate-blocked',
+      run_id: executionPayload.run_id,
+      from_role: roleId,
+      to_role: transition.to_role || roleId,
+      next_role: transition.next_role || null,
+      pending_gate: transition.pending_gate || 'before-archive',
+      status: transition.status || 'waiting-approval',
+      clear_pending_gate: false,
+      message: executionPayload.next_action || transition.message,
+      source: 'expert-executor-auto-transition',
+    };
+  }
+
   const nextRole = executionPayload.next_role !== undefined
     ? executionPayload.next_role
     : transition.next_role;
@@ -280,6 +320,7 @@ function buildAutoRuntimeAction(targetDir, executionPayload) {
     message: executionPayload.next_action || transition.message,
     source: 'expert-executor-auto-transition',
     openspec_action: action === 'complete' ? 'archive' : null,
+    skip_artifact_check: action === 'complete' && roleId === 'archive-change',
   };
 }
 

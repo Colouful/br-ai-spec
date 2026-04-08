@@ -1,19 +1,19 @@
-## Why
+## 目标
 
-<!-- Explain the business goal or engineering reason for this change. -->
+<!-- 说明这项变更的业务目标或工程原因。 -->
 
-## Scope
+## 范围
 
-<!-- List what is included in this change. -->
+<!-- 列出本次变更包含的内容。 -->
 
-## Non-Goals
+## 非目标
 
-<!-- List what is explicitly out of scope. -->
+<!-- 列出本次明确不包含的内容。 -->
 
-## Assumptions
+## 默认假设
 
-<!-- Record assumptions inferred from the repository, project rules, or existing code. -->
+<!-- 记录根据仓库、项目规则或现有代码推断出的默认假设。 -->
 
-## Risks And Open Questions
+## 风险与待确认项
 
-<!-- Surface unresolved tradeoffs, constraints, and high-risk items before implementation. -->
+<!-- 在进入实现前明确尚未解决的权衡、约束与高风险项。 -->

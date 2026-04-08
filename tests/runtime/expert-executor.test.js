@@ -24,6 +24,62 @@ function writeJsonFile(targetDir, relPath, value) {
   writeProjectFile(targetDir, relPath, JSON.stringify(value, null, 2));
 }
 
+function buildArchiveDispatch(runId) {
+  return {
+    schema_version: 1,
+    kind: 'expert-dispatch',
+    run_id: runId,
+    role: {
+      id: 'archive-change',
+      name: '归档专家',
+      source: '.agents/roles/common/archive-change.md',
+    },
+    task: {
+      raw_goal: 'archive runtime smoke demo',
+      change_id: 'runtime-smoke-demo',
+    },
+    flow: {
+      id: 'prd-to-delivery',
+    },
+    execution: {
+      profile: 'vue',
+      delivery_profile: 'micro',
+      artifact_profile: 'compact',
+      current_role: 'archive-change',
+      next_role: null,
+      pending_gate: null,
+      expected_output: ['合并当前增量规范', '完成当前变更归档'],
+      skills: [{ id: 'archive-change' }],
+    },
+    anchor: {
+      schema_version: 1,
+      kind: 'task-anchor',
+      task: {
+        raw_goal: 'archive runtime smoke demo',
+        change_id: 'runtime-smoke-demo',
+        input_kind: 'natural-language',
+      },
+      stage: {
+        flow_id: 'prd-to-delivery',
+        current_role: 'archive-change',
+        next_role: null,
+      },
+      artifacts: {
+        proposal: 'openspec/changes/runtime-smoke-demo/proposal.md',
+        specs: 'openspec/changes/runtime-smoke-demo/specs/ui/spec.md',
+        tasks: 'openspec/changes/runtime-smoke-demo/tasks.md',
+        checklist: 'openspec/changes/runtime-smoke-demo/checklist.md',
+        iterations: 'openspec/changes/runtime-smoke-demo/iterations.md',
+      },
+      expected_output: ['完成归档'],
+    },
+    instructions: {
+      source: '.agents/roles/common/archive-change.md',
+      markdown: '# archive-change',
+    },
+  };
+}
+
 function createWorkspace() {
   const targetDir = fs.mkdtempSync(path.join(os.tmpdir(), 'br-ai-spec-executor-test-'));
   writeProjectFile(targetDir, 'package.json', JSON.stringify({
@@ -89,6 +145,19 @@ function main() {
     '## Risk',
     '- No real API integration in this smoke case.',
   ].join('\n'));
+  writeProjectFile(targetDir, 'openspec/changes/runtime-smoke-demo/specs/ui/spec.md', [
+    '## 新增需求',
+    '',
+    '### 需求：商品演示页',
+    '',
+    '系统必须提供一个最小商品演示页，用于 runtime smoke 验证。',
+    '',
+    '#### 场景：进入演示页',
+    '',
+    '- **已知** 当前变更仅用于 mock 演示',
+    '- **当** 用户访问商品演示页',
+    '- **则** 页面展示本地 mock 商品列表，不请求真实接口',
+  ].join('\n'));
   writeProjectFile(targetDir, 'openspec/changes/runtime-smoke-demo/tasks.md', [
     '# Tasks',
     '',
@@ -106,6 +175,7 @@ function main() {
   assert.strictEqual(result.payload.openspec_action, 'propose');
   assert.deepStrictEqual(result.validation.required_outputs, [
     'openspec/changes/runtime-smoke-demo/proposal.md',
+    'openspec/changes/runtime-smoke-demo/specs/ui/spec.md',
     'openspec/changes/runtime-smoke-demo/tasks.md',
   ]);
   assert.strictEqual(result.runtime_transition.payload.action, 'handoff');
@@ -125,6 +195,7 @@ function main() {
   assert.strictEqual(result.payload.openspec_action, 'apply');
   assert.deepStrictEqual(result.validation.required_inputs, [
     'openspec/changes/runtime-smoke-demo/proposal.md',
+    'openspec/changes/runtime-smoke-demo/specs/ui/spec.md',
     'openspec/changes/runtime-smoke-demo/tasks.md',
   ]);
   assert.strictEqual(result.runtime_transition.payload.action, 'handoff');
@@ -148,16 +219,74 @@ function main() {
     'openspec/changes/runtime-smoke-demo/checklist.md',
     'openspec/changes/runtime-smoke-demo/iterations.md',
   ]);
-  assert.strictEqual(result.runtime_transition.payload.action, 'complete');
-  assert.strictEqual(result.runtime_transition.payload.openspec_action, 'archive');
+  assert.strictEqual(result.runtime_transition.payload.action, 'gate-blocked');
+  assert.strictEqual(result.runtime_transition.payload.pending_gate, 'before-archive');
   let currentRun = readCurrentRun(targetDir);
-  assert.strictEqual(currentRun.status, 'success');
+  assert.strictEqual(currentRun.status, 'waiting-approval');
   assert.strictEqual(currentRun.current_role, 'code-guardian');
+  assert.strictEqual(currentRun.pending_gate, 'before-archive');
+  assertMissingCurrentArtifacts(targetDir);
+
+  result = expertExecutor.applyRuntimeActionData({
+    target: targetDir,
+    advanceRuntime: true,
+    payloadData: {
+      schema_version: 1,
+      kind: 'task-orchestrator-runtime-action',
+      action: 'approve',
+      gate: 'before-archive',
+      to_role: 'archive-change',
+      next_role: null,
+      message: 'archive approved',
+    },
+  });
+  currentRun = readCurrentRun(targetDir);
+  assert.strictEqual(currentRun.status, 'running');
+  assert.strictEqual(currentRun.current_role, 'archive-change');
+  assert.strictEqual(currentRun.pending_gate, null);
+
+  expertDispatch.applyDispatchData({
+    target: targetDir,
+    payloadData: buildArchiveDispatch(currentRun.run_id),
+  });
+  result = expertExecutor.applyExecutionData({
+    target: targetDir,
+    advanceRuntime: true,
+    payloadData: {
+      schema_version: 1,
+      kind: 'expert-execution',
+      run_id: currentRun.run_id,
+      status: 'completed',
+      role: {
+        id: 'archive-change',
+        name: '归档专家',
+      },
+      task: {
+        change_id: 'runtime-smoke-demo',
+      },
+      flow: {
+        id: 'prd-to-delivery',
+      },
+      execution_plan: {
+        execution_steps: ['合并增量规范', '归档当前变更'],
+      },
+    },
+  });
+  assert.strictEqual(result.payload.openspec_action, 'archive');
+  assert.ok(result.archive_result, 'expected archive_result after archive-change execution');
+  assert.strictEqual(result.runtime_transition.payload.action, 'complete');
+  assert.strictEqual(result.runtime_transition.payload.skip_artifact_check, true);
+  currentRun = readCurrentRun(targetDir);
+  assert.strictEqual(currentRun.status, 'success');
+  assert.strictEqual(currentRun.current_role, 'archive-change');
+  assert.ok(currentRun.artifacts.proposal.includes('openspec/changes/archive/'));
+  assert.ok(fs.existsSync(path.join(targetDir, 'openspec/specs/ui/spec.md')));
   assertMissingCurrentArtifacts(targetDir);
 
   const runtimeActionTarget = createWorkspace();
   bootstrapRun(runtimeActionTarget);
   writeProjectFile(runtimeActionTarget, 'openspec/changes/runtime-smoke-demo/proposal.md', '# Proposal');
+  writeProjectFile(runtimeActionTarget, 'openspec/changes/runtime-smoke-demo/specs/ui/spec.md', '# Spec');
   writeProjectFile(runtimeActionTarget, 'openspec/changes/runtime-smoke-demo/tasks.md', '# Tasks');
   writeProjectFile(runtimeActionTarget, 'openspec/changes/runtime-smoke-demo/checklist.md', '# checklist');
   writeProjectFile(runtimeActionTarget, 'openspec/changes/runtime-smoke-demo/iterations.md', '# iterations');
@@ -169,7 +298,7 @@ function main() {
       kind: 'task-orchestrator-runtime-action',
       action: 'complete',
       status: 'success',
-      to_role: 'code-guardian',
+      to_role: 'archive-change',
       message: 'manual archive closeout',
     },
   });
@@ -177,7 +306,7 @@ function main() {
   assert.strictEqual(result.payload.openspec_action, 'archive');
   currentRun = readCurrentRun(runtimeActionTarget);
   assert.strictEqual(currentRun.status, 'success');
-  assert.strictEqual(currentRun.current_role, 'code-guardian');
+  assert.strictEqual(currentRun.current_role, 'archive-change');
 
   const registryOverrideTarget = createWorkspace();
   bootstrapRun(registryOverrideTarget);
@@ -204,6 +333,13 @@ function main() {
     '## Scope',
     '- Keep compact proposal sufficient for the micro gate.',
   ].join('\n'));
+  writeProjectFile(registryOverrideTarget, 'openspec/changes/runtime-smoke-demo/specs/ui/spec.md', [
+    '## 新增需求',
+    '',
+    '### 需求：覆盖 transition',
+    '',
+    '系统必须支持本地注册表覆盖。',
+  ].join('\n'));
   writeProjectFile(registryOverrideTarget, 'openspec/changes/runtime-smoke-demo/tasks.md', [
     '# Tasks',
     '',
@@ -218,7 +354,7 @@ function main() {
   });
   assert.strictEqual(result.runtime_transition.payload.message, 'registry override handoff message');
 
-  console.log('expert-executor test passed: execution semantics advance runtime-state with propose/apply/verify/archive linkage');
+  console.log('expert-executor test passed: execution semantics advance runtime-state with specs and archive confirmation linkage');
 }
 
 main();

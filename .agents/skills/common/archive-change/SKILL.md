@@ -26,6 +26,15 @@ description: 变更归档增强层。在执行 /opsx:archive 时确保增量规�
 - "归档变更"
 - "归档当前变更"
 
+优先执行命令：
+
+```bash
+./node_modules/.bin/ai-spec archive-change --target . --change-id <name> --complete-run --json
+```
+
+除非该命令不可用，否则不要手工执行 `mkdir`、`cp`、`mv` 去合并或迁移目录。
+该命令成功后会直接完成运行收尾；不要再手工补 `runtime-state complete`，也不要额外执行 `protocol-advance`。
+
 ---
 
 ## 步骤 1：归档前检查

@@ -1,15 +1,15 @@
-## Issues Found
+## 本轮问题
 
-- [ ] Record key issues identified in this round
+- [ ] 记录本轮识别出的关键问题
 
-## Corrective Actions
+## 修正动作
 
-- [ ] Record fixes or follow-up actions taken
+- [ ] 记录已采取的修复或后续处理动作
 
-## Residual Risks
+## 残留风险
 
-- [ ] Record remaining risks, warnings, or deferred items
+- [ ] 记录仍然存在的风险、警告或延后项
 
-## Next Round Notes
+## 下轮提醒
 
-- [ ] Record reminders for the next iteration or future change
+- [ ] 记录下一轮协作或后续变更的提醒

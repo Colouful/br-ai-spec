@@ -66,8 +66,8 @@
         }
       },
       "openspec_actions": ["propose"],
-      "openspec_rule_sections": ["proposal", "tasks"],
-      "required_outputs": ["proposal", "tasks"],
+      "openspec_rule_sections": ["proposal", "specs", "tasks"],
+      "required_outputs": ["proposal", "specs", "tasks"],
       "runtime_transition": {
         "action": "handoff",
         "to_role": "frontend-implementer",
@@ -105,8 +105,8 @@
         }
       },
       "openspec_actions": ["apply"],
-      "openspec_rule_sections": ["tasks", "design"],
-      "required_inputs": ["proposal", "tasks"],
+      "openspec_rule_sections": ["specs", "tasks", "design"],
+      "required_inputs": ["proposal", "specs", "tasks"],
       "runtime_transition": {
         "action": "handoff",
         "to_role": "code-guardian",
@@ -144,13 +144,44 @@
       },
       "openspec_actions": ["verify"],
       "openspec_rule_sections": ["tasks", "specs", "checklist", "iterations"],
+      "required_inputs": ["proposal", "specs", "tasks"],
       "required_outputs": ["checklist", "iterations"],
       "runtime_transition": {
-        "action": "complete",
+        "action": "gate-blocked",
         "to_role": "code-guardian",
+        "next_role": "archive-change",
+        "pending_gate": "before-archive",
+        "status": "waiting-approval",
+        "message": "wait for archive confirmation after code-guardian final review"
+      }
+    },
+    "archive-change": {
+      "name": "归档专家",
+      "status": "active",
+      "domains": ["delivery", "documentation"],
+      "source": ".agents/roles/common/archive-change.md",
+      "skill_priority": ["archive-change"],
+      "micro_skill_allowlist": ["archive-change"],
+      "rule_contract_profiles": {
+        "default": {
+          "must_follow": [
+            "先合并 openspec/changes/<change-id>/specs/ 到 openspec/specs/，再归档 change 目录。",
+            "归档目录必须落在 openspec/changes/archive/YYYY-MM-DD-<change-id>/，不能改到其它位置。"
+          ],
+          "blocked_when": [
+            "缺少 proposal/specs/tasks/checklist/iterations 任一关键产物时，不得执行归档。"
+          ]
+        }
+      },
+      "openspec_actions": ["archive"],
+      "openspec_rule_sections": ["specs", "checklist", "iterations"],
+      "required_inputs": ["proposal", "specs", "tasks", "checklist", "iterations"],
+      "runtime_transition": {
+        "action": "complete",
+        "to_role": "archive-change",
         "next_role": null,
         "status": "success",
-        "message": "run completed after code-guardian final review"
+        "message": "run completed after archive-change closeout"
       }
     },
     "design-collaborator": {

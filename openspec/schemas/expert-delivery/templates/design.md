@@ -1,19 +1,19 @@
-## Overview
+## 方案概览
 
-<!-- Summarize the implementation approach in the current repository context. -->
+<!-- 结合当前仓库上下文，概述本次实现方案。 -->
 
-## Repo Alignment
+## 仓库对齐
 
-<!-- Describe target directories, route entries, API layers, state layers, and style entry points to reuse. -->
+<!-- 说明需要复用的目标目录、路由入口、API 层、状态层和样式入口。 -->
 
-## Key Decisions
+## 关键决策
 
-<!-- Explain the main design choices and why they fit this repository. -->
+<!-- 说明主要设计选择，以及为什么适合当前仓库。 -->
 
-## Data And Interface Changes
+## 数据与接口变更
 
-<!-- Describe request/response changes, state updates, props, events, or contracts. -->
+<!-- 说明请求/响应、状态更新、props、事件或契约变化。 -->
 
-## Verification Notes
+## 验证说明
 
-<!-- Note the verification strategy, expected tests, and UI validation approach if applicable. -->
+<!-- 说明验证策略、预期测试和必要的 UI 验收方式。 -->
