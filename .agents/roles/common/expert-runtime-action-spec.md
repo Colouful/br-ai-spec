@@ -22,7 +22,7 @@ description: 定义如何把 task-orchestrator（任务主代理） 产出的 ta
 这一步不负责：
 
 - 自动推理该动作
-- 自动执行该动作
+- 默认不自动执行该动作
 - 自动递归推进下一轮
 
 ## 2. 推荐落盘位置
@@ -44,6 +44,17 @@ ai-spec expert-executor apply-action --payload ./.ai-spec/internal/tmp/current-r
 cat ./.ai-spec/internal/tmp/current-runtime-action.json | ai-spec expert-executor apply-action --stdin
 ```
 
+如果当前环境已经确认由 `expert-executor（专家执行器）` 负责把动作提交到运行态，可显式启用：
+
+```bash
+ai-spec expert-executor apply-action --payload ./.ai-spec/internal/tmp/current-runtime-action.json --advance-runtime
+```
+
+补充约束：
+
+- `run_id` 缺省时允许从 `.ai-spec/current-run.json` 自动补齐
+- `complete` 会被视作 OpenSpec 的 `archive` 语义收尾，但运行态仍落为 `complete`
+
 ## 4. 与 Phase C（第三步） 的边界
 
 当前这一步只做：
@@ -52,10 +63,11 @@ cat ./.ai-spec/internal/tmp/current-runtime-action.json | ai-spec expert-executo
 
 当前这一步不做：
 
-- 自动调用 `task-orchestrator-adapter（自动执行适配层）`
-- 自动递归推进下一轮
-- 自动连跑完整专家链
+- 默认不自动调用 `task-orchestrator-adapter（自动执行适配层）`
+- 不自动递归推进下一轮
+- 不自动连跑完整专家链
+- 不自动生成下一轮 `expert-dispatch（专家派发载荷）`
 
 ## 5. 一句话要求
 
-> Phase B（第二步） 允许系统记录“下一步动作草案”，但动作本身必须由 `task-orchestrator（任务主代理）` 明确产出，不能由本地脚本代替 `task-orchestrator（任务主代理）` 推理。
+> Phase B（第二步） 允许系统记录“下一步动作草案”，也允许在显式授权下把它提交到运行态；但动作本身仍必须由 `task-orchestrator（任务主代理）` 明确产出，不能由本地脚本代替 `task-orchestrator（任务主代理）` 推理。

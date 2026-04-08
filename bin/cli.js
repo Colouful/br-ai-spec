@@ -60,6 +60,11 @@ try {
     process.exit(expertExecutor.main(args.slice(1)));
   }
 
+  if (args[0] === 'demo-runtime-smoke') {
+    const demoRuntimeSmoke = require('./demo-runtime-smoke');
+    process.exit(demoRuntimeSmoke.main(args.slice(1)));
+  }
+
   if (process.platform === 'win32') {
     const ps1 = path.join(pkgRoot, 'install.ps1');
     execFileSync('powershell', [

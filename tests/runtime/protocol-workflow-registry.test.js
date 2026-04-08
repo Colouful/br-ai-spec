@@ -1,0 +1,169 @@
+const assert = require('assert');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+const protocolWorkflow = require('../../internal/ai-protocol-workflow');
+const runner = require('../../bin/task-orchestrator-runner');
+
+const fixturesDir = path.join(__dirname, 'fixtures');
+
+function copyFixture(targetDir, fixtureName, inboxName) {
+  const inboxDir = path.join(targetDir, '.ai-spec', 'internal', 'tmp');
+  fs.mkdirSync(inboxDir, { recursive: true });
+  fs.copyFileSync(path.join(fixturesDir, fixtureName), path.join(inboxDir, inboxName));
+}
+
+function writeProjectFile(targetDir, relPath, content) {
+  const filePath = path.join(targetDir, relPath);
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, `${content}\n`, 'utf8');
+}
+
+function writeJsonFile(targetDir, relPath, value) {
+  writeProjectFile(targetDir, relPath, JSON.stringify(value, null, 2));
+}
+
+function createWorkspace() {
+  const targetDir = fs.mkdtempSync(path.join(os.tmpdir(), 'br-ai-spec-protocol-registry-test-'));
+  writeProjectFile(targetDir, 'package.json', JSON.stringify({
+    name: 'protocol-registry-smoke',
+    scripts: {
+      build: 'vite build',
+      lint: 'eslint .',
+    },
+    dependencies: {
+      vue: '^3.5.0',
+      'vue-router': '^4.4.0',
+      pinia: '^3.0.0',
+      vite: '^6.0.0',
+    },
+    devDependencies: {
+      typescript: '^5.0.0',
+    },
+  }, null, 2));
+  writeProjectFile(targetDir, 'pnpm-lock.yaml', 'lockfileVersion: 9.0');
+  writeProjectFile(targetDir, 'src/router/index.ts', 'export const router = {}');
+  writeProjectFile(targetDir, 'src/router/modules/demo.ts', 'export default []');
+  writeProjectFile(targetDir, 'src/views/demo/index.vue', '<template><div /></template>');
+  writeProjectFile(targetDir, 'src/api/order.ts', 'export function getOrderListApi() {}');
+  writeProjectFile(targetDir, 'src/api/types/order.ts', 'export interface Order {}');
+  writeProjectFile(targetDir, 'src/styles/variables.scss', ':root {}');
+  writeProjectFile(targetDir, 'context/PROJECT.md', '# PROJECT');
+  return targetDir;
+}
+
+function main() {
+  const flowOverrideTarget = createWorkspace();
+  writeJsonFile(flowOverrideTarget, '.agents/registry/flows.json', {
+    version: 1,
+    flows: {
+      'prd-to-delivery': {
+        required_roles: ['requirement-analyst', 'code-guardian'],
+        first_handoff: 'code-guardian',
+        approval_gates: ['before-delivery'],
+        required_artifacts: ['proposal.md', 'checklist.md'],
+        handoff_policy: 'task-orchestrator -> code-guardian -> terminal',
+        completion_policy: 'proposal.md, checklist.md 缺一不可',
+      },
+    },
+  });
+
+  let workflow = protocolWorkflow.advanceProtocolStep({
+    target: flowOverrideTarget,
+    userInput: '创建一个商品组件',
+  });
+
+  assert.deepStrictEqual(
+    workflow.turn.guidance.routing_constraints.required_experts,
+    ['requirement-analyst', 'code-guardian'],
+  );
+  assert.strictEqual(workflow.turn.guidance.routing_constraints.first_handoff, 'code-guardian');
+  assert.deepStrictEqual(workflow.turn.guidance.approval_contract.gates, ['before-delivery']);
+  assert.deepStrictEqual(workflow.turn.guidance.orchestration_contract.required_artifacts, ['proposal.md', 'checklist.md']);
+  assert.strictEqual(
+    workflow.turn.guidance.orchestration_contract.handoff_policy,
+    'task-orchestrator -> code-guardian -> terminal',
+  );
+  assert.strictEqual(
+    workflow.turn.guidance.orchestration_contract.completion_policy,
+    'proposal.md, checklist.md 缺一不可',
+  );
+
+  const roleOverrideTarget = createWorkspace();
+  writeProjectFile(roleOverrideTarget, '.agents/rules/custom-overview.md', '# custom overview');
+  writeProjectFile(roleOverrideTarget, '.agents/skills/custom-design-analysis/SKILL.md', '# custom design analysis');
+  writeJsonFile(roleOverrideTarget, '.agents/registry/rules.json', {
+    version: 1,
+    rules: {
+      'project-overview': {
+        source: '.agents/rules/custom-overview.md',
+      },
+    },
+  });
+  writeJsonFile(roleOverrideTarget, '.agents/registry/skills.json', {
+    version: 1,
+    skills: {
+      'design-analysis': {
+        source: '.agents/skills/custom-design-analysis/SKILL.md',
+      },
+    },
+  });
+  writeJsonFile(roleOverrideTarget, '.agents/registry/roles.json', {
+    version: 1,
+    roles: {
+      'requirement-analyst': {
+        rule_ids: ['project-overview'],
+        skill_priority: ['design-analysis', 'create-proposal'],
+        rule_contract_profiles: {
+          default: {
+            must_follow: ['先按本地项目约束收敛需求。'],
+            blocked_when: ['若关键上下文缺失则维持门禁。'],
+          },
+        },
+        openspec_rule_sections: ['proposal'],
+      },
+    },
+  });
+  copyFixture(roleOverrideTarget, 'task-orchestrator-bootstrap-reply.md', 'task-orchestrator-turn.json');
+  const bootstrap = runner.advanceRunner({ target: roleOverrideTarget });
+  assert.strictEqual(bootstrap.applied.adapter_action, 'bootstrap');
+
+  workflow = protocolWorkflow.advanceProtocolStep({
+    target: roleOverrideTarget,
+  });
+
+  assert.strictEqual(workflow.turn.actor.id, 'requirement-analyst');
+  assert.deepStrictEqual(
+    workflow.turn.guidance.role_rule_contract.source_rules.map((item) => item.id),
+    ['project-overview'],
+  );
+  assert.strictEqual(
+    workflow.turn.guidance.role_rule_contract.source_rules[0].path,
+    '.agents/rules/custom-overview.md',
+  );
+  assert.deepStrictEqual(
+    workflow.turn.guidance.role_skill_contract.primary_skills,
+    ['design-analysis', 'create-proposal'],
+  );
+  assert.deepStrictEqual(
+    workflow.turn.guidance.role_rule_contract.must_follow,
+    ['先按本地项目约束收敛需求。', '页面任务优先对齐 src/views/<page>/index.vue 与 src/router/modules/<module>.ts 的落点约定。', '若为 mock 或占位页，明确写清 src/mock 或本地 mock 方案，以及“不接真实 API”的边界。', '样式和视觉约束需对齐主题 CSS 变量，不要把硬编码颜色或自由样式当默认方案。'],
+  );
+  assert.deepStrictEqual(
+    workflow.turn.guidance.role_rule_contract.blocked_when,
+    ['若关键上下文缺失则维持门禁。'],
+  );
+  assert.ok(
+    workflow.turn.guidance.role_skill_contract.read_targets.some(
+      (item) => item.rel_path === '.agents/skills/custom-design-analysis/SKILL.md' && item.exists,
+    ),
+  );
+  assert.deepStrictEqual(
+    workflow.turn.guidance.openspec_rules.sections.map((item) => item.name),
+    ['proposal'],
+  );
+
+  console.log('protocol workflow registry test passed: task-orchestrator and expert turns honor local flow, rule, and skill overrides');
+}
+
+main();

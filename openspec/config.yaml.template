@@ -1,42 +1,42 @@
-# OpenSpec 项目配置（由 ex-ai-spec  提供的增强版模板）
-# install.sh L3 安装时会将此模板写入 openspec/config.yaml
+# OpenSpec 项目配置（由 ex-ai-spec 提供的增强版模板）
+# install.sh / install.ps1 在 L3 安装时会将此模板写入 openspec/config.yaml，
+# 并同步 openspec/schemas/expert-delivery 到目标项目。
 # 详见 https://github.com/Fission-AI/OpenSpec
 
-schema: spec-driven
+schema: expert-delivery
 
 context: |
-  本项目使用 ex-ai-spec  规范体系：
-  - .agents/rules/: 开发规范（编码、组件、API、路由、状态管理、样式等）
-  - .agents/skills/: 实践技能（组件、路由、接口、设计稿分析、UI验收等）
-  执行任务时遵循 .agents/rules/12-Superpowers执行规范.md
-  技能索引：.agents/skills/README.md
+  本项目接入 ex-ai-spec 专家协同平台：
+  - rules: .agents/rules/
+  - skills: .agents/skills/
+  - roles: .agents/roles/
+  - flows: .agents/flows/
+  - runtime: .ai-spec/
+
+  项目执行时优先遵循：
+  1. 仓库现有代码中的目录、路由、接口、样式、测试约定
+  2. context/PROJECT.md 中的项目背景与仓库事实
+  3. .agents/rules/ 中的团队规范
+  4. .agents/skills/ 中的执行技能
 
 rules:
   proposal:
-    - "创建提案前确认：是否有设计稿、是否有接口、交付形态（页面/组件/模块）"
-    - "有设计稿时使用 .agents/skills/design-analysis/SKILL.md 产出 UI 分析清单"
-    - "交付为页面时，参考 .agents/rules/06-路由规范.md 确定路由结构"
-    - "交付为组件时，参考 .agents/rules/04-组件规范.md 确定组件放置"
-    - "涉及接口时，参考 .agents/rules/05-API规范.md 确定接口结构"
-    - "未就绪的接口按项目 Mock 数据策略处理"
-  tasks:
-    - "执行任务前须读取 .agents/rules/12-Superpowers执行规范.md"
-    - "按 .agents/skills/execute-task/SKILL.md 的四步循环执行"
-    - "涉及组件开发须引用 .agents/rules/04-组件规范.md"
-    - "涉及接口须引用 .agents/rules/05-API规范.md"
-    - "涉及 UI 还原须在末尾加验收任务，引用 .agents/skills/ui-verification/SKILL.md"
-    - "每条任务完成后须按 .agents/rules/14-审计汇报规范.md 输出审计报告"
-    - "保持改动最小化，聚焦于请求的变更"
-  design:
-    - "技术方案须遵循 .agents/rules/ 中的架构约束"
-    - "样式方案须使用主题变量，见 .agents/rules/09-样式规范.md"
-    - "组件拆分须遵循 .agents/rules/04-组件规范.md"
+    - "先收敛目标、范围、非目标项、默认假设和风险，再进入实现。"
+    - "能从项目规则和代码推断的内容，优先写入 assumptions，不重复标记为缺失输入。"
+    - "涉及页面、路由、接口、状态、样式时，必须对齐项目既有落点。"
   specs:
-    - "每个 capability 的验收场景须可测试"
-    - "有设计稿时引用 UI 分析清单作为验收参考"
-  archive:
-    - "步骤1：检查 openspec/specs/ 目录是否存在，不存在则创建"
-    - "步骤2：遍历 openspec/changes/<name>/specs/ 下的每个域目录（如 ui/、api/），将增量规范合并到 openspec/specs/<domain>/"
-    - "合并策略：按 domain 目录名匹配；openspec/specs/<domain>/ 不存在则创建；已存在则更新对应 spec.md 内容（保留未涉及的 capability）"
-    - "步骤3：合并完成后，将变更目录移动到 openspec/changes/archive/YYYY-MM-DD-<name>/（注意是 changes/archive/ 下，不是 openspec/archive/）"
-    - "步骤4：输出合并摘要 — 新增了哪些 specs 域、更新了哪些 specs、归档路径"
+    - "需求必须落为可测试的增量规范和场景。"
+    - "涉及 UI 时，验收场景应覆盖关键布局、状态和交互。"
+  tasks:
+    - "任务必须可执行、可验证、可交接。"
+    - "实现阶段不得静默扩 scope。"
+    - "涉及 UI 时必须明确验收方式；涉及接口时必须明确封装方式。"
+    - "保持改动最小化，聚焦于请求的变更。"
+  design:
+    - "技术方案必须对齐项目目录、路由、API、状态、样式和测试约定。"
+    - "新增能力优先复用现有结构，不因单次变更引入无关重构。"
+  checklist:
+    - "必须明确通过项、未通过项、阻断项和是否建议放行。"
+    - "检查结论必须基于 proposal/tasks、项目规则和实现证据。"
+  iterations:
+    - "必须记录问题、修正动作、残留风险和下轮提醒。"

@@ -13,10 +13,13 @@ description: sync（同步）本地求解使用的最小注册表目录。用于
   - 定义 `scenario_package（场景方案包）` 默认展开出的 `roles（专家角色） / skills（技能） / rules（规则） / domains（能力域）`
 - `rules.json`
   - 定义 `rule（规则） id` 到实际文件的映射，以及它们的 `domains（能力域）`
+  - `task-orchestrator` 优先通过它解析规则文件，不再在执行器中硬编码规则路径
 - `skills.json`
   - 定义 `skill（技能）` 的 `domains（能力域）` 标签
+  - `task-orchestrator` 优先通过它解析技能文件，不再在执行器中硬编码技能路径
 - `roles.json`
   - 定义 `role（专家角色）` 的安装元数据，以及角色侧公共支持文件
+  - 同时承载 `rule_ids / skill_priority / micro_skill_allowlist / rule_contract_profiles / openspec_actions / runtime_transition` 等运行时约束
 - `flows.json`
   - 定义 `flow（流程模板）` 的安装元数据，以及流程侧公共支持文件
 
@@ -48,8 +51,10 @@ ai-spec validate-registry --json
 - `JSON（结构化数据）` 是否可解析
 - 根字段是否存在
 - `version（版本号）` 是否合法
-- `source（源文件） / support_files（支持文件）` 是否真实存在
+- `source（源文件） / sourceByProfile（按技术栈源文件） / support_files（支持文件）` 是否真实存在
 - `domains（能力域）` 是否为字符串数组
+- `roles.json / flows.json / scenario-packages.json` 对 `rules / skills / roles` 的引用是否都能在注册表中找到
+- `roles.json.rule_contract_profiles` 的 profile key 与数组字段是否合法
 - `scenario_package（场景方案包）` 引用的 `roles（专家角色） / skills（技能） / rules（规则）` 是否都能在注册表中找到
 
 `ai-spec sync（同步）` 在执行前也会先跑一次注册表校验；若校验失败，会直接中断并提示先执行 `ai-spec validate-registry` 查看详情。

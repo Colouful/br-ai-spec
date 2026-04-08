@@ -982,7 +982,19 @@ setup_openspec() {
   fi
 
   # 无论 CLI 是否可用，始终确保目录骨架存在
-  mkdir -p "$target/openspec/specs" "$target/openspec/changes/archive"
+  mkdir -p "$target/openspec/specs" "$target/openspec/changes/archive" "$target/openspec/schemas"
+
+  # 同步项目级自定义 schema
+  local schema_src="$SOURCE_DIR/openspec/schemas"
+  local schema_dst="$target/openspec/schemas"
+  if [ -d "$schema_src" ]; then
+    for schema_dir in "$schema_src"/*/; do
+      [ -d "$schema_dir" ] || continue
+      local schema_name; schema_name="$(basename "$schema_dir")"
+      rm -rf "$schema_dst/$schema_name"
+      cp -R "$schema_dir" "$schema_dst/$schema_name"
+    done
+  fi
 
   # 合并增强版 config.yaml 模板
   local template="$SOURCE_DIR/openspec/config.yaml.template"
@@ -995,6 +1007,9 @@ setup_openspec() {
         ok "config.yaml 已增强"
       else
         info "config.yaml 已包含 context 字段，跳过合并"
+      fi
+      if grep -q "^schema:[[:space:]]*spec-driven" "$config_file" 2>/dev/null; then
+        warn "检测到 legacy schema=spec-driven，建议迁移到 expert-delivery 以启用 checklist/iterations 产物"
       fi
     else
       mkdir -p "$(dirname "$config_file")"
@@ -1382,11 +1397,15 @@ cmd_check() {
     ok "openspec/ 存在"
     if [ -f "$target/openspec/config.yaml" ] || [ -f "$target/openspec/config.yml" ]; then
       ok "  config.yaml 存在"
+      if grep -q "^schema:[[:space:]]*spec-driven" "$target/openspec/config.yaml" 2>/dev/null; then
+        warn "  config.yaml 仍为 legacy spec-driven，建议迁移到 expert-delivery"
+      fi
     else
       warn "  config.yaml 缺失"
     fi
     [ -d "$target/openspec/specs" ]   && ok "  specs/ 存在"   || warn "  specs/ 缺失"
     [ -d "$target/openspec/changes" ] && ok "  changes/ 存在" || warn "  changes/ 缺失"
+    [ -f "$target/openspec/schemas/expert-delivery/schema.yaml" ] && ok "  expert-delivery schema 存在" || warn "  expert-delivery schema 缺失"
   else
     info "openspec/ 不存在（L3 级别才需要）"
   fi

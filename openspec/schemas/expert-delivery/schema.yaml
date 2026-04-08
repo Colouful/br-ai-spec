@@ -1,0 +1,69 @@
+name: expert-delivery
+version: 1
+description: Expert-driven delivery workflow built on top of spec-driven with explicit verification artifacts.
+
+artifacts:
+  - id: proposal
+    generates: proposal.md
+    description: Change proposal and execution boundary
+    template: proposal.md
+    instruction: |
+      Create a proposal that explains why the change is needed, what is in scope, what is out of scope,
+      and which assumptions or risks must be surfaced before implementation.
+    requires: []
+
+  - id: specs
+    generates: specs/**/*.md
+    description: Delta specs for requirements and acceptance scenarios
+    template: spec.md
+    instruction: |
+      Create one or more delta spec files under specs/<domain>/spec.md.
+      Each spec must define concrete requirements and testable scenarios aligned with the proposal.
+    requires:
+      - proposal
+
+  - id: design
+    generates: design.md
+    description: Technical design and implementation approach
+    template: design.md
+    instruction: |
+      Create a design document that explains how the change should be implemented in the current repository.
+      Reuse existing structures where possible and avoid unrelated refactors.
+    requires:
+      - proposal
+
+  - id: tasks
+    generates: tasks.md
+    description: Executable implementation checklist
+    template: tasks.md
+    instruction: |
+      Create a task list that can be executed by implementation specialists.
+      Tasks must be concrete, verifiable, and scoped to the approved change.
+    requires:
+      - specs
+      - design
+
+  - id: checklist
+    generates: checklist.md
+    description: Delivery verification checklist
+    template: checklist.md
+    instruction: |
+      Create a verification checklist that records pass, fail, blocking items, and a release recommendation
+      based on the implemented code, tasks, specs, and project rules.
+    requires:
+      - tasks
+
+  - id: iterations
+    generates: iterations.md
+    description: Iteration notes and residual risks
+    template: iterations.md
+    instruction: |
+      Record issues found in this round, corrective actions taken, residual risks, and recommendations for
+      the next iteration or follow-up work.
+    requires:
+      - checklist
+
+apply:
+  requires:
+    - tasks
+  tracks: tasks.md

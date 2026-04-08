@@ -1,6 +1,14 @@
 #!/usr/bin/env node
 const fs = require('fs');
 const path = require('path');
+const runtimeState = require('./runtime-state');
+const expertDispatch = require('./expert-dispatch');
+const {
+  getRoleArtifactRequirements,
+  inferExecutionOpenSpecAction,
+  inferRuntimeActionOpenSpecAction,
+  buildAutoRuntimeAction,
+} = require('./execution-semantics');
 const {
   resolveRuntimePaths,
   getCandidatePaths,
@@ -21,6 +29,7 @@ Options:
   --target <dir>         Target project directory (default: .)
   --payload <file>       Path to payload JSON file
   --stdin                Read payload JSON from stdin
+  --advance-runtime      Persist payload and apply inferred runtime-state mutation
   --json                 Print JSON result only
   --pretty               Print readable summary (default)
   --help                 Show this help
@@ -47,6 +56,9 @@ function parseArgs(argv) {
         break;
       case '--stdin':
         options.stdin = true;
+        break;
+      case '--advance-runtime':
+        options.advanceRuntime = true;
         break;
       case '--json':
         options.json = true;
@@ -124,6 +136,19 @@ function readJsonIfExists(filePath) {
   return readJson(filePath, 'json');
 }
 
+function resolveRuntimeContext(targetDir) {
+  const runtimePaths = resolveRuntimePaths(targetDir);
+  return {
+    runtimePaths,
+    currentRun: readJsonIfExists(runtimePaths.currentRun.path),
+    currentDispatch: readJsonIfExists(getExistingPath(runtimePaths.currentDispatch)),
+  };
+}
+
+function shouldAdvanceRuntime(options = {}) {
+  return options.advanceRuntime === true;
+}
+
 function buildOpenSpecArtifactMap(changeId, artifacts = {}) {
   if (!changeId) {
     return {
@@ -143,38 +168,84 @@ function buildOpenSpecArtifactMap(changeId, artifacts = {}) {
   };
 }
 
-function validateOpenSpecOutputs(targetDir, payload) {
-  const requiredByRole = {
-    'requirement-analyst': ['proposal', 'tasks'],
-    'code-guardian': ['checklist', 'iterations'],
-  };
+function hydrateExecutionPayload(targetDir, payload) {
+  const hydrated = JSON.parse(JSON.stringify(payload || {}));
+  const context = resolveRuntimeContext(targetDir);
+  const { currentRun, currentDispatch } = context;
 
-  const requiredKeys = requiredByRole[payload.role.id] || [];
-  if (requiredKeys.length === 0) {
-    return null;
-  }
-
-  const runtimePaths = resolveRuntimePaths(targetDir);
-  const currentRun = readJsonIfExists(runtimePaths.currentRun.path);
-  const currentDispatch = readJsonIfExists(getExistingPath(runtimePaths.currentDispatch));
-  const changeId =
-    payload.task?.change_id ||
+  hydrated.run_id = hydrated.run_id || currentDispatch?.run_id || currentRun?.run_id || null;
+  hydrated.dispatch_id = hydrated.dispatch_id || currentDispatch?.dispatch_id || null;
+  hydrated.role = typeof hydrated.role === 'object' && hydrated.role ? hydrated.role : {};
+  hydrated.role.id = hydrated.role.id || currentDispatch?.role?.id || null;
+  hydrated.role.name = hydrated.role.name || currentDispatch?.role?.name || null;
+  hydrated.flow = typeof hydrated.flow === 'object' && hydrated.flow ? hydrated.flow : {};
+  hydrated.flow.id = hydrated.flow.id || currentDispatch?.flow?.id || currentRun?.flow?.id || null;
+  hydrated.task = typeof hydrated.task === 'object' && hydrated.task ? hydrated.task : {};
+  hydrated.task.change_id =
+    hydrated.task.change_id ||
     currentDispatch?.task?.change_id ||
     currentRun?.task?.change_id ||
     currentRun?.anchor?.task?.change_id ||
     null;
 
+  const artifactMap = buildOpenSpecArtifactMap(
+    hydrated.task.change_id,
+    currentRun?.artifacts || {},
+  );
+  hydrated.artifacts = {
+    ...artifactMap,
+    ...(typeof hydrated.artifacts === 'object' && hydrated.artifacts ? hydrated.artifacts : {}),
+  };
+  hydrated.openspec_action = hydrated.openspec_action || inferExecutionOpenSpecAction(hydrated, targetDir);
+
+  return {
+    payload: hydrated,
+    context,
+  };
+}
+
+function hydrateRuntimeActionPayload(targetDir, payload) {
+  const hydrated = JSON.parse(JSON.stringify(payload || {}));
+  const context = resolveRuntimeContext(targetDir);
+  const { currentRun } = context;
+
+  hydrated.run_id = hydrated.run_id || currentRun?.run_id || null;
+  hydrated.from_role = hydrated.from_role || currentRun?.current_role || null;
+  hydrated.to_role = hydrated.to_role || null;
+  hydrated.openspec_action = hydrated.openspec_action || inferRuntimeActionOpenSpecAction(hydrated);
+
+  return {
+    payload: hydrated,
+    context,
+  };
+}
+
+function collectMissingArtifacts(targetDir, artifactMap, keys) {
+  return keys
+    .map((key) => artifactMap[key])
+    .filter((relPath) => !relPath || !fs.existsSync(path.join(targetDir, relPath)));
+}
+
+function validateExecutionArtifacts(targetDir, payload) {
+  const changeId = payload.task?.change_id || null;
   if (!changeId) {
     throw new Error(
-      `Execution payload for ${payload.role.id} requires task.change_id or current-run.task.change_id to resolve OpenSpec outputs`,
+      `Execution payload for ${payload.role.id} requires task.change_id or current-run.task.change_id to resolve OpenSpec artifacts`,
     );
   }
 
-  const artifactMap = buildOpenSpecArtifactMap(changeId, currentRun?.artifacts || {});
-  const missingOutputs = requiredKeys
-    .map((key) => artifactMap[key])
-    .filter((relPath) => !relPath || !fs.existsSync(path.join(targetDir, relPath)));
+  const artifactMap = buildOpenSpecArtifactMap(changeId, payload.artifacts || {});
+  const requirements = getRoleArtifactRequirements(targetDir, payload.role.id);
+  const requiredInputs = requirements.required_inputs;
+  const requiredOutputs = requirements.required_outputs;
+  const missingInputs = collectMissingArtifacts(targetDir, artifactMap, requiredInputs);
+  const missingOutputs = collectMissingArtifacts(targetDir, artifactMap, requiredOutputs);
 
+  if (missingInputs.length > 0) {
+    throw new Error(
+      `Execution payload for ${payload.role.id} is missing required OpenSpec inputs: ${missingInputs.join(', ')}`,
+    );
+  }
   if (missingOutputs.length > 0) {
     throw new Error(
       `Execution payload for ${payload.role.id} is missing required OpenSpec artifacts: ${missingOutputs.join(', ')}`,
@@ -183,7 +254,10 @@ function validateOpenSpecOutputs(targetDir, payload) {
 
   return {
     change_id: changeId,
-    required_outputs: requiredKeys.map((key) => artifactMap[key]),
+    openspec_action: payload.openspec_action || null,
+    required_inputs: requiredInputs.map((key) => artifactMap[key]),
+    required_outputs: requiredOutputs.map((key) => artifactMap[key]),
+    artifact_map: artifactMap,
   };
 }
 
@@ -197,6 +271,9 @@ function renderExecutionMarkdown(payload) {
   lines.push('');
   lines.push(`- run_id（运行 ID）: ${payload.run_id || 'n/a'}`);
   lines.push(`- role（专家角色）: ${payload.role?.id || 'n/a'}${payload.role?.name ? `（${payload.role.name}）` : ''}`);
+  if (payload.openspec_action) {
+    lines.push(`- openspec_action（OpenSpec 动作）: ${payload.openspec_action}`);
+  }
   lines.push(`- execution_id（执行 ID）: ${payload.execution_id || 'n/a'}`);
   lines.push(`- status（状态）: ${payload.status || 'n/a'}`);
   if (payload.flow?.id) lines.push(`- flow（流程模板）: ${payload.flow.id}`);
@@ -223,6 +300,9 @@ function renderRuntimeActionMarkdown(payload) {
   lines.push('');
   lines.push(`- run_id（运行 ID）: ${payload.run_id || 'n/a'}`);
   lines.push(`- action（动作）: ${payload.action || 'n/a'}`);
+  if (payload.openspec_action) {
+    lines.push(`- openspec_action（OpenSpec 动作）: ${payload.openspec_action}`);
+  }
   lines.push(`- from_role（来源专家）: ${payload.from_role || 'n/a'}`);
   if (payload.to_role) lines.push(`- to_role（目标专家）: ${payload.to_role}`);
   if (payload.next_role) lines.push(`- next_role（下一位专家）: ${payload.next_role}`);
@@ -231,7 +311,7 @@ function renderRuntimeActionMarkdown(payload) {
   return lines.join('\n').trim();
 }
 
-function validateExecutionPayload(payload, sourceLabel) {
+function validateExecutionPayload(payload, sourceLabel, context = {}) {
   if (!payload || typeof payload !== 'object') {
     throw new Error(`Invalid execution payload: ${sourceLabel}`);
   }
@@ -243,6 +323,23 @@ function validateExecutionPayload(payload, sourceLabel) {
   }
   if (!payload.role || typeof payload.role !== 'object' || !payload.role.id) {
     throw new Error(`Execution payload is missing role.id: ${sourceLabel}`);
+  }
+
+  const currentDispatch = context.currentDispatch || null;
+  if (currentDispatch?.run_id && payload.run_id && currentDispatch.run_id !== payload.run_id) {
+    throw new Error(
+      `Execution payload run_id does not match current-dispatch: expected ${currentDispatch.run_id}, got ${payload.run_id}`,
+    );
+  }
+  if (currentDispatch?.dispatch_id && payload.dispatch_id && currentDispatch.dispatch_id !== payload.dispatch_id) {
+    throw new Error(
+      `Execution payload dispatch_id does not match current-dispatch: expected ${currentDispatch.dispatch_id}, got ${payload.dispatch_id}`,
+    );
+  }
+  if (currentDispatch?.role?.id && payload.role.id && currentDispatch.role.id !== payload.role.id) {
+    throw new Error(
+      `Execution payload role.id does not match current-dispatch: expected ${currentDispatch.role.id}, got ${payload.role.id}`,
+    );
   }
 }
 
@@ -265,6 +362,7 @@ function normalizeExecutionPayload(payload) {
   const normalized = JSON.parse(JSON.stringify(payload));
   normalized.schema_version = normalized.schema_version || 1;
   normalized.kind = 'expert-execution';
+  normalized.openspec_action = normalized.openspec_action || inferExecutionOpenSpecAction(normalized);
   normalized.execution_id = normalized.execution_id || createStampedId('execution', normalized.role.id);
   normalized.generated_at = normalized.generated_at || new Date().toISOString();
   if (normalized.markdown || shouldWriteRuntimeMarkdown()) {
@@ -279,6 +377,7 @@ function normalizeRuntimeActionPayload(payload) {
   const normalized = JSON.parse(JSON.stringify(payload));
   normalized.schema_version = normalized.schema_version || 1;
   normalized.kind = 'task-orchestrator-runtime-action';
+  normalized.openspec_action = normalized.openspec_action || inferRuntimeActionOpenSpecAction(normalized);
   normalized.action_id = normalized.action_id || createStampedId('action', normalized.action);
   normalized.generated_at = normalized.generated_at || new Date().toISOString();
   if (normalized.markdown || shouldWriteRuntimeMarkdown()) {
@@ -405,22 +504,146 @@ function cleanupTmpSource(targetDir, sourcePath) {
   return null;
 }
 
+function clearCurrentExpertArtifacts(targetDir) {
+  return {
+    dispatch: expertDispatch.clearDispatch({ target: targetDir }),
+    execution: clearExecution({ target: targetDir }),
+    runtime_action: clearRuntimeAction({ target: targetDir }),
+  };
+}
+
+function applyRuntimeMutation(targetDir, payload, payloadSource) {
+  const requestedAction = String(payload.action || '').trim().toLowerCase();
+  const runtimeAction = requestedAction === 'archive'
+    ? 'complete'
+    : requestedAction === 'completed'
+    ? 'complete'
+    : requestedAction === 'blocked'
+    ? 'gate-blocked'
+    : requestedAction;
+  const options = {
+    target: targetDir,
+    runId: payload.run_id,
+    toRole: payload.to_role,
+    nextRole: payload.next_role,
+    fromRole: payload.from_role,
+    gate: payload.gate,
+    pendingGate: payload.pending_gate,
+    message: payload.message,
+    error: payload.error,
+    eventType: payload.event_type || payload.eventType,
+    status: payload.status,
+    clearPendingGate:
+      Object.prototype.hasOwnProperty.call(payload, 'clear_pending_gate') ||
+      Object.prototype.hasOwnProperty.call(payload, 'clearPendingGate')
+        ? Boolean(
+          Object.prototype.hasOwnProperty.call(payload, 'clear_pending_gate')
+            ? payload.clear_pending_gate
+            : payload.clearPendingGate
+        )
+        : undefined,
+    taskAnchorData: payload.task_anchor || payload.taskAnchor || null,
+  };
+
+  let result = null;
+  switch (runtimeAction) {
+    case 'handoff':
+      result = runtimeState.handoffRunState(options);
+      break;
+    case 'approve':
+      result = runtimeState.approveRunState(options);
+      break;
+    case 'resume':
+      result = runtimeState.resumeRunState(options);
+      break;
+    case 'gate-blocked':
+      result = runtimeState.gateBlockedRunState(options);
+      break;
+    case 'status':
+      result = runtimeState.statusRunState(options);
+      break;
+    case 'complete':
+      result = runtimeState.completeRunState(options);
+      break;
+    case 'fail':
+      result = runtimeState.failRunState(options);
+      break;
+    case 'cancel':
+      result = runtimeState.cancelRunState(options);
+      break;
+    default:
+      throw new Error(`Unsupported runtime action for expert-executor: ${payload.action}`);
+  }
+
+  const clearableActions = new Set([
+    'handoff',
+    'approve',
+    'resume',
+    'gate-blocked',
+    'complete',
+    'fail',
+    'cancel',
+  ]);
+  const cleared = clearableActions.has(runtimeAction)
+    ? clearCurrentExpertArtifacts(targetDir)
+    : null;
+
+  return {
+    requested_action: requestedAction,
+    applied_action: runtimeAction,
+    adapter_source: payloadSource,
+    result,
+    cleared,
+  };
+}
+
 function applyExecution(options) {
   const targetDir = path.resolve(options.target || '.');
   const { sourcePath, rawPayload } = readPayloadFromOptions(options, 'expert-execution');
-  validateExecutionPayload(rawPayload, sourcePath);
-  const validation = validateOpenSpecOutputs(targetDir, rawPayload);
-  const payload = normalizeExecutionPayload(rawPayload);
+  const hydrated = hydrateExecutionPayload(targetDir, rawPayload);
+  validateExecutionPayload(hydrated.payload, sourcePath, hydrated.context);
+  const validation = validateExecutionArtifacts(targetDir, hydrated.payload);
+  const payload = normalizeExecutionPayload(hydrated.payload);
   const artifacts = writeExecutionArtifacts(targetDir, payload);
+  let runtime_transition = null;
+  if (shouldAdvanceRuntime(options)) {
+    const runtimeActionPayload = buildAutoRuntimeAction(targetDir, payload);
+    if (runtimeActionPayload) {
+      const runtimePayload = normalizeRuntimeActionPayload(runtimeActionPayload);
+      const runtimeArtifacts = writeRuntimeActionArtifacts(targetDir, runtimePayload);
+      const applied = applyRuntimeMutation(targetDir, runtimePayload, 'expert-executor:auto-runtime');
+      runtime_transition = {
+        payload: runtimePayload,
+        artifacts: {
+          ...runtimeArtifacts,
+          current_runtime_action_json: applied.cleared ? null : runtimeArtifacts.current_runtime_action_json,
+          current_runtime_action_md: applied.cleared ? null : runtimeArtifacts.current_runtime_action_md,
+        },
+        applied: {
+          requested_action: applied.requested_action,
+          applied_action: applied.applied_action,
+          run_id: applied.result?.state?.run_id || null,
+          status: applied.result?.state?.status || null,
+          current_role: applied.result?.state?.current_role || null,
+          pending_gate: applied.result?.state?.pending_gate || null,
+        },
+      };
+    }
+  }
   const cleanedSource = cleanupTmpSource(targetDir, sourcePath);
 
   return {
     status: 'success',
     target: targetDir,
     source: sourcePath,
-    artifacts,
+    artifacts: {
+      ...artifacts,
+      current_execution_json: runtime_transition?.applied ? null : artifacts.current_execution_json,
+      current_execution_md: runtime_transition?.applied ? null : artifacts.current_execution_md,
+    },
     payload,
     validation,
+    runtime_transition,
     cleaned_source: cleanedSource,
   };
 }
@@ -428,36 +651,86 @@ function applyExecution(options) {
 function applyExecutionData(options) {
   const targetDir = path.resolve(options.target || '.');
   const sourcePath = options.source || 'memory-payload';
-  const rawPayload = options.payloadData;
-  validateExecutionPayload(rawPayload, sourcePath);
-  const validation = validateOpenSpecOutputs(targetDir, rawPayload);
-  const payload = normalizeExecutionPayload(rawPayload);
+  const hydrated = hydrateExecutionPayload(targetDir, options.payloadData);
+  validateExecutionPayload(hydrated.payload, sourcePath, hydrated.context);
+  const validation = validateExecutionArtifacts(targetDir, hydrated.payload);
+  const payload = normalizeExecutionPayload(hydrated.payload);
   const artifacts = writeExecutionArtifacts(targetDir, payload);
+  let runtime_transition = null;
+  if (shouldAdvanceRuntime(options)) {
+    const runtimeActionPayload = buildAutoRuntimeAction(targetDir, payload);
+    if (runtimeActionPayload) {
+      const runtimePayload = normalizeRuntimeActionPayload(runtimeActionPayload);
+      const runtimeArtifacts = writeRuntimeActionArtifacts(targetDir, runtimePayload);
+      const applied = applyRuntimeMutation(targetDir, runtimePayload, 'expert-executor:auto-runtime');
+      runtime_transition = {
+        payload: runtimePayload,
+        artifacts: {
+          ...runtimeArtifacts,
+          current_runtime_action_json: applied.cleared ? null : runtimeArtifacts.current_runtime_action_json,
+          current_runtime_action_md: applied.cleared ? null : runtimeArtifacts.current_runtime_action_md,
+        },
+        applied: {
+          requested_action: applied.requested_action,
+          applied_action: applied.applied_action,
+          run_id: applied.result?.state?.run_id || null,
+          status: applied.result?.state?.status || null,
+          current_role: applied.result?.state?.current_role || null,
+          pending_gate: applied.result?.state?.pending_gate || null,
+        },
+      };
+    }
+  }
 
   return {
     status: 'success',
     target: targetDir,
     source: sourcePath,
-    artifacts,
+    artifacts: {
+      ...artifacts,
+      current_execution_json: runtime_transition?.applied ? null : artifacts.current_execution_json,
+      current_execution_md: runtime_transition?.applied ? null : artifacts.current_execution_md,
+    },
     payload,
     validation,
+    runtime_transition,
   };
 }
 
 function applyRuntimeAction(options) {
   const targetDir = path.resolve(options.target || '.');
   const { sourcePath, rawPayload } = readPayloadFromOptions(options, 'runtime-action');
-  validateRuntimeActionPayload(rawPayload, sourcePath);
-  const payload = normalizeRuntimeActionPayload(rawPayload);
+  const hydrated = hydrateRuntimeActionPayload(targetDir, rawPayload);
+  validateRuntimeActionPayload(hydrated.payload, sourcePath);
+  const payload = normalizeRuntimeActionPayload(hydrated.payload);
   const artifacts = writeRuntimeActionArtifacts(targetDir, payload);
+  let runtime_transition = null;
+  if (shouldAdvanceRuntime(options)) {
+    const applied = applyRuntimeMutation(targetDir, payload, sourcePath);
+    runtime_transition = {
+      applied: {
+        requested_action: applied.requested_action,
+        applied_action: applied.applied_action,
+        run_id: applied.result?.state?.run_id || null,
+        status: applied.result?.state?.status || null,
+        current_role: applied.result?.state?.current_role || null,
+        pending_gate: applied.result?.state?.pending_gate || null,
+      },
+    };
+  }
   const cleanedSource = cleanupTmpSource(targetDir, sourcePath);
 
   return {
     status: 'success',
     target: targetDir,
     source: sourcePath,
-    artifacts,
+    artifacts: {
+      ...artifacts,
+      current_runtime_action_json: runtime_transition?.applied ? null : artifacts.current_runtime_action_json,
+      current_runtime_action_md: runtime_transition?.applied ? null : artifacts.current_runtime_action_md,
+    },
     payload,
+    runtime_transition,
     cleaned_source: cleanedSource,
   };
 }
@@ -465,17 +738,36 @@ function applyRuntimeAction(options) {
 function applyRuntimeActionData(options) {
   const targetDir = path.resolve(options.target || '.');
   const sourcePath = options.source || 'memory-payload';
-  const rawPayload = options.payloadData;
-  validateRuntimeActionPayload(rawPayload, sourcePath);
-  const payload = normalizeRuntimeActionPayload(rawPayload);
+  const hydrated = hydrateRuntimeActionPayload(targetDir, options.payloadData);
+  validateRuntimeActionPayload(hydrated.payload, sourcePath);
+  const payload = normalizeRuntimeActionPayload(hydrated.payload);
   const artifacts = writeRuntimeActionArtifacts(targetDir, payload);
+  let runtime_transition = null;
+  if (shouldAdvanceRuntime(options)) {
+    const applied = applyRuntimeMutation(targetDir, payload, sourcePath);
+    runtime_transition = {
+      applied: {
+        requested_action: applied.requested_action,
+        applied_action: applied.applied_action,
+        run_id: applied.result?.state?.run_id || null,
+        status: applied.result?.state?.status || null,
+        current_role: applied.result?.state?.current_role || null,
+        pending_gate: applied.result?.state?.pending_gate || null,
+      },
+    };
+  }
 
   return {
     status: 'success',
     target: targetDir,
     source: sourcePath,
-    artifacts,
+    artifacts: {
+      ...artifacts,
+      current_runtime_action_json: runtime_transition?.applied ? null : artifacts.current_runtime_action_json,
+      current_runtime_action_md: runtime_transition?.applied ? null : artifacts.current_runtime_action_md,
+    },
     payload,
+    runtime_transition,
   };
 }
 
@@ -536,11 +828,18 @@ function printPretty(result, command) {
     console.log(`  run_id: ${result.payload.run_id}`);
     if (result.payload.kind === 'expert-execution') {
       console.log(`  role: ${result.payload.role.id}`);
+      console.log(`  openspec_action: ${result.payload.openspec_action || 'n/a'}`);
       console.log(`  execution_id: ${result.payload.execution_id}`);
       console.log(`  current_execution: ${result.artifacts.current_execution_json}`);
     } else {
       console.log(`  action: ${result.payload.action}`);
+      console.log(`  openspec_action: ${result.payload.openspec_action || 'n/a'}`);
       console.log(`  current_runtime_action: ${result.artifacts.current_runtime_action_json}`);
+    }
+    if (result.runtime_transition?.applied) {
+      console.log(`  runtime_action: ${result.runtime_transition.applied.requested_action || 'n/a'}`);
+      console.log(`  runtime_status: ${result.runtime_transition.applied.status || 'n/a'}`);
+      console.log(`  runtime_current_role: ${result.runtime_transition.applied.current_role || 'n/a'}`);
     }
   } else {
     if (result.artifacts.current_execution_json) {

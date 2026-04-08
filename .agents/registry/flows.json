@@ -9,7 +9,16 @@
     "prd-to-delivery": {
       "name": "PRD 到交付",
       "status": "active",
-      "source": ".agents/flows/common/prd-to-delivery.md"
+      "source": ".agents/flows/common/prd-to-delivery.md",
+      "default_schema": "expert-delivery",
+      "artifact_profile": "full",
+      "required_roles": ["requirement-analyst", "frontend-implementer", "code-guardian"],
+      "first_handoff": "requirement-analyst",
+      "approval_gates": ["before-implementation", "before-delivery"],
+      "core_artifacts": ["proposal", "tasks", "checklist", "iterations"],
+      "required_artifacts": ["proposal.md", "tasks.md", "checklist.md", "iterations.md"],
+      "handoff_policy": "task-orchestrator -> requirement-analyst -> frontend-implementer -> code-guardian -> terminal",
+      "completion_policy": "proposal.md, tasks.md, checklist.md, iterations.md 缺一不可"
     }
   }
 }

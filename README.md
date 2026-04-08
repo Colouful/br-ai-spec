@@ -21,6 +21,12 @@ AI Coding 团队规范驱动开发 CLI — 让 AI 编码助手遵循统一的开
 
 **L1 / L2 / L3 是渐进安装层级**：**默认主推 L3**（含 OpenSpec 完整闭环）。若仅需规范与 MCP、暂不要需求流程，可选用 **L2**；个人试用可用 **L1**。详见下文「安装层级」与 [docs/openspec-guide.md](docs/openspec-guide.md)。
 
+如果你想先从“这个项目当前到底怎么运作”入手，优先看：
+[docs/paser_three/项目介绍与运行机制说明.md](docs/paser_three/项目介绍与运行机制说明.md)
+
+如果你想先直接跑通一个最小示例，优先看：
+[docs/paser_three/最小示例运行说明.md](docs/paser_three/最小示例运行说明.md)
+
 ## 快速开始
 
 ### npx 一键安装（推荐）

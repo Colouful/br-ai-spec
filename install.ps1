@@ -1091,6 +1091,17 @@ function Install-OpenSpec {
     # 无论 CLI 是否可用，始终确保目录骨架存在
     New-Item -ItemType Directory -Path (Join-Path $Target "openspec/specs") -Force | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $Target "openspec/changes/archive") -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $Target "openspec/schemas") -Force | Out-Null
+
+    $schemaSrc = Join-Path $script:SourceDir "openspec/schemas"
+    $schemaDst = Join-Path $Target "openspec/schemas"
+    if (Test-Path $schemaSrc) {
+        Get-ChildItem -Path $schemaSrc -Directory | ForEach-Object {
+            $dest = Join-Path $schemaDst $_.Name
+            if (Test-Path $dest) { Remove-Item -LiteralPath $dest -Recurse -Force }
+            Copy-Item -Path $_.FullName -Destination $dest -Recurse -Force
+        }
+    }
 
     $template = Join-Path $script:SourceDir "openspec/config.yaml.template"
     $configFile = Join-Path $Target "openspec/config.yaml"
@@ -1105,6 +1116,9 @@ function Install-OpenSpec {
                 Write-Ok "config.yaml 已增强"
             } else {
                 Write-Info "config.yaml 已包含 context 字段，跳过合并"
+            }
+            if ($content -match '(?m)^schema:\s*spec-driven\s*$') {
+                Write-Warn "检测到 legacy schema=spec-driven，建议迁移到 expert-delivery 以启用 checklist/iterations 产物"
             }
         } else {
             $configDir = Split-Path $configFile -Parent
@@ -1366,10 +1380,16 @@ function Invoke-Check {
         Write-Ok "openspec/ 存在"
         $configPath = Join-Path $target "openspec/config.yaml"
         $configPathYml = Join-Path $target "openspec/config.yml"
-        if ((Test-Path $configPath) -or (Test-Path $configPathYml)) { Write-Ok "  config.yaml 存在" }
+        if ((Test-Path $configPath) -or (Test-Path $configPathYml)) {
+            Write-Ok "  config.yaml 存在"
+            if ((Test-Path $configPath) -and ((Get-Content $configPath -Raw) -match '(?m)^schema:\s*spec-driven\s*$')) {
+                Write-Warn "  config.yaml 仍为 legacy spec-driven，建议迁移到 expert-delivery"
+            }
+        }
         else { Write-Warn "  config.yaml 缺失" }
         if (Test-Path (Join-Path $target "openspec/specs")) { Write-Ok "  specs/ 存在" } else { Write-Warn "  specs/ 缺失" }
         if (Test-Path (Join-Path $target "openspec/changes")) { Write-Ok "  changes/ 存在" } else { Write-Warn "  changes/ 缺失" }
+        if (Test-Path (Join-Path $target "openspec/schemas/expert-delivery/schema.yaml")) { Write-Ok "  expert-delivery schema 存在" } else { Write-Warn "  expert-delivery schema 缺失" }
     } else {
         Write-Info "openspec/ 不存在（L3 级别才需要）"
     }

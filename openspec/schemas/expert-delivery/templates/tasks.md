@@ -1,0 +1,4 @@
+- [ ] Confirm implementation entry points and affected files
+- [ ] Implement the scoped change according to design.md and specs
+- [ ] Add or update tests and verification evidence as needed
+- [ ] Review the result against proposal.md, specs, and project rules

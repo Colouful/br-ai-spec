@@ -18,25 +18,140 @@
       "name": "任务主代理",
       "status": "active",
       "domains": ["orchestration"],
-      "source": ".agents/roles/common/task-orchestrator.md"
+      "source": ".agents/roles/common/task-orchestrator.md",
+      "rule_ids": ["project-overview", "project-structure", "api-standard", "route-standard", "style-standard"],
+      "rule_contract_profiles": {
+        "default": {
+          "must_follow": [
+            "首轮编排必须优先吸收仓库现状与规则，再决定 flow、delivery_profile 和人工确认点。",
+            "能从仓库结构、项目规则推断的路由/API/mock/样式事实，优先转成 assumptions 或 routing constraints。"
+          ],
+          "blocked_when": [
+            "高风险领域的流程、安全、合规、风控或权限边界仍未确认时，不得放行到 frontend-implementer。"
+          ]
+        },
+        "vue": {
+          "must_follow": [
+            "Vue 页面类任务优先以 src/views、src/router/modules、src/api、src/api/types、src/style.css 等当前仓库落点编排。",
+            "若仓库缺少 vue-router 或请求层骨架，要先把“补骨架还是保持占位入口”写进编排约束。",
+            "mock-first、真实接口、Pinia/store 与主题变量策略需要在首轮编排时明确，不留到实现阶段临时猜。"
+          ]
+        }
+      }
     },
     "requirement-analyst": {
       "name": "需求解析专家",
       "status": "active",
       "domains": ["demand-design"],
-      "source": ".agents/roles/common/requirement-analyst.md"
+      "source": ".agents/roles/common/requirement-analyst.md",
+      "rule_ids": ["project-overview", "project-structure", "api-standard", "route-standard", "style-standard"],
+      "skill_priority": ["create-proposal", "design-analysis"],
+      "micro_skill_allowlist": ["create-proposal", "design-analysis"],
+      "rule_contract_profiles": {
+        "default": {
+          "must_follow": [
+            "先把项目定位、目录落点、路由/API/样式约定吸收到 proposal/tasks，不要把规范已明确的信息重复写成 missing_inputs。",
+            "需求收敛必须落到当前仓库可实施的页面、路由、接口或 mock 落点，而不是抽象方案。"
+          ],
+          "blocked_when": [
+            "高风险领域的流程、安全、合规、风控或权限边界仍未确认时，必须维持 before-implementation 门禁。"
+          ]
+        },
+        "vue": {
+          "must_follow": [
+            "页面任务优先对齐 src/views/<page>/index.vue 与 src/router/modules/<module>.ts 的落点约定。",
+            "若为 mock 或占位页，明确写清 src/mock 或本地 mock 方案，以及“不接真实 API”的边界。",
+            "样式和视觉约束需对齐主题 CSS 变量，不要把硬编码颜色或自由样式当默认方案。"
+          ]
+        }
+      },
+      "openspec_actions": ["propose"],
+      "openspec_rule_sections": ["proposal", "tasks"],
+      "required_outputs": ["proposal", "tasks"],
+      "runtime_transition": {
+        "action": "handoff",
+        "to_role": "frontend-implementer",
+        "next_role": "code-guardian",
+        "status": "running",
+        "message": "handoff to frontend-implementer after requirement convergence"
+      }
     },
     "frontend-implementer": {
       "name": "前端实现专家",
       "status": "active",
       "domains": ["engineering", "delivery"],
-      "source": ".agents/roles/common/frontend-implementer.md"
+      "source": ".agents/roles/common/frontend-implementer.md",
+      "rule_ids": ["project-structure", "component-standard", "route-standard", "api-standard", "store-standard", "style-standard"],
+      "skill_priority": ["create-view", "create-route", "create-api", "theme-variables", "create-component", "create-store", "execute-task"],
+      "micro_skill_allowlist": ["create-view", "create-component", "create-route", "theme-variables"],
+      "rule_contract_profiles": {
+        "default": {
+          "must_follow": [
+            "优先复用现有目录、路由、请求封装、状态管理和样式变量约定。",
+            "实现前先对齐 proposal/tasks 的范围与落点，不要自行扩 scope。"
+          ],
+          "blocked_when": [
+            "proposal/tasks 未落盘或仍处于 before-implementation 审批门禁时，禁止改业务代码。"
+          ]
+        },
+        "vue": {
+          "must_follow": [
+            "Vue 视图优先落在 src/views/<page>/index.vue；页面专用组件落在 src/views/<page>/components/。",
+            "路由统一放在 src/router/modules/，页面路由必须懒加载，并补齐 meta.title / requiresAuth 等项目约定。",
+            "接口统一走 src/api/<module>.ts 与 src/api/types/<module>.ts，组件或页面里禁止直接调 request。",
+            "状态管理统一走 Pinia 和 src/store/modules/；mock-first 场景优先本地状态，不预建复杂 store。",
+            "样式必须使用主题变量和 scoped/CSS Modules，禁止硬编码颜色值。"
+          ]
+        }
+      },
+      "openspec_actions": ["apply"],
+      "openspec_rule_sections": ["tasks", "design"],
+      "required_inputs": ["proposal", "tasks"],
+      "runtime_transition": {
+        "action": "handoff",
+        "to_role": "code-guardian",
+        "next_role": null,
+        "status": "running",
+        "message": "handoff to code-guardian after implementation delivery"
+      }
     },
     "code-guardian": {
       "name": "规范守护者",
       "status": "active",
       "domains": ["governance", "testing"],
-      "source": ".agents/roles/common/code-guardian.md"
+      "source": ".agents/roles/common/code-guardian.md",
+      "rule_ids": ["coding-standard", "api-standard", "route-standard", "style-standard", "test-standard", "format-check-standard", "audit-report-standard"],
+      "skill_priority": ["ui-verification", "web-design-guidelines", "create-test"],
+      "micro_skill_allowlist": ["ui-verification", "web-design-guidelines"],
+      "rule_contract_profiles": {
+        "default": {
+          "must_follow": [
+            "以 proposal/tasks 和项目规则为准检查实现，而不是只做泛化 lint。",
+            "必须给出阻断项、非阻断项和交付建议，不能写成模糊建议列表。"
+          ],
+          "blocked_when": [
+            "存在与项目规范冲突的目录、路由、API、样式或测试问题时，不得给 complete 结论。"
+          ]
+        },
+        "vue": {
+          "must_follow": [
+            "核查页面是否落在 src/views、路由是否落在 src/router/modules，并保持动态导入。",
+            "核查 API 是否通过 src/api 封装、类型是否放在 src/api/types，页面中未直接调 request。",
+            "核查样式是否使用主题变量、scoped 或 CSS Modules，而不是硬编码全局样式。",
+            "核查 Pinia/store、mock 与 proposal/tasks 的边界是否一致，避免“演示页写成生产页”。"
+          ]
+        }
+      },
+      "openspec_actions": ["verify"],
+      "openspec_rule_sections": ["tasks", "specs", "checklist", "iterations"],
+      "required_outputs": ["checklist", "iterations"],
+      "runtime_transition": {
+        "action": "complete",
+        "to_role": "code-guardian",
+        "next_role": null,
+        "status": "success",
+        "message": "run completed after code-guardian final review"
+      }
     },
     "design-collaborator": {
       "name": "设计协作专家",

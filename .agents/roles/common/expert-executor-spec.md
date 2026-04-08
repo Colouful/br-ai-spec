@@ -17,7 +17,8 @@ description: 定义如何消费 current-dispatch（当前专家派发载荷）�
 因此当前阶段的最小实现是：
 
 - 当前专家负责产出 `expert-execution（专家执行载荷）`
-- 本地工具只负责校验和落盘
+- 本地工具默认负责校验和落盘
+- 当显式启用 `--advance-runtime` 时，本地工具还会把本轮执行稳定映射到运行态更新
 - Phase A（第一步） 只到执行载荷
 - Phase B（第二步） 可额外落盘 `runtime-action（运行动作）` 草案
 - 不自动递归跑完整链
@@ -51,12 +52,33 @@ ai-spec expert-executor apply --payload ./.ai-spec/internal/tmp/current-executio
 cat ./.ai-spec/internal/tmp/current-execution.json | ai-spec expert-executor apply --stdin
 ```
 
-Phase B（第二步） 当前只建议继续落盘 `runtime-action（运行动作）` 草案，不建议由本地脚本自行推理：
+如果当前环境希望把执行语义和运行态直接接通，可显式启用：
+
+```bash
+ai-spec expert-executor apply --payload ./.ai-spec/internal/tmp/current-execution.json --advance-runtime
+```
+
+此时工具会：
+
+- 识别 `requirement-analyst -> propose`
+- 识别 `frontend-implementer -> apply`
+- 识别 `code-guardian -> verify`
+- 优先读取 `.agents/registry/roles.json` 中的动作与交接约定，代码内置映射只作保底
+- 校验对应 OpenSpec 产物
+- 在确定的流转场景下生成并应用最小 `runtime-action（运行动作）`
+
+Phase B（第二步） 仍支持继续落盘 `runtime-action（运行动作）` 草案：
 
 ```bash
 ai-spec expert-executor apply-action --payload ./.ai-spec/internal/tmp/current-runtime-action.json
 ```
 
+如需直接提交到运行态：
+
+```bash
+ai-spec expert-executor apply-action --payload ./.ai-spec/internal/tmp/current-runtime-action.json --advance-runtime
+```
+
 ## 5. 一句话约束
 
-> `expert-executor（专家执行器）` 不应替当前专家做技能选择、执行推理和下一步动作判断；它只是“当前专家”结构化输出的校验与落盘器。
+> `expert-executor（专家执行器）` 不应替当前专家做技能选择、执行推理和下一步动作判断；它可以在显式授权下推进最小运行态，但仍不负责自动生成下一轮 `expert-dispatch（专家派发载荷）`。

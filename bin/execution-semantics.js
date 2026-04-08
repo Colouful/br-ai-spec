@@ -1,0 +1,297 @@
+const fs = require('fs');
+const path = require('path');
+const { resolveRuntimePaths } = require('./runtime-paths');
+const {
+  getRoleRuntimeConfig,
+  getFlowRuntimeConfig,
+} = require('./runtime-registry');
+
+const AUTO_ADVANCE_EXECUTION_STATUSES = new Set(['done', 'success', 'completed']);
+
+const FLOW_RUNTIME_TRANSITIONS = {
+  'prd-to-delivery': {
+    'requirement-analyst': {
+      action: 'handoff',
+      to_role: 'frontend-implementer',
+      next_role: 'code-guardian',
+      message: 'handoff to frontend-implementer after requirement convergence',
+    },
+    'frontend-implementer': {
+      action: 'handoff',
+      to_role: 'code-guardian',
+      next_role: null,
+      message: 'handoff to code-guardian after implementation delivery',
+    },
+    'code-guardian': {
+      action: 'complete',
+      to_role: 'code-guardian',
+      next_role: null,
+      message: 'run completed after code-guardian final review',
+    },
+  },
+};
+
+const ROLE_OPENSPEC_ACTIONS = {
+  'requirement-analyst': 'propose',
+  'frontend-implementer': 'apply',
+  'code-guardian': 'verify',
+  'archive-change': 'archive',
+};
+
+const ROLE_REQUIRED_INPUTS = {
+  'frontend-implementer': ['proposal', 'tasks'],
+};
+
+const ROLE_REQUIRED_OUTPUTS = {
+  'requirement-analyst': ['proposal', 'tasks'],
+  'code-guardian': ['checklist', 'iterations'],
+};
+
+function readJsonFile(filePath, label) {
+  const raw = fs.readFileSync(filePath, 'utf8');
+  try {
+    return JSON.parse(raw);
+  } catch (error) {
+    throw new Error(`${label} is not valid JSON: ${filePath}`);
+  }
+}
+
+function readCurrentRun(targetDir) {
+  const runtimePaths = resolveRuntimePaths(targetDir);
+  if (!fs.existsSync(runtimePaths.currentRun.path)) {
+    return null;
+  }
+  return readJsonFile(runtimePaths.currentRun.path, 'current run-state');
+}
+
+function listMarkdownBullets(content) {
+  return content
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => /^[-*]\s+/.test(line) || /^\d+\.\s+/.test(line));
+}
+
+function normalizeStringList(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.map((item) => String(item || '').trim()).filter(Boolean);
+}
+
+function getRoleArtifactRequirements(targetDir, roleId) {
+  const registryEntry = getRoleRuntimeConfig(targetDir, roleId);
+  const requiredInputs = normalizeStringList(registryEntry?.required_inputs);
+  const requiredOutputs = normalizeStringList(registryEntry?.required_outputs);
+
+  return {
+    required_inputs: requiredInputs.length > 0 ? requiredInputs : (ROLE_REQUIRED_INPUTS[roleId] || []),
+    required_outputs: requiredOutputs.length > 0 ? requiredOutputs : (ROLE_REQUIRED_OUTPUTS[roleId] || []),
+  };
+}
+
+function inferExecutionOpenSpecAction(payload, targetDir = null) {
+  if (payload?.openspec_action) {
+    return String(payload.openspec_action).trim().toLowerCase();
+  }
+
+  if (targetDir && payload?.role?.id) {
+    const registryEntry = getRoleRuntimeConfig(targetDir, payload.role.id);
+    const configuredActions = normalizeStringList(registryEntry?.openspec_actions);
+    if (configuredActions.length > 0) {
+      return configuredActions[0].toLowerCase();
+    }
+  }
+
+  return ROLE_OPENSPEC_ACTIONS[payload?.role?.id] || null;
+}
+
+function inferRuntimeActionOpenSpecAction(payload) {
+  if (payload?.openspec_action) {
+    return String(payload.openspec_action).trim().toLowerCase();
+  }
+
+  const action = String(payload?.action || '').trim().toLowerCase();
+  if (action === 'archive' || action === 'complete' || action === 'completed') {
+    return 'archive';
+  }
+
+  return null;
+}
+
+function validatePreImplementationGate(targetDir, currentRun, executionPayload) {
+  if (!currentRun || currentRun.flow?.id !== 'prd-to-delivery') {
+    return { ok: true, reasons: [] };
+  }
+
+  if (executionPayload.role?.id !== 'requirement-analyst') {
+    return { ok: true, reasons: [] };
+  }
+
+  const deliveryProfile = currentRun.delivery_profile || 'standard';
+  const riskLevel = String(currentRun.task?.risk_level || '').trim().toLowerCase();
+  const rawInput = String(currentRun.trigger?.raw_input || '');
+  const proposalPath = currentRun.artifacts?.proposal
+    ? path.join(targetDir, currentRun.artifacts.proposal)
+    : null;
+  const tasksPath = currentRun.artifacts?.tasks
+    ? path.join(targetDir, currentRun.artifacts.tasks)
+    : null;
+  const reasons = [];
+
+  if (!proposalPath || !fs.existsSync(proposalPath)) {
+    reasons.push('proposal.md 缺失');
+  }
+  if (!tasksPath || !fs.existsSync(tasksPath)) {
+    reasons.push('tasks.md 缺失');
+  }
+
+  if (reasons.length > 0) {
+    return { ok: false, reasons };
+  }
+
+  const proposalContent = fs.readFileSync(proposalPath, 'utf8').trim();
+  const tasksContent = fs.readFileSync(tasksPath, 'utf8').trim();
+  const taskItems = listMarkdownBullets(tasksContent);
+
+  if (riskLevel === 'high') {
+    reasons.push('当前任务涉及支付/认证/安全/合规等高风险领域，进入实现前必须人工审批');
+  }
+
+  if (/先不说|先不提供|暂不说|暂不提供|暂未确定|未明确|待定|后续再说|后面再说/.test(rawInput)) {
+    reasons.push('原始需求已明确存在未说明的关键流程或安全约束，进入实现前必须人工审批');
+  }
+
+  const missingInputs = Array.isArray(currentRun.missing_inputs)
+    ? currentRun.missing_inputs.map((item) => String(item || ''))
+    : [];
+  if (
+    riskLevel === 'high' &&
+    missingInputs.some((item) => /支付|认证|oauth|短信|权限|安全|合规|风控|收款|交易/.test(item))
+  ) {
+    reasons.push('高风险任务仍存在关键缺失输入，进入实现前必须人工审批');
+  }
+
+  if (deliveryProfile === 'micro') {
+    if (proposalContent.length < 60) {
+      reasons.push('proposal.md 过短，未达到 compact 最小信息量');
+    }
+    if (taskItems.length < 3) {
+      reasons.push('tasks.md 任务条目不足 3 条');
+    }
+  } else {
+    const headingCount = proposalContent
+      .split('\n')
+      .filter((line) => /^#{1,6}\s+/.test(line.trim()))
+      .length;
+    if (proposalContent.length < 120) {
+      reasons.push('proposal.md 过短，未达到 standard 最小信息量');
+    }
+    if (headingCount < 2) {
+      reasons.push('proposal.md 缺少足够的小节结构');
+    }
+    if (taskItems.length < 4) {
+      reasons.push('tasks.md 任务条目不足 4 条');
+    }
+  }
+
+  return {
+    ok: reasons.length === 0,
+    reasons,
+  };
+}
+
+function getRuntimeTransition(targetDir, flowId, roleId) {
+  const roleConfig = getRoleRuntimeConfig(targetDir, roleId);
+  const roleTransition = roleConfig?.runtime_transition;
+  if (roleTransition && typeof roleTransition === 'object' && roleTransition.action) {
+    return roleTransition;
+  }
+
+  const flowConfig = getFlowRuntimeConfig(targetDir, flowId);
+  const flowTransition = flowConfig?.runtime_transitions?.[roleId];
+  if (flowTransition && typeof flowTransition === 'object' && flowTransition.action) {
+    return flowTransition;
+  }
+
+  return FLOW_RUNTIME_TRANSITIONS[flowId]?.[roleId] || null;
+}
+
+function buildAutoRuntimeAction(targetDir, executionPayload) {
+  const currentRun = readCurrentRun(targetDir);
+  if (!currentRun) {
+    return null;
+  }
+
+  if (!AUTO_ADVANCE_EXECUTION_STATUSES.has(String(executionPayload.status || '').toLowerCase())) {
+    return null;
+  }
+
+  if (currentRun.pending_gate) {
+    return null;
+  }
+
+  const flowId = executionPayload.flow?.id || currentRun.flow?.id || null;
+  const roleId = executionPayload.role?.id || null;
+  if (!flowId || !roleId) {
+    return null;
+  }
+
+  const transition = getRuntimeTransition(targetDir, flowId, roleId);
+  if (!transition) {
+    return null;
+  }
+
+  if (transition.action === 'handoff' && roleId === 'requirement-analyst') {
+    const gateCheck = validatePreImplementationGate(targetDir, currentRun, executionPayload);
+    if (!gateCheck.ok) {
+      return {
+        schema_version: 1,
+        kind: 'task-orchestrator-runtime-action',
+        action: 'gate-blocked',
+        run_id: executionPayload.run_id,
+        from_role: roleId,
+        to_role: roleId,
+        next_role: transition.to_role,
+        pending_gate: 'before-implementation',
+        status: 'waiting-approval',
+        clear_pending_gate: false,
+        message: `requirement gate blocked: ${gateCheck.reasons.join('；')}`,
+        source: 'expert-executor-auto-transition',
+      };
+    }
+  }
+
+  const nextRole = executionPayload.next_role !== undefined
+    ? executionPayload.next_role
+    : transition.next_role;
+  const toRole = executionPayload.next_role || transition.to_role || null;
+  const action = transition.action;
+
+  return {
+    schema_version: 1,
+    kind: 'task-orchestrator-runtime-action',
+    action,
+    run_id: executionPayload.run_id,
+    from_role: roleId,
+    to_role: action === 'handoff' ? toRole : transition.to_role || roleId,
+    next_role: nextRole,
+    status: action === 'complete' ? 'success' : 'running',
+    clear_pending_gate: true,
+    message: executionPayload.next_action || transition.message,
+    source: 'expert-executor-auto-transition',
+    openspec_action: action === 'complete' ? 'archive' : null,
+  };
+}
+
+module.exports = {
+  AUTO_ADVANCE_EXECUTION_STATUSES,
+  FLOW_RUNTIME_TRANSITIONS,
+  ROLE_OPENSPEC_ACTIONS,
+  getRoleArtifactRequirements,
+  getRuntimeTransition,
+  inferExecutionOpenSpecAction,
+  inferRuntimeActionOpenSpecAction,
+  validatePreImplementationGate,
+  buildAutoRuntimeAction,
+  readCurrentRun,
+};

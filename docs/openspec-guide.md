@@ -223,53 +223,47 @@ openspec/
 
 ## 四、config.yaml 详解
 
-`openspec/config.yaml` 是 ex-ai-spec  与 OpenSpec 的桥梁。L3 安装时会自动写入以下配置：
+`openspec/config.yaml` 是 ex-ai-spec 与 OpenSpec 的桥梁。当前 L3 实施方案会同步一个项目级自定义 schema：`openspec/schemas/expert-delivery/`，并将 `config.yaml` 默认 schema 指向它。
 
 ```yaml
-# OpenSpec 项目配置（由 ex-ai-spec  提供的增强版模板）
-schema: spec-driven
+# OpenSpec 项目配置（由 ex-ai-spec 提供的增强版模板）
+schema: expert-delivery
 
 context: |
-  本项目使用 ex-ai-spec  规范体系：
-  - .agents/rules/: 开发规范（编码、组件、API、路由、样式等）
-  - .agents/skills/: 实践技能（组件、路由、接口、设计稿分析、UI验收等）
-  执行任务时遵循 .agents/rules/12-Superpowers执行规范.md
-  技能索引：.agents/skills/README.md
+  本项目接入 ex-ai-spec 专家协同平台：
+  - rules: .agents/rules/
+  - skills: .agents/skills/
+  - roles: .agents/roles/
+  - flows: .agents/flows/
+  - runtime: .ai-spec/
 
 rules:
   proposal:
-    - "创建提案前确认：是否有设计稿、是否有接口、交付形态（页面/组件/模块）"
-    - "有设计稿时使用 .agents/skills/design-analysis/SKILL.md 产出 UI 分析清单"
-    - "交付为页面时，参考 .agents/rules/06-路由规范.md 确定路由结构"
-    - "交付为组件时，参考 .agents/rules/04-组件规范.md 确定组件放置"
-    - "涉及接口时，参考 .agents/rules/05-API规范.md 确定接口结构"
-    - "未就绪的接口按项目 Mock 数据策略处理"
-  tasks:
-    - "执行任务前须读取 .agents/rules/12-Superpowers执行规范.md"
-    - "按 .agents/skills/execute-task/SKILL.md 的四步循环执行"
-    - "涉及组件开发须引用 .agents/rules/04-组件规范.md"
-    - "涉及接口须引用 .agents/rules/05-API规范.md"
-    - "涉及 UI 还原须在末尾加验收任务，引用 .agents/skills/ui-verification/SKILL.md"
-    - "保持改动最小化，聚焦于请求的变更"
-  design:
-    - "技术方案须遵循 .agents/rules/ 中的架构约束"
-    - "样式方案须使用主题变量，见 .agents/rules/09-样式规范.md"
-    - "组件拆分须遵循 .agents/rules/04-组件规范.md"
+    - "先收敛目标、范围、非目标项、默认假设和风险，再进入实现。"
   specs:
-    - "每个 capability 的验收场景须可测试"
-    - "有设计稿时引用 UI 分析清单作为验收参考"
+    - "需求必须落为可测试的增量规范和场景。"
+  tasks:
+    - "任务必须可执行、可验证、可交接。"
+  design:
+    - "技术方案必须对齐项目目录、路由、API、状态、样式和测试约定。"
+  checklist:
+    - "必须明确通过项、未通过项、阻断项和是否建议放行。"
+  iterations:
+    - "必须记录问题、修正动作、残留风险和下轮提醒。"
 ```
 
 ### 各字段作用
 
 | 字段 | 作用 |
 |------|------|
-| `schema` | 工作流模式，`spec-driven` 是标准的提案驱动模式 |
-| `context` | 项目上下文，告诉 OpenSpec "这个项目使用什么规范体系" |
-| `rules.proposal` | 创建提案时的约束，确保提案包含设计稿分析等前置步骤 |
-| `rules.tasks` | 执行任务时的约束，确保每个任务都遵循 Superpowers 规范 |
-| `rules.design` | 技术设计时的约束，确保方案遵循架构和样式规范 |
-| `rules.specs` | 规范定义时的约束，确保验收场景可测试 |
+| `schema` | 默认工作流 schema；当前推荐使用 `expert-delivery` |
+| `context` | 项目上下文，告诉 OpenSpec 当前项目使用的规则、技能、角色和运行态入口 |
+| `rules.proposal` | 约束提案如何收敛范围、假设与风险 |
+| `rules.specs` | 约束增量规范如何表达需求和验收场景 |
+| `rules.tasks` | 约束任务拆分必须可执行、可验证、可交接 |
+| `rules.design` | 约束技术方案必须对齐仓库落点与项目规范 |
+| `rules.checklist` | 约束守护阶段如何输出放行结论 |
+| `rules.iterations` | 约束反馈阶段如何记录问题与残留风险 |
 
 ### 自定义 config.yaml
 

@@ -120,6 +120,12 @@ task-orchestrator-runner.advanceRunner({ target })
 如果暂未接 `Runner（运行器）`，再回退为：
 
 ```bash
+ai-spec expert-executor apply-action --payload ./.ai-spec/internal/tmp/current-runtime-action.json --advance-runtime
+```
+
+若当前环境仍坚持旧的“两步桥接”模式，则继续使用：
+
+```bash
 ai-spec expert-executor apply-action --payload ./.ai-spec/internal/tmp/current-runtime-action.json
 ai-spec task-orchestrator-adapter apply --payload ./.ai-spec/internal/current-runtime-action.json
 ```
@@ -195,6 +201,7 @@ task-orchestrator（任务主代理）
 - 自动生成所有中间 `task-anchor（任务锚点）` 文件的执行器
 - 由本地脚本替代 `task-orchestrator（任务主代理）` 产出 `expert-dispatch（专家派发载荷） / runtime-action（运行动作）`
 - 由本地脚本替当前专家产出 `expert-execution（专家执行载荷）`
+- 由 `expert-executor（专家执行器）` 自动补下一轮 `expert-dispatch（专家派发载荷）`
 
 所以这份规范当前的意义是：
 

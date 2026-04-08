@@ -90,6 +90,92 @@ function assertArrayOfStrings(report, value, label) {
   return value;
 }
 
+function assertOptionalString(report, value, label) {
+  if (value === undefined || value === null) {
+    return;
+  }
+  if (typeof value !== 'string' || !value.trim()) {
+    report.errors.push(`${label} must be a non-empty string`);
+  }
+}
+
+function validateSourceDefinition(report, sourceDir, entry, label) {
+  const hasSource = typeof entry.source === 'string';
+  const hasSourceByProfile = entry.sourceByProfile && typeof entry.sourceByProfile === 'object';
+
+  if (hasSource) {
+    if (!entry.source.trim()) {
+      report.errors.push(`${label} source must be a non-empty string`);
+    } else if (!fileExists(sourceDir, entry.source)) {
+      report.errors.push(`${label} references missing source: ${entry.source}`);
+    }
+  }
+
+  if (hasSourceByProfile) {
+    for (const [profile, relPath] of Object.entries(entry.sourceByProfile)) {
+      if (!['react', 'vue'].includes(profile)) {
+        report.errors.push(`${label} has unsupported profile key: ${profile}`);
+      }
+      if (typeof relPath !== 'string' || !relPath.trim()) {
+        report.errors.push(`${label} sourceByProfile.${profile} must be a non-empty string`);
+        continue;
+      }
+      if (!fileExists(sourceDir, relPath)) {
+        report.errors.push(`${label} references missing profile source: ${relPath}`);
+      }
+    }
+  }
+
+  return {
+    hasSource,
+    hasSourceByProfile,
+  };
+}
+
+function validateRuntimeTransition(report, value, label) {
+  if (value === undefined || value === null) {
+    return;
+  }
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    report.errors.push(`${label} must be an object`);
+    return;
+  }
+  assertOptionalString(report, value.action, `${label}.action`);
+  assertOptionalString(report, value.to_role, `${label}.to_role`);
+  if (value.next_role !== undefined && value.next_role !== null) {
+    assertOptionalString(report, value.next_role, `${label}.next_role`);
+  }
+  assertOptionalString(report, value.status, `${label}.status`);
+  assertOptionalString(report, value.message, `${label}.message`);
+}
+
+function validateRuleContractProfiles(report, value, label) {
+  if (value === undefined || value === null) {
+    return;
+  }
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    report.errors.push(`${label} must be an object`);
+    return;
+  }
+
+  for (const [profile, entry] of Object.entries(value)) {
+    if (!['default', 'react', 'vue'].includes(profile)) {
+      report.errors.push(`${label} has unsupported profile key: ${profile}`);
+      continue;
+    }
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+      report.errors.push(`${label}.${profile} must be an object`);
+      continue;
+    }
+    if (entry.must_follow !== undefined) {
+      assertArrayOfStrings(report, entry.must_follow, `${label}.${profile}.must_follow`);
+    }
+    if (entry.blocked_when !== undefined) {
+      assertArrayOfStrings(report, entry.blocked_when, `${label}.${profile}.blocked_when`);
+    }
+  }
+}
+
 function validateRulesRegistry(sourceDir, rulesRegistry, report) {
   if (typeof rulesRegistry.version !== 'number') {
     report.errors.push('rules.json version must be a number');
@@ -106,27 +192,14 @@ function validateRulesRegistry(sourceDir, rulesRegistry, report) {
       report.errors.push(`rules.json entry "${ruleId}" must be an object`);
       continue;
     }
-    const hasSource = typeof entry.source === 'string';
-    const hasSourceByProfile = entry.sourceByProfile && typeof entry.sourceByProfile === 'object';
+    const { hasSource, hasSourceByProfile } = validateSourceDefinition(
+      report,
+      sourceDir,
+      entry,
+      `rules.json entry "${ruleId}"`,
+    );
     if (!hasSource && !hasSourceByProfile) {
       report.errors.push(`rules.json entry "${ruleId}" must define source or sourceByProfile`);
-    }
-    if (hasSource && !fileExists(sourceDir, entry.source)) {
-      report.errors.push(`rules.json entry "${ruleId}" references missing source: ${entry.source}`);
-    }
-    if (hasSourceByProfile) {
-      for (const [profile, relPath] of Object.entries(entry.sourceByProfile)) {
-        if (!['react', 'vue'].includes(profile)) {
-          report.errors.push(`rules.json entry "${ruleId}" has unsupported profile key: ${profile}`);
-        }
-        if (typeof relPath !== 'string' || !relPath.trim()) {
-          report.errors.push(`rules.json entry "${ruleId}" sourceByProfile.${profile} must be a non-empty string`);
-          continue;
-        }
-        if (!fileExists(sourceDir, relPath)) {
-          report.errors.push(`rules.json entry "${ruleId}" references missing profile source: ${relPath}`);
-        }
-      }
     }
     if (entry.domains !== undefined) {
       assertArrayOfStrings(report, entry.domains, `rules.json entry "${ruleId}" domains`);
@@ -136,7 +209,7 @@ function validateRulesRegistry(sourceDir, rulesRegistry, report) {
   return ruleIds;
 }
 
-function validateSkillsRegistry(skillsRegistry, report) {
+function validateSkillsRegistry(sourceDir, skillsRegistry, report) {
   if (typeof skillsRegistry.version !== 'number') {
     report.errors.push('skills.json version must be a number');
   }
@@ -152,6 +225,7 @@ function validateSkillsRegistry(skillsRegistry, report) {
       report.errors.push(`skills.json entry "${skillId}" must be an object`);
       continue;
     }
+    validateSourceDefinition(report, sourceDir, entry, `skills.json entry "${skillId}"`);
     if (entry.domains !== undefined) {
       assertArrayOfStrings(report, entry.domains, `skills.json entry "${skillId}" domains`);
     }
@@ -192,6 +266,36 @@ function validateRolesRegistry(sourceDir, rolesRegistry, report) {
     if (entry.domains !== undefined) {
       assertArrayOfStrings(report, entry.domains, `roles.json entry "${roleId}" domains`);
     }
+    if (entry.openspec_actions !== undefined) {
+      assertArrayOfStrings(report, entry.openspec_actions, `roles.json entry "${roleId}" openspec_actions`);
+    }
+    if (entry.rule_ids !== undefined) {
+      assertArrayOfStrings(report, entry.rule_ids, `roles.json entry "${roleId}" rule_ids`);
+    }
+    if (entry.skill_priority !== undefined) {
+      assertArrayOfStrings(report, entry.skill_priority, `roles.json entry "${roleId}" skill_priority`);
+    }
+    if (entry.micro_skill_allowlist !== undefined) {
+      assertArrayOfStrings(report, entry.micro_skill_allowlist, `roles.json entry "${roleId}" micro_skill_allowlist`);
+    }
+    if (entry.rule_contract_profiles !== undefined) {
+      validateRuleContractProfiles(report, entry.rule_contract_profiles, `roles.json entry "${roleId}" rule_contract_profiles`);
+    }
+    if (entry.openspec_rule_sections !== undefined) {
+      assertArrayOfStrings(report, entry.openspec_rule_sections, `roles.json entry "${roleId}" openspec_rule_sections`);
+    }
+    if (entry.required_inputs !== undefined) {
+      assertArrayOfStrings(report, entry.required_inputs, `roles.json entry "${roleId}" required_inputs`);
+    }
+    if (entry.required_outputs !== undefined) {
+      assertArrayOfStrings(report, entry.required_outputs, `roles.json entry "${roleId}" required_outputs`);
+    }
+    if (entry.approval_gates !== undefined) {
+      assertArrayOfStrings(report, entry.approval_gates, `roles.json entry "${roleId}" approval_gates`);
+    }
+    if (entry.runtime_transition !== undefined) {
+      validateRuntimeTransition(report, entry.runtime_transition, `roles.json entry "${roleId}" runtime_transition`);
+    }
   }
 
   return roleIds;
@@ -226,9 +330,77 @@ function validateFlowsRegistry(sourceDir, flowsRegistry, report) {
     } else if (!fileExists(sourceDir, entry.source)) {
       report.errors.push(`flows.json entry "${flowId}" references missing source: ${entry.source}`);
     }
+    if (entry.default_schema !== undefined) {
+      assertOptionalString(report, entry.default_schema, `flows.json entry "${flowId}" default_schema`);
+    }
+    if (entry.artifact_profile !== undefined) {
+      assertOptionalString(report, entry.artifact_profile, `flows.json entry "${flowId}" artifact_profile`);
+    }
+    if (entry.required_roles !== undefined) {
+      assertArrayOfStrings(report, entry.required_roles, `flows.json entry "${flowId}" required_roles`);
+    }
+    if (entry.first_handoff !== undefined) {
+      assertOptionalString(report, entry.first_handoff, `flows.json entry "${flowId}" first_handoff`);
+    }
+    if (entry.approval_gates !== undefined) {
+      assertArrayOfStrings(report, entry.approval_gates, `flows.json entry "${flowId}" approval_gates`);
+    }
+    if (entry.core_artifacts !== undefined) {
+      assertArrayOfStrings(report, entry.core_artifacts, `flows.json entry "${flowId}" core_artifacts`);
+    }
+    if (entry.required_artifacts !== undefined) {
+      assertArrayOfStrings(report, entry.required_artifacts, `flows.json entry "${flowId}" required_artifacts`);
+    }
+    if (entry.handoff_policy !== undefined) {
+      assertOptionalString(report, entry.handoff_policy, `flows.json entry "${flowId}" handoff_policy`);
+    }
+    if (entry.completion_policy !== undefined) {
+      assertOptionalString(report, entry.completion_policy, `flows.json entry "${flowId}" completion_policy`);
+    }
   }
 
   return flowIds;
+}
+
+function validateRoleAndFlowReferences(rolesRegistry, flowsRegistry, report, ids) {
+  for (const [roleId, entry] of Object.entries(rolesRegistry.roles || {})) {
+    for (const ruleId of normalizeList(entry.rule_ids)) {
+      if (!ids.rules.has(ruleId)) {
+        report.errors.push(`roles.json entry "${roleId}" references unknown rule: ${ruleId}`);
+      }
+    }
+    for (const skillId of normalizeList(entry.skill_priority)) {
+      if (!ids.skills.has(skillId)) {
+        report.errors.push(`roles.json entry "${roleId}" skill_priority references unknown skill: ${skillId}`);
+      }
+    }
+    for (const skillId of normalizeList(entry.micro_skill_allowlist)) {
+      if (!ids.skills.has(skillId)) {
+        report.errors.push(`roles.json entry "${roleId}" micro_skill_allowlist references unknown skill: ${skillId}`);
+      }
+    }
+    for (const skillId of normalizeList(entry.preferred_skills)) {
+      if (!ids.skills.has(skillId)) {
+        report.errors.push(`roles.json entry "${roleId}" preferred_skills references unknown skill: ${skillId}`);
+      }
+    }
+    for (const handoffRole of normalizeList(entry.handoff_to)) {
+      if (!ids.roles.has(handoffRole)) {
+        report.errors.push(`roles.json entry "${roleId}" handoff_to references unknown role: ${handoffRole}`);
+      }
+    }
+  }
+
+  for (const [flowId, entry] of Object.entries(flowsRegistry.flows || {})) {
+    for (const roleId of normalizeList(entry.required_roles)) {
+      if (!ids.roles.has(roleId)) {
+        report.errors.push(`flows.json entry "${flowId}" references unknown role in required_roles: ${roleId}`);
+      }
+    }
+    if (entry.first_handoff && !ids.roles.has(entry.first_handoff)) {
+      report.errors.push(`flows.json entry "${flowId}" references unknown first_handoff role: ${entry.first_handoff}`);
+    }
+  }
 }
 
 function validateScenarioPackagesRegistry(scenariosRegistry, report, ids) {
@@ -310,15 +482,17 @@ function validateRegistry(sourceDir) {
   );
 
   const ruleIds = validateRulesRegistry(sourceDir, rulesRegistry, report);
-  const skillIds = validateSkillsRegistry(skillsRegistry, report);
+  const skillIds = validateSkillsRegistry(sourceDir, skillsRegistry, report);
   const roleIds = validateRolesRegistry(sourceDir, rolesRegistry, report);
   const flowIds = validateFlowsRegistry(sourceDir, flowsRegistry, report);
-  validateScenarioPackagesRegistry(scenariosRegistry, report, {
+  const ids = {
     roles: roleIds,
     skills: skillIds,
     rules: ruleIds,
     flows: flowIds,
-  });
+  };
+  validateRoleAndFlowReferences(rolesRegistry, flowsRegistry, report, ids);
+  validateScenarioPackagesRegistry(scenariosRegistry, report, ids);
 
   if (report.errors.length > 0) {
     report.status = 'failed';

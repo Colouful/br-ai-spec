@@ -13,6 +13,15 @@ const {
   getExistingPath,
   getExistingRelPath,
 } = require('../bin/runtime-paths');
+const {
+  getRoleRuntimeConfig,
+  getFlowRuntimeConfig,
+  getRuleRuntimeConfig,
+  getSkillRuntimeConfig,
+} = require('../bin/runtime-registry');
+const {
+  getRuntimeTransition,
+} = require('../bin/execution-semantics');
 const PACKAGE_ROOT = path.resolve(__dirname, '..');
 
 const START_INSTRUCTION_FILES = [
@@ -23,94 +32,62 @@ const CONTINUE_INSTRUCTION_FILES = [];
 
 const DISPATCH_INSTRUCTION_FILES = [];
 
-const ROLE_RULE_HINTS = {
-  'task-orchestrator': [
-    '.agents/rules/01-项目概述.md',
-    '.agents/rules/03-项目结构.md',
-    '.agents/rules/05-API规范.md',
-    '.agents/rules/06-路由规范.md',
-    '.agents/rules/09-样式规范.md',
-  ],
-  'requirement-analyst': [
-    '.agents/rules/01-项目概述.md',
-    '.agents/rules/03-项目结构.md',
-    '.agents/rules/05-API规范.md',
-    '.agents/rules/06-路由规范.md',
-    '.agents/rules/09-样式规范.md',
-  ],
-  'frontend-implementer': [
-    '.agents/rules/03-项目结构.md',
-    '.agents/rules/04-组件规范.md',
-    '.agents/rules/06-路由规范.md',
-    '.agents/rules/09-样式规范.md',
-    '.agents/rules/11-测试规范.md',
-  ],
-  'code-guardian': [
-    '.agents/rules/05-API规范.md',
-    '.agents/rules/06-路由规范.md',
-    '.agents/rules/09-样式规范.md',
-    '.agents/rules/11-测试规范.md',
-    '.agents/rules/13-代码格式化与检查.md',
-    '.agents/rules/14-审计汇报规范.md',
-  ],
-};
-
-const RULE_FILE_CANDIDATES = {
-  overview: {
+const FALLBACK_RULE_SOURCE_CANDIDATES = {
+  'project-overview': {
     vue: ['.agents/rules/01-项目概述.md', '.agents/rules/profiles/vue/01-项目概述.md'],
     react: ['.agents/rules/01-项目概述.md', '.agents/rules/profiles/react/01-项目概述.md'],
     default: ['.agents/rules/01-项目概述.md'],
   },
-  structure: {
+  'project-structure': {
     vue: ['.agents/rules/03-项目结构.md', '.agents/rules/profiles/vue/03-项目结构.md'],
     react: ['.agents/rules/03-项目结构.md', '.agents/rules/profiles/react/03-项目结构.md'],
     default: ['.agents/rules/03-项目结构.md'],
   },
-  component: {
+  'component-standard': {
     vue: ['.agents/rules/04-组件规范.md', '.agents/rules/profiles/vue/04-组件规范.md'],
     react: ['.agents/rules/04-组件规范.md', '.agents/rules/profiles/react/04-组件规范.md'],
     default: ['.agents/rules/04-组件规范.md'],
   },
-  api: {
+  'api-standard': {
     default: ['.agents/rules/05-API规范.md', '.agents/rules/common/05-API规范.md'],
   },
-  route: {
+  'route-standard': {
     vue: ['.agents/rules/06-路由规范.md', '.agents/rules/profiles/vue/06-路由规范.md'],
     react: ['.agents/rules/06-路由规范.md', '.agents/rules/profiles/react/06-路由规范.md'],
     default: ['.agents/rules/06-路由规范.md'],
   },
-  state: {
+  'store-standard': {
     vue: ['.agents/rules/07-状态管理.md', '.agents/rules/profiles/vue/07-状态管理.md'],
     react: ['.agents/rules/07-状态管理.md', '.agents/rules/profiles/react/07-状态管理.md'],
     default: ['.agents/rules/07-状态管理.md'],
   },
-  style: {
+  'style-standard': {
     vue: ['.agents/rules/09-样式规范.md', '.agents/rules/profiles/vue/09-样式规范.md'],
     react: ['.agents/rules/09-样式规范.md', '.agents/rules/profiles/react/09-样式规范.md'],
     default: ['.agents/rules/09-样式规范.md'],
   },
-  coding: {
+  'coding-standard': {
     default: ['.agents/rules/02-编码规范.md', '.agents/rules/common/02-编码规范.md'],
   },
-  test: {
+  'test-standard': {
     default: ['.agents/rules/11-测试规范.md', '.agents/rules/common/11-测试规范.md'],
   },
-  format: {
+  'format-check-standard': {
     default: ['.agents/rules/13-代码格式化与检查.md', '.agents/rules/common/13-代码格式化与检查.md'],
   },
-  audit: {
+  'audit-report-standard': {
     default: ['.agents/rules/14-审计汇报规范.md', '.agents/rules/common/14-审计汇报规范.md'],
   },
 };
 
-const ROLE_RULE_FILE_KEYS = {
-  'task-orchestrator': ['overview', 'structure', 'api', 'route', 'style'],
-  'requirement-analyst': ['overview', 'structure', 'api', 'route', 'style'],
-  'frontend-implementer': ['structure', 'component', 'route', 'api', 'state', 'style'],
-  'code-guardian': ['coding', 'api', 'route', 'style', 'test', 'format', 'audit'],
+const FALLBACK_ROLE_RULE_IDS = {
+  'task-orchestrator': ['project-overview', 'project-structure', 'api-standard', 'route-standard', 'style-standard'],
+  'requirement-analyst': ['project-overview', 'project-structure', 'api-standard', 'route-standard', 'style-standard'],
+  'frontend-implementer': ['project-structure', 'component-standard', 'route-standard', 'api-standard', 'store-standard', 'style-standard'],
+  'code-guardian': ['coding-standard', 'api-standard', 'route-standard', 'style-standard', 'test-standard', 'format-check-standard', 'audit-report-standard'],
 };
 
-const SKILL_FILE_CANDIDATES = {
+const FALLBACK_SKILL_SOURCE_CANDIDATES = {
   'create-proposal': {
     default: ['.agents/skills/common/create-proposal/SKILL.md'],
   },
@@ -155,16 +132,23 @@ const SKILL_FILE_CANDIDATES = {
   },
 };
 
-const ROLE_SKILL_PRIORITY = {
+const FALLBACK_ROLE_SKILL_PRIORITY = {
   'requirement-analyst': ['create-proposal', 'design-analysis'],
   'frontend-implementer': ['create-view', 'create-route', 'create-api', 'theme-variables', 'create-component', 'create-store', 'execute-task'],
   'code-guardian': ['ui-verification', 'web-design-guidelines', 'create-test'],
 };
 
-const ROLE_OPENSPEC_RULE_SECTIONS = {
+const FALLBACK_ROLE_OPENSPEC_RULE_SECTIONS = {
   'requirement-analyst': ['proposal', 'tasks'],
   'frontend-implementer': ['tasks', 'design'],
-  'code-guardian': ['tasks', 'specs'],
+  'code-guardian': ['tasks', 'specs', 'checklist', 'iterations'],
+};
+
+const DEFAULT_FLOW_ID = 'prd-to-delivery';
+const DEFAULT_FLOW_CONSTRAINTS = {
+  required_roles: ['requirement-analyst', 'frontend-implementer', 'code-guardian'],
+  approval_gates: ['before-implementation', 'before-delivery'],
+  required_artifacts: ['proposal.md', 'tasks.md', 'checklist.md', 'iterations.md'],
 };
 
 const MICRO_ROLE_EXTRAS = {
@@ -226,8 +210,16 @@ const MICRO_OPENSPEC_RULES = {
     '继续使用主题变量和既有目录结构。'
   ],
   specs: [
-    '只记录关键检查项、阻断项和最终结论。',
-    '保留可测试的验收结论，不展开长篇复盘。'
+    '只记录当前变更真正需要的增量规范和关键验收场景。',
+    '保留可测试的结论，不展开无关背景说明。'
+  ],
+  checklist: [
+    'checklist.md 只保留关键检查项、阻断项和最终放行结论。',
+    '检查项必须能回指 proposal/tasks/specs 或实现证据。'
+  ],
+  iterations: [
+    'iterations.md 只记录问题、修正动作和残留风险。',
+    '避免输出泛泛复盘，聚焦本轮变更。'
   ],
 };
 
@@ -297,7 +289,7 @@ const SKILL_GUIDANCE = {
   'web-design-guidelines': '用于规则和体验审查。',
 };
 
-const ROLE_RULE_CONSTRAINTS = {
+const FALLBACK_ROLE_RULE_CONSTRAINT_PROFILES = {
   default: {
     'task-orchestrator': {
       must_follow: [
@@ -343,11 +335,6 @@ const ROLE_RULE_CONSTRAINTS = {
         '若仓库缺少 vue-router 或请求层骨架，要先把“补骨架还是保持占位入口”写进编排约束。',
         'mock-first、真实接口、Pinia/store 与主题变量策略需要在首轮编排时明确，不留到实现阶段临时猜。'
       ],
-      repo_specific: (facts) => [
-        facts.routeEntry ? `当前路由入口为 ${facts.routeEntry}，优先按现有路由骨架编排。` : '仓库尚未检测到路由入口；页面类任务需先明确补路由骨架还是保留占位入口。',
-        facts.apiDir ? `当前 API 目录为 ${facts.apiDir}${facts.apiTypesDir ? `，类型目录为 ${facts.apiTypesDir}` : ''}。` : '仓库尚未检测到 API 模块目录；真实接口任务需先明确请求层承载方式。',
-        facts.styleEntry ? `当前样式入口为 ${facts.styleEntry}，需沿用主题变量与现有样式承载方式。` : null,
-      ].filter(Boolean),
     },
     'requirement-analyst': {
       must_follow: [
@@ -355,10 +342,6 @@ const ROLE_RULE_CONSTRAINTS = {
         '若为 mock 或占位页，明确写清 src/mock 或本地 mock 方案，以及“不接真实 API”的边界。',
         '样式和视觉约束需对齐主题 CSS 变量，不要把硬编码颜色或自由样式当默认方案。',
       ],
-      repo_specific: (facts) => [
-        facts.routeModulesDir ? `当前仓库已有路由模块目录 ${facts.routeModulesDir}，proposal/tasks 需要按该目录组织。` : '若项目尚未接入 vue-router，需要在 proposal/tasks 明确是补路由还是保持占位入口。',
-        facts.viewsDir ? `页面目录以 ${facts.viewsDir} 为准，任务拆解要写清页面落点。` : null,
-      ].filter(Boolean),
     },
     'frontend-implementer': {
       must_follow: [
@@ -368,11 +351,6 @@ const ROLE_RULE_CONSTRAINTS = {
         '状态管理统一走 Pinia 和 src/store/modules/；mock-first 场景优先本地状态，不预建复杂 store。',
         '样式必须使用主题变量和 scoped/CSS Modules，禁止硬编码颜色值。',
       ],
-      repo_specific: (facts) => [
-        facts.routeEntry ? `当前路由入口为 ${facts.routeEntry}。` : '仓库尚未检测到路由入口，若需新增路由必须先补路由骨架。',
-        facts.requestConfig ? `当前请求层配置入口为 ${facts.requestConfig}。` : facts.apiDir ? `当前 API 目录为 ${facts.apiDir}，新增接口时保持模块化拆分。` : '仓库尚未检测到 API 封装入口，如需真实接口需先补请求层约定。',
-        facts.styleEntry ? `当前样式入口为 ${facts.styleEntry}，新增样式要沿用主题变量。` : null,
-      ].filter(Boolean),
     },
     'code-guardian': {
       must_follow: [
@@ -381,6 +359,33 @@ const ROLE_RULE_CONSTRAINTS = {
         '核查样式是否使用主题变量、scoped 或 CSS Modules，而不是硬编码全局样式。',
         '核查 Pinia/store、mock 与 proposal/tasks 的边界是否一致，避免“演示页写成生产页”。',
       ],
+    },
+  },
+};
+
+const ROLE_RULE_REPO_SPECIFIC = {
+  vue: {
+    'task-orchestrator': {
+      repo_specific: (facts) => [
+        facts.routeEntry ? `当前路由入口为 ${facts.routeEntry}，优先按现有路由骨架编排。` : '仓库尚未检测到路由入口；页面类任务需先明确补路由骨架还是保留占位入口。',
+        facts.apiDir ? `当前 API 目录为 ${facts.apiDir}${facts.apiTypesDir ? `，类型目录为 ${facts.apiTypesDir}` : ''}。` : '仓库尚未检测到 API 模块目录；真实接口任务需先明确请求层承载方式。',
+        facts.styleEntry ? `当前样式入口为 ${facts.styleEntry}，需沿用主题变量与现有样式承载方式。` : null,
+      ].filter(Boolean),
+    },
+    'requirement-analyst': {
+      repo_specific: (facts) => [
+        facts.routeModulesDir ? `当前仓库已有路由模块目录 ${facts.routeModulesDir}，proposal/tasks 需要按该目录组织。` : '若项目尚未接入 vue-router，需要在 proposal/tasks 明确是补路由还是保持占位入口。',
+        facts.viewsDir ? `页面目录以 ${facts.viewsDir} 为准，任务拆解要写清页面落点。` : null,
+      ].filter(Boolean),
+    },
+    'frontend-implementer': {
+      repo_specific: (facts) => [
+        facts.routeEntry ? `当前路由入口为 ${facts.routeEntry}。` : '仓库尚未检测到路由入口，若需新增路由必须先补路由骨架。',
+        facts.requestConfig ? `当前请求层配置入口为 ${facts.requestConfig}。` : facts.apiDir ? `当前 API 目录为 ${facts.apiDir}，新增接口时保持模块化拆分。` : '仓库尚未检测到 API 封装入口，如需真实接口需先补请求层约定。',
+        facts.styleEntry ? `当前样式入口为 ${facts.styleEntry}，新增样式要沿用主题变量。` : null,
+      ].filter(Boolean),
+    },
+    'code-guardian': {
       repo_specific: (facts) => [
         facts.routeModulesDir ? `重点核对 ${facts.routeModulesDir} 下的路由模块是否与页面落点一致。` : null,
         facts.mockDir ? `重点核对 ${facts.mockDir} 中的 mock 是否与演示范围一致。` : null,
@@ -723,6 +728,8 @@ function inferRiskDrivers(rawInput, repoConventions) {
 }
 
 function buildOrchestratorGuidance(targetDir, runState = null, userInput = null) {
+  const selectedFlowId = runState?.flow?.id || DEFAULT_FLOW_ID;
+  const flowDefinition = loadFlowDefinition(targetDir, selectedFlowId);
   const projectProfile = detectProjectProfile(targetDir);
   const repoConventions = collectRepoConventions(targetDir, projectProfile);
   const rawInput = userInput || runState?.trigger?.latest_user_input || runState?.trigger?.raw_input || null;
@@ -730,13 +737,13 @@ function buildOrchestratorGuidance(targetDir, runState = null, userInput = null)
     rawInput,
     taskType: null,
     deliveryProfile: runState?.delivery_profile || null,
-    flowId: runState?.flow?.id || 'prd-to-delivery',
+    flowId: selectedFlowId,
   });
   const deliveryProfile = runState?.delivery_profile || inferDeliveryProfile({
     rawInput,
     taskType: null,
     riskLevel,
-    flowId: 'prd-to-delivery',
+    flowId: selectedFlowId,
   });
   const artifactProfile = runState?.artifact_profile || inferArtifactProfile({
     deliveryProfile,
@@ -759,8 +766,11 @@ function buildOrchestratorGuidance(targetDir, runState = null, userInput = null)
   );
   const riskDrivers = inferRiskDrivers(rawInput, repoConventions);
   const pendingGate = runState?.pending_gate || null;
-  const expectedGate = pendingGate || (riskLevel === 'high' ? 'before-implementation' : null);
-  const requiredArtifacts = ['proposal.md', 'tasks.md', 'checklist.md', 'iterations.md'];
+  const hasBeforeImplementationGate = flowDefinition.approval_gates.includes('before-implementation');
+  const expectedGate = pendingGate || (riskLevel === 'high' && hasBeforeImplementationGate ? 'before-implementation' : null);
+  const resumeRole = expectedGate === 'before-implementation'
+    ? inferApprovalResumeRoleFromFlow(targetDir, runState, flowDefinition)
+    : null;
 
   return {
     project_context: projectContextGuidance,
@@ -768,9 +778,9 @@ function buildOrchestratorGuidance(targetDir, runState = null, userInput = null)
     role: buildRoleGuidance('task-orchestrator', deliveryProfile),
     role_rule_contract: roleRuleContract,
     routing_constraints: {
-      selected_flow: runState?.flow?.id || 'prd-to-delivery',
-      required_experts: ['requirement-analyst', 'frontend-implementer', 'code-guardian'],
-      first_handoff: 'requirement-analyst',
+      selected_flow: flowDefinition.id,
+      required_experts: flowDefinition.required_roles,
+      first_handoff: runState?.plan?.first_handoff || flowDefinition.first_handoff,
       route_strategy: inferRoutingStrategy(repoConventions, rawInput),
       api_strategy: inferApiStrategy(repoConventions, rawInput),
       mock_strategy: inferMockStrategy(repoConventions, rawInput),
@@ -782,21 +792,21 @@ function buildOrchestratorGuidance(targetDir, runState = null, userInput = null)
       risk_level: riskLevel,
       complexity,
       drivers: riskDrivers,
-      before_implementation_gate: riskLevel === 'high' ? 'before-implementation' : null,
-      manual_confirmation_required: riskLevel === 'high',
-      escalation_rule: riskLevel === 'high'
+      before_implementation_gate: riskLevel === 'high' && hasBeforeImplementationGate ? 'before-implementation' : null,
+      manual_confirmation_required: riskLevel === 'high' && hasBeforeImplementationGate,
+      escalation_rule: riskLevel === 'high' && hasBeforeImplementationGate
         ? '需求收敛后必须进入 before-implementation 审批门禁，再决定是否放行实现'
         : '按三专家协同自动推进，必要时仅在异常或门禁场景下阻断',
     },
     approval_contract: {
-      gates: ['before-implementation', 'before-delivery'],
+      gates: flowDefinition.approval_gates,
       pending_gate: pendingGate,
       expected_gate: expectedGate,
       required_when: [
         '支付、认证、权限、安全、风控、合规等高风险领域',
         '关键流程或约束仍未确认，继续实现会显著放大返工成本',
       ],
-      approve_resume_to_role: expectedGate === 'before-implementation' ? 'frontend-implementer' : null,
+      approve_resume_to_role: resumeRole,
       approval_examples: [
         '我同意按当前 proposal 的范围继续实现',
         '按演示版范围继续推进',
@@ -804,12 +814,12 @@ function buildOrchestratorGuidance(targetDir, runState = null, userInput = null)
       ],
     },
     orchestration_contract: {
-      selected_flow: runState?.flow?.id || 'prd-to-delivery',
+      selected_flow: flowDefinition.id,
       delivery_profile: deliveryProfile,
       artifact_profile: artifactProfile,
       change_id: runState?.task?.change_id || null,
-      required_experts: ['requirement-analyst', 'frontend-implementer', 'code-guardian'],
-      required_artifacts: requiredArtifacts,
+      required_experts: flowDefinition.required_roles,
+      required_artifacts: flowDefinition.required_artifacts,
       assumptions_policy: [
         '仓库结构、项目规则和现有代码可推断的信息优先转成 assumptions',
         '只在高风险、不可逆或规则冲突时把缺口升级为审批或阻断',
@@ -818,8 +828,8 @@ function buildOrchestratorGuidance(targetDir, runState = null, userInput = null)
         '规范中已明确、仓库中已存在的事实不要重复标成 missing_inputs',
         '高风险且无法可靠推断的边界必须显式升级为审批点',
       ],
-      handoff_policy: 'task-orchestrator -> requirement-analyst -> frontend-implementer -> code-guardian -> terminal',
-      completion_policy: 'proposal/tasks/checklist/iterations 四类核心产物缺一不可',
+      handoff_policy: flowDefinition.handoff_policy,
+      completion_policy: flowDefinition.completion_policy,
       repo_alignment: [
         repoConventions.viewsDir ? `页面目录优先对齐 ${repoConventions.viewsDir}` : '页面目录需先与仓库结构对齐',
         repoConventions.routeEntry ? `路由入口优先对齐 ${repoConventions.routeEntry}` : '未检测到路由入口时，页面任务需先明确骨架方案',
@@ -1007,16 +1017,118 @@ function loadRoleDefinition(targetDir, sourceRelPath) {
 
   const content = fs.readFileSync(sourceTarget.path, 'utf8');
   const frontmatter = parseFrontmatter(content);
+  const roleId = frontmatter.id || null;
+  const registryEntry = getRoleRuntimeConfig(targetDir, roleId);
 
   return {
-    id: frontmatter.id || null,
-    name: frontmatter.name || null,
+    id: roleId,
+    name: frontmatter.name || registryEntry?.name || null,
     source: sourceRelPath,
-    preferred_skills: Array.isArray(frontmatter.preferred_skills) ? frontmatter.preferred_skills : [],
+    preferred_skills: Array.isArray(frontmatter.preferred_skills)
+      ? frontmatter.preferred_skills
+      : Array.isArray(registryEntry?.preferred_skills)
+      ? registryEntry.preferred_skills
+      : [],
     reads: Array.isArray(frontmatter.reads) ? frontmatter.reads : [],
     writes: Array.isArray(frontmatter.writes) ? frontmatter.writes : [],
-    handoff_to: Array.isArray(frontmatter.handoff_to) ? frontmatter.handoff_to : [],
+    handoff_to: Array.isArray(frontmatter.handoff_to)
+      ? frontmatter.handoff_to
+      : Array.isArray(registryEntry?.handoff_to)
+      ? registryEntry.handoff_to
+      : [],
   };
+}
+
+function normalizeStringArray(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.map((item) => String(item || '').trim()).filter(Boolean);
+}
+
+function normalizeFlowArtifactHints(values) {
+  return normalizeStringArray(values).map((item) => {
+    if (item.includes('/')) {
+      return path.basename(item);
+    }
+    return item;
+  });
+}
+
+function loadFlowDefinition(targetDir, flowId = DEFAULT_FLOW_ID) {
+  const registryEntry = getFlowRuntimeConfig(targetDir, flowId) || {};
+  const sourceRel = registryEntry.source || null;
+  let frontmatter = {};
+
+  if (sourceRel) {
+    const sourceTarget = buildReadableTarget(targetDir, sourceRel);
+    if (sourceTarget.exists) {
+      frontmatter = parseFrontmatter(fs.readFileSync(sourceTarget.path, 'utf8'));
+    }
+  }
+
+  const requiredRoles = normalizeStringArray(registryEntry.required_roles || frontmatter.required_roles);
+  const approvalGates = normalizeStringArray(registryEntry.approval_gates || frontmatter.approval_gates);
+  const requiredArtifacts = normalizeFlowArtifactHints(
+    registryEntry.required_artifacts ||
+    registryEntry.core_artifacts ||
+    frontmatter.artifacts,
+  );
+  const resolvedRequiredRoles = requiredRoles.length > 0
+    ? requiredRoles
+    : DEFAULT_FLOW_CONSTRAINTS.required_roles;
+  const resolvedApprovalGates = approvalGates.length > 0
+    ? approvalGates
+    : DEFAULT_FLOW_CONSTRAINTS.approval_gates;
+  const resolvedRequiredArtifacts = requiredArtifacts.length > 0
+    ? requiredArtifacts
+    : DEFAULT_FLOW_CONSTRAINTS.required_artifacts;
+  const firstHandoff = registryEntry.first_handoff || resolvedRequiredRoles[0] || null;
+
+  return {
+    id: flowId,
+    name: registryEntry.name || frontmatter.name || flowId,
+    source: sourceRel || null,
+    default_schema: registryEntry.default_schema || null,
+    artifact_profile: registryEntry.artifact_profile || null,
+    required_roles: resolvedRequiredRoles,
+    approval_gates: resolvedApprovalGates,
+    required_artifacts: resolvedRequiredArtifacts,
+    first_handoff: firstHandoff,
+    handoff_policy: registryEntry.handoff_policy || `task-orchestrator -> ${resolvedRequiredRoles.join(' -> ')} -> terminal`,
+    completion_policy: registryEntry.completion_policy || `${resolvedRequiredArtifacts.join(', ')} 缺一不可`,
+  };
+}
+
+function resolveRoleOpenSpecSections(targetDir, roleId) {
+  const registryEntry = getRoleRuntimeConfig(targetDir, roleId);
+  const configured = normalizeStringArray(registryEntry?.openspec_rule_sections);
+  if (configured.length > 0) {
+    return configured;
+  }
+  return FALLBACK_ROLE_OPENSPEC_RULE_SECTIONS[roleId] || [];
+}
+
+function resolveNextRole(targetDir, flowId, roleId, roleDefinition = null) {
+  const transition = getRuntimeTransition(targetDir, flowId, roleId);
+  if (transition?.to_role) {
+    return transition.to_role;
+  }
+  return roleDefinition?.handoff_to?.[0] || null;
+}
+
+function inferApprovalResumeRoleFromFlow(targetDir, runState, flowDefinition) {
+  const currentRole = runState?.current_role || flowDefinition.first_handoff || null;
+  if (!currentRole) {
+    return null;
+  }
+
+  const anchorNextRole = runState?.anchor?.stage?.next_role || null;
+  if (anchorNextRole) {
+    return anchorNextRole;
+  }
+
+  return resolveNextRole(targetDir, flowDefinition.id, currentRole, null);
 }
 
 function loadOpenSpecRuleSections(targetDir) {
@@ -1209,7 +1321,7 @@ function buildSkillGuidance(skills) {
     }));
 }
 
-function selectRoleSkills(roleId, skills, deliveryProfile) {
+function selectRoleSkills(targetDir, roleId, skills, deliveryProfile) {
   if (!Array.isArray(skills)) {
     return [];
   }
@@ -1218,7 +1330,7 @@ function selectRoleSkills(roleId, skills, deliveryProfile) {
     return skills;
   }
 
-  const allowlist = MICRO_ROLE_SKILL_ALLOWLIST[roleId];
+  const allowlist = resolveRoleMicroSkillAllowlist(targetDir, roleId);
   if (!Array.isArray(allowlist) || allowlist.length === 0) {
     return skills;
   }
@@ -1226,36 +1338,97 @@ function selectRoleSkills(roleId, skills, deliveryProfile) {
   return skills.filter((item) => allowlist.includes(item?.id || item));
 }
 
-function getRuleCandidates(ruleKey, projectProfile) {
-  const config = RULE_FILE_CANDIDATES[ruleKey];
+function getSourceCandidates(entry, projectProfile, fallbackConfig = null) {
+  const configured = entry && typeof entry === 'object'
+    ? (entry.sourceByProfile?.[projectProfile] || entry.source || null)
+    : null;
+  if (configured) {
+    return [configured];
+  }
+
+  const config = fallbackConfig;
   if (!config) {
     return [];
   }
   return config[projectProfile] || config.default || [];
 }
 
+function resolveRoleRuleIds(targetDir, roleId) {
+  const registryEntry = getRoleRuntimeConfig(targetDir, roleId);
+  const configured = normalizeStringArray(registryEntry?.rule_ids);
+  if (configured.length > 0) {
+    return configured;
+  }
+  return FALLBACK_ROLE_RULE_IDS[roleId] || [];
+}
+
+function resolveRoleRuleConstraintProfiles(targetDir, roleId, projectProfile) {
+  const registryEntry = getRoleRuntimeConfig(targetDir, roleId) || {};
+  const configuredProfiles = registryEntry.rule_contract_profiles && typeof registryEntry.rule_contract_profiles === 'object'
+    ? registryEntry.rule_contract_profiles
+    : {};
+  const fallbackProfiles = FALLBACK_ROLE_RULE_CONSTRAINT_PROFILES;
+
+  const configuredDefault = configuredProfiles.default && typeof configuredProfiles.default === 'object'
+    ? configuredProfiles.default
+    : {};
+  const configuredScoped = configuredProfiles[projectProfile] && typeof configuredProfiles[projectProfile] === 'object'
+    ? configuredProfiles[projectProfile]
+    : {};
+  const fallbackDefault = fallbackProfiles.default?.[roleId] || {};
+  const fallbackScoped = fallbackProfiles[projectProfile]?.[roleId] || {};
+
+  return {
+    default: {
+      must_follow: normalizeStringArray(
+        configuredDefault.must_follow !== undefined ? configuredDefault.must_follow : fallbackDefault.must_follow,
+      ),
+      blocked_when: normalizeStringArray(
+        configuredDefault.blocked_when !== undefined ? configuredDefault.blocked_when : fallbackDefault.blocked_when,
+      ),
+    },
+    scoped: {
+      must_follow: normalizeStringArray(
+        configuredScoped.must_follow !== undefined ? configuredScoped.must_follow : fallbackScoped.must_follow,
+      ),
+      blocked_when: normalizeStringArray(
+        configuredScoped.blocked_when !== undefined ? configuredScoped.blocked_when : fallbackScoped.blocked_when,
+      ),
+    },
+  };
+}
+
 function buildRoleRuleContract(targetDir, roleId, deliveryProfile, projectProfile, repoConventions) {
-  const ruleKeys = ROLE_RULE_FILE_KEYS[roleId] || [];
-  const sourceRules = ruleKeys
-    .map((key) => {
-      const target = buildReadableTargetFromCandidates(targetDir, getRuleCandidates(key, projectProfile), {
+  const ruleIds = resolveRoleRuleIds(targetDir, roleId);
+  const sourceRules = ruleIds
+    .map((ruleId) => {
+      const target = buildReadableTargetFromCandidates(
+        targetDir,
+        getSourceCandidates(
+          getRuleRuntimeConfig(targetDir, ruleId),
+          projectProfile,
+          FALLBACK_RULE_SOURCE_CANDIDATES[ruleId],
+        ),
+        {
         required: true,
-        label: `${roleId} rule: ${key}`,
-      });
+        label: `${roleId} rule: ${ruleId}`,
+      },
+      );
       if (!target) {
         return null;
       }
       return {
-        id: key,
+        id: ruleId,
         path: target.rel_path,
         target,
-        focus: key,
+        focus: ruleId,
       };
     })
     .filter(Boolean);
 
-  const scopedConstraints = ROLE_RULE_CONSTRAINTS[projectProfile]?.[roleId] || {};
-  const fallbackConstraints = ROLE_RULE_CONSTRAINTS.default[roleId] || {};
+  const resolvedConstraintProfiles = resolveRoleRuleConstraintProfiles(targetDir, roleId, projectProfile);
+  const scopedConstraints = resolvedConstraintProfiles.scoped;
+  const fallbackConstraints = resolvedConstraintProfiles.default;
   const mustFollow = [
     ...(fallbackConstraints.must_follow || []),
     ...(scopedConstraints.must_follow || []),
@@ -1264,9 +1437,11 @@ function buildRoleRuleContract(targetDir, roleId, deliveryProfile, projectProfil
     ...(fallbackConstraints.blocked_when || []),
     ...(scopedConstraints.blocked_when || []),
   ];
+  const fallbackRepoSpecific = ROLE_RULE_REPO_SPECIFIC.default?.[roleId] || {};
+  const scopedRepoSpecific = ROLE_RULE_REPO_SPECIFIC[projectProfile]?.[roleId] || {};
   const repoSpecific = [
-    ...((typeof fallbackConstraints.repo_specific === 'function' ? fallbackConstraints.repo_specific(repoConventions) : fallbackConstraints.repo_specific) || []),
-    ...((typeof scopedConstraints.repo_specific === 'function' ? scopedConstraints.repo_specific(repoConventions) : scopedConstraints.repo_specific) || []),
+    ...((typeof fallbackRepoSpecific.repo_specific === 'function' ? fallbackRepoSpecific.repo_specific(repoConventions) : fallbackRepoSpecific.repo_specific) || []),
+    ...((typeof scopedRepoSpecific.repo_specific === 'function' ? scopedRepoSpecific.repo_specific(repoConventions) : scopedRepoSpecific.repo_specific) || []),
   ].filter(Boolean);
 
   return {
@@ -1285,11 +1460,15 @@ function buildRoleRuleContract(targetDir, roleId, deliveryProfile, projectProfil
 }
 
 function buildSkillTarget(targetDir, skillId, projectProfile) {
-  const config = SKILL_FILE_CANDIDATES[skillId];
-  if (!config) {
+  const candidates = getSourceCandidates(
+    getSkillRuntimeConfig(targetDir, skillId),
+    projectProfile,
+    FALLBACK_SKILL_SOURCE_CANDIDATES[skillId],
+  );
+  if (candidates.length === 0) {
     return null;
   }
-  return buildReadableTargetFromCandidates(targetDir, config[projectProfile] || config.default || [], {
+  return buildReadableTargetFromCandidates(targetDir, candidates, {
     required: true,
     label: `skill: ${skillId}`,
   });
@@ -1304,8 +1483,30 @@ function normalizeSkillIds(skills) {
     .filter(Boolean);
 }
 
-function choosePrimarySkillIds(roleId, selectedSkills, repoConventions, userRequest = null) {
-  const ordered = ROLE_SKILL_PRIORITY[roleId] || [];
+function resolveRoleSkillPriority(targetDir, roleId, selectedSkills) {
+  const registryEntry = getRoleRuntimeConfig(targetDir, roleId);
+  const configured = normalizeStringArray(registryEntry?.skill_priority || registryEntry?.preferred_skills);
+  if (configured.length > 0) {
+    return configured;
+  }
+  const normalized = normalizeSkillIds(selectedSkills);
+  if (normalized.length > 0) {
+    return normalized;
+  }
+  return FALLBACK_ROLE_SKILL_PRIORITY[roleId] || [];
+}
+
+function resolveRoleMicroSkillAllowlist(targetDir, roleId) {
+  const registryEntry = getRoleRuntimeConfig(targetDir, roleId);
+  const configured = normalizeStringArray(registryEntry?.micro_skill_allowlist);
+  if (configured.length > 0) {
+    return configured;
+  }
+  return MICRO_ROLE_SKILL_ALLOWLIST[roleId] || [];
+}
+
+function choosePrimarySkillIds(targetDir, roleId, selectedSkills, repoConventions, userRequest = null) {
+  const ordered = resolveRoleSkillPriority(targetDir, roleId, selectedSkills);
   const selected = new Set(normalizeSkillIds(selectedSkills));
   const requestText = String(userRequest || '');
 
@@ -1328,7 +1529,7 @@ function choosePrimarySkillIds(roleId, selectedSkills, repoConventions, userRequ
 
 function buildRoleSkillContract(targetDir, roleId, selectedSkills, deliveryProfile, projectProfile, repoConventions, userRequest = null) {
   const normalized = normalizeSkillIds(selectedSkills);
-  const primaryIds = choosePrimarySkillIds(roleId, selectedSkills, repoConventions, userRequest);
+  const primaryIds = choosePrimarySkillIds(targetDir, roleId, selectedSkills, repoConventions, userRequest);
   const targetIds = primaryIds.length > 0 ? primaryIds : normalized.slice(0, roleId === 'frontend-implementer' ? 4 : 3);
   const readTargets = targetIds
     .map((id) => buildSkillTarget(targetDir, id, projectProfile))
@@ -1353,10 +1554,9 @@ function buildRoleSkillContract(targetDir, roleId, selectedSkills, deliveryProfi
 }
 
 function buildRuleHints(roleId, deliveryProfile, roleRuleContract = null) {
-  const contractHints = Array.isArray(roleRuleContract?.source_rules)
+  const hints = Array.isArray(roleRuleContract?.source_rules)
     ? roleRuleContract.source_rules.map((item) => path.basename(item.path))
     : [];
-  const hints = (contractHints.length > 0 ? contractHints : (ROLE_RULE_HINTS[roleId] || []).map((relPath) => path.basename(relPath)));
   if (deliveryProfile === 'micro') {
     return hints.slice(0, 3);
   }
@@ -1365,7 +1565,7 @@ function buildRuleHints(roleId, deliveryProfile, roleRuleContract = null) {
 
 function buildOpenSpecGuidance(targetDir, roleId, deliveryProfile) {
   const config = loadOpenSpecRuleSections(targetDir);
-  const sectionNames = ROLE_OPENSPEC_RULE_SECTIONS[roleId] || [];
+  const sectionNames = resolveRoleOpenSpecSections(targetDir, roleId);
   const artifactProfile = inferArtifactProfile({
     deliveryProfile,
   });
@@ -1539,7 +1739,7 @@ function buildRoleGuidance(roleId, deliveryProfile) {
   };
 }
 
-function buildExecutionContract(runtimePaths, dispatch, roleDefinition, writes, deliveryProfile) {
+function buildExecutionContract(targetDir, runtimePaths, dispatch, roleDefinition, writes, deliveryProfile) {
   const artifactWrites = writes
     .filter((item) => item.kind === 'file' && item.rel_path !== runtimePaths.tmpCurrentExecution.relPath)
     .map((item) => item.rel_path);
@@ -1574,8 +1774,10 @@ function buildExecutionContract(runtimePaths, dispatch, roleDefinition, writes, 
     contract.required_fields.push('assumptions');
   }
 
-  if (Array.isArray(roleDefinition.handoff_to) && roleDefinition.handoff_to.length > 0) {
-    contract.default_next_role = roleDefinition.handoff_to[0];
+  const flowId = dispatch.flow?.id || DEFAULT_FLOW_ID;
+  const nextRole = resolveNextRole(targetDir, flowId, dispatch.role?.id, roleDefinition);
+  if (nextRole) {
+    contract.default_next_role = nextRole;
   }
 
   return contract;
@@ -1665,6 +1867,7 @@ function attachActorPresentation(turn) {
 
 function buildStartTurn(targetDir, userInput) {
   const runtimePaths = resolveRuntimePaths(targetDir);
+  const flowDefinition = loadFlowDefinition(targetDir, DEFAULT_FLOW_ID);
   const riskLevel = inferRiskLevel({
     rawInput: userInput,
     taskType: null,
@@ -1674,7 +1877,7 @@ function buildStartTurn(targetDir, userInput) {
     rawInput: userInput,
     taskType: null,
     riskLevel,
-    flowId: 'prd-to-delivery',
+    flowId: flowDefinition.id,
   });
   const artifactProfile = inferArtifactProfile({
     deliveryProfile,
@@ -1691,7 +1894,7 @@ function buildStartTurn(targetDir, userInput) {
       risk_level: riskLevel,
     },
     flow: {
-      id: 'prd-to-delivery',
+      id: flowDefinition.id,
     },
   }, userInput);
 
@@ -1736,7 +1939,7 @@ function buildStartTurn(targetDir, userInput) {
     guidance: {
       ...orchestratorGuidance,
       routing: {
-        selected_flow: 'prd-to-delivery',
+        selected_flow: flowDefinition.id,
         delivery_profile: deliveryProfile,
         artifact_profile: artifactProfile,
         complexity,
@@ -1878,13 +2081,14 @@ function buildContinueTurn(targetDir, status, currentArtifacts) {
 
 function buildApprovalGateTurn(targetDir, status, currentArtifacts) {
   const pendingGate = currentArtifacts.run?.pending_gate || null;
+  const flowDefinition = loadFlowDefinition(targetDir, currentArtifacts.run?.flow?.id || DEFAULT_FLOW_ID);
   const orchestratorGuidance = buildOrchestratorGuidance(
     targetDir,
     currentArtifacts.run,
     currentArtifacts.run?.trigger?.latest_user_input || currentArtifacts.run?.trigger?.raw_input || null,
   );
   const resumeRole = pendingGate === 'before-implementation'
-    ? 'frontend-implementer'
+    ? inferApprovalResumeRoleFromFlow(targetDir, currentArtifacts.run, flowDefinition)
     : currentArtifacts.run?.current_role || null;
   const blockedReason = pendingGate === 'before-implementation'
     ? '支付/认证/安全/风控等关键约束未获人工确认，当前不能进入实现阶段。'
@@ -1970,6 +2174,7 @@ function buildApprovalGateTurn(targetDir, status, currentArtifacts) {
 
 function buildUpdateReviewTurn(targetDir, status, currentArtifacts) {
   const runtimePaths = resolveRuntimePaths(targetDir);
+  const flowDefinition = loadFlowDefinition(targetDir, currentArtifacts.run?.flow?.id || DEFAULT_FLOW_ID);
   const recentUpdates = Array.isArray(currentArtifacts.run?.input_updates)
     ? currentArtifacts.run.input_updates.slice(-3)
     : [];
@@ -2046,15 +2251,15 @@ function buildUpdateReviewTurn(targetDir, status, currentArtifacts) {
       approval_gate: pendingGate
         ? {
             gate: pendingGate,
-            approval_intent_detected: approvalIntent,
-            latest_user_input: latestInput,
-            resume_to_role: pendingGate === 'before-implementation'
-              ? 'frontend-implementer'
+      approval_intent_detected: approvalIntent,
+      latest_user_input: latestInput,
+      resume_to_role: pendingGate === 'before-implementation'
+              ? inferApprovalResumeRoleFromFlow(targetDir, currentArtifacts.run, flowDefinition)
               : currentArtifacts.run?.current_role || null,
             next_step: approvalIntent
               ? `生成 action=approve 的 runtime-action，清除 pending_gate，并恢复到 ${
                 pendingGate === 'before-implementation'
-                  ? 'frontend-implementer'
+                  ? (inferApprovalResumeRoleFromFlow(targetDir, currentArtifacts.run, flowDefinition) || '下一位专家')
                   : (currentArtifacts.run?.current_role || '当前角色')
               }`
               : '若未获得明确批准，保持 waiting-approval，不要放行到实现阶段',
@@ -2092,6 +2297,7 @@ function buildExpertTurn(targetDir, status, currentArtifacts) {
     changeId: dispatch.task?.change_id || currentArtifacts.run?.task?.change_id || null,
     runId: dispatch.run_id || currentArtifacts.run?.run_id || null,
   };
+  const flowId = dispatch.flow?.id || currentArtifacts.run?.flow?.id || DEFAULT_FLOW_ID;
   const deliveryProfile = currentArtifacts.run?.delivery_profile || 'standard';
   const artifactProfile = currentArtifacts.run?.artifact_profile || inferArtifactProfile({
     deliveryProfile,
@@ -2145,6 +2351,7 @@ function buildExpertTurn(targetDir, status, currentArtifacts) {
     expectedOutput.push(item);
   }
   const selectedSkills = selectRoleSkills(
+    targetDir,
     dispatch.role?.id,
     Array.isArray(dispatch.execution?.skills) && dispatch.execution.skills.length > 0
       ? dispatch.execution.skills
@@ -2183,6 +2390,7 @@ function buildExpertTurn(targetDir, status, currentArtifacts) {
         label: 'project stable context',
       })
     : null;
+  const nextRole = dispatch.execution?.next_role || resolveNextRole(targetDir, flowId, dispatch.role?.id, roleDefinition);
   if (projectContextRead) {
     reads.push(projectContextRead);
   }
@@ -2214,9 +2422,9 @@ function buildExpertTurn(targetDir, status, currentArtifacts) {
     input: {
       user_request: dispatch.task?.raw_goal || currentArtifacts.run?.trigger?.raw_input || null,
       change_id: context.changeId,
-      flow_id: dispatch.flow?.id || currentArtifacts.run?.flow?.id || null,
+      flow_id: flowId,
       current_role: dispatch.execution?.current_role || dispatch.role.id,
-      next_role: dispatch.execution?.next_role || roleDefinition.handoff_to[0] || null,
+      next_role: nextRole,
       delivery_profile: deliveryProfile,
       artifact_profile: artifactProfile,
     },
@@ -2224,7 +2432,7 @@ function buildExpertTurn(targetDir, status, currentArtifacts) {
     reads: dedupeTargets(reads),
     writes: dedupeTargets(writes),
     expected_output: [...new Set(expectedOutput)],
-    execution_contract: buildExecutionContract(runtimePaths, dispatch, roleDefinition, writes, deliveryProfile),
+    execution_contract: buildExecutionContract(targetDir, runtimePaths, dispatch, roleDefinition, writes, deliveryProfile),
     guidance: {
       project_context: projectContextGuidance,
       repo_conventions: buildRepoConventionGuidance(repoConventions),
@@ -2246,7 +2454,7 @@ function buildExpertTurn(targetDir, status, currentArtifacts) {
       ),
       openspec_rules: buildOpenSpecGuidance(targetDir, dispatch.role?.id, deliveryProfile),
     },
-    handoff_to: roleDefinition.handoff_to,
+    handoff_to: nextRole ? [nextRole] : roleDefinition.handoff_to,
   }), {
     userInput: currentArtifacts.run?.trigger?.latest_user_input || currentArtifacts.run?.trigger?.raw_input || null,
   });
