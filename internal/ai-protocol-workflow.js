@@ -1135,6 +1135,9 @@ function attachProtocolContracts(turn, options = {}) {
       '逐条罗列 created/updated 文件清单',
       '过细的实现结构描述或组件内部实现细节',
       '无必要的绝对/相对文件路径',
+      '阶段说明（语义）式回放或逐角色完成播报',
+      '对内说明、内部注释或实现者自述',
+      '默认附加本地执行提示（如 pnpm dev、浏览器打开路径等）',
     ],
   };
 
@@ -1183,6 +1186,8 @@ function attachProtocolContracts(turn, options = {}) {
                   '任何文件路径',
                   '组件/页面内部实现结构细节',
                   '具体命令名或协议推进细节',
+                  '阶段说明（语义）式回放或逐角色完成播报',
+                  '默认附加本地执行提示（如 pnpm dev、浏览器打开路径等）',
                 ],
               }
             : standardUserReportContract,
@@ -1952,6 +1957,8 @@ function buildApprovalGateTurn(targetDir, status, currentArtifacts) {
             '输出交付结论 / 验证结果 / 残留风险三段式',
             '协议执行过程描述',
             '命令行细节或多步操作解释',
+            '对内说明、内部注释或实现者自述',
+            '任何本地执行提示或额外操作指南',
           ],
         },
       },

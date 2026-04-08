@@ -32,7 +32,7 @@
 若 `turn.status = blocked` 且存在 `turn.summary.pending_gate`：
 - 明确告诉用户：当前停在该审批门禁，尚未批准，不能继续实现
 - 若存在 `turn.guidance.approval_gate.user_report_contract`，严格按它输出极简摘要：
-  只保留“当前状态 / 关键原因 / 下一步”，不要写长篇阶段说明，不要罗列 proposal/tasks 或仓库文件路径
+  只保留“当前状态 / 关键原因 / 下一步”，不要写长篇阶段说明，不要罗列 proposal/tasks 或仓库文件路径，不要输出任何“对内说明”
 - 不要继续执行 `advance`
 - 若用户随后给出明确批准意见，先执行 `turn.commands.update` 记录审批说明，再让用户重新执行 `/spec-continue`
 
@@ -40,3 +40,5 @@
 若存在 `turn.finalize_contract.user_report_contract`，最终摘要严格服从它：
 - `micro`：压成三句式，只保留交付结论、验证结果、残留风险；不要文件路径、实现结构细节、命令名
 - `standard`：只保留关键结果、验证结果、残留风险，必要时补一句下一步；不要协议细节、路径、OpenSpec 文件名或长篇实现说明
+- 不要额外输出“阶段说明（语义）”式逐角色播报
+- 不要默认附加 `pnpm dev`、浏览器打开路径等本地操作提示，除非用户明确要
