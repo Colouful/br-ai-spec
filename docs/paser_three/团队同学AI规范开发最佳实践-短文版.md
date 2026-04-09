@@ -1,6 +1,6 @@
-# 团队同学 AI 规范开发最佳实践
+# 开发人员 AI 规范开发最佳实践
 
-这篇文档只回答两件事：为什么团队现在要升级 AI 开发做法，以及今天怎么开始。  
+这篇文档只回答两件事：为什么 AI 开发不能再停留在“谁更会写 prompt”，以及今天怎么开始用规范化的方法做开发。  
 **AI Coding 下半场，重点不是让 AI 更快写，而是让 AI 按团队方法稳定地做。**
 
 想今天就试，先看“方案设计 / 人工快速使用”。  
@@ -20,9 +20,9 @@ flowchart LR
 
 - 场景 1：需求刚说了半句，AI 已经开始改代码。最后功能做出来了，但不是大家真正想要的，返工还是回到团队自己身上。
 - 场景 2：代码功能没问题，但目录、路由、接口、样式、测试约定不一致。上线能过，交接很难，维护成本越来越高。
-- 场景 3：一次会话里做得不错，换一个同学、换一个会话就接不上。经验停留在聊天记录里，没有沉淀成 `proposal / design / tasks / checklist / archive` 这些可复用资产。
+- 场景 3：一次会话里做得不错，换一个开发人员、换一个会话就接不上。经验停留在聊天记录里，没有沉淀成 `proposal / design / tasks / checklist / archive` 这些可复用资产。
 
-这也是 [AI Coding时代，我们处在什么位置？](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/AI Coding时代，我们处在什么位置？.md) 里最值得团队吸收的判断：今天比拼的不是“谁更会用 AI”，而是“谁能把 AI 稳定纳入软件工程体系”。
+今天真正拉开差距的，不是“谁更会用 AI”，而是“谁能把 AI 稳定纳入软件工程体系”。
 
 ## 竞品分析
 
@@ -32,7 +32,7 @@ flowchart LR
 | --- | --- | --- | --- |
 | `spec-kit` | 让需求先沉淀成 spec / tasks，再进入实现 | artifact-first、spec-driven | 团队 rules、运行态和归档闭环 |
 | `superpowers` | 把高频做法和执行纪律沉淀成 workflow | methodology-as-code、workflow-driven | 项目安装链路和团队级资产管理 |
-| `harness engineering` | 让 context、constraints、feedback loops 组成稳定系统 | system-driven、先设计系统再用模型 | 面向一线同学的落地路径 |
+| `harness engineering` | 让 context、constraints、feedback loops 组成稳定系统 | system-driven、先设计系统再用模型 | 面向开发人员的落地路径 |
 | 我们当前路线 | 用 `OpenSpec + .agents + .ai-spec` 做规范、流程和运行态协同 | 偏实操、偏项目接入、偏团队复用 | 入口体验和平台化能力仍在持续建设 |
 
 - `spec-kit` 提醒我们先有产物，再进入实现。
@@ -134,7 +134,7 @@ flowchart LR
 
 - 现在：先把试点项目跑起来，让团队知道这套方法不是纸上方案。
 - 短期：把 `prd-to-delivery` 主链、`expert-delivery` schema、归档闭环和团队文档打磨稳定。
-- 中期：把 Hub 场景包、manifest、works 插件入口和流程模板矩阵做出来，让更多同学按场景接入，而不是先学一堆命令。
-- 长期：把平台资产、works、OpenClaw 控制面、CI/CD 校验和度量治理连成一体，这部分可以继续参考 [AI规范驱动开发平台-综合蓝图.md](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/paser_two/AI规范驱动开发平台-综合蓝图.md)、[流程模板矩阵与分阶段建设建议.md](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/paser_two/流程模板矩阵与分阶段建设建议.md) 和 [OpenClaw团队协同控制面定位与价值说明-03-31-13-03.md](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/paser_two/OpenClaw团队协同控制面定位与价值说明-03-31-13-03.md)。
+- 中期：把 Hub 场景包、manifest、works 插件入口和流程模板矩阵做出来，让更多开发人员按场景接入，而不是先学一堆命令。
+- 长期：把平台资产、works、OpenClaw 控制面、CI/CD 校验和度量治理连成一体，逐步形成统一的团队协同底座。
 
-对团队同学来说，最终想看到的变化其实很简单：今天还是少数人会用 AI，未来会变成团队按统一方法使用 AI；今天主要靠本地 IDE，未来会变成 IDE、Hub 和远程控制面共享同一套底座。
+对开发人员来说，最终想看到的变化其实很简单：今天还是少数人会用 AI，未来会变成团队按统一方法使用 AI；今天主要靠本地 IDE，未来会变成 IDE、Hub 和远程控制面共享同一套底座。
