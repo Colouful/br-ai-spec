@@ -260,6 +260,7 @@ const ROLE_GUIDANCE = {
     must_do: [
       '先读 proposal.md、specs/、design.md 和 tasks.md 再改代码',
       '严格在当前变更范围内实现，不顺手扩 scope',
+      '遵守最小改动原则，只修改与当前任务直接相关的文件',
       '实现完成后写 expert-execution 回执并等待下一轮编排',
     ],
     must_not: [
@@ -321,6 +322,7 @@ const FALLBACK_ROLE_RULE_CONSTRAINT_PROFILES = {
       must_follow: [
         '优先复用现有目录、路由、请求封装、状态管理和样式变量约定。',
         '实现前先对齐 proposal/specs/design/tasks 的范围与落点，不要自行扩 scope。',
+        '坚持最小 patch，避免顺手重构无关模块或扩大改动面。',
       ],
       blocked_when: [
         'proposal/specs/design/tasks 未落盘或仍处于 before-implementation 审批门禁时，禁止改业务代码。',
@@ -795,6 +797,7 @@ function buildOrchestratorGuidance(targetDir, runState = null, userInput = null)
 
   return {
     project_context: projectContextGuidance,
+    repo_map_source: '.ai-spec/repo-map.json',
     repo_conventions: buildRepoConventionGuidance(repoConventions),
     role: buildRoleGuidance('task-orchestrator', deliveryProfile),
     role_rule_contract: roleRuleContract,
@@ -1728,6 +1731,10 @@ function buildRoleSpecificContract(
         repoConventions.routeModulesDir ? `路由修改优先对齐 ${repoConventions.routeModulesDir}` : '若新增路由，需先确认路由入口与模块组织方式',
         repoConventions.apiDir ? `接口封装优先对齐 ${repoConventions.apiDir}` : '若涉及真实接口，需先确认 API 封装入口',
       ],
+      implementation_constraints: [
+        '遵守最小改动原则：只改当前需求直接相关的页面、路由、mock、API 或样式文件',
+        '不要顺手重构无关模块，不要为了“更完整”扩大改动面',
+      ],
     };
   }
 
@@ -1763,6 +1770,7 @@ function buildRoleSpecificContract(
         repoConventions.routeModulesDir ? `路由是否落在 ${repoConventions.routeModulesDir} 并保持懒加载/meta 约定` : '新增路由是否先补齐路由骨架并符合模块组织方式',
         repoConventions.apiDir ? `接口是否经由 ${repoConventions.apiDir} 封装，页面/组件未直接调 request` : '涉及真实接口时是否先建立统一 API 封装入口',
         repoConventions.styleEntry ? `样式是否沿用 ${repoConventions.styleEntry} 及主题变量，不存在硬编码颜色或全局污染` : '样式是否继续使用主题变量和作用域样式',
+        '是否出现与本次任务无关的扩改、顺手重构或越权补功能',
         '实现是否越过 proposal/specs/design/tasks 或审批约束，把演示页扩成生产能力',
       ],
       scope_guard: [
@@ -2075,7 +2083,12 @@ function buildStartTurn(targetDir, userInput) {
     input: {
       user_request: userInput || null,
     },
-    reads: buildCommandTargets(targetDir, START_INSTRUCTION_FILES),
+    reads: dedupeTargets([
+      ...buildCommandTargets(targetDir, START_INSTRUCTION_FILES),
+      buildFileTarget(targetDir, runtimePaths.repoMap.relPath, {
+        label: 'lightweight repo map',
+      }),
+    ]),
     writes: [
       buildFileTarget(targetDir, runtimePaths.tmpTaskOrchestratorTurn.relPath, {
         required: true,
@@ -2232,8 +2245,9 @@ function buildContinueTurn(targetDir, status, currentArtifacts) {
 
 function buildApprovalGateTurn(targetDir, status, currentArtifacts) {
   const pendingGate = currentArtifacts.run?.pending_gate || null;
+  const gateContext = currentArtifacts.run?.gate_context || null;
   const flowDefinition = loadFlowDefinition(targetDir, currentArtifacts.run?.flow?.id || DEFAULT_FLOW_ID);
-  const resumeRole = inferPendingGateResumeRole(targetDir, currentArtifacts.run, flowDefinition, pendingGate);
+  const resumeRole = gateContext?.resume_to_role || inferPendingGateResumeRole(targetDir, currentArtifacts.run, flowDefinition, pendingGate);
   const gateDescription = describeApprovalGate(pendingGate, resumeRole);
   const useCompactArchiveGate = pendingGate === 'before-archive';
   const orchestratorGuidance = useCompactArchiveGate
@@ -2330,10 +2344,12 @@ function buildApprovalGateTurn(targetDir, status, currentArtifacts) {
       ...orchestratorGuidance,
       approval_gate: {
         gate: pendingGate,
+        gate_id: gateContext?.gate_id || pendingGate,
         status: 'waiting-approval',
-        required_user_action: gateDescription.requiredUserAction,
+        required_user_action: gateContext?.required_user_action || gateDescription.requiredUserAction,
         blocked_rule: gateDescription.blockedRule,
-        blocked_reason: gateDescription.blockedReason,
+        blocked_reason: gateContext?.blocked_reason || gateDescription.blockedReason,
+        blocked_by_role: gateContext?.blocked_by_role || currentArtifacts.run?.current_role || null,
         resume_to_role: resumeRole,
         resume_rule: gateDescription.resumeRule,
         user_report_contract: {
@@ -2369,11 +2385,12 @@ function buildUpdateReviewTurn(targetDir, status, currentArtifacts) {
     : [];
   const latestInput = currentArtifacts.run?.trigger?.latest_user_input || null;
   const pendingGate = currentArtifacts.run?.pending_gate || null;
+  const gateContext = currentArtifacts.run?.gate_context || null;
   const approvalIntent = pendingGate === 'before-archive'
     ? (looksLikeArchiveApproveInput(latestInput) || looksLikeApprovalInput(latestInput))
     : (pendingGate ? looksLikeApprovalInput(latestInput) : false);
   const archiveSkipIntent = pendingGate === 'before-archive' ? looksLikeArchiveSkipInput(latestInput) : false;
-  const resumeRole = inferPendingGateResumeRole(targetDir, currentArtifacts.run, flowDefinition, pendingGate);
+  const resumeRole = gateContext?.resume_to_role || inferPendingGateResumeRole(targetDir, currentArtifacts.run, flowDefinition, pendingGate);
   const useCompactArchiveGate = pendingGate === 'before-archive' && (approvalIntent || archiveSkipIntent);
   const orchestratorGuidance = useCompactArchiveGate
     ? {
@@ -2470,10 +2487,14 @@ function buildUpdateReviewTurn(targetDir, status, currentArtifacts) {
       approval_gate: pendingGate
         ? {
             gate: pendingGate,
-      approval_intent_detected: approvalIntent,
-      archive_skip_intent_detected: archiveSkipIntent,
-      latest_user_input: latestInput,
-      resume_to_role: resumeRole,
+            gate_id: gateContext?.gate_id || pendingGate,
+            blocked_by_role: gateContext?.blocked_by_role || currentArtifacts.run?.current_role || null,
+            blocked_reason: gateContext?.blocked_reason || null,
+            required_user_action: gateContext?.required_user_action || null,
+            approval_intent_detected: approvalIntent,
+            archive_skip_intent_detected: archiveSkipIntent,
+            latest_user_input: latestInput,
+            resume_to_role: resumeRole,
             next_step: approvalIntent
               ? `生成 action=approve 的 runtime-action，清除 pending_gate，并恢复到 ${resumeRole || '下一位专家'}`
               : archiveSkipIntent
@@ -2530,6 +2551,9 @@ function buildExpertTurn(targetDir, status, currentArtifacts) {
     buildFileTarget(targetDir, getExistingRelPath(runtimePaths.currentDispatch), {
       required: true,
       label: 'current expert dispatch',
+    }),
+    buildFileTarget(targetDir, runtimePaths.repoMap.relPath, {
+      label: 'lightweight repo map',
     }),
   ];
 
@@ -2664,8 +2688,12 @@ function buildExpertTurn(targetDir, status, currentArtifacts) {
         ? roleSpecificContract
         : null,
       review_contract: dispatch.role?.id === 'code-guardian'
-        ? roleSpecificContract
+        ? {
+            ...(roleSpecificContract || {}),
+            latest_verification: currentArtifacts.run?.verification || null,
+          }
         : null,
+      repo_map_source: '.ai-spec/repo-map.json',
       rule_hints: buildRuleHints(dispatch.role?.id, deliveryProfile, roleRuleContract),
       skills: buildSkillGuidance(
         selectedSkills.map((item) => (typeof item === 'string' ? { id: item } : item)),

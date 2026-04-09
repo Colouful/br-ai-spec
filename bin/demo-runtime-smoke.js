@@ -123,9 +123,9 @@ function scaffoldDemoTarget(targetDir) {
     name: 'runtime-smoke-demo',
     private: true,
     scripts: {
-      build: 'vite build',
-      lint: 'eslint .',
-      test: 'vitest run',
+      build: 'node -e "process.exit(0)"',
+      lint: 'node -e "process.exit(0)"',
+      test: 'node -e "process.exit(0)"',
     },
     dependencies: {
       vue: '^3.5.0',

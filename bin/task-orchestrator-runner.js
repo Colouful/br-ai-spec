@@ -472,6 +472,10 @@ function buildRuntimeOptionsFromPayload(payload, targetDir) {
     ['fromRole', ['from_role', 'fromRole']],
     ['gate', ['gate']],
     ['pendingGate', ['pending_gate', 'pendingGate']],
+    ['blockedByRole', ['blocked_by_role', 'blockedByRole']],
+    ['resumeToRole', ['resume_to_role', 'resumeToRole']],
+    ['requiredUserAction', ['required_user_action', 'requiredUserAction']],
+    ['blockedReason', ['blocked_reason', 'blockedReason']],
     ['message', ['message']],
     ['error', ['error']],
     ['eventType', ['event_type', 'eventType']],
@@ -500,6 +504,9 @@ function buildRuntimeOptionsFromPayload(payload, targetDir) {
   }
   if (payload.artifacts && typeof payload.artifacts === 'object') {
     options.artifactsData = payload.artifacts;
+  }
+  if (payload.verification && typeof payload.verification === 'object') {
+    options.verificationData = payload.verification;
   }
   if (Object.prototype.hasOwnProperty.call(payload, 'skip_artifact_check') || Object.prototype.hasOwnProperty.call(payload, 'skipArtifactCheck')) {
     options.skipArtifactCheck = Boolean(

@@ -93,6 +93,10 @@ function main() {
       tasks: 'openspec/changes/archive-runtime-demo/tasks.md',
       checklist: 'openspec/changes/archive-runtime-demo/checklist.md',
       iterations: 'openspec/changes/archive-runtime-demo/iterations.md',
+      additional: [
+        'openspec/changes/archive-runtime-demo/specs/',
+        'openspec/changes/archive-runtime-demo/notes.md',
+      ],
     },
     events: [],
     timestamps: {
@@ -124,6 +128,8 @@ function main() {
   assert.strictEqual(runtimeResult.runtime_transition.state.status, 'success');
   assert.strictEqual(runtimeResult.runtime_transition.state.current_role, 'archive-change');
   assert.ok(runtimeResult.runtime_transition.state.artifacts.proposal.includes('openspec/changes/archive/'));
+  assert.ok(!runtimeResult.runtime_transition.state.artifacts.additional.includes('openspec/changes/archive-runtime-demo/specs'));
+  assert.ok(runtimeResult.runtime_transition.state.artifacts.additional.includes('openspec/changes/archive/2026-04-08-archive-runtime-demo/notes.md'));
   assert.ok(!fs.existsSync(path.join(targetDirWithRuntime, '.ai-spec', 'internal', 'current-dispatch.json')));
 
   console.log('archive-change test passed: spec merge and change archive complete');

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 const fs = require('fs');
 const path = require('path');
+const { spawnSync } = require('child_process');
 const runtimeState = require('./runtime-state');
 const expertDispatch = require('./expert-dispatch');
 const { archiveChange } = require('./archive-change');
@@ -123,6 +124,114 @@ function normalizeList(value) {
   if (!value) return [];
   if (Array.isArray(value)) return value.filter(Boolean);
   return [String(value)].filter(Boolean);
+}
+
+function loadPackageManifest(targetDir) {
+  const packagePath = path.join(targetDir, 'package.json');
+  if (!fs.existsSync(packagePath)) {
+    return null;
+  }
+  return readJson(packagePath, 'package.json');
+}
+
+function detectPackageManager(targetDir) {
+  if (fs.existsSync(path.join(targetDir, 'pnpm-lock.yaml'))) {
+    return 'pnpm';
+  }
+  if (fs.existsSync(path.join(targetDir, 'yarn.lock'))) {
+    return 'yarn';
+  }
+  if (fs.existsSync(path.join(targetDir, 'package-lock.json'))) {
+    return 'npm';
+  }
+  return 'npm';
+}
+
+function trimOutput(value, maxLength = 400) {
+  const text = String(value || '').trim();
+  if (!text) {
+    return null;
+  }
+  return text.length > maxLength ? `${text.slice(0, maxLength)}...` : text;
+}
+
+function buildVerificationCommand(packageManager, stepName) {
+  if (packageManager === 'yarn') {
+    return {
+      command: 'yarn',
+      args: [stepName],
+      printable: `yarn ${stepName}`,
+    };
+  }
+
+  return {
+    command: packageManager,
+    args: ['run', stepName],
+    printable: `${packageManager} run ${stepName}`,
+  };
+}
+
+function runVerificationSuite(targetDir) {
+  const pkg = loadPackageManifest(targetDir);
+  const scripts = pkg?.scripts && typeof pkg.scripts === 'object' ? pkg.scripts : {};
+  const packageManager = detectPackageManager(targetDir);
+  const stepNames = ['build', 'lint', 'test'];
+  const steps = [];
+
+  for (const stepName of stepNames) {
+    if (typeof scripts[stepName] !== 'string' || !scripts[stepName].trim()) {
+      steps.push({
+        name: stepName,
+        status: 'skipped',
+        reason: `package.json scripts.${stepName} 未定义`,
+      });
+      continue;
+    }
+
+    const command = buildVerificationCommand(packageManager, stepName);
+    const result = spawnSync(command.command, command.args, {
+      cwd: targetDir,
+      encoding: 'utf8',
+      env: process.env,
+    });
+
+    if (result.error) {
+      steps.push({
+        name: stepName,
+        command: command.printable,
+        status: 'failed',
+        exit_code: typeof result.status === 'number' ? result.status : null,
+        error: result.error.message,
+      });
+      continue;
+    }
+
+    steps.push({
+      name: stepName,
+      command: command.printable,
+      status: result.status === 0 ? 'passed' : 'failed',
+      exit_code: typeof result.status === 'number' ? result.status : null,
+      stdout_excerpt: trimOutput(result.stdout),
+      stderr_excerpt: trimOutput(result.stderr),
+    });
+  }
+
+  const summary = steps.reduce((accumulator, step) => {
+    const key = step.status === 'passed' || step.status === 'failed' ? step.status : 'skipped';
+    accumulator[key] += 1;
+    return accumulator;
+  }, { passed: 0, failed: 0, skipped: 0 });
+
+  return {
+    schema_version: 1,
+    kind: 'verification',
+    auto_generated: true,
+    generated_at: new Date().toISOString(),
+    package_manager: packageManager,
+    overall_status: summary.failed > 0 ? 'failed' : summary.passed > 0 ? 'passed' : 'skipped',
+    steps,
+    summary,
+  };
 }
 
 function shouldWriteRuntimeMarkdown() {
@@ -395,6 +504,26 @@ function normalizeExecutionPayload(payload) {
   return normalized;
 }
 
+function attachVerificationIfNeeded(targetDir, payload) {
+  if (payload?.role?.id !== 'frontend-implementer') {
+    return payload;
+  }
+
+  const normalizedStatus = String(payload.status || '').trim().toLowerCase();
+  if (!['done', 'success', 'completed'].includes(normalizedStatus)) {
+    return payload;
+  }
+
+  if (payload.verification && Array.isArray(payload.verification.steps) && payload.verification.steps.length > 0) {
+    return payload;
+  }
+
+  return {
+    ...payload,
+    verification: runVerificationSuite(targetDir),
+  };
+}
+
 function normalizeRuntimeActionPayload(payload) {
   const normalized = JSON.parse(JSON.stringify(payload));
   normalized.schema_version = normalized.schema_version || 1;
@@ -551,11 +680,16 @@ function applyRuntimeMutation(targetDir, payload, payloadSource) {
     fromRole: payload.from_role,
     gate: payload.gate,
     pendingGate: payload.pending_gate,
+    blockedByRole: payload.blocked_by_role,
+    resumeToRole: payload.resume_to_role,
+    requiredUserAction: payload.required_user_action,
+    blockedReason: payload.blocked_reason,
     message: payload.message,
     error: payload.error,
     eventType: payload.event_type || payload.eventType,
     status: payload.status,
     artifactsData: payload.artifacts || null,
+    verificationData: payload.verification || null,
     skipArtifactCheck:
       Object.prototype.hasOwnProperty.call(payload, 'skip_artifact_check') ||
       Object.prototype.hasOwnProperty.call(payload, 'skipArtifactCheck')
@@ -636,7 +770,7 @@ function applyExecution(options) {
   validateExecutionPayload(hydrated.payload, sourcePath, hydrated.context);
   const validation = validateExecutionArtifacts(targetDir, hydrated.payload);
   const archive_result = maybeApplyArchiveChange(targetDir, hydrated.payload);
-  const payload = normalizeExecutionPayload(hydrated.payload);
+  const payload = normalizeExecutionPayload(attachVerificationIfNeeded(targetDir, hydrated.payload));
   const artifacts = writeExecutionArtifacts(targetDir, payload);
   let runtime_transition = null;
   if (shouldAdvanceRuntime(options)) {
@@ -693,7 +827,7 @@ function applyExecutionData(options) {
   validateExecutionPayload(hydrated.payload, sourcePath, hydrated.context);
   const validation = validateExecutionArtifacts(targetDir, hydrated.payload);
   const archive_result = maybeApplyArchiveChange(targetDir, hydrated.payload);
-  const payload = normalizeExecutionPayload(hydrated.payload);
+  const payload = normalizeExecutionPayload(attachVerificationIfNeeded(targetDir, hydrated.payload));
   const artifacts = writeExecutionArtifacts(targetDir, payload);
   let runtime_transition = null;
   if (shouldAdvanceRuntime(options)) {

@@ -24,9 +24,9 @@ function createWorkspace(prefix) {
   writeProjectFile(targetDir, 'package.json', JSON.stringify({
     name: 'protocol-update-fast-path',
     scripts: {
-      build: 'vite build',
-      lint: 'eslint .',
-      test: 'vitest run',
+      build: 'node -e "process.exit(0)"',
+      lint: 'node -e "process.exit(0)"',
+      test: 'node -e "process.exit(0)"',
     },
     dependencies: {
       vue: '^3.5.0',
@@ -141,6 +141,7 @@ function main() {
   assert.strictEqual(currentRun.status, 'success');
   assert.strictEqual(currentRun.current_role, 'archive-change');
   assert.strictEqual(currentRun.pending_gate, null);
+  assert.ok(!Array.isArray(currentRun.artifacts.additional) || currentRun.artifacts.additional.every((item) => !item.includes('openspec/changes/runtime-smoke-demo')));
   assert.ok(result.fast_path.archived_to.includes('openspec/changes/archive/'));
   assert.ok(fs.existsSync(path.join(approveTarget, 'openspec/specs/product-demo/spec.md')));
   assert.ok(!fs.existsSync(path.join(approveTarget, 'openspec/changes/runtime-smoke-demo')));

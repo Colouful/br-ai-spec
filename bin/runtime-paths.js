@@ -33,6 +33,8 @@ function resolveRuntimePaths(targetDir) {
     aiSpecDir: buildEntry(targetDir, path.join('.ai-spec')),
     internalDir: buildEntry(targetDir, path.join('.ai-spec', 'internal')),
     currentRun: buildEntry(targetDir, path.join('.ai-spec', 'current-run.json')),
+    checkpointsDir: buildEntry(targetDir, path.join('.ai-spec', 'checkpoints')),
+    repoMap: buildEntry(targetDir, path.join('.ai-spec', 'repo-map.json')),
     runsDir: buildHistoryEntry(
       targetDir,
       ['runs'],

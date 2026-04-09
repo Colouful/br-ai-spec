@@ -49,14 +49,18 @@ function writeExecutionInbox(targetDir, value) {
   writeProjectFile(targetDir, '.ai-spec/internal/tmp/current-execution.json', JSON.stringify(value, null, 2));
 }
 
+function readCurrentRun(targetDir) {
+  return JSON.parse(fs.readFileSync(path.join(targetDir, '.ai-spec', 'current-run.json'), 'utf8'));
+}
+
 function main() {
   const targetDir = fs.mkdtempSync(path.join(os.tmpdir(), 'br-ai-spec-runner-test-'));
   writeProjectFile(targetDir, 'package.json', JSON.stringify({
     name: 'runner-smoke',
     scripts: {
-      build: 'vite build',
-      lint: 'eslint .',
-      test: 'vitest run',
+      build: 'node -e "process.exit(0)"',
+      lint: 'node -e "process.exit(0)"',
+      test: 'node -e "process.exit(0)"',
     },
     dependencies: {
       vue: '^3.5.0',
@@ -85,6 +89,7 @@ function main() {
   assert.strictEqual(workflow.turn.actor.id, 'task-orchestrator');
   assert.strictEqual(workflow.turn.command, '/spec-start');
   assert.strictEqual(workflow.turn.guidance.project_context.framework, 'vue');
+  assert.strictEqual(workflow.turn.guidance.repo_map_source, '.ai-spec/repo-map.json');
   assert.strictEqual(workflow.turn.guidance.repo_conventions.route_modules_dir, 'src/router/modules');
   assert.strictEqual(workflow.turn.guidance.routing_constraints.first_handoff, 'requirement-analyst');
   assert.ok(workflow.turn.guidance.routing_constraints.route_strategy.includes('src/router/index.ts'));
@@ -99,6 +104,7 @@ function main() {
   assert.strictEqual(report.applied.adapter_action, 'bootstrap');
   assert.strictEqual(report.applied.run_id, 'run_20260331_160700_smoke');
   assert.strictEqual(report.recorded.dispatch.role, 'requirement-analyst');
+  assert.ok(fs.existsSync(path.join(targetDir, '.ai-spec', 'repo-map.json')));
   assert.deepStrictEqual(report.next_expected.files, ['.ai-spec/internal/tmp/current-execution.json']);
 
   workflow = step(targetDir);
@@ -200,6 +206,7 @@ function main() {
   assert.strictEqual(report.applied.adapter_action, 'handoff');
   assert.strictEqual(report.applied.current_role, 'code-guardian');
   assert.strictEqual(report.recorded.dispatch.role, 'code-guardian');
+  assert.ok(readCurrentRun(targetDir).verification, 'expected frontend verification to be persisted for guardian');
   assert.deepStrictEqual(report.next_expected.files, ['.ai-spec/internal/tmp/current-execution.json']);
 
   workflow = step(targetDir);
@@ -211,8 +218,10 @@ function main() {
   assert.ok(workflow.turn.guidance.review_contract.evidence_targets.includes('src/router/index.ts'));
   assert.ok(workflow.turn.guidance.review_contract.evidence_targets.includes('src/api'));
   assert.ok(workflow.turn.guidance.review_contract.blocking_checks.some((item) => item.includes('src/api')));
+  assert.ok(workflow.turn.guidance.review_contract.blocking_checks.some((item) => item.includes('无关的扩改')));
   assert.ok(workflow.turn.guidance.review_contract.scope_guard.some((item) => item.includes('proposal/specs/design/tasks')));
   assert.ok(workflow.turn.guidance.review_contract.verification_expectations.includes('pnpm run build'));
+  assert.ok(workflow.turn.guidance.review_contract.latest_verification);
   assert.deepStrictEqual(listTurnTargets(workflow.turn), [
     '.ai-spec/internal/tmp/current-execution.json',
     'openspec/changes/runtime-smoke-demo/checklist.md',

@@ -291,6 +291,25 @@ function completeRunAfterArchive(targetDir, archiveResult) {
   };
 }
 
+function buildArchivedAdditionalArtifacts(currentArtifacts, changeId, archivedRelBase) {
+  const currentAdditional = Array.isArray(currentArtifacts?.additional) ? currentArtifacts.additional : [];
+  if (currentAdditional.length === 0) {
+    return [];
+  }
+
+  const activeBase = `openspec/changes/${changeId}`;
+  return currentAdditional
+    .map((item) => String(item || '').trim())
+    .filter(Boolean)
+    .map((item) => item.replace(/[\\/]+$/, ''))
+    .map((item) => {
+      if (item === activeBase || item.startsWith(`${activeBase}/`)) {
+        return item.replace(activeBase, archivedRelBase);
+      }
+      return item;
+    });
+}
+
 function archiveChange(options = {}) {
   const targetDir = path.resolve(options.target || '.');
   const changeId = resolveChangeId(targetDir, options.changeId);
@@ -371,13 +390,15 @@ function archiveChange(options = {}) {
   ensureDir(archiveRoot);
   const archivedPath = buildArchiveDestination(archiveRoot, changeId, options.now || new Date());
   fs.renameSync(changeDir, archivedPath);
+  const archivedRelBase = path.relative(targetDir, archivedPath);
+  const currentRun = readJsonIfExists(path.join(targetDir, '.ai-spec', 'current-run.json'));
 
   const result = {
     kind: 'archive-change-result',
     status: 'success',
     target: targetDir,
     change_id: changeId,
-    archived_to: path.relative(targetDir, archivedPath),
+    archived_to: archivedRelBase,
     archived_artifacts: {
       proposal: path.relative(targetDir, path.join(archivedPath, 'proposal.md')),
       specs: path.relative(targetDir, path.join(archivedPath, 'specs')),
@@ -389,6 +410,7 @@ function archiveChange(options = {}) {
       iterations: fs.existsSync(path.join(archivedPath, 'iterations.md'))
         ? path.relative(targetDir, path.join(archivedPath, 'iterations.md'))
         : null,
+      additional: buildArchivedAdditionalArtifacts(currentRun?.artifacts || null, changeId, archivedRelBase),
     },
     merged,
     task_completion: countTaskCompletion(path.join(archivedPath, 'tasks.md')),

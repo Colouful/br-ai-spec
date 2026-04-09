@@ -340,6 +340,10 @@ function buildAutoRuntimeAction(targetDir, executionPayload) {
         to_role: roleId,
         next_role: transition.to_role,
         pending_gate: 'before-implementation',
+        blocked_by_role: roleId,
+        resume_to_role: transition.to_role || null,
+        required_user_action: '明确批准或拒绝当前 proposal / specs / design / tasks 的实现范围与限制条件。',
+        blocked_reason: gateCheck.reasons.join('；'),
         status: 'waiting-approval',
         clear_pending_gate: false,
         message: `requirement gate blocked: ${gateCheck.reasons.join('；')}`,
@@ -358,6 +362,10 @@ function buildAutoRuntimeAction(targetDir, executionPayload) {
       to_role: transition.to_role || roleId,
       next_role: transition.next_role || null,
       pending_gate: transition.pending_gate || 'before-archive',
+      blocked_by_role: roleId,
+      resume_to_role: transition.next_role || null,
+      required_user_action: '明确告诉系统是否执行归档；同意则进入归档专家，不归档则直接结束本次运行。',
+      blocked_reason: executionPayload.next_action || transition.message,
       status: transition.status || 'waiting-approval',
       clear_pending_gate: false,
       message: executionPayload.next_action || transition.message,
@@ -385,6 +393,7 @@ function buildAutoRuntimeAction(targetDir, executionPayload) {
     source: 'expert-executor-auto-transition',
     openspec_action: action === 'complete' ? 'archive' : null,
     skip_artifact_check: action === 'complete' && roleId === 'archive-change',
+    verification: executionPayload.verification || null,
   };
 }
 

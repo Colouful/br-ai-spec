@@ -7,6 +7,7 @@ const {
   getCandidatePaths,
   shouldPersistHistory,
 } = require('./runtime-paths');
+const { syncRepoMap } = require('./repo-map');
 
 function printUsage() {
   console.log(`Usage:
@@ -16,6 +17,7 @@ function printUsage() {
   ai-spec runtime-state handoff --to-role <role> [options]
   ai-spec runtime-state approve [options]
   ai-spec runtime-state resume [options]
+  ai-spec runtime-state restore --checkpoint <file> [options]
   ai-spec runtime-state gate-blocked [options]
   ai-spec runtime-state complete [options]
   ai-spec runtime-state fail [options]
@@ -33,8 +35,14 @@ Options:
   --next-role <role>       Next role after current handoff
   --from-role <role>       Explicit source role override
   --gate <id>              Expected approval gate id
+  --checkpoint <file>      Restore source checkpoint JSON file
   --pending-gate <id>      Pending approval gate id
   --clear-pending-gate     Clear current pending gate
+  --blocked-by-role <id>   Role that raised the current gate
+  --resume-to-role <id>    Role to resume into after approval
+  --required-user-action <text>
+                           Explicit user action required by the gate
+  --blocked-reason <text>  Human-readable reason for the gate
   --message <text>         Event message override
   --error <text>           Failure detail appended to errors list
   --event-type <type>      Event type override (default: role-handoff)
@@ -94,11 +102,26 @@ function parseArgs(argv) {
       case '--gate':
         options.gate = args.shift();
         break;
+      case '--checkpoint':
+        options.checkpoint = args.shift();
+        break;
       case '--pending-gate':
         options.pendingGate = args.shift();
         break;
       case '--clear-pending-gate':
         options.clearPendingGate = true;
+        break;
+      case '--blocked-by-role':
+        options.blockedByRole = args.shift();
+        break;
+      case '--resume-to-role':
+        options.resumeToRole = args.shift();
+        break;
+      case '--required-user-action':
+        options.requiredUserAction = args.shift();
+        break;
+      case '--blocked-reason':
+        options.blockedReason = args.shift();
         break;
       case '--message':
         options.message = args.shift();
@@ -248,6 +271,40 @@ function inferApprovalResumeRole(state, options = {}) {
   }
 
   return state.current_role || state.anchor?.stage?.current_role || state.plan?.first_handoff || null;
+}
+
+const CHECKPOINT_EVENTS = new Set([
+  'bootstrap',
+  'handoff',
+  'gate-blocked',
+  'approve',
+  'complete',
+  'fail',
+  'cancel',
+]);
+
+function buildGateContext(state, options = {}, fallbackGate = null) {
+  const gateId = options.gateId || options.gate || options.pendingGate || fallbackGate || state?.pending_gate || null;
+  if (!gateId) {
+    return null;
+  }
+
+  return {
+    gate_id: gateId,
+    blocked_by_role: options.blockedByRole || options.fromRole || state?.current_role || null,
+    resume_to_role: options.resumeToRole || options.nextRole || options.toRole || inferApprovalResumeRole(state || {}, options) || null,
+    required_user_action: options.requiredUserAction || state?.gate_context?.required_user_action || null,
+    blocked_reason: options.blockedReason || state?.gate_context?.blocked_reason || null,
+  };
+}
+
+function buildCheckpointMetadata(state, eventName, relPath, timestamp) {
+  return {
+    sequence: (Number(state?.checkpoint_count) || 0) + 1,
+    event: eventName,
+    at: timestamp,
+    file: relPath,
+  };
 }
 
 const MICRO_TASK_TYPES = new Set([
@@ -468,18 +525,33 @@ function buildDefaultArtifacts(changeId) {
 }
 
 function mergeArtifacts(baseArtifacts, inferredArtifacts) {
+  const proposal = inferredArtifacts?.proposal || baseArtifacts?.proposal || null;
+  const specs = normalizeSpecsArtifactPath(inferredArtifacts?.specs || baseArtifacts?.specs || null);
+  const design = inferredArtifacts?.design || baseArtifacts?.design || null;
+  const tasks = inferredArtifacts?.tasks || baseArtifacts?.tasks || null;
+  const checklist = inferredArtifacts?.checklist || baseArtifacts?.checklist || null;
+  const iterations = inferredArtifacts?.iterations || baseArtifacts?.iterations || null;
+  const primaryArtifacts = new Set(
+    [proposal, specs, design, tasks, checklist, iterations]
+      .map((item) => (typeof item === 'string' ? item.trim().replace(/[\\/]+$/, '') : null))
+      .filter(Boolean),
+  );
   const additional = [
     ...(Array.isArray(baseArtifacts?.additional) ? baseArtifacts.additional : []),
     ...(Array.isArray(inferredArtifacts?.additional) ? inferredArtifacts.additional : []),
-  ];
+  ]
+    .map((item) => String(item || '').trim())
+    .filter(Boolean)
+    .map((item) => item.replace(/[\\/]+$/, ''))
+    .filter((item) => !primaryArtifacts.has(item));
 
   const merged = {
-    proposal: inferredArtifacts?.proposal || baseArtifacts?.proposal || null,
-    specs: normalizeSpecsArtifactPath(inferredArtifacts?.specs || baseArtifacts?.specs || null),
-    design: inferredArtifacts?.design || baseArtifacts?.design || null,
-    tasks: inferredArtifacts?.tasks || baseArtifacts?.tasks || null,
-    checklist: inferredArtifacts?.checklist || baseArtifacts?.checklist || null,
-    iterations: inferredArtifacts?.iterations || baseArtifacts?.iterations || null,
+    proposal,
+    specs,
+    design,
+    tasks,
+    checklist,
+    iterations,
     additional: Array.from(new Set(additional.filter(Boolean))),
   };
 
@@ -713,7 +785,11 @@ function buildRunState({ runPlan, taskAnchor, options, now, source }) {
     current_role: currentRole,
     pending_input_update: false,
     pending_gate: pendingGate,
+    gate_context: buildGateContext(null, options, pendingGate),
     artifacts,
+    verification: null,
+    last_checkpoint: null,
+    checkpoint_count: 0,
     assumptions: Array.isArray(runPlan.assumptions) ? runPlan.assumptions : [],
     missing_inputs: runPlan.missing_inputs || [],
     warnings: runPlan.warnings || [],
@@ -812,13 +888,60 @@ function loadTaskAnchor(taskAnchorPath, taskAnchorData = null) {
   return taskAnchorPath ? readJsonFile(taskAnchorPath, 'task-anchor') : null;
 }
 
-function saveUpdatedRunState({ historyRunPath, currentRunPath, syncCurrent, state }) {
+function maybeAttachCheckpoint(targetDir, state, checkpointEvent) {
+  if (!checkpointEvent || !CHECKPOINT_EVENTS.has(checkpointEvent)) {
+    return state;
+  }
+
+  const runtimePaths = resolveRuntimePaths(targetDir);
+  const checkpointDir = path.join(runtimePaths.checkpointsDir.path, state.run_id);
+  ensureDir(checkpointDir);
+
+  const timestamp = state.timestamps?.updated_at || new Date().toISOString();
+  const sequence = (Number(state.checkpoint_count) || 0) + 1;
+  const checkpointFileName = `${String(sequence).padStart(3, '0')}-${checkpointEvent}.json`;
+  const checkpointPath = path.join(checkpointDir, checkpointFileName);
+  const checkpointRelPath = path.relative(targetDir, checkpointPath);
+  const metadata = buildCheckpointMetadata(state, checkpointEvent, checkpointRelPath, timestamp);
+  const nextState = {
+    ...state,
+    checkpoint_count: sequence,
+    last_checkpoint: metadata,
+  };
+
+  writeJsonFile(checkpointPath, {
+    schema_version: 1,
+    kind: 'runtime-checkpoint',
+    run_id: state.run_id,
+    sequence,
+    event: checkpointEvent,
+    created_at: timestamp,
+    state: nextState,
+  });
+
+  return nextState;
+}
+
+function saveUpdatedRunState({
+  targetDir,
+  historyRunPath,
+  currentRunPath,
+  syncCurrent,
+  forceSyncCurrent = false,
+  state,
+  checkpointEvent = null,
+}) {
+  syncRepoMap(targetDir);
+  const nextState = maybeAttachCheckpoint(targetDir, state, checkpointEvent);
+
   if (historyRunPath) {
-    writeJsonFile(historyRunPath, state);
+    writeJsonFile(historyRunPath, nextState);
   }
-  if (syncCurrent) {
-    writeJsonFile(currentRunPath, state);
+  if (syncCurrent || forceSyncCurrent) {
+    writeJsonFile(currentRunPath, nextState);
   }
+
+  return nextState;
 }
 
 function recordRunInputUpdate(options) {
@@ -875,7 +998,13 @@ function recordRunInputUpdate(options) {
     },
   };
 
-  saveUpdatedRunState({ historyRunPath, currentRunPath, syncCurrent, state: updatedState });
+  const persistedState = saveUpdatedRunState({
+    targetDir,
+    historyRunPath,
+    currentRunPath,
+    syncCurrent,
+    state: updatedState,
+  });
 
   return {
     status: 'success',
@@ -884,7 +1013,7 @@ function recordRunInputUpdate(options) {
       current_run: syncCurrent ? currentRunPath : null,
       run_history: historyRunPath,
     },
-    state: updatedState,
+    state: persistedState,
     update,
   };
 }
@@ -904,10 +1033,15 @@ function writeRunState({ targetDir, runPlan, taskAnchor, options, source }) {
     ? path.join(runtimePaths.runsDir.path, `${state.run_id}.json`)
     : null;
 
-  writeJsonFile(currentRunPath, state);
-  if (historyRunPath) {
-    writeJsonFile(historyRunPath, state);
-  }
+  const persistedState = saveUpdatedRunState({
+    targetDir,
+    historyRunPath,
+    currentRunPath,
+    syncCurrent: true,
+    forceSyncCurrent: true,
+    state,
+    checkpointEvent: 'bootstrap',
+  });
 
   return {
     status: 'success',
@@ -916,7 +1050,7 @@ function writeRunState({ targetDir, runPlan, taskAnchor, options, source }) {
       current_run: currentRunPath,
       run_history: historyRunPath,
     },
-    state,
+    state: persistedState,
     source: {
       run_plan: source.runPlan || null,
       task_anchor: source.taskAnchor || null,
@@ -990,6 +1124,7 @@ function buildHandoffEvent({ state, options, now }) {
     pending_gate:
       options.clearPendingGate ? null :
       (Object.prototype.hasOwnProperty.call(options, 'pendingGate') ? options.pendingGate || null : state.pending_gate || null),
+    gate_context: options.clearPendingGate ? null : buildGateContext(state, options),
     message,
   };
 }
@@ -1013,6 +1148,7 @@ function buildStateEvent({ state, options, now, defaults = {} }) {
     from_role: fromRole,
     to_role: toRole,
     pending_gate: pendingGate,
+    gate_context: pendingGate ? buildGateContext(state, options, pendingGate) : null,
     message,
   };
 }
@@ -1060,6 +1196,10 @@ function handoffRunState(options) {
     pending_gate: options.clearPendingGate
       ? null
       : (Object.prototype.hasOwnProperty.call(options, 'pendingGate') ? options.pendingGate || null : state.pending_gate || null),
+    gate_context: options.clearPendingGate
+      ? null
+      : buildGateContext(state, options),
+    verification: options.verificationData || state.verification || null,
     anchor: sanitizedAnchor,
     events: [...(Array.isArray(state.events) ? state.events : []), event],
     timestamps: {
@@ -1068,7 +1208,14 @@ function handoffRunState(options) {
     },
   };
 
-  saveUpdatedRunState({ historyRunPath, currentRunPath, syncCurrent, state: updatedState });
+  const persistedState = saveUpdatedRunState({
+    targetDir,
+    historyRunPath,
+    currentRunPath,
+    syncCurrent,
+    state: updatedState,
+    checkpointEvent: 'handoff',
+  });
 
   return {
     status: 'success',
@@ -1077,7 +1224,7 @@ function handoffRunState(options) {
       current_run: syncCurrent ? currentRunPath : null,
       run_history: historyRunPath,
     },
-    state: updatedState,
+    state: persistedState,
     source: {
       task_anchor: taskAnchorPath,
     },
@@ -1127,6 +1274,7 @@ function approveRunState(options) {
     current_role: toRole,
     pending_input_update: false,
     pending_gate: null,
+    gate_context: null,
     anchor,
     events: [...(Array.isArray(state.events) ? state.events : []), event],
     timestamps: {
@@ -1135,7 +1283,14 @@ function approveRunState(options) {
     },
   };
 
-  saveUpdatedRunState({ historyRunPath, currentRunPath, syncCurrent, state: updatedState });
+  const persistedState = saveUpdatedRunState({
+    targetDir,
+    historyRunPath,
+    currentRunPath,
+    syncCurrent,
+    state: updatedState,
+    checkpointEvent: 'approve',
+  });
 
   return {
     status: 'success',
@@ -1144,7 +1299,7 @@ function approveRunState(options) {
       current_run: syncCurrent ? currentRunPath : null,
       run_history: historyRunPath,
     },
-    state: updatedState,
+    state: persistedState,
     source: {
       task_anchor: taskAnchorPath,
       gate: requestedGate,
@@ -1187,6 +1342,7 @@ function resumeRunState(options) {
     current_role: toRole,
     pending_input_update: false,
     pending_gate: options.clearPendingGate === false ? state.pending_gate || null : null,
+    gate_context: options.clearPendingGate === false ? state.gate_context || null : null,
     anchor,
     events: [...(Array.isArray(state.events) ? state.events : []), event],
     timestamps: {
@@ -1195,7 +1351,13 @@ function resumeRunState(options) {
     },
   };
 
-  saveUpdatedRunState({ historyRunPath, currentRunPath, syncCurrent, state: updatedState });
+  const persistedState = saveUpdatedRunState({
+    targetDir,
+    historyRunPath,
+    currentRunPath,
+    syncCurrent,
+    state: updatedState,
+  });
 
   return {
     status: 'success',
@@ -1204,9 +1366,81 @@ function resumeRunState(options) {
       current_run: syncCurrent ? currentRunPath : null,
       run_history: historyRunPath,
     },
-    state: updatedState,
+    state: persistedState,
     source: {
       task_anchor: taskAnchorPath,
+    },
+  };
+}
+
+function restoreRunState(options) {
+  if (!options.checkpoint) {
+    throw new Error('Missing required argument: --checkpoint <file>');
+  }
+
+  const targetDir = path.resolve(process.cwd(), options.target || '.');
+  const checkpointPath = path.resolve(process.cwd(), options.checkpoint);
+  const checkpoint = readJsonFile(checkpointPath, 'runtime checkpoint');
+
+  if (checkpoint.kind !== 'runtime-checkpoint' || !checkpoint.state || checkpoint.state.kind !== 'run-state') {
+    throw new Error(`Invalid runtime checkpoint: ${checkpointPath}`);
+  }
+
+  const runId = options.runId || checkpoint.run_id || checkpoint.state.run_id || null;
+  if (!runId) {
+    throw new Error(`Checkpoint is missing run_id: ${checkpointPath}`);
+  }
+  if (checkpoint.run_id && checkpoint.run_id !== runId) {
+    throw new Error(`Checkpoint run_id mismatch: expected ${runId}, got ${checkpoint.run_id}`);
+  }
+
+  const { currentRunPath, historyRunPath } = resolveRunStatePaths(targetDir, runId);
+  const currentRun = fs.existsSync(currentRunPath) ? readRunStateFile(currentRunPath) : null;
+  if (currentRun && currentRun.run_id !== runId) {
+    throw new Error(`Restore only supports the current active run; current run is ${currentRun.run_id}, requested ${runId}`);
+  }
+
+  const now = new Date();
+  const restoredState = {
+    ...checkpoint.state,
+    events: [
+      ...(Array.isArray(checkpoint.state.events) ? checkpoint.state.events : []),
+      {
+        at: now.toISOString(),
+        type: 'run-restored',
+        status: checkpoint.state.status || 'running',
+        from_role: checkpoint.state.current_role || null,
+        to_role: checkpoint.state.current_role || null,
+        pending_gate: checkpoint.state.pending_gate || null,
+        message: `restored from checkpoint ${path.relative(targetDir, checkpointPath)}`,
+      },
+    ],
+    timestamps: {
+      ...(checkpoint.state.timestamps || {}),
+      updated_at: now.toISOString(),
+    },
+  };
+
+  const persistedState = saveUpdatedRunState({
+    targetDir,
+    historyRunPath,
+    currentRunPath,
+    syncCurrent: true,
+    forceSyncCurrent: true,
+    state: restoredState,
+  });
+
+  return {
+    status: 'success',
+    target: targetDir,
+    artifacts: {
+      current_run: currentRunPath,
+      run_history: historyRunPath,
+      checkpoint: checkpointPath,
+    },
+    state: persistedState,
+    source: {
+      checkpoint: checkpointPath,
     },
   };
 }
@@ -1236,6 +1470,9 @@ function statusRunState(options) {
       pending_input_update: Boolean(state.pending_input_update),
       input_update_count: Array.isArray(state.input_updates) ? state.input_updates.length : 0,
       pending_gate: state.pending_gate || null,
+      gate_context: state.gate_context || null,
+      checkpoint_count: Number(state.checkpoint_count) || 0,
+      last_checkpoint: state.last_checkpoint || null,
       updated_at: state.timestamps?.updated_at || null,
       last_event: lastEvent,
     },
@@ -1275,6 +1512,7 @@ function gateBlockedRunState(options) {
     current_role: toRole,
     pending_input_update: false,
     pending_gate: requestedGate,
+    gate_context: buildGateContext(state, options, requestedGate),
     anchor,
     events: [...(Array.isArray(state.events) ? state.events : []), event],
     timestamps: {
@@ -1283,7 +1521,14 @@ function gateBlockedRunState(options) {
     },
   };
 
-  saveUpdatedRunState({ historyRunPath, currentRunPath, syncCurrent, state: updatedState });
+  const persistedState = saveUpdatedRunState({
+    targetDir,
+    historyRunPath,
+    currentRunPath,
+    syncCurrent,
+    state: updatedState,
+    checkpointEvent: 'gate-blocked',
+  });
 
   return {
     status: 'success',
@@ -1292,7 +1537,7 @@ function gateBlockedRunState(options) {
       current_run: syncCurrent ? currentRunPath : null,
       run_history: historyRunPath,
     },
-    state: updatedState,
+    state: persistedState,
     source: {
       task_anchor: taskAnchorPath,
       gate: requestedGate,
@@ -1337,6 +1582,7 @@ function completeRunState(options) {
     current_role: toRole,
     pending_input_update: false,
     pending_gate: null,
+    gate_context: null,
     artifacts: nextArtifacts,
     anchor,
     events: [...(Array.isArray(state.events) ? state.events : []), event],
@@ -1347,7 +1593,14 @@ function completeRunState(options) {
     },
   };
 
-  saveUpdatedRunState({ historyRunPath, currentRunPath, syncCurrent, state: updatedState });
+  const persistedState = saveUpdatedRunState({
+    targetDir,
+    historyRunPath,
+    currentRunPath,
+    syncCurrent,
+    state: updatedState,
+    checkpointEvent: 'complete',
+  });
 
   return {
     status: 'success',
@@ -1356,7 +1609,7 @@ function completeRunState(options) {
       current_run: syncCurrent ? currentRunPath : null,
       run_history: historyRunPath,
     },
-    state: updatedState,
+    state: persistedState,
     source: {
       task_anchor: taskAnchorPath,
     },
@@ -1397,6 +1650,7 @@ function failRunState(options) {
     current_role: toRole,
     pending_input_update: false,
     pending_gate: null,
+    gate_context: null,
     anchor,
     errors: updatedErrors,
     events: [...(Array.isArray(state.events) ? state.events : []), event],
@@ -1407,7 +1661,14 @@ function failRunState(options) {
     },
   };
 
-  saveUpdatedRunState({ historyRunPath, currentRunPath, syncCurrent, state: updatedState });
+  const persistedState = saveUpdatedRunState({
+    targetDir,
+    historyRunPath,
+    currentRunPath,
+    syncCurrent,
+    state: updatedState,
+    checkpointEvent: 'fail',
+  });
 
   return {
     status: 'success',
@@ -1416,7 +1677,7 @@ function failRunState(options) {
       current_run: syncCurrent ? currentRunPath : null,
       run_history: historyRunPath,
     },
-    state: updatedState,
+    state: persistedState,
     source: {
       task_anchor: taskAnchorPath,
       error: options.error || null,
@@ -1453,6 +1714,7 @@ function cancelRunState(options) {
     current_role: toRole,
     pending_input_update: false,
     pending_gate: null,
+    gate_context: null,
     anchor,
     events: [...(Array.isArray(state.events) ? state.events : []), event],
     timestamps: {
@@ -1462,7 +1724,14 @@ function cancelRunState(options) {
     },
   };
 
-  saveUpdatedRunState({ historyRunPath, currentRunPath, syncCurrent, state: updatedState });
+  const persistedState = saveUpdatedRunState({
+    targetDir,
+    historyRunPath,
+    currentRunPath,
+    syncCurrent,
+    state: updatedState,
+    checkpointEvent: 'cancel',
+  });
 
   return {
     status: 'success',
@@ -1471,7 +1740,7 @@ function cancelRunState(options) {
       current_run: syncCurrent ? currentRunPath : null,
       run_history: historyRunPath,
     },
-    state: updatedState,
+    state: persistedState,
     source: {
       task_anchor: taskAnchorPath,
     },
@@ -1555,6 +1824,8 @@ function printPretty(result, action = 'init') {
     console.log('run-state approved');
   } else if (action === 'resume') {
     console.log('run-state resumed');
+  } else if (action === 'restore') {
+    console.log('run-state restored');
   } else if (action === 'gate-blocked') {
     console.log('run-state blocked');
   } else if (action === 'status') {
@@ -1578,10 +1849,17 @@ function printPretty(result, action = 'init') {
   console.log(`  delivery_profile: ${result.state.delivery_profile || 'n/a'}`);
   console.log(`  artifact_profile: ${result.state.artifact_profile || 'n/a'}`);
   console.log(`  complexity: ${result.state.complexity || result.state.task?.complexity || 'n/a'}`);
+  console.log(`  checkpoints: ${Number(result.state.checkpoint_count) || 0}`);
+  if (result.state.last_checkpoint?.file) {
+    console.log(`  last_checkpoint: ${result.state.last_checkpoint.file}`);
+  }
   if (action === 'status') {
     console.log(`  status: ${result.state.status || 'n/a'}`);
     console.log(`  current_role: ${result.state.current_role || 'n/a'}`);
     console.log(`  pending_gate: ${result.state.pending_gate || 'n/a'}`);
+    if (result.state.gate_context?.required_user_action) {
+      console.log(`  required_user_action: ${result.state.gate_context.required_user_action}`);
+    }
   } else if (action === 'handoff') {
     console.log(`  current_role: ${result.state.current_role || 'n/a'}`);
     console.log(`  from_role: ${result.handoff?.from_role || 'n/a'}`);
@@ -1589,6 +1867,7 @@ function printPretty(result, action = 'init') {
   } else if (
     action === 'approve' ||
     action === 'resume' ||
+    action === 'restore' ||
     action === 'gate-blocked' ||
     action === 'complete' ||
     action === 'fail'
@@ -1676,6 +1955,18 @@ function main(argv = process.argv.slice(2)) {
     return 0;
   }
 
+  if (command === 'restore') {
+    const result = restoreRunState(options);
+
+    if (options.json) {
+      console.log(JSON.stringify(result, null, 2));
+    } else {
+      printPretty(result, 'restore');
+    }
+
+    return 0;
+  }
+
   if (command === 'gate-blocked') {
     const result = gateBlockedRunState(options);
 
@@ -1742,6 +2033,7 @@ function main(argv = process.argv.slice(2)) {
     command !== 'handoff' &&
     command !== 'approve' &&
     command !== 'resume' &&
+    command !== 'restore' &&
     command !== 'gate-blocked' &&
     command !== 'status' &&
     command !== 'complete' &&
@@ -1782,6 +2074,7 @@ module.exports = {
   handoffRunState,
   approveRunState,
   resumeRunState,
+  restoreRunState,
   gateBlockedRunState,
   statusRunState,
   completeRunState,

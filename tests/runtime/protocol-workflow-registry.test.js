@@ -28,8 +28,8 @@ function createWorkspace() {
   writeProjectFile(targetDir, 'package.json', JSON.stringify({
     name: 'protocol-registry-smoke',
     scripts: {
-      build: 'vite build',
-      lint: 'eslint .',
+      build: 'node -e "process.exit(0)"',
+      lint: 'node -e "process.exit(0)"',
     },
     dependencies: {
       vue: '^3.5.0',

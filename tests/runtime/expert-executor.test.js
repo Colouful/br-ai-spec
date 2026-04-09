@@ -86,9 +86,9 @@ function createWorkspace() {
   writeProjectFile(targetDir, 'package.json', JSON.stringify({
     name: 'executor-smoke',
     scripts: {
-      build: 'vite build',
-      lint: 'eslint .',
-      test: 'vitest run',
+      build: 'node -e "process.exit(0)"',
+      lint: 'node -e "process.exit(0)"',
+      test: 'node -e "process.exit(0)"',
     },
     dependencies: {
       vue: '^3.5.0',
@@ -133,6 +133,7 @@ function main() {
   const bootstrap = bootstrapRun(targetDir);
   assert.strictEqual(bootstrap.applied.adapter_action, 'bootstrap');
   assert.strictEqual(bootstrap.recorded.dispatch.role, 'requirement-analyst');
+  assert.ok(fs.existsSync(path.join(targetDir, '.ai-spec', 'repo-map.json')));
 
   writeProjectFile(targetDir, 'openspec/changes/runtime-smoke-demo/proposal.md', [
     '# Proposal',
@@ -218,7 +219,13 @@ function main() {
   ]);
   assert.strictEqual(result.runtime_transition.payload.action, 'handoff');
   assert.strictEqual(result.runtime_transition.applied.current_role, 'code-guardian');
-  assert.strictEqual(readCurrentRun(targetDir).current_role, 'code-guardian');
+  let currentRun = readCurrentRun(targetDir);
+  assert.strictEqual(currentRun.current_role, 'code-guardian');
+  assert.ok(result.payload.verification, 'expected auto-generated verification on frontend delivery');
+  assert.strictEqual(result.payload.verification.kind, 'verification');
+  assert.strictEqual(result.payload.verification.steps.length, 3);
+  assert.ok(currentRun.verification, 'expected verification to be persisted into current-run');
+  assert.strictEqual(currentRun.verification.kind, 'verification');
   assertMissingCurrentArtifacts(targetDir);
 
   expertDispatch.applyDispatch({
@@ -239,10 +246,11 @@ function main() {
   ]);
   assert.strictEqual(result.runtime_transition.payload.action, 'gate-blocked');
   assert.strictEqual(result.runtime_transition.payload.pending_gate, 'before-archive');
-  let currentRun = readCurrentRun(targetDir);
+  currentRun = readCurrentRun(targetDir);
   assert.strictEqual(currentRun.status, 'waiting-approval');
   assert.strictEqual(currentRun.current_role, 'code-guardian');
   assert.strictEqual(currentRun.pending_gate, 'before-archive');
+  assert.strictEqual(currentRun.gate_context.resume_to_role, 'archive-change');
   assertMissingCurrentArtifacts(targetDir);
 
   result = expertExecutor.applyRuntimeActionData({
