@@ -3,12 +3,9 @@
 这篇文档只回答两件事：为什么 AI 开发不能再停留在“谁更会写 prompt”，以及今天怎么开始用规范化的方法做开发。  
 **AI Coding 下半场，重点不是让 AI 更快写，而是让 AI 按团队方法稳定地做。**
 
-想今天就试，先看“方案设计 / 人工快速使用”。  
-想看团队怎么放大，直接看“方案设计 / 工具加速使用”和“后续规划”。
-
 ## 背景
 
-**本章判断：团队现在真正缺的，不是更会写 prompt，而是让 AI 能稳定接入团队工程体系。**
+**本章判断：现在真正缺的，不是更会写 prompt，而是让 AI 能稳定接入日常开发流程。**
 
 ```mermaid
 flowchart LR
@@ -30,16 +27,16 @@ flowchart LR
 
 | 路线 | 更偏解决什么问题 | 最值得吸收什么 | 我们还要补什么 |
 | --- | --- | --- | --- |
-| `spec-kit` | 让需求先沉淀成 spec / tasks，再进入实现 | artifact-first、spec-driven | 团队 rules、运行态和归档闭环 |
-| `superpowers` | 把高频做法和执行纪律沉淀成 workflow | methodology-as-code、workflow-driven | 项目安装链路和团队级资产管理 |
-| `harness engineering` | 让 context、constraints、feedback loops 组成稳定系统 | system-driven、先设计系统再用模型 | 面向开发人员的落地路径 |
-| 我们当前路线 | 用 `OpenSpec + .agents + .ai-spec` 做规范、流程和运行态协同 | 偏实操、偏项目接入、偏团队复用 | 入口体验和平台化能力仍在持续建设 |
+| `spec-kit` | 让需求先沉淀成规范产物，再进入实现 | artifact-first、spec-driven | 团队规则、流程状态和归档收口 |
+| `superpowers` | 把高频做法和执行纪律沉淀成工作流 | methodology-as-code、workflow-driven | 项目接入方式和团队资产管理 |
+| `harness engineering` | 让上下文、约束和反馈组成稳定系统 | system-driven、先设计系统再用模型 | 面向开发人员的落地路径 |
+| 我们当前路线 | 把需求产物、团队规则和流程状态放进同一套机制里 | 偏实操、偏项目接入、偏团队复用 | 入口体验和平台化能力仍在持续建设 |
 
 - `spec-kit` 提醒我们先有产物，再进入实现。
 - `superpowers` 提醒我们先有方法，再让 AI 执行。
 - `harness engineering` 提醒我们先把系统设计好，不要只迷信模型。
 
-我们当前的取法更直接：`OpenSpec` 管产物，`.agents` 管 rules / skills / roles / flows，`.ai-spec` 管运行状态。`Cursor / Copilot` 当然重要，但它们更像入口和执行体验层，不是团队规范资产本身。
+我们当前的取法更直接：把需求产物、团队规则和流程状态放进同一套机制里，让开发人员不只是“会用 AI”，而是“按统一方法把事情做完”。`Cursor / Copilot` 当然重要，但它们更像入口和执行体验层，不是团队规范资产本身。
 
 ## 方案设计
 
@@ -53,8 +50,8 @@ flowchart LR
     A4 --> Z["团队放大 / 可复用 / 可持续"]
 
     B1["工具加速使用<br/>Hub 选资产"] --> B2["场景页组合规则与技能"]
-    B2 --> B3["生成 manifest"]
-    B3 --> B4["ai-spec sync 接入项目"]
+    B2 --> B3["生成安装清单"]
+    B3 --> B4["同步接入项目"]
     B4 --> Z
 ```
 
@@ -87,14 +84,14 @@ React 项目只需要把 `--profile vue` 换成 `--profile react`。
 
 5. 复盘并回补规则、技能和文档。重点不是“这次做完了”，而是“下次同类任务更容易做好”。
 
-当前已经稳定下来的最小主链是：`requirement-analyst -> frontend-implementer -> code-guardian -> archive-change`。
+当前已经稳定下来的最小主链可以理解成：需求分析 -> 开发实现 -> 规范检查 -> 归档收口，对应系统里的角色依次是 `requirement-analyst -> frontend-implementer -> code-guardian -> archive-change`。
 
 ### 工具加速使用
 
 当试点已经证明这套方法有效，下一步就不是继续靠人记住流程，而是把流程变成可安装、可复制、可推广的资产。
 
-1. 在 [skill-q-platform](/Users/lizhenwei/workspace/vueworkspace/bairong/skill-q-platform/README.md) 选择 Skill、Rule、Scenario Package。
-2. 在场景页组合角色、技能和规则，并由 [scenario-manifest.ts](/Users/lizhenwei/workspace/vueworkspace/bairong/skill-q-platform/src/lib/scenario-manifest.ts) 生成 manifest。
+1. 在 [Hub 平台](/Users/lizhenwei/workspace/vueworkspace/bairong/skill-q-platform/README.md) 选择技能包、规则包和场景方案。
+2. 在场景页组合角色、技能和规则，生成安装清单（manifest）。
 3. 在目标项目执行同步：
 
 ```bash
@@ -103,7 +100,7 @@ npx @ex/ai-spec sync . --manifest ./manifest.json
 
 4. 让团队在统一资产上继续运行和复用，而不是每个项目重新从零搭一遍。
 
-可以把这条链理解成四句话：Hub 负责“选资产”，manifest 负责“描述安装清单”，`@ex/ai-spec` 负责“解析并安装”，目标项目负责“承接并运行”。安装结构的详细约束，继续看 [Manifest安装清单规范.md](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/paser_two/Manifest安装清单规范.md)。
+可以把这条链理解成四句话：Hub 负责“选资产”，安装清单负责“描述要装什么”，`@ex/ai-spec` 负责“解析并安装”，目标项目负责“承接并运行”。如果要看安装清单的详细结构，再继续看 [Manifest安装清单规范.md](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/paser_two/Manifest安装清单规范.md)。
 
 **一句话收口：人工方案解决“先开始”，工具方案解决“可复制、可扩展、可持续”。**
 
@@ -113,11 +110,11 @@ npx @ex/ai-spec sync . --manifest ./manifest.json
 
 | 层次 | 重点看什么 | 团队能感知到什么 |
 | --- | --- | --- |
-| 接入层 | 有多少项目开始用，L1/L2/L3 占比如何，主要通过 IDE 还是 Hub / manifest 接入 | 试点是否真的启动，而不是停留在讨论里 |
-| 过程层 | 有没有形成 proposal 到 archive 的闭环，门禁是否真正被触发，活跃流程和活跃角色是否持续使用 | 团队是不是在按统一方法推进，而不是各做各的 |
-| 结果层 | Review 里的规范问题是否减少，返工率是否下降，规则 / 技能 / manifest / 场景包是否被复用 | 同类任务是否越来越少靠个人记忆，越来越多靠团队资产 |
+| 接入层 | 有多少项目开始用，接入深度如何，主要通过 IDE 还是 Hub / 安装清单接入 | 试点是否真的启动，而不是停留在讨论里 |
+| 过程层 | 有没有形成从需求产物到归档收口的完整闭环，关键门禁是否真正被触发，活跃流程和活跃角色是否持续使用 | 团队是不是在按统一方法推进，而不是各做各的 |
+| 结果层 | Review 里的规范问题是否减少，返工率是否下降，规则 / 技能 / 安装清单 / 场景包是否被复用 | 同类任务是否越来越少靠个人记忆，越来越多靠团队资产 |
 
-当前已经确认的资产底盘是：`v0.0.37`、`21` 条 rules、`25` 个 skills、`32` 个角色、`5` 个 active 角色、`1` 条 active flow。
+当前已经确认的资产底盘是：`v0.0.37`、`21` 条规则、`25` 个技能、`32` 个角色、`5` 个活跃角色、`1` 条活跃流程。
 
 真正值得团队关注的，不只是资产数量，而是两个信号：一次任务完成后，别人是不是更容易接着做；同类任务下次是不是不用重新摸索一遍。
 
@@ -127,14 +124,14 @@ npx @ex/ai-spec sync . --manifest ./manifest.json
 
 ```mermaid
 flowchart LR
-    A["现在<br/>试点开始"] --> B["短期<br/>跑稳主链与归档闭环"]
-    B --> C["中期<br/>Hub 场景包 + manifest + works 入口"]
-    C --> D["长期<br/>OpenClaw 控制面 + CI/CD 校验 + 度量治理"]
+    A["现在<br/>试点开始"] --> B["短期<br/>跑稳主链与归档收口"]
+    B --> C["中期<br/>Hub 场景方案 + 安装清单 + 统一入口"]
+    C --> D["长期<br/>远程控制面 + CI/CD 校验 + 度量治理"]
 ```
 
 - 现在：先把试点项目跑起来，让团队知道这套方法不是纸上方案。
-- 短期：把 `prd-to-delivery` 主链、`expert-delivery` schema、归档闭环和团队文档打磨稳定。
-- 中期：把 Hub 场景包、manifest、works 插件入口和流程模板矩阵做出来，让更多开发人员按场景接入，而不是先学一堆命令。
-- 长期：把平台资产、works、OpenClaw 控制面、CI/CD 校验和度量治理连成一体，逐步形成统一的团队协同底座。
+- 短期：把当前主链、归档收口和团队文档打磨稳定，让试点项目持续出结果。
+- 中期：把 Hub 场景方案、安装清单、统一入口和流程模板矩阵做出来，让更多开发人员按场景接入，而不是先学一堆命令。
+- 长期：把平台资产、远程控制面、CI/CD 校验和度量治理连成一体，逐步形成统一的团队协同底座。
 
 对开发人员来说，最终想看到的变化其实很简单：今天还是少数人会用 AI，未来会变成团队按统一方法使用 AI；今天主要靠本地 IDE，未来会变成 IDE、Hub 和远程控制面共享同一套底座。
