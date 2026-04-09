@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const runtimeState = require('./runtime-state');
 const { resolveRuntimePaths } = require('./runtime-paths');
 const {
   getRoleRuntimeConfig,
@@ -47,13 +48,13 @@ const ROLE_OPENSPEC_ACTIONS = {
 };
 
 const ROLE_REQUIRED_INPUTS = {
-  'frontend-implementer': ['proposal', 'specs', 'tasks'],
-  'code-guardian': ['proposal', 'specs', 'tasks'],
-  'archive-change': ['proposal', 'specs', 'tasks', 'checklist', 'iterations'],
+  'frontend-implementer': ['proposal', 'specs', 'design', 'tasks'],
+  'code-guardian': ['proposal', 'specs', 'design', 'tasks'],
+  'archive-change': ['proposal', 'specs', 'design', 'tasks', 'checklist', 'iterations'],
 };
 
 const ROLE_REQUIRED_OUTPUTS = {
-  'requirement-analyst': ['proposal', 'specs', 'tasks'],
+  'requirement-analyst': ['proposal', 'specs', 'design', 'tasks'],
   'code-guardian': ['checklist', 'iterations'],
 };
 
@@ -86,6 +87,52 @@ function normalizeStringList(value) {
     return [];
   }
   return value.map((item) => String(item || '').trim()).filter(Boolean);
+}
+
+function listMarkdownFilesRecursive(rootDir) {
+  if (!rootDir || !fs.existsSync(rootDir)) {
+    return [];
+  }
+
+  const rootStat = fs.statSync(rootDir);
+  if (!rootStat.isDirectory()) {
+    return rootDir.endsWith('.md') ? [rootDir] : [];
+  }
+
+  const files = [];
+  const stack = [rootDir];
+  while (stack.length > 0) {
+    const current = stack.pop();
+    const entries = fs.readdirSync(current, { withFileTypes: true });
+    for (const entry of entries) {
+      const nextPath = path.join(current, entry.name);
+      if (entry.isDirectory()) {
+        stack.push(nextPath);
+      } else if (entry.isFile() && entry.name.endsWith('.md')) {
+        files.push(nextPath);
+      }
+    }
+  }
+
+  return files.sort();
+}
+
+function readMarkdownArtifactContent(artifactPath) {
+  if (!artifactPath || !fs.existsSync(artifactPath)) {
+    return {
+      files: [],
+      content: '',
+    };
+  }
+
+  const files = listMarkdownFilesRecursive(artifactPath);
+  return {
+    files,
+    content: files
+      .map((filePath) => fs.readFileSync(filePath, 'utf8').trim())
+      .filter(Boolean)
+      .join('\n\n'),
+  };
 }
 
 function getRoleArtifactRequirements(targetDir, roleId) {
@@ -144,7 +191,10 @@ function validatePreImplementationGate(targetDir, currentRun, executionPayload) 
     ? path.join(targetDir, currentRun.artifacts.proposal)
     : null;
   const specsPath = currentRun.artifacts?.specs
-    ? path.join(targetDir, currentRun.artifacts.specs)
+    ? path.join(targetDir, runtimeState.normalizeSpecsArtifactPath(currentRun.artifacts.specs))
+    : null;
+  const designPath = currentRun.artifacts?.design
+    ? path.join(targetDir, currentRun.artifacts.design)
     : null;
   const tasksPath = currentRun.artifacts?.tasks
     ? path.join(targetDir, currentRun.artifacts.tasks)
@@ -155,7 +205,10 @@ function validatePreImplementationGate(targetDir, currentRun, executionPayload) 
     reasons.push('proposal.md 缺失');
   }
   if (!specsPath || !fs.existsSync(specsPath)) {
-    reasons.push('spec.md 缺失');
+    reasons.push('specs/ 缺失');
+  }
+  if (!designPath || !fs.existsSync(designPath)) {
+    reasons.push('design.md 缺失');
   }
   if (!tasksPath || !fs.existsSync(tasksPath)) {
     reasons.push('tasks.md 缺失');
@@ -166,9 +219,14 @@ function validatePreImplementationGate(targetDir, currentRun, executionPayload) 
   }
 
   const proposalContent = fs.readFileSync(proposalPath, 'utf8').trim();
-  const specsContent = fs.readFileSync(specsPath, 'utf8').trim();
+  const specsArtifact = readMarkdownArtifactContent(specsPath);
+  const designContent = fs.readFileSync(designPath, 'utf8').trim();
   const tasksContent = fs.readFileSync(tasksPath, 'utf8').trim();
   const taskItems = listMarkdownBullets(tasksContent);
+
+  if (specsArtifact.files.length === 0) {
+    reasons.push('specs/ 缺少 spec 文件');
+  }
 
   if (riskLevel === 'high') {
     reasons.push('当前任务涉及支付/认证/安全/合规等高风险领域，进入实现前必须人工审批');
@@ -192,8 +250,11 @@ function validatePreImplementationGate(targetDir, currentRun, executionPayload) 
     if (proposalContent.length < 60) {
       reasons.push('proposal.md 过短，未达到 compact 最小信息量');
     }
-    if (specsContent.length < 40) {
-      reasons.push('spec.md 过短，未达到 compact 最小信息量');
+    if (specsArtifact.content.length < 40) {
+      reasons.push('specs/ 过短，未达到 compact 最小信息量');
+    }
+    if (designContent.length < 40) {
+      reasons.push('design.md 过短，未达到 compact 最小信息量');
     }
     if (taskItems.length < 3) {
       reasons.push('tasks.md 任务条目不足 3 条');
@@ -206,8 +267,11 @@ function validatePreImplementationGate(targetDir, currentRun, executionPayload) 
     if (proposalContent.length < 120) {
       reasons.push('proposal.md 过短，未达到 standard 最小信息量');
     }
-    if (specsContent.length < 80) {
-      reasons.push('spec.md 过短，未达到 standard 最小信息量');
+    if (specsArtifact.content.length < 80) {
+      reasons.push('specs/ 过短，未达到 standard 最小信息量');
+    }
+    if (designContent.length < 80) {
+      reasons.push('design.md 过短，未达到 standard 最小信息量');
     }
     if (headingCount < 2) {
       reasons.push('proposal.md 缺少足够的小节结构');

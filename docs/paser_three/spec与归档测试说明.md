@@ -4,7 +4,7 @@
 
 这一版和前一版相比，当前主链多了两件关键事情：
 
-- `requirement-analyst` 现在必须真实产出 `specs/ui/spec.md`
+- `requirement-analyst` 现在必须真实产出 `specs/` 和 `design.md`
 - `code-guardian` 完成后不会直接结束，而是先进入 `before-archive`，询问用户是否归档
 
 如果用户同意归档：
@@ -44,7 +44,8 @@ bash /Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/scripts/setup-cu
 3. 在 requirement 阶段结束后，检查是否生成：
 
 ```text
-openspec/changes/<change-id>/specs/ui/spec.md
+openspec/changes/<change-id>/specs/
+openspec/changes/<change-id>/design.md
 ```
 
 4. 在 code-guardian 完成后，检查是否出现“是否归档”的摘要询问。
@@ -58,6 +59,7 @@ openspec/changes/<change-id>/specs/ui/spec.md
 
 ```text
 openspec/specs/ui/spec.md
+openspec/specs/api/spec.md
 openspec/changes/archive/YYYY-MM-DD-<change-id>/
 ```
 

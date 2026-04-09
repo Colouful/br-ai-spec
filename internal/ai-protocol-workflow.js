@@ -1,12 +1,15 @@
 const fs = require('fs');
 const path = require('path');
 const runner = require('../bin/task-orchestrator-runner');
+const { archiveChange } = require('../bin/archive-change');
 const {
   inferDeliveryProfile,
   inferArtifactProfile,
   inferComplexity,
   inferRiskLevel,
   recordRunInputUpdate,
+  approveRunState,
+  completeRunState,
 } = require('../bin/runtime-state');
 const {
   resolveRuntimePaths,
@@ -18,6 +21,7 @@ const {
   getFlowRuntimeConfig,
   getRuleRuntimeConfig,
   getSkillRuntimeConfig,
+  resolveRuntimeProfileId,
 } = require('../bin/runtime-registry');
 const {
   getRuntimeTransition,
@@ -139,17 +143,17 @@ const FALLBACK_ROLE_SKILL_PRIORITY = {
 };
 
 const FALLBACK_ROLE_OPENSPEC_RULE_SECTIONS = {
-  'requirement-analyst': ['proposal', 'specs', 'tasks'],
+  'requirement-analyst': ['proposal', 'specs', 'design', 'tasks'],
   'frontend-implementer': ['specs', 'tasks', 'design'],
-  'code-guardian': ['tasks', 'specs', 'checklist', 'iterations'],
-  'archive-change': ['specs', 'checklist', 'iterations'],
+  'code-guardian': ['tasks', 'specs', 'design', 'checklist', 'iterations'],
+  'archive-change': ['specs', 'design', 'checklist', 'iterations'],
 };
 
 const DEFAULT_FLOW_ID = 'prd-to-delivery';
 const DEFAULT_FLOW_CONSTRAINTS = {
   required_roles: ['requirement-analyst', 'frontend-implementer', 'code-guardian'],
   approval_gates: ['before-implementation', 'before-archive'],
-  required_artifacts: ['proposal.md', 'specs/ui/spec.md', 'tasks.md', 'checklist.md', 'iterations.md'],
+  required_artifacts: ['proposal.md', 'specs', 'design.md', 'tasks.md', 'checklist.md', 'iterations.md'],
 };
 
 const MICRO_ROLE_EXTRAS = {
@@ -164,10 +168,11 @@ const MICRO_ROLE_EXTRAS = {
     ],
   },
   'requirement-analyst': {
-    goal: '用短版 proposal.md、spec.md 和 tasks.md 收敛需求，不写实现代码。',
+    goal: '用短版 proposal.md、specs/、design.md 和 tasks.md 收敛需求，不写实现代码。',
     must_do: [
       'proposal.md 只保留目标、范围、默认假设、风险四块',
-      'spec.md 只保留当前变更需要的增量规范和场景',
+      'specs/<domain>/spec.md 只保留当前变更需要的增量规范和场景',
+      'design.md 只保留真实实现落点和关键约束',
       'tasks.md 保持 3-5 条可执行任务，覆盖实现与验收',
     ],
     must_not: [
@@ -175,7 +180,7 @@ const MICRO_ROLE_EXTRAS = {
     ],
   },
   'frontend-implementer': {
-    goal: '基于短版 proposal/tasks 做最小必要实现，优先复用现有结构。',
+    goal: '基于短版 proposal/specs/design/tasks 做最小必要实现，优先复用现有结构。',
     must_do: [
       '保持改动最小化，优先就地复用现有页面、组件、样式变量和 mock 约定',
       '实现说明只保留当前变更、验证结果和残留风险',
@@ -217,7 +222,7 @@ const MICRO_OPENSPEC_RULES = {
   ],
   checklist: [
     'checklist.md 只保留关键检查项、阻断项和最终放行结论。',
-    '检查项必须能回指 proposal/tasks/specs 或实现证据。'
+    '检查项必须能回指 proposal/specs/design/tasks 或实现证据。'
   ],
   iterations: [
     'iterations.md 只记录问题、修正动作和残留风险。',
@@ -235,25 +240,25 @@ const ROLE_GUIDANCE = {
     ],
     must_not: [
       '不要越权替代 requirement-analyst、frontend-implementer 或 code-guardian 的职责',
-      '不要在 proposal/tasks/checklist/iterations 缺失时跳过门禁直接推进',
+      '不要在 proposal/specs/design/tasks/checklist/iterations 缺失时跳过门禁直接推进',
     ],
   },
   'requirement-analyst': {
-    goal: '把需求收敛成可执行的 proposal.md 和 tasks.md，不写实现代码。',
+    goal: '把需求收敛成可执行的 proposal.md、specs/、design.md 和 tasks.md，不写实现代码。',
     must_do: [
       '先明确目标、范围、非目标、关键假设和风险',
-      'proposal.md 需要能支撑后续实现和验收',
+      'proposal.md、specs/ 和 design.md 需要能支撑后续实现和验收',
       'tasks.md 必须是可执行任务清单，而不是空标题模板',
     ],
     must_not: [
       '不要直接开始写 Vue/TS/CSS 代码',
-      '不要在 proposal.md 和 tasks.md 未落盘前宣称本阶段完成',
+      '不要在 proposal.md、specs/、design.md 和 tasks.md 未落盘前宣称本阶段完成',
     ],
   },
   'frontend-implementer': {
-    goal: '基于 proposal.md 和 tasks.md 完成当前范围内的前端实现。',
+    goal: '基于 proposal.md、specs/、design.md 和 tasks.md 完成当前范围内的前端实现。',
     must_do: [
-      '先读 proposal.md 和 tasks.md 再改代码',
+      '先读 proposal.md、specs/、design.md 和 tasks.md 再改代码',
       '严格在当前变更范围内实现，不顺手扩 scope',
       '实现完成后写 expert-execution 回执并等待下一轮编排',
     ],
@@ -263,7 +268,7 @@ const ROLE_GUIDANCE = {
     ],
   },
   'code-guardian': {
-    goal: '基于 proposal、tasks 和实现结果做交付前检查，产出 checklist.md 和 iterations.md。',
+    goal: '基于 proposal、specs、design、tasks 和实现结果做交付前检查，产出 checklist.md 和 iterations.md。',
     must_do: [
       '明确区分阻断项和非阻断项',
       'checklist.md 记录检查项和结论',
@@ -277,7 +282,7 @@ const ROLE_GUIDANCE = {
 };
 
 const SKILL_GUIDANCE = {
-  'create-proposal': '用于快速形成 proposal/tasks 的结构和变更说明。',
+  'create-proposal': '用于快速形成 proposal/specs/design/tasks 的结构和变更说明。',
   'design-analysis': '用于整理页面结构、信息层级和交互要点。',
   'create-view': '用于创建或调整 Vue 页面文件与页面目录结构。',
   'create-component': '用于拆分和实现 Vue 组件。',
@@ -304,7 +309,8 @@ const FALLBACK_ROLE_RULE_CONSTRAINT_PROFILES = {
     },
     'requirement-analyst': {
       must_follow: [
-        '先把项目定位、目录落点、路由/API/样式约定吸收到 proposal/tasks，不要把规范已明确的信息重复写成 missing_inputs。',
+        '先把项目定位、目录落点、路由/API/样式约定吸收到 proposal/specs/design/tasks，不要把规范已明确的信息重复写成 missing_inputs。',
+        '需求收敛必须同时落到 specs/ 与 design.md，不能只写 tasks 而缺实现落点。',
         '需求收敛必须落到当前仓库可实施的页面、路由、接口或 mock 落点，而不是抽象方案。',
       ],
       blocked_when: [
@@ -314,15 +320,15 @@ const FALLBACK_ROLE_RULE_CONSTRAINT_PROFILES = {
     'frontend-implementer': {
       must_follow: [
         '优先复用现有目录、路由、请求封装、状态管理和样式变量约定。',
-        '实现前先对齐 proposal/tasks 的范围与落点，不要自行扩 scope。',
+        '实现前先对齐 proposal/specs/design/tasks 的范围与落点，不要自行扩 scope。',
       ],
       blocked_when: [
-        'proposal/tasks 未落盘或仍处于 before-implementation 审批门禁时，禁止改业务代码。',
+        'proposal/specs/design/tasks 未落盘或仍处于 before-implementation 审批门禁时，禁止改业务代码。',
       ],
     },
     'code-guardian': {
       must_follow: [
-        '以 proposal/tasks 和项目规则为准检查实现，而不是只做泛化 lint。',
+        '以 proposal/specs/design/tasks 和项目规则为准检查实现，而不是只做泛化 lint。',
         '必须给出阻断项、非阻断项和交付建议，不能写成模糊建议列表。',
       ],
       blocked_when: [
@@ -359,7 +365,7 @@ const FALLBACK_ROLE_RULE_CONSTRAINT_PROFILES = {
         '核查页面是否落在 src/views、路由是否落在 src/router/modules，并保持动态导入。',
         '核查 API 是否通过 src/api 封装、类型是否放在 src/api/types，页面中未直接调 request。',
         '核查样式是否使用主题变量、scoped 或 CSS Modules，而不是硬编码全局样式。',
-        '核查 Pinia/store、mock 与 proposal/tasks 的边界是否一致，避免“演示页写成生产页”。',
+        '核查 Pinia/store、mock 与 proposal/specs/design/tasks 的边界是否一致，避免“演示页写成生产页”。',
       ],
     },
   },
@@ -376,7 +382,7 @@ const ROLE_RULE_REPO_SPECIFIC = {
     },
     'requirement-analyst': {
       repo_specific: (facts) => [
-        facts.routeModulesDir ? `当前仓库已有路由模块目录 ${facts.routeModulesDir}，proposal/tasks 需要按该目录组织。` : '若项目尚未接入 vue-router，需要在 proposal/tasks 明确是补路由还是保持占位入口。',
+        facts.routeModulesDir ? `当前仓库已有路由模块目录 ${facts.routeModulesDir}，proposal/specs/design/tasks 需要按该目录组织。` : '若项目尚未接入 vue-router，需要在 proposal/specs/design/tasks 明确是补路由还是保持占位入口。',
         facts.viewsDir ? `页面目录以 ${facts.viewsDir} 为准，任务拆解要写清页面落点。` : null,
       ].filter(Boolean),
     },
@@ -528,6 +534,19 @@ function hasDependency(pkg, names) {
 }
 
 function detectProjectProfile(targetDir) {
+  const manifestPath = path.join(targetDir, '.ai-spec', 'manifest.json');
+  if (fs.existsSync(manifestPath)) {
+    try {
+      const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+      const manifestProfile = resolveRuntimeProfileId(targetDir, manifest?.profile);
+      if (manifestProfile) {
+        return manifestProfile;
+      }
+    } catch (error) {
+      // Ignore invalid local manifest during profile detection and fall back to repo facts.
+    }
+  }
+
   const pkg = loadPackageManifest(targetDir);
   if (hasDependency(pkg, ['vue', 'vue-router', 'pinia'])) {
     return 'vue';
@@ -660,7 +679,7 @@ function inferRoutingStrategy(repoConventions, rawInput) {
       : `复用现有路由入口 ${repoConventions.routeEntry}`;
   }
   if (/页面|列表|详情|欢迎|登录|路由|router|page/i.test(text)) {
-    return '仓库未检测到显式路由入口；页面类任务需先补路由骨架或在 proposal/tasks 中明确占位入口方案';
+    return '仓库未检测到显式路由入口；页面类任务需先补路由骨架或在 proposal/specs/design/tasks 中明确占位入口方案';
   }
   return '当前任务不强依赖新增路由，优先保持现有入口结构';
 }
@@ -674,7 +693,7 @@ function inferApiStrategy(repoConventions, rawInput) {
     return `沿用 ${repoConventions.apiDir}${repoConventions.apiTypesDir ? ` + ${repoConventions.apiTypesDir}` : ''} 进行接口与类型拆分`;
   }
   if (/接口|api|请求|分页|搜索|筛选|状态|重试|支付|订单|用户/i.test(text)) {
-    return '仓库尚未检测到稳定 API 封装入口；真实接口任务需先建立请求层或在 proposal/tasks 中明确占位方案';
+    return '仓库尚未检测到稳定 API 封装入口；真实接口任务需先建立请求层或在 proposal/specs/design/tasks 中明确占位方案';
   }
   return '当前任务不强依赖真实接口，优先保持最小数据流';
 }
@@ -687,7 +706,7 @@ function inferMockStrategy(repoConventions, rawInput) {
       : `${repoConventions.mockDir} 可作为 mock-first 兜底方案`;
   }
   if (/mock|演示|占位/i.test(text)) {
-    return '仓库未检测到独立 mock 目录；若采用演示版，需要在 proposal/tasks 中明确本地 mock 或页面内占位方案';
+    return '仓库未检测到独立 mock 目录；若采用演示版，需要在 proposal/specs/design/tasks 中明确本地 mock 或页面内占位方案';
   }
   return '未显式声明 mock-first，按真实接口交付评估';
 }
@@ -1690,10 +1709,11 @@ function buildRoleSpecificContract(
   if (roleId === 'requirement-analyst') {
     return {
       ...base,
-      summary: '先按项目规则把需求收敛成 proposal/specs/tasks，再把高风险缺口转成门禁或待确认项。',
-      expected_outputs: ['proposal.md', 'specs/ui/spec.md', 'tasks.md'],
+      summary: '先按项目规则把需求收敛成 proposal/specs/design/tasks，再把高风险缺口转成门禁或待确认项。',
+      expected_outputs: ['proposal.md', 'specs/', 'design.md', 'tasks.md'],
       must_resolve: [
         '页面/路由/API/mock/样式落点需和仓库约定一致',
+        '至少产出一个 specs/<domain>/spec.md，并在 design.md 说明实现落点',
         '能从项目规则与代码推断的信息优先转成 assumptions',
       ],
     };
@@ -1702,7 +1722,7 @@ function buildRoleSpecificContract(
   if (roleId === 'frontend-implementer') {
     return {
       ...base,
-      summary: '按 proposal/specs/tasks 与项目目录、路由、API、样式约定完成实现，不擅自扩 scope。',
+      summary: '按 proposal/specs/design/tasks 与项目目录、路由、API、样式约定完成实现，不擅自扩 scope。',
       implementation_focus: [
         repoConventions.viewsDir ? `页面落点优先对齐 ${repoConventions.viewsDir}` : '页面落点需与仓库 views 约定一致',
         repoConventions.routeModulesDir ? `路由修改优先对齐 ${repoConventions.routeModulesDir}` : '若新增路由，需先确认路由入口与模块组织方式',
@@ -1731,10 +1751,10 @@ function buildRoleSpecificContract(
 
     return {
       ...base,
-      summary: '按 proposal/specs/tasks 和项目规范核查目录落点、路由/API/样式/Test 合规性，再给交付结论。',
+      summary: '按 proposal/specs/design/tasks 和项目规范核查目录落点、路由/API/样式/Test 合规性，再给交付结论。',
       review_focus: [
         '页面/组件/路由/API/mock/store 是否落到正确目录',
-        '实现边界是否仍符合 proposal/tasks 与审批限制',
+        '实现边界是否仍符合 proposal/specs/design/tasks 与审批限制',
         '样式是否继续使用主题变量与作用域样式',
       ],
       evidence_targets: evidenceTargets,
@@ -1743,10 +1763,10 @@ function buildRoleSpecificContract(
         repoConventions.routeModulesDir ? `路由是否落在 ${repoConventions.routeModulesDir} 并保持懒加载/meta 约定` : '新增路由是否先补齐路由骨架并符合模块组织方式',
         repoConventions.apiDir ? `接口是否经由 ${repoConventions.apiDir} 封装，页面/组件未直接调 request` : '涉及真实接口时是否先建立统一 API 封装入口',
         repoConventions.styleEntry ? `样式是否沿用 ${repoConventions.styleEntry} 及主题变量，不存在硬编码颜色或全局污染` : '样式是否继续使用主题变量和作用域样式',
-        '实现是否越过 proposal/tasks 或审批约束，把演示页扩成生产能力',
+        '实现是否越过 proposal/specs/design/tasks 或审批约束，把演示页扩成生产能力',
       ],
       scope_guard: [
-        '只按 proposal/tasks 与已批准范围审查，不接受静默扩 scope',
+        '只按 proposal/specs/design/tasks 与已批准范围审查，不接受静默扩 scope',
         '高风险领域未批准的真实支付、敏感采集、风控/权限逻辑必须继续阻断',
         'mock / 占位实现不得伪装成可直接上线的真实交付',
       ],
@@ -1795,6 +1815,22 @@ function looksLikeApprovalInput(input) {
     /按 proposal 继续/,
     /按提案继续/,
     /审批通过/,
+  ].some((pattern) => pattern.test(text));
+}
+
+function looksLikeArchiveApproveInput(input) {
+  const text = String(input || '').trim();
+  if (!text) {
+    return false;
+  }
+
+  return [
+    /归档/,
+    /同意归档/,
+    /确认归档/,
+    /执行归档/,
+    /继续归档/,
+    /开始归档/,
   ].some((pattern) => pattern.test(text));
 }
 
@@ -1891,7 +1927,8 @@ function buildExpertExpectedOutput(dispatch, writes, runtimePaths, deliveryProfi
 
   if (dispatch.role?.id === 'requirement-analyst') {
     outputs.push(deliveryProfile === 'micro' ? '完成短版 openspec proposal.md' : '完成 openspec proposal.md');
-    outputs.push(deliveryProfile === 'micro' ? '完成短版 openspec specs/ui/spec.md' : '完成 openspec specs/ui/spec.md');
+    outputs.push(deliveryProfile === 'micro' ? '完成短版 openspec specs/<domain>/spec.md（可多份）' : '完成 openspec specs/<domain>/spec.md（可多份）');
+    outputs.push(deliveryProfile === 'micro' ? '完成短版 openspec design.md' : '完成 openspec design.md');
     outputs.push(deliveryProfile === 'micro' ? '完成短版 openspec tasks.md' : '完成 openspec tasks.md');
   } else if (dispatch.role?.id === 'frontend-implementer') {
     outputs.push('完成当前范围内的代码实现');
@@ -2196,13 +2233,33 @@ function buildContinueTurn(targetDir, status, currentArtifacts) {
 function buildApprovalGateTurn(targetDir, status, currentArtifacts) {
   const pendingGate = currentArtifacts.run?.pending_gate || null;
   const flowDefinition = loadFlowDefinition(targetDir, currentArtifacts.run?.flow?.id || DEFAULT_FLOW_ID);
-  const orchestratorGuidance = buildOrchestratorGuidance(
-    targetDir,
-    currentArtifacts.run,
-    currentArtifacts.run?.trigger?.latest_user_input || currentArtifacts.run?.trigger?.raw_input || null,
-  );
   const resumeRole = inferPendingGateResumeRole(targetDir, currentArtifacts.run, flowDefinition, pendingGate);
   const gateDescription = describeApprovalGate(pendingGate, resumeRole);
+  const useCompactArchiveGate = pendingGate === 'before-archive';
+  const orchestratorGuidance = useCompactArchiveGate
+    ? {
+        approval_contract: {
+          gates: flowDefinition.approval_gates,
+          pending_gate: pendingGate,
+          expected_gate: pendingGate,
+          approve_resume_to_role: resumeRole,
+        },
+        orchestration_contract: {
+          selected_flow: flowDefinition.id,
+          delivery_profile: currentArtifacts.run?.delivery_profile || null,
+          artifact_profile: currentArtifacts.run?.artifact_profile || null,
+          change_id: currentArtifacts.run?.task?.change_id || null,
+          required_experts: flowDefinition.required_roles,
+          required_artifacts: ['checklist.md', 'iterations.md'],
+          handoff_policy: flowDefinition.handoff_policy,
+          completion_policy: '归档确认只需基于当前检查结论与残留风险做放行决策',
+        },
+      }
+    : buildOrchestratorGuidance(
+        targetDir,
+        currentArtifacts.run,
+        currentArtifacts.run?.trigger?.latest_user_input || currentArtifacts.run?.trigger?.raw_input || null,
+      );
   const reads = [
     buildFileTarget(targetDir, path.join('.ai-spec', 'current-run.json'), {
       required: true,
@@ -2210,20 +2267,25 @@ function buildApprovalGateTurn(targetDir, status, currentArtifacts) {
     }),
   ];
 
-  if (currentArtifacts.run?.artifacts?.proposal) {
+  if (!useCompactArchiveGate && currentArtifacts.run?.artifacts?.proposal) {
     reads.push(buildReadableTarget(targetDir, currentArtifacts.run.artifacts.proposal, {
       label: 'proposal for approval review',
     }));
   }
 
-  if (currentArtifacts.run?.artifacts?.tasks) {
+  if (!useCompactArchiveGate && currentArtifacts.run?.artifacts?.tasks) {
     reads.push(buildReadableTarget(targetDir, currentArtifacts.run.artifacts.tasks, {
       label: 'tasks for approval review',
     }));
   }
-  if (currentArtifacts.run?.artifacts?.specs) {
+  if (!useCompactArchiveGate && currentArtifacts.run?.artifacts?.specs) {
     reads.push(buildReadableTarget(targetDir, currentArtifacts.run.artifacts.specs, {
-      label: 'spec for approval review',
+      label: 'specs for approval review',
+    }));
+  }
+  if (!useCompactArchiveGate && currentArtifacts.run?.artifacts?.design) {
+    reads.push(buildReadableTarget(targetDir, currentArtifacts.run.artifacts.design, {
+      label: 'design for approval review',
     }));
   }
   if (pendingGate === 'before-archive') {
@@ -2306,11 +2368,33 @@ function buildUpdateReviewTurn(targetDir, status, currentArtifacts) {
     ? currentArtifacts.run.input_updates.slice(-3)
     : [];
   const latestInput = currentArtifacts.run?.trigger?.latest_user_input || null;
-  const orchestratorGuidance = buildOrchestratorGuidance(targetDir, currentArtifacts.run, latestInput);
   const pendingGate = currentArtifacts.run?.pending_gate || null;
-  const approvalIntent = pendingGate ? looksLikeApprovalInput(latestInput) : false;
+  const approvalIntent = pendingGate === 'before-archive'
+    ? (looksLikeArchiveApproveInput(latestInput) || looksLikeApprovalInput(latestInput))
+    : (pendingGate ? looksLikeApprovalInput(latestInput) : false);
   const archiveSkipIntent = pendingGate === 'before-archive' ? looksLikeArchiveSkipInput(latestInput) : false;
   const resumeRole = inferPendingGateResumeRole(targetDir, currentArtifacts.run, flowDefinition, pendingGate);
+  const useCompactArchiveGate = pendingGate === 'before-archive' && (approvalIntent || archiveSkipIntent);
+  const orchestratorGuidance = useCompactArchiveGate
+    ? {
+        approval_contract: {
+          gates: flowDefinition.approval_gates,
+          pending_gate: pendingGate,
+          expected_gate: pendingGate,
+          approve_resume_to_role: resumeRole,
+        },
+        orchestration_contract: {
+          selected_flow: flowDefinition.id,
+          delivery_profile: currentArtifacts.run?.delivery_profile || null,
+          artifact_profile: currentArtifacts.run?.artifact_profile || null,
+          change_id: currentArtifacts.run?.task?.change_id || null,
+          required_experts: flowDefinition.required_roles,
+          required_artifacts: ['checklist.md', 'iterations.md'],
+          handoff_policy: flowDefinition.handoff_policy,
+          completion_policy: '归档确认已完成，只需生成最小 runtime-action 执行放行或结束',
+        },
+      }
+    : buildOrchestratorGuidance(targetDir, currentArtifacts.run, latestInput);
   const reads = [
     ...buildCommandTargets(targetDir, CONTINUE_INSTRUCTION_FILES),
     buildFileTarget(targetDir, path.join('.ai-spec', 'current-run.json'), {
@@ -2319,7 +2403,7 @@ function buildUpdateReviewTurn(targetDir, status, currentArtifacts) {
     }),
   ];
 
-  if (currentArtifacts.dispatch) {
+  if (!useCompactArchiveGate && currentArtifacts.dispatch) {
     reads.push(
       buildFileTarget(targetDir, getExistingRelPath(runtimePaths.currentDispatch), {
         required: true,
@@ -2328,7 +2412,7 @@ function buildUpdateReviewTurn(targetDir, status, currentArtifacts) {
     );
   }
 
-  if (currentArtifacts.execution) {
+  if (!useCompactArchiveGate && currentArtifacts.execution) {
     reads.push(
       buildFileTarget(targetDir, getExistingRelPath(runtimePaths.currentExecutionJson), {
         required: true,
@@ -2690,11 +2774,98 @@ function advanceProtocolStep(options = {}) {
   };
 }
 
+function tryApplyBeforeArchiveFastPath(targetDir, userInput) {
+  const currentArtifacts = loadCurrentArtifacts(targetDir);
+  const runState = currentArtifacts.run || null;
+  if (!runState || runState.pending_gate !== 'before-archive') {
+    return null;
+  }
+
+  const archiveSkipIntent = looksLikeArchiveSkipInput(userInput);
+  const archiveApproveIntent = !archiveSkipIntent && (
+    looksLikeArchiveApproveInput(userInput) || looksLikeApprovalInput(userInput)
+  );
+
+  if (!archiveSkipIntent && !archiveApproveIntent) {
+    return null;
+  }
+
+  const updated = recordRunInputUpdate({
+    target: targetDir,
+    userInput,
+    source: 'protocol-update',
+  });
+
+  if (archiveSkipIntent) {
+    const completed = completeRunState({
+      target: targetDir,
+      runId: updated.state.run_id,
+      fromRole: updated.state.current_role || 'code-guardian',
+      toRole: updated.state.current_role || 'code-guardian',
+      status: 'success',
+      message: '用户选择暂不归档，当前运行按现有交付结果结束。',
+      clearPendingGate: true,
+    });
+
+    return {
+      executed: true,
+      action: 'complete-without-archive',
+      updated,
+      final_state: completed.state,
+      archived_to: null,
+    };
+  }
+
+  const approved = approveRunState({
+    target: targetDir,
+    runId: updated.state.run_id,
+    gate: 'before-archive',
+    toRole: 'archive-change',
+    nextRole: null,
+    message: '用户确认归档，进入 archive-change',
+  });
+  const archiveResult = archiveChange({
+    target: targetDir,
+    changeId: approved.state.task?.change_id || runState.task?.change_id || null,
+    completeRun: true,
+  });
+
+  return {
+    executed: true,
+    action: 'archive-approved',
+    updated,
+    final_state: archiveResult.runtime_transition?.state || approved.state,
+    archived_to: archiveResult.archived_to || null,
+  };
+}
+
 function updateProtocolInput(options = {}) {
   const targetDir = resolveTargetDir(options.target);
   const userInput = options.userInput || null;
   if (!userInput) {
     throw new Error('Missing required argument: --user-input <text>');
+  }
+
+  const fastPath = tryApplyBeforeArchiveFastPath(targetDir, userInput);
+  if (fastPath) {
+    return {
+      kind: 'ai-protocol-input-update',
+      target: targetDir,
+      updated: fastPath.updated,
+      fast_path: {
+        executed: true,
+        action: fastPath.action,
+        archived_to: fastPath.archived_to,
+        run_status: fastPath.final_state?.status || null,
+        current_role: fastPath.final_state?.current_role || null,
+        requires_followup_turn: false,
+      },
+      runner_status: runner.buildStatus(targetDir),
+      turn: buildProtocolTurn({
+        target: targetDir,
+        userInput: null,
+      }),
+    };
   }
 
   const updated = recordRunInputUpdate({
@@ -2707,6 +2878,14 @@ function updateProtocolInput(options = {}) {
     kind: 'ai-protocol-input-update',
     target: targetDir,
     updated,
+    fast_path: {
+      executed: false,
+      action: null,
+      archived_to: null,
+      run_status: updated.state?.status || null,
+      current_role: updated.state?.current_role || null,
+      requires_followup_turn: true,
+    },
     runner_status: runner.buildStatus(targetDir),
     turn: buildProtocolTurn({
       target: targetDir,

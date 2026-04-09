@@ -208,8 +208,8 @@ description: 定义 task-orchestrator 在首次识别任务时必须输出的最
 对于 `prd-to-delivery（需求到交付）`：
 
 - 首轮 `run-plan（运行计划）` 必须确定稳定 `change_id（变更 ID）`
-- 首轮 `run-plan（运行计划）` 必须显式带出 `proposal/tasks/checklist/iterations` 的目标路径
-- 未存在 `proposal.md` 与 `tasks.md` 时，不得交给 `frontend-implementer（前端实现专家）`
+- 首轮 `run-plan（运行计划）` 必须显式带出 `proposal/specs/design/tasks/checklist/iterations` 的目标路径
+- 未存在 `proposal.md`、`specs/`、`design.md` 与 `tasks.md` 时，不得交给 `frontend-implementer（前端实现专家）`
 - 未存在 `checklist.md` 与 `iterations.md` 时，不得进入 `complete（完成）`
 
 ## 6. 示例

@@ -162,7 +162,7 @@ artifacts:
 示例：
 
 - `before-implementation`
-- `before-delivery`
+- `before-archive`
 
 ### 3.8 `artifacts`
 

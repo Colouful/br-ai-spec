@@ -13,7 +13,7 @@ description: 指导在 Vue 3 项目中按团队规范创建和维护页面路由
 - `.agents/rules/06-路由规范.md`：路由模块、懒加载、meta、唯一命名
 - `.agents/rules/05-API规范.md`：若页面会接真实接口，接口落点必须同步考虑
 
-如果当前仓库还没有 `src/router/index.ts` 或 `src/router/modules/`，先按 proposal/tasks 判断：
+如果当前仓库还没有 `src/router/index.ts` 或 `src/router/modules/`，先按 proposal/specs/design/tasks 判断：
 
 - 是补路由骨架
 - 还是保持占位入口，不强行新增半套路由
@@ -112,7 +112,7 @@ const routes = [
 
 优先：
 
-- 在 proposal/tasks 中写清“补路由骨架”是本次范围的一部分
+- 在 proposal/specs/design/tasks 中写清“补路由骨架”是本次范围的一部分
 - 保持最小实现，不顺手扩展守卫、权限体系、菜单体系
 
 不要：
@@ -125,7 +125,7 @@ const routes = [
 - [ ] 页面落在 `src/views/<page>/index.vue`
 - [ ] 路由模块落在 `src/router/modules/<module>.ts`
 - [ ] 页面级路由使用动态导入懒加载
-- [ ] 路由 `name` 全局唯一，`path` 与 proposal/tasks 一致
+- [ ] 路由 `name` 全局唯一，`path` 与 proposal/specs/design/tasks 一致
 - [ ] `meta.title`、`meta.requiresAuth` 已补齐
 - [ ] 未在组件或页面内部重复维护路由
 - [ ] 若为 mock/演示页，已在页面或 proposal 中明确边界

@@ -1106,19 +1106,37 @@ function Install-OpenSpec {
     $template = Join-Path $script:SourceDir "openspec/config.yaml.template"
     $configFile = Join-Path $Target "openspec/config.yaml"
     if (Test-Path $template) {
+        $templateContent = Get-Content $template -Raw
+        $templateSchemaLine = ((Get-Content $template) | Where-Object { $_ -match '^schema:\s*' } | Select-Object -First 1)
+        $contextAndRulesMatch = [regex]::Match($templateContent, '(?ms)^context:\r?\n.*$')
+        $contextAndRules = if ($contextAndRulesMatch.Success) { $contextAndRulesMatch.Value } else { $null }
         if (Test-Path $configFile) {
             $content = Get-Content $configFile -Raw -ErrorAction SilentlyContinue
-            if ($content -and $content -notmatch '(?m)^context:') {
+            if ($content -notmatch '(?m)^context:') {
                 Write-Info "合并 ex-ai-spec  context/rules 到 config.yaml ..."
-                $templateContent = Get-Content $template -Raw
-                $linesToAppend = ($templateContent -split "`n" | Select-Object -Skip 1) -join "`n"
-                Add-Content -Path $configFile -Value $linesToAppend
+                if ($contextAndRules) {
+                    Add-Content -Path $configFile -Value $contextAndRules
+                }
                 Write-Ok "config.yaml 已增强"
             } else {
                 Write-Info "config.yaml 已包含 context 字段，跳过合并"
             }
-            if ($content -match '(?m)^schema:\s*spec-driven\s*$') {
-                Write-Warn "检测到 legacy schema=spec-driven，建议迁移到 expert-delivery 以启用 checklist/iterations 产物"
+            $updatedContent = Get-Content $configFile -Raw -ErrorAction SilentlyContinue
+            if ($templateSchemaLine) {
+                if ($updatedContent -match '(?m)^schema:\s*.*$') {
+                    $updatedContent = [regex]::Replace(
+                        $updatedContent,
+                        '(?m)^schema:\s*.*$',
+                        [System.Text.RegularExpressions.MatchEvaluator]{ param($m) $templateSchemaLine },
+                        1
+                    )
+                } elseif ([string]::IsNullOrWhiteSpace($updatedContent)) {
+                    $updatedContent = $templateSchemaLine + "`r`n"
+                } else {
+                    $updatedContent = $templateSchemaLine + "`r`n`r`n" + $updatedContent
+                }
+                Set-Content -Path $configFile -Value $updatedContent
+                Write-Ok "config.yaml 的 schema 已同步为模板默认值"
             }
         } else {
             $configDir = Split-Path $configFile -Parent

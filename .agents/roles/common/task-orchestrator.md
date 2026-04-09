@@ -72,7 +72,7 @@ handoff_to:
 - 不越权替代产品判断和高风险技术决策
 - 不直接跳过审查和验证节点
 - 当输入不完整时，先暴露缺口并明确假设；只在高风险、不可逆或冲突场景下阻断
-- `prd-to-delivery（需求到交付）` 下，不得跳过 `proposal/tasks/checklist/iterations` 这 4 类核心产物
+- `prd-to-delivery（需求到交付）` 下，不得跳过 `proposal/specs/design/tasks/checklist/iterations` 这 6 类核心产物
 
 ## 必做步骤
 

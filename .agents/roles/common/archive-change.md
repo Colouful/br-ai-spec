@@ -38,7 +38,7 @@ handoff_to: []
 
 ## 必做步骤
 
-1. 确认当前变更的 proposal、specs、tasks、checklist、iterations 已齐备
+1. 确认当前变更的 proposal、specs、design、tasks、checklist、iterations 已齐备
 2. 将 `openspec/changes/<change-id>/specs/` 合并到 `openspec/specs/`
 3. 将 `openspec/changes/<change-id>/` 迁移到 `openspec/changes/archive/YYYY-MM-DD-<change-id>/`
 4. 输出归档摘要并完成本次运行
@@ -49,7 +49,7 @@ handoff_to: []
 - 不手工执行 `mkdir`、`cp`、`mv` 去合并或迁移归档目录，除非内置命令不可用
 - 优先读取 `archive-change` skill，按其中的目录与合并规则执行
 - 若存在同名规范文件，必须保留既有内容并追加本次增量，不得直接覆盖
-- 归档后的目录应继续可追溯，不能丢失 proposal/tasks/checklist/iterations
+- 归档后的目录应继续可追溯，不能丢失 proposal/specs/design/tasks/checklist/iterations
 - 内置命令成功后，本轮运行已结束；不要再补写 `expert-execution`、不要再手工执行 `runtime-state complete`、不要再额外调用 `protocol-advance`
 
 ## 输出标准

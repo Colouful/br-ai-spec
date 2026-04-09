@@ -41,6 +41,7 @@ artifacts:
       任务必须具体、可验证，并严格限定在已批准的变更范围内。
     requires:
       - specs
+      - design
 
   - id: checklist
     generates: checklist.md

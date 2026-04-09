@@ -1,6 +1,10 @@
 #!/usr/bin/env node
 const fs = require('fs');
 const path = require('path');
+const {
+  getProfileIds,
+  readProfilesRegistry,
+} = require('./profile-registry');
 
 function printUsage() {
   console.log(`Usage:
@@ -66,6 +70,10 @@ function readJsonFile(filePath, label) {
   }
 }
 
+function buildSupportedProfileSet(profilesRegistry) {
+  return new Set(getProfileIds(profilesRegistry));
+}
+
 function normalizeList(value) {
   if (!value) return [];
   if (Array.isArray(value)) {
@@ -99,7 +107,7 @@ function assertOptionalString(report, value, label) {
   }
 }
 
-function validateSourceDefinition(report, sourceDir, entry, label) {
+function validateSourceDefinition(report, sourceDir, entry, label, supportedProfiles) {
   const hasSource = typeof entry.source === 'string';
   const hasSourceByProfile = entry.sourceByProfile && typeof entry.sourceByProfile === 'object';
 
@@ -113,7 +121,7 @@ function validateSourceDefinition(report, sourceDir, entry, label) {
 
   if (hasSourceByProfile) {
     for (const [profile, relPath] of Object.entries(entry.sourceByProfile)) {
-      if (!['react', 'vue'].includes(profile)) {
+      if (!supportedProfiles.has(profile)) {
         report.errors.push(`${label} has unsupported profile key: ${profile}`);
       }
       if (typeof relPath !== 'string' || !relPath.trim()) {
@@ -149,7 +157,7 @@ function validateRuntimeTransition(report, value, label) {
   assertOptionalString(report, value.message, `${label}.message`);
 }
 
-function validateRuleContractProfiles(report, value, label) {
+function validateRuleContractProfiles(report, value, label, supportedProfiles) {
   if (value === undefined || value === null) {
     return;
   }
@@ -159,7 +167,7 @@ function validateRuleContractProfiles(report, value, label) {
   }
 
   for (const [profile, entry] of Object.entries(value)) {
-    if (!['default', 'react', 'vue'].includes(profile)) {
+    if (profile !== 'default' && !supportedProfiles.has(profile)) {
       report.errors.push(`${label} has unsupported profile key: ${profile}`);
       continue;
     }
@@ -176,7 +184,57 @@ function validateRuleContractProfiles(report, value, label) {
   }
 }
 
-function validateRulesRegistry(sourceDir, rulesRegistry, report) {
+function validateProfileList(report, value, label, supportedProfiles) {
+  const profiles = assertArrayOfStrings(report, value, label);
+  for (const profile of profiles) {
+    if (!supportedProfiles.has(profile)) {
+      report.errors.push(`${label} references unsupported profile: ${profile}`);
+    }
+  }
+  return profiles;
+}
+
+function validateProfilesRegistry(sourceDir, profilesRegistry, report) {
+  if (typeof profilesRegistry.version !== 'number') {
+    report.errors.push('profiles.json version must be a number');
+  }
+  if (!profilesRegistry.profiles || typeof profilesRegistry.profiles !== 'object') {
+    report.errors.push('profiles.json is missing "profiles" object');
+    return new Set();
+  }
+
+  const profileIds = new Set();
+  for (const [profileId, entry] of Object.entries(profilesRegistry.profiles)) {
+    profileIds.add(profileId);
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+      report.errors.push(`profiles.json entry "${profileId}" must be an object`);
+      continue;
+    }
+
+    assertOptionalString(report, entry.status, `profiles.json entry "${profileId}" status`);
+    assertOptionalString(report, entry.label, `profiles.json entry "${profileId}" label`);
+    assertOptionalString(report, entry.rules_dir, `profiles.json entry "${profileId}" rules_dir`);
+    assertOptionalString(report, entry.skills_dir, `profiles.json entry "${profileId}" skills_dir`);
+    assertOptionalString(report, entry.configs_dir, `profiles.json entry "${profileId}" configs_dir`);
+    if (entry.aliases !== undefined) {
+      assertArrayOfStrings(report, entry.aliases, `profiles.json entry "${profileId}" aliases`);
+    }
+
+    if (typeof entry.rules_dir === 'string' && entry.rules_dir.trim() && !fileExists(sourceDir, entry.rules_dir)) {
+      report.errors.push(`profiles.json entry "${profileId}" references missing rules_dir: ${entry.rules_dir}`);
+    }
+    if (typeof entry.skills_dir === 'string' && entry.skills_dir.trim() && !fileExists(sourceDir, entry.skills_dir)) {
+      report.errors.push(`profiles.json entry "${profileId}" references missing skills_dir: ${entry.skills_dir}`);
+    }
+    if (typeof entry.configs_dir === 'string' && entry.configs_dir.trim() && !fileExists(sourceDir, entry.configs_dir)) {
+      report.errors.push(`profiles.json entry "${profileId}" references missing configs_dir: ${entry.configs_dir}`);
+    }
+  }
+
+  return profileIds;
+}
+
+function validateRulesRegistry(sourceDir, rulesRegistry, report, supportedProfiles) {
   if (typeof rulesRegistry.version !== 'number') {
     report.errors.push('rules.json version must be a number');
   }
@@ -197,6 +255,7 @@ function validateRulesRegistry(sourceDir, rulesRegistry, report) {
       sourceDir,
       entry,
       `rules.json entry "${ruleId}"`,
+      supportedProfiles,
     );
     if (!hasSource && !hasSourceByProfile) {
       report.errors.push(`rules.json entry "${ruleId}" must define source or sourceByProfile`);
@@ -209,7 +268,7 @@ function validateRulesRegistry(sourceDir, rulesRegistry, report) {
   return ruleIds;
 }
 
-function validateSkillsRegistry(sourceDir, skillsRegistry, report) {
+function validateSkillsRegistry(sourceDir, skillsRegistry, report, supportedProfiles) {
   if (typeof skillsRegistry.version !== 'number') {
     report.errors.push('skills.json version must be a number');
   }
@@ -225,16 +284,19 @@ function validateSkillsRegistry(sourceDir, skillsRegistry, report) {
       report.errors.push(`skills.json entry "${skillId}" must be an object`);
       continue;
     }
-    validateSourceDefinition(report, sourceDir, entry, `skills.json entry "${skillId}"`);
+    validateSourceDefinition(report, sourceDir, entry, `skills.json entry "${skillId}"`, supportedProfiles);
     if (entry.domains !== undefined) {
       assertArrayOfStrings(report, entry.domains, `skills.json entry "${skillId}" domains`);
+    }
+    if (entry.profiles !== undefined) {
+      validateProfileList(report, entry.profiles, `skills.json entry "${skillId}" profiles`, supportedProfiles);
     }
   }
 
   return skillIds;
 }
 
-function validateRolesRegistry(sourceDir, rolesRegistry, report) {
+function validateRolesRegistry(sourceDir, rolesRegistry, report, supportedProfiles) {
   if (typeof rolesRegistry.version !== 'number') {
     report.errors.push('roles.json version must be a number');
   }
@@ -266,6 +328,9 @@ function validateRolesRegistry(sourceDir, rolesRegistry, report) {
     if (entry.domains !== undefined) {
       assertArrayOfStrings(report, entry.domains, `roles.json entry "${roleId}" domains`);
     }
+    if (entry.profiles !== undefined) {
+      validateProfileList(report, entry.profiles, `roles.json entry "${roleId}" profiles`, supportedProfiles);
+    }
     if (entry.openspec_actions !== undefined) {
       assertArrayOfStrings(report, entry.openspec_actions, `roles.json entry "${roleId}" openspec_actions`);
     }
@@ -279,7 +344,7 @@ function validateRolesRegistry(sourceDir, rolesRegistry, report) {
       assertArrayOfStrings(report, entry.micro_skill_allowlist, `roles.json entry "${roleId}" micro_skill_allowlist`);
     }
     if (entry.rule_contract_profiles !== undefined) {
-      validateRuleContractProfiles(report, entry.rule_contract_profiles, `roles.json entry "${roleId}" rule_contract_profiles`);
+      validateRuleContractProfiles(report, entry.rule_contract_profiles, `roles.json entry "${roleId}" rule_contract_profiles`, supportedProfiles);
     }
     if (entry.openspec_rule_sections !== undefined) {
       assertArrayOfStrings(report, entry.openspec_rule_sections, `roles.json entry "${roleId}" openspec_rule_sections`);
@@ -301,7 +366,7 @@ function validateRolesRegistry(sourceDir, rolesRegistry, report) {
   return roleIds;
 }
 
-function validateFlowsRegistry(sourceDir, flowsRegistry, report) {
+function validateFlowsRegistry(sourceDir, flowsRegistry, report, supportedProfiles) {
   if (typeof flowsRegistry.version !== 'number') {
     report.errors.push('flows.json version must be a number');
   }
@@ -332,6 +397,9 @@ function validateFlowsRegistry(sourceDir, flowsRegistry, report) {
     }
     if (entry.default_schema !== undefined) {
       assertOptionalString(report, entry.default_schema, `flows.json entry "${flowId}" default_schema`);
+    }
+    if (entry.profiles !== undefined) {
+      validateProfileList(report, entry.profiles, `flows.json entry "${flowId}" profiles`, supportedProfiles);
     }
     if (entry.artifact_profile !== undefined) {
       assertOptionalString(report, entry.artifact_profile, `flows.json entry "${flowId}" artifact_profile`);
@@ -403,7 +471,7 @@ function validateRoleAndFlowReferences(rolesRegistry, flowsRegistry, report, ids
   }
 }
 
-function validateScenarioPackagesRegistry(scenariosRegistry, report, ids) {
+function validateScenarioPackagesRegistry(scenariosRegistry, report, ids, supportedProfiles) {
   if (typeof scenariosRegistry.version !== 'number') {
     report.errors.push('scenario-packages.json version must be a number');
   }
@@ -423,6 +491,9 @@ function validateScenarioPackagesRegistry(scenariosRegistry, report, ids) {
     const rules = assertArrayOfStrings(report, entry.rules || [], `scenario-packages.json entry "${scenarioId}" rules`);
     if (entry.domains !== undefined) {
       assertArrayOfStrings(report, entry.domains, `scenario-packages.json entry "${scenarioId}" domains`);
+    }
+    if (entry.profiles !== undefined) {
+      validateProfileList(report, entry.profiles, `scenario-packages.json entry "${scenarioId}" profiles`, supportedProfiles);
     }
 
     for (const roleId of roles) {
@@ -467,6 +538,7 @@ function validateRegistry(sourceDir) {
   const flowsPath = path.join(registryDir, 'flows.json');
   const scenariosPath = path.join(registryDir, 'scenario-packages.json');
 
+  const profilesRegistry = readProfilesRegistry(sourceDir);
   const rulesRegistry = readJsonFile(rulesPath, 'rules.json');
   const skillsRegistry = readJsonFile(skillsPath, 'skills.json');
   const rolesRegistry = readJsonFile(rolesPath, 'roles.json');
@@ -474,6 +546,7 @@ function validateRegistry(sourceDir) {
   const scenariosRegistry = readJsonFile(scenariosPath, 'scenario-packages.json');
 
   report.checked_files.push(
+    '.agents/registry/profiles.json',
     '.agents/registry/rules.json',
     '.agents/registry/skills.json',
     '.agents/registry/roles.json',
@@ -481,24 +554,28 @@ function validateRegistry(sourceDir) {
     '.agents/registry/scenario-packages.json'
   );
 
-  const ruleIds = validateRulesRegistry(sourceDir, rulesRegistry, report);
-  const skillIds = validateSkillsRegistry(sourceDir, skillsRegistry, report);
-  const roleIds = validateRolesRegistry(sourceDir, rolesRegistry, report);
-  const flowIds = validateFlowsRegistry(sourceDir, flowsRegistry, report);
+  const profileIds = validateProfilesRegistry(sourceDir, profilesRegistry, report);
+  const supportedProfiles = buildSupportedProfileSet(profilesRegistry);
+  const ruleIds = validateRulesRegistry(sourceDir, rulesRegistry, report, supportedProfiles);
+  const skillIds = validateSkillsRegistry(sourceDir, skillsRegistry, report, supportedProfiles);
+  const roleIds = validateRolesRegistry(sourceDir, rolesRegistry, report, supportedProfiles);
+  const flowIds = validateFlowsRegistry(sourceDir, flowsRegistry, report, supportedProfiles);
   const ids = {
+    profiles: profileIds,
     roles: roleIds,
     skills: skillIds,
     rules: ruleIds,
     flows: flowIds,
   };
   validateRoleAndFlowReferences(rolesRegistry, flowsRegistry, report, ids);
-  validateScenarioPackagesRegistry(scenariosRegistry, report, ids);
+  validateScenarioPackagesRegistry(scenariosRegistry, report, ids, supportedProfiles);
 
   if (report.errors.length > 0) {
     report.status = 'failed';
   }
 
   report.summary = {
+    profile_count: profileIds.size,
     rule_count: ruleIds.size,
     skill_count: skillIds.size,
     role_count: roleIds.size,
@@ -513,6 +590,7 @@ function printPretty(report) {
   console.log(`registry-validation（注册表校验）: ${report.status}`);
   console.log(`source（源码目录）: ${report.source}`);
   if (report.summary) {
+    console.log(`profiles（技术栈）: ${report.summary.profile_count}`);
     console.log(`rules（规则）: ${report.summary.rule_count}`);
     console.log(`skills（技能）: ${report.summary.skill_count}`);
     console.log(`roles（专家角色）: ${report.summary.role_count}`);

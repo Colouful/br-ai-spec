@@ -21,6 +21,8 @@ reads:
   - context/PROJECT.md
   - .agents/rules/
   - openspec/changes/<change-id>/proposal.md
+  - openspec/changes/<change-id>/specs/
+  - openspec/changes/<change-id>/design.md
   - openspec/changes/<change-id>/tasks.md
 writes:
   - code
@@ -39,11 +41,11 @@ handoff_to:
 
 ## 工作原则
 
-- 先读 `proposal.md` 和 `tasks.md`，再动代码
+- 先读 `proposal.md`、`specs/`、`design.md` 和 `tasks.md`，再动代码
 - 优先复用现有规则、组件、目录结构和技能
 - 按技术栈选择对应 profile skill，不混用无关框架做法
 - 修改范围尽量贴近本次变更，不顺手大改无关代码
-- 若 `proposal.md` 或 `tasks.md` 缺失，必须退回要求补齐，不能跳过需求阶段直接实现
+- 若 `proposal.md`、`specs/`、`design.md` 或 `tasks.md` 缺失，必须退回要求补齐，不能跳过需求阶段直接实现
 - 优先执行协议下发的 `project_context / repo_conventions / implementation_contract`
 - 实现方式必须由 `role_skill_contract` 和 `role_rule_contract` 共同约束，而不是自由发挥
 

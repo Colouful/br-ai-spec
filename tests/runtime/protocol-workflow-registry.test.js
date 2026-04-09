@@ -163,6 +163,79 @@ function main() {
     ['proposal'],
   );
 
+  const futureProfileTarget = fs.mkdtempSync(path.join(os.tmpdir(), 'br-ai-spec-protocol-future-profile-'));
+  writeProjectFile(futureProfileTarget, 'package.json', JSON.stringify({
+    name: 'protocol-future-profile',
+    dependencies: {
+      '@nestjs/core': '^10.0.0',
+    },
+  }, null, 2));
+  writeJsonFile(futureProfileTarget, '.ai-spec/manifest.json', {
+    schema_version: 1,
+    manifest_type: 'hub-install',
+    profile: 'nest',
+    ides: ['cursor'],
+    scenario_packages: [],
+    roles: ['task-orchestrator'],
+    skills: [],
+    rules: ['project-structure'],
+  });
+  writeJsonFile(futureProfileTarget, '.agents/registry/profiles.json', {
+    version: 1,
+    profiles: {
+      nest: {
+        status: 'active',
+        label: 'NestJS',
+        rules_dir: '.agents/rules/profiles/nest',
+        skills_dir: '.agents/skills/profiles/nest',
+      },
+    },
+  });
+  writeJsonFile(futureProfileTarget, '.agents/registry/rules.json', {
+    version: 1,
+    rules: {
+      'project-structure': {
+        sourceByProfile: {
+          nest: '.agents/rules/profiles/nest/03-项目结构.md',
+        },
+      },
+    },
+  });
+  writeJsonFile(futureProfileTarget, '.agents/registry/roles.json', {
+    version: 1,
+    roles: {
+      'task-orchestrator': {
+        source: '.agents/roles/common/task-orchestrator.md',
+        rule_ids: ['project-structure'],
+        rule_contract_profiles: {
+          default: {
+            must_follow: ['先读通用结构规则。'],
+          },
+          nest: {
+            must_follow: ['按 Nest 模块结构组织实现。'],
+          },
+        },
+      },
+    },
+  });
+  writeProjectFile(futureProfileTarget, '.agents/roles/common/task-orchestrator.md', '# task-orchestrator');
+  writeProjectFile(futureProfileTarget, '.agents/rules/profiles/nest/03-项目结构.md', '# nest project structure');
+
+  workflow = protocolWorkflow.advanceProtocolStep({
+    target: futureProfileTarget,
+    userInput: '创建一个订单模块',
+  });
+
+  assert.strictEqual(workflow.turn.guidance.project_context.framework, 'nest');
+  assert.strictEqual(workflow.turn.guidance.role_rule_contract.profile, 'nest');
+  assert.strictEqual(
+    workflow.turn.guidance.role_rule_contract.source_rules[0].path,
+    '.agents/rules/profiles/nest/03-项目结构.md',
+  );
+  assert.ok(
+    workflow.turn.guidance.role_rule_contract.must_follow.includes('按 Nest 模块结构组织实现。'),
+  );
+
   console.log('protocol workflow registry test passed: task-orchestrator and expert turns honor local flow, rule, and skill overrides');
 }
 

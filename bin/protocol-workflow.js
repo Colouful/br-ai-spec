@@ -280,6 +280,15 @@ function printUpdate(result) {
   console.log(`updated: ${result.updated?.status || '(none)'}`);
   console.log(`run_id: ${result.updated?.state?.run_id || '(none)'}`);
   console.log(`latest_user_input: ${result.updated?.state?.trigger?.latest_user_input || '(none)'}`);
+  if (result.fast_path) {
+    console.log('fast_path:');
+    console.log(`  executed: ${result.fast_path.executed ? 'yes' : 'no'}`);
+    console.log(`  action: ${result.fast_path.action || '(none)'}`);
+    console.log(`  run_status: ${result.fast_path.run_status || '(none)'}`);
+    console.log(`  current_role: ${result.fast_path.current_role || '(none)'}`);
+    console.log(`  archived_to: ${result.fast_path.archived_to || '(none)'}`);
+    console.log(`  requires_followup_turn: ${result.fast_path.requires_followup_turn ? 'yes' : 'no'}`);
+  }
   console.log('turn:');
   printTurn(result.turn);
 }

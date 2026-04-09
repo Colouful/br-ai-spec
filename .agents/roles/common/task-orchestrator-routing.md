@@ -106,7 +106,7 @@ description: 为任务主代理提供“先选模板、再动态加减专家”�
 说明：
 
 - 不减少专家
-- 只把 `proposal/tasks/checklist/iterations` 切到短版 compact 规格
+- 只把 `proposal/specs/design/tasks/checklist/iterations` 切到短版 compact 规格
 
 ### standard
 
@@ -212,7 +212,7 @@ description: 为任务主代理提供“先选模板、再动态加减专家”�
 - 存在明显技术 trade-off
 - API 契约未确认
 
-### before-delivery
+### before-archive
 
 满足以下任一条件时必须设立：
 

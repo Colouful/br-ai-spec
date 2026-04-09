@@ -2,19 +2,29 @@
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
+const {
+  formatSupportedProfiles,
+  getProfileEntries,
+  readProfilesRegistry,
+  resolveProfileId,
+} = require('./profile-registry');
 
 const SUPPORTED_IDES = ['cursor', 'claude', 'opencode', 'trae'];
 const DEFAULT_IDES = ['cursor', 'claude'];
 const ALL_IDES = [...SUPPORTED_IDES];
 const IDE_AUTOLINK_EXCLUDED_SKILLS = new Set(['using-superpowers']);
+const DEFAULT_REMOTE_MANIFEST_TIMEOUT_MS = 15000;
 
-function printUsage() {
+function printUsage(profilesRegistry = null) {
+  const profileHint = profilesRegistry
+    ? formatSupportedProfiles(profilesRegistry)
+    : 'see .agents/registry/profiles.json';
   console.log(`Usage:
-  ai-spec sync [target] --manifest <local-manifest.json> [options]
+  ai-spec sync [target] --manifest <manifest.json|url> [options]
 
 Options:
-  --manifest <file>       Local manifest JSON file path
-  --profile <profile>     Override profile from manifest (react | vue)
+  --manifest <file|url>   Local manifest JSON file path or remote manifest URL
+  --profile <profile>     Override profile from manifest (${profileHint})
   --ide <preset>          Override ides (default | all | cursor | claude | comma-separated)
   --json                  Print JSON output only
   --dry-run               Resolve only, do not write files
@@ -180,14 +190,18 @@ function walkFiles(rootDir, predicate) {
 
 function readSkillCatalog(sourceDir) {
   const skillRegistry = readRegistryJson(sourceDir, 'skills.json', 'skills');
+  const profilesRegistry = readProfilesRegistry(sourceDir);
   const catalog = {
     common: new Map(),
-    profiles: {
-      react: new Map(),
-      vue: new Map(),
-    },
+    profiles: Object.fromEntries(
+      Object.keys(getProfileEntries(profilesRegistry)).map((profileId) => [profileId, new Map()])
+    ),
     domains: new Map(),
   };
+  const profileDirMap = Object.entries(getProfileEntries(profilesRegistry)).map(([profileId, entry]) => ({
+    profileId,
+    skillsDir: String(entry?.skills_dir || '').trim(),
+  }));
 
   const skillsRoot = path.join(sourceDir, '.agents/skills');
   const skillFiles = walkFiles(skillsRoot, (filePath) => filePath.endsWith('/SKILL.md'));
@@ -204,12 +218,13 @@ function readSkillCatalog(sourceDir) {
 
     if (rel.startsWith('.agents/skills/common/')) {
       catalog.common.set(id, entry);
-    } else if (rel.startsWith('.agents/skills/profiles/react/')) {
-      catalog.profiles.react.set(id, entry);
-    } else if (rel.startsWith('.agents/skills/profiles/vue/')) {
-      catalog.profiles.vue.set(id, entry);
     } else if (rel.startsWith('.agents/skills/domains/')) {
       catalog.domains.set(id, entry);
+    } else {
+      const matchedProfile = profileDirMap.find((item) => item.skillsDir && rel.startsWith(`${item.skillsDir}/`));
+      if (matchedProfile) {
+        catalog.profiles[matchedProfile.profileId].set(id, entry);
+      }
     }
   }
 
@@ -282,14 +297,16 @@ function resolveRule(id, profile, ruleRegistry) {
   return { id, sourceRel: entry.source, domains: entry.domains || [] };
 }
 
-function normalizeManifest(rawManifest, existingManifest, options) {
+function normalizeManifest(rawManifest, existingManifest, options, profilesRegistry) {
+  const rawProfile = options.profile || rawManifest?.profile || existingManifest?.profile || null;
+  const resolvedProfile = resolveProfileId(profilesRegistry, rawProfile);
   const manifest = {
     schema_version: Number(rawManifest?.schema_version || existingManifest?.schema_version || 1),
     manifest_type: rawManifest?.manifest_type || existingManifest?.manifest_type || 'hub-install',
     name: rawManifest?.name || existingManifest?.name || null,
     description: rawManifest?.description || existingManifest?.description || null,
     version: rawManifest?.version || existingManifest?.version || null,
-    profile: options.profile || rawManifest?.profile || existingManifest?.profile || null,
+    profile: resolvedProfile,
     ides: normalizeIdes(options.ide || rawManifest?.ides || existingManifest?.ides || 'default'),
     scenario_packages: normalizeList(rawManifest?.scenario_packages || existingManifest?.scenario_packages),
     roles: normalizeList(rawManifest?.roles || existingManifest?.roles),
@@ -303,13 +320,60 @@ function normalizeManifest(rawManifest, existingManifest, options) {
   };
 
   if (!manifest.profile) {
-    throw new Error('Manifest is missing profile（技术栈）');
-  }
-  if (!['react', 'vue'].includes(manifest.profile)) {
-    throw new Error(`Unsupported profile: ${manifest.profile}`);
+    if (!rawProfile) {
+      throw new Error('Manifest is missing profile（技术栈）');
+    }
+    throw new Error(`Unsupported profile: ${rawProfile}. Supported profiles: ${formatSupportedProfiles(profilesRegistry)}`);
   }
 
   return manifest;
+}
+
+async function loadManifestInput(manifestInput, timeoutMs = DEFAULT_REMOTE_MANIFEST_TIMEOUT_MS) {
+  if (isHttpUrl(manifestInput)) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const response = await fetch(manifestInput, {
+        signal: controller.signal,
+        headers: {
+          accept: 'application/json',
+        },
+      });
+      if (!response.ok) {
+        throw new Error(`Remote manifest request failed with status ${response.status} ${response.statusText}: ${manifestInput}`);
+      }
+      const rawText = await response.text();
+      try {
+        return {
+          manifestSource: manifestInput,
+          rawManifest: JSON.parse(rawText),
+        };
+      } catch (error) {
+        throw new Error(`Remote manifest is not valid JSON: ${manifestInput}`);
+      }
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        throw new Error(`Remote manifest request timed out after ${timeoutMs}ms: ${manifestInput}`);
+      }
+      if (error.message && error.message.startsWith('Remote manifest')) {
+        throw error;
+      }
+      throw new Error(`Failed to fetch remote manifest: ${manifestInput} (${error.message})`);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  const manifestPath = path.resolve(manifestInput);
+  if (!fs.existsSync(manifestPath)) {
+    throw new Error(`Manifest file not found: ${manifestPath}`);
+  }
+
+  return {
+    manifestSource: manifestPath,
+    rawManifest: readJsonFile(manifestPath, 'Manifest'),
+  };
 }
 
 function sha256Json(value) {
@@ -820,15 +884,23 @@ function dedupeChanges(changes) {
   };
 }
 
-function main(argv) {
+async function main(argv) {
   try {
     const options = parseArgs(argv);
+    const sourceDir = getSourceDir();
+    let profilesRegistry = null;
+    try {
+      profilesRegistry = readProfilesRegistry(sourceDir);
+    } catch (error) {
+      if (!options.help) {
+        throw error;
+      }
+    }
     if (options.help) {
-      printUsage();
+      printUsage(profilesRegistry);
       return 0;
     }
 
-    const sourceDir = getSourceDir();
     const registryValidation = require('./validate-registry').validateRegistry(sourceDir);
     if (registryValidation.status !== 'success') {
       throw new Error(`Registry validation failed with ${registryValidation.errors.length} error(s). Run "ai-spec validate-registry" for details.`);
@@ -844,18 +916,13 @@ function main(argv) {
       throw new Error('sync（同步） requires --manifest（安装清单） or an existing .ai-spec/manifest.json');
     }
 
-    if (isHttpUrl(manifestInput)) {
-      throw new Error(`Remote manifest URL is not supported yet in current sync（同步） implementation: ${manifestInput}`);
-    }
-
-    const manifestPath = path.resolve(manifestInput);
-    if (!fs.existsSync(manifestPath)) {
-      throw new Error(`Manifest file not found: ${manifestPath}`);
-    }
-
-    const rawManifest = readJsonFile(manifestPath, 'Manifest');
+    const requestedTimeout = Number(process.env.AI_SPEC_REMOTE_MANIFEST_TIMEOUT_MS || DEFAULT_REMOTE_MANIFEST_TIMEOUT_MS);
+    const timeoutMs = Number.isFinite(requestedTimeout) && requestedTimeout > 0
+      ? requestedTimeout
+      : DEFAULT_REMOTE_MANIFEST_TIMEOUT_MS;
+    const { manifestSource, rawManifest } = await loadManifestInput(manifestInput, timeoutMs);
     const existingManifest = readExistingManifest(targetDir);
-    const manifest = normalizeManifest(rawManifest, existingManifest, options);
+    const manifest = normalizeManifest(rawManifest, existingManifest, options, profilesRegistry);
     const registry = loadSyncRegistry(sourceDir);
     const catalogs = {
       roles: readRoleCatalog(registry.roles),
@@ -864,7 +931,7 @@ function main(argv) {
     };
     const resolvedResult = resolveManifest(manifest, catalogs, registry);
 
-    const plan = buildPlan(targetDir, manifestPath, manifest, resolvedResult);
+    const plan = buildPlan(targetDir, manifestSource, manifest, resolvedResult);
     if (options.dryRun) {
       if (options.json) {
         process.stdout.write(`${JSON.stringify(plan, null, 2)}\n`);
@@ -895,9 +962,9 @@ function main(argv) {
     const sourcesOutPath = path.join(aiSpecDir, 'sources.json');
 
     writeJsonTracked(targetDir, manifestOutPath, manifest, changes);
-    const lock = buildLock(manifest, targetDir, manifestPath, resolvedResult.resolved, cliVersion);
+    const lock = buildLock(manifest, targetDir, manifestSource, resolvedResult.resolved, cliVersion);
     writeJsonTracked(targetDir, lockOutPath, lock, changes);
-    const sources = buildSources(manifest, manifestPath, resolvedResult.resolved, sourceDir);
+    const sources = buildSources(manifest, manifestSource, resolvedResult.resolved, sourceDir);
     writeJsonTracked(targetDir, sourcesOutPath, sources, changes);
     const normalizedChanges = dedupeChanges(changes);
 
@@ -911,7 +978,7 @@ function main(argv) {
         ides: manifest.ides,
       },
       source: {
-        manifest: manifestPath,
+        manifest: manifestSource,
         manifest_type: manifest.manifest_type,
       },
       request: {

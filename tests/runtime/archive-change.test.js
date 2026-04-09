@@ -19,7 +19,15 @@ function main() {
     '',
     '系统必须保留已有规范内容。',
   ].join('\n'));
+  writeFile(targetDir, 'openspec/specs/api/spec.md', [
+    '## 新增需求',
+    '',
+    '### 需求：已有接口规范',
+    '',
+    '系统必须保留已有 API 规范内容。',
+  ].join('\n'));
   writeFile(targetDir, 'openspec/changes/add-demo-page/proposal.md', '# Proposal');
+  writeFile(targetDir, 'openspec/changes/add-demo-page/design.md', '# Design');
   writeFile(targetDir, 'openspec/changes/add-demo-page/tasks.md', [
     '# Tasks',
     '',
@@ -35,6 +43,13 @@ function main() {
     '',
     '系统必须新增一个演示页。',
   ].join('\n'));
+  writeFile(targetDir, 'openspec/changes/add-demo-page/specs/api/spec.md', [
+    '## 新增需求',
+    '',
+    '### 需求：演示页数据来源',
+    '',
+    '系统必须明确演示页使用本地 mock 数据，不请求真实接口。',
+  ].join('\n'));
 
   const result = archiveChange({
     target: targetDir,
@@ -45,6 +60,7 @@ function main() {
   assert.strictEqual(result.status, 'success');
   assert.strictEqual(result.archived_to, 'openspec/changes/archive/2026-04-08-add-demo-page');
   assert.ok(fs.existsSync(path.join(targetDir, 'openspec/specs/ui/spec.md')));
+  assert.ok(fs.existsSync(path.join(targetDir, 'openspec/specs/api/spec.md')));
   assert.ok(fs.existsSync(path.join(targetDir, result.archived_to, 'proposal.md')));
   assert.strictEqual(result.task_completion.completed, 1);
   assert.strictEqual(result.task_completion.total, 2);
@@ -52,6 +68,9 @@ function main() {
   const mergedSpec = fs.readFileSync(path.join(targetDir, 'openspec/specs/ui/spec.md'), 'utf8');
   assert.ok(mergedSpec.includes('已有规范'));
   assert.ok(mergedSpec.includes('新增演示页'));
+  const mergedApiSpec = fs.readFileSync(path.join(targetDir, 'openspec/specs/api/spec.md'), 'utf8');
+  assert.ok(mergedApiSpec.includes('已有接口规范'));
+  assert.ok(mergedApiSpec.includes('本地 mock 数据'));
 
   const targetDirWithRuntime = fs.mkdtempSync(path.join(os.tmpdir(), 'br-ai-spec-archive-runtime-test-'));
   writeFile(targetDirWithRuntime, '.ai-spec/current-run.json', JSON.stringify({
@@ -69,7 +88,8 @@ function main() {
     },
     artifacts: {
       proposal: 'openspec/changes/archive-runtime-demo/proposal.md',
-      specs: 'openspec/changes/archive-runtime-demo/specs/ui/spec.md',
+      specs: 'openspec/changes/archive-runtime-demo/specs/',
+      design: 'openspec/changes/archive-runtime-demo/design.md',
       tasks: 'openspec/changes/archive-runtime-demo/tasks.md',
       checklist: 'openspec/changes/archive-runtime-demo/checklist.md',
       iterations: 'openspec/changes/archive-runtime-demo/iterations.md',
@@ -88,6 +108,7 @@ function main() {
     },
   }, null, 2));
   writeFile(targetDirWithRuntime, 'openspec/changes/archive-runtime-demo/proposal.md', '# Proposal');
+  writeFile(targetDirWithRuntime, 'openspec/changes/archive-runtime-demo/design.md', '# Design');
   writeFile(targetDirWithRuntime, 'openspec/changes/archive-runtime-demo/tasks.md', '- [x] done');
   writeFile(targetDirWithRuntime, 'openspec/changes/archive-runtime-demo/checklist.md', '# Checklist');
   writeFile(targetDirWithRuntime, 'openspec/changes/archive-runtime-demo/iterations.md', '# Iterations');

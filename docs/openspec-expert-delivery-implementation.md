@@ -223,7 +223,7 @@ rules:
     - "涉及 UI 时必须明确验收方式；涉及接口时必须明确封装方式。"
   checklist:
     - "必须明确通过项、未通过项、阻断项和是否建议放行。"
-    - "检查结论必须基于 proposal/tasks、项目规则和实现证据。"
+    - "检查结论必须基于 proposal/specs/design/tasks、项目规则和实现证据。"
   iterations:
     - "必须记录问题、修正动作、残留风险和下轮提醒。"
 ```
@@ -275,7 +275,7 @@ rules:
     "rule_contract_profiles": {
       "default": {
         "must_follow": ["优先复用现有目录与路由约定。"],
-        "blocked_when": ["proposal/tasks 未落盘时禁止改业务代码。"]
+        "blocked_when": ["proposal/specs/design/tasks 未落盘时禁止改业务代码。"]
       },
       "vue": {
         "must_follow": ["路由统一放在 src/router/modules/。"]
@@ -319,9 +319,9 @@ rules:
     "artifact_profile": "full",
     "required_roles": ["requirement-analyst", "frontend-implementer", "code-guardian"],
     "first_handoff": "requirement-analyst",
-    "approval_gates": ["before-implementation", "before-delivery"],
-    "core_artifacts": ["proposal", "tasks", "checklist", "iterations"],
-    "required_artifacts": ["proposal.md", "tasks.md", "checklist.md", "iterations.md"]
+    "approval_gates": ["before-implementation", "before-archive"],
+    "core_artifacts": ["proposal", "specs", "design", "tasks", "checklist", "iterations"],
+    "required_artifacts": ["proposal.md", "specs", "design.md", "tasks.md", "checklist.md", "iterations.md"]
   }
 }
 ```
@@ -490,7 +490,7 @@ rules:
 
 真正执行业务动作：
 
-- 需求专家产出 proposal/tasks
+- 需求专家产出 proposal/specs/design/tasks
 - 实现专家修改代码
 - 守护专家产出 checklist/iterations
 
@@ -519,7 +519,7 @@ rules:
 
 完成标准：
 
-- `proposal/tasks/checklist/iterations` 都成为正式 schema artifact
+- `proposal/specs/design/tasks/checklist/iterations` 都成为正式 schema artifact
 
 ### Phase 2：补齐动作执行适配层
 

@@ -155,6 +155,7 @@ function buildOpenSpecArtifactMap(changeId, artifacts = {}) {
     return {
       proposal: null,
       specs: null,
+      design: null,
       tasks: null,
       checklist: null,
       iterations: null,
@@ -164,7 +165,8 @@ function buildOpenSpecArtifactMap(changeId, artifacts = {}) {
   const baseDir = `openspec/changes/${changeId}`;
   return {
     proposal: artifacts.proposal || `${baseDir}/proposal.md`,
-    specs: artifacts.specs || `${baseDir}/specs/ui/spec.md`,
+    specs: runtimeState.normalizeSpecsArtifactPath(artifacts.specs || `${baseDir}/specs`),
+    design: artifacts.design || `${baseDir}/design.md`,
     tasks: artifacts.tasks || `${baseDir}/tasks.md`,
     checklist: artifacts.checklist || `${baseDir}/checklist.md`,
     iterations: artifacts.iterations || `${baseDir}/iterations.md`,

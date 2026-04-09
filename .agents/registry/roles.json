@@ -17,6 +17,7 @@
     "task-orchestrator": {
       "name": "任务主代理",
       "status": "active",
+      "profiles": ["vue", "react"],
       "domains": ["orchestration"],
       "source": ".agents/roles/common/task-orchestrator.md",
       "rule_ids": ["project-overview", "project-structure", "api-standard", "route-standard", "style-standard"],
@@ -42,6 +43,7 @@
     "requirement-analyst": {
       "name": "需求解析专家",
       "status": "active",
+      "profiles": ["vue", "react"],
       "domains": ["demand-design"],
       "source": ".agents/roles/common/requirement-analyst.md",
       "rule_ids": ["project-overview", "project-structure", "api-standard", "route-standard", "style-standard"],
@@ -50,7 +52,7 @@
       "rule_contract_profiles": {
         "default": {
           "must_follow": [
-            "先把项目定位、目录落点、路由/API/样式约定吸收到 proposal/tasks，不要把规范已明确的信息重复写成 missing_inputs。",
+            "先把项目定位、目录落点、路由/API/样式约定吸收到 proposal/specs/design/tasks，不要把规范已明确的信息重复写成 missing_inputs。",
             "需求收敛必须落到当前仓库可实施的页面、路由、接口或 mock 落点，而不是抽象方案。"
           ],
           "blocked_when": [
@@ -66,8 +68,8 @@
         }
       },
       "openspec_actions": ["propose"],
-      "openspec_rule_sections": ["proposal", "specs", "tasks"],
-      "required_outputs": ["proposal", "specs", "tasks"],
+      "openspec_rule_sections": ["proposal", "specs", "design", "tasks"],
+      "required_outputs": ["proposal", "specs", "design", "tasks"],
       "runtime_transition": {
         "action": "handoff",
         "to_role": "frontend-implementer",
@@ -79,6 +81,7 @@
     "frontend-implementer": {
       "name": "前端实现专家",
       "status": "active",
+      "profiles": ["vue", "react"],
       "domains": ["engineering", "delivery"],
       "source": ".agents/roles/common/frontend-implementer.md",
       "rule_ids": ["project-structure", "component-standard", "route-standard", "api-standard", "store-standard", "style-standard"],
@@ -88,10 +91,10 @@
         "default": {
           "must_follow": [
             "优先复用现有目录、路由、请求封装、状态管理和样式变量约定。",
-            "实现前先对齐 proposal/tasks 的范围与落点，不要自行扩 scope。"
+            "实现前先对齐 proposal/specs/design/tasks 的范围与落点，不要自行扩 scope。"
           ],
           "blocked_when": [
-            "proposal/tasks 未落盘或仍处于 before-implementation 审批门禁时，禁止改业务代码。"
+            "proposal/specs/design/tasks 未落盘或仍处于 before-implementation 审批门禁时，禁止改业务代码。"
           ]
         },
         "vue": {
@@ -106,7 +109,7 @@
       },
       "openspec_actions": ["apply"],
       "openspec_rule_sections": ["specs", "tasks", "design"],
-      "required_inputs": ["proposal", "specs", "tasks"],
+      "required_inputs": ["proposal", "specs", "design", "tasks"],
       "runtime_transition": {
         "action": "handoff",
         "to_role": "code-guardian",
@@ -118,6 +121,7 @@
     "code-guardian": {
       "name": "规范守护者",
       "status": "active",
+      "profiles": ["vue", "react"],
       "domains": ["governance", "testing"],
       "source": ".agents/roles/common/code-guardian.md",
       "rule_ids": ["coding-standard", "api-standard", "route-standard", "style-standard", "test-standard", "format-check-standard", "audit-report-standard"],
@@ -126,7 +130,7 @@
       "rule_contract_profiles": {
         "default": {
           "must_follow": [
-            "以 proposal/tasks 和项目规则为准检查实现，而不是只做泛化 lint。",
+            "以 proposal/specs/design/tasks 和项目规则为准检查实现，而不是只做泛化 lint。",
             "必须给出阻断项、非阻断项和交付建议，不能写成模糊建议列表。"
           ],
           "blocked_when": [
@@ -138,13 +142,13 @@
             "核查页面是否落在 src/views、路由是否落在 src/router/modules，并保持动态导入。",
             "核查 API 是否通过 src/api 封装、类型是否放在 src/api/types，页面中未直接调 request。",
             "核查样式是否使用主题变量、scoped 或 CSS Modules，而不是硬编码全局样式。",
-            "核查 Pinia/store、mock 与 proposal/tasks 的边界是否一致，避免“演示页写成生产页”。"
+            "核查 Pinia/store、mock 与 proposal/specs/design/tasks 的边界是否一致，避免“演示页写成生产页”。"
           ]
         }
       },
       "openspec_actions": ["verify"],
-      "openspec_rule_sections": ["tasks", "specs", "checklist", "iterations"],
-      "required_inputs": ["proposal", "specs", "tasks"],
+      "openspec_rule_sections": ["tasks", "specs", "design", "checklist", "iterations"],
+      "required_inputs": ["proposal", "specs", "design", "tasks"],
       "required_outputs": ["checklist", "iterations"],
       "runtime_transition": {
         "action": "gate-blocked",
@@ -169,13 +173,13 @@
             "归档目录必须落在 openspec/changes/archive/YYYY-MM-DD-<change-id>/，不能改到其它位置。"
           ],
           "blocked_when": [
-            "缺少 proposal/specs/tasks/checklist/iterations 任一关键产物时，不得执行归档。"
+            "缺少 proposal/specs/design/tasks/checklist/iterations 任一关键产物时，不得执行归档。"
           ]
         }
       },
       "openspec_actions": ["archive"],
       "openspec_rule_sections": ["specs", "checklist", "iterations"],
-      "required_inputs": ["proposal", "specs", "tasks", "checklist", "iterations"],
+      "required_inputs": ["proposal", "specs", "design", "tasks", "checklist", "iterations"],
       "runtime_transition": {
         "action": "complete",
         "to_role": "archive-change",

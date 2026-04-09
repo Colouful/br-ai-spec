@@ -46,7 +46,7 @@ description: 变更归档增强层。在执行 /opsx:archive 时确保增量规�
 | 变更元数据 | `openspec/changes/<name>/.openspec.yaml` | 是 |
 | 提案文档 | `openspec/changes/<name>/proposal.md` | 是 |
 | 增量规范 | `openspec/changes/<name>/specs/` | 是 |
-| 技术设计 | `openspec/changes/<name>/design.md` | 否（警告） |
+| 技术设计 | `openspec/changes/<name>/design.md` | 是 |
 | 任务清单 | `openspec/changes/<name>/tasks.md` | 是 |
 
 检查 `tasks.md` 中的任务完成状态：

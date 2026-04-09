@@ -53,9 +53,11 @@
     "triggers": ["prd-input", "design-input", "new-feature", "incremental-change"],
     "required_roles": ["requirement-analyst", "frontend-implementer", "code-guardian"],
     "optional_roles": ["design-collaborator", "api-contract-specialist", "unit-test-specialist", "verification-reviewer", "performance-auditor"],
-    "approval_gates": ["before-implementation", "before-delivery"],
+    "approval_gates": ["before-implementation", "before-archive"],
     "artifacts": [
       "openspec/changes/<change-id>/proposal.md",
+      "openspec/changes/<change-id>/specs/",
+      "openspec/changes/<change-id>/design.md",
       "openspec/changes/<change-id>/tasks.md",
       "code",
       "openspec/changes/<change-id>/checklist.md",
@@ -124,6 +126,8 @@
   },
   "artifacts": [
     "openspec/changes/add-user-center/proposal.md",
+    "openspec/changes/add-user-center/specs/",
+    "openspec/changes/add-user-center/design.md",
     "openspec/changes/add-user-center/tasks.md",
     "openspec/changes/add-user-center/checklist.md",
     "openspec/changes/add-user-center/iterations.md"

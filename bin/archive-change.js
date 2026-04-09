@@ -121,6 +121,21 @@ function normalizeMarkdown(content) {
   return String(content || '').replace(/\r\n/g, '\n').trim();
 }
 
+function normalizeSpecsArtifactPath(relPath) {
+  const value = String(relPath || '').trim();
+  if (!value) {
+    return null;
+  }
+
+  const normalized = value.replace(/[\\/]+$/, '');
+  if (/[\\/]specs$/.test(normalized)) {
+    return normalized;
+  }
+
+  const match = normalized.match(/^(.*[\\/]specs)(?:[\\/].+)?$/);
+  return match ? match[1] : normalized;
+}
+
 function mergeSpecFile(targetPath, incomingContent, changeId) {
   if (!fs.existsSync(targetPath)) {
     fs.writeFileSync(targetPath, `${incomingContent.trim()}\n`, 'utf8');
@@ -176,16 +191,19 @@ function buildAlreadyArchivedResult(targetDir, changeId) {
     ? path.join(targetDir, currentRun.artifacts.proposal)
     : null;
   const specsPath = currentRun?.artifacts?.specs
-    ? path.join(targetDir, currentRun.artifacts.specs)
+    ? path.join(targetDir, normalizeSpecsArtifactPath(currentRun.artifacts.specs))
+    : null;
+  const designPath = currentRun?.artifacts?.design
+    ? path.join(targetDir, currentRun.artifacts.design)
     : null;
 
-  if (!proposalPath || !specsPath) {
+  if (!proposalPath || !specsPath || !designPath) {
     return null;
   }
   if (!proposalPath.includes(`${path.sep}openspec${path.sep}changes${path.sep}archive${path.sep}`)) {
     return null;
   }
-  if (!fs.existsSync(proposalPath) || !fs.existsSync(specsPath)) {
+  if (!fs.existsSync(proposalPath) || !fs.existsSync(specsPath) || !fs.existsSync(designPath)) {
     return null;
   }
   if ((currentRun?.task?.change_id || currentRun?.anchor?.task?.change_id || null) !== changeId) {
@@ -203,6 +221,7 @@ function buildAlreadyArchivedResult(targetDir, changeId) {
     archived_artifacts: {
       proposal: path.relative(targetDir, proposalPath),
       specs: path.relative(targetDir, specsPath),
+      design: path.relative(targetDir, designPath),
       tasks: currentRun?.artifacts?.tasks || null,
       checklist: currentRun?.artifacts?.checklist || null,
       iterations: currentRun?.artifacts?.iterations || null,
@@ -293,6 +312,7 @@ function archiveChange(options = {}) {
 
   const proposalPath = path.join(changeDir, 'proposal.md');
   const tasksPath = path.join(changeDir, 'tasks.md');
+  const designPath = path.join(changeDir, 'design.md');
   const checklistPath = path.join(changeDir, 'checklist.md');
   const iterationsPath = path.join(changeDir, 'iterations.md');
   const specsDir = path.join(changeDir, 'specs');
@@ -302,6 +322,9 @@ function archiveChange(options = {}) {
   }
   if (!fs.existsSync(tasksPath)) {
     throw new Error(`tasks.md is missing for change ${changeId}`);
+  }
+  if (!fs.existsSync(designPath)) {
+    throw new Error(`design.md is missing for change ${changeId}`);
   }
   if (!fs.existsSync(specsDir)) {
     throw new Error(`specs/ is missing for change ${changeId}`);
@@ -357,7 +380,8 @@ function archiveChange(options = {}) {
     archived_to: path.relative(targetDir, archivedPath),
     archived_artifacts: {
       proposal: path.relative(targetDir, path.join(archivedPath, 'proposal.md')),
-      specs: path.relative(targetDir, path.join(archivedPath, 'specs', 'ui', 'spec.md')),
+      specs: path.relative(targetDir, path.join(archivedPath, 'specs')),
+      design: path.relative(targetDir, path.join(archivedPath, 'design.md')),
       tasks: path.relative(targetDir, path.join(archivedPath, 'tasks.md')),
       checklist: fs.existsSync(path.join(archivedPath, 'checklist.md'))
         ? path.relative(targetDir, path.join(archivedPath, 'checklist.md'))

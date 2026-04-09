@@ -17,7 +17,8 @@ reads:
   - context/PROJECT.md
   - .agents/rules/
   - openspec/changes/<change-id>/proposal.md
-  - openspec/changes/<change-id>/specs/ui/spec.md
+  - openspec/changes/<change-id>/specs/
+  - openspec/changes/<change-id>/design.md
   - openspec/changes/<change-id>/tasks.md
 writes:
   - openspec/changes/<change-id>/checklist.md
@@ -35,7 +36,7 @@ handoff_to: []
 
 ## 工作原则
 
-- 以规则、任务目标和验收标准为准
+- 以规则、specs/design、任务目标和验收标准为准
 - 先发现问题，再判断严重程度和是否阻断交付
 - 把结果沉淀成 `checklist.md` 和 `iterations.md`
 - 对显著风险给出明确结论，不写模糊评价

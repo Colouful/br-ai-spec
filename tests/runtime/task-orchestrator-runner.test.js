@@ -116,7 +116,8 @@ function main() {
   assert.deepStrictEqual(listTurnTargets(workflow.turn), [
     '.ai-spec/internal/tmp/current-execution.json',
     'openspec/changes/runtime-smoke-demo/proposal.md',
-    'openspec/changes/runtime-smoke-demo/specs/ui/spec.md',
+    'openspec/changes/runtime-smoke-demo/specs/',
+    'openspec/changes/runtime-smoke-demo/design.md',
     'openspec/changes/runtime-smoke-demo/tasks.md',
   ]);
 
@@ -144,6 +145,21 @@ function main() {
     '- **已知** 当前仅提供 mock 数据',
     '- **当** 用户进入商品演示页',
     '- **则** 页面展示本地 mock 列表且不请求真实接口',
+  ].join('\n'));
+  writeProjectFile(targetDir, 'openspec/changes/runtime-smoke-demo/specs/api/spec.md', [
+    '## 新增需求',
+    '',
+    '### 需求：数据来源约束',
+    '',
+    '系统必须明确页面只读取本地 mock 数据，不请求真实接口。',
+  ].join('\n'));
+  writeProjectFile(targetDir, 'openspec/changes/runtime-smoke-demo/design.md', [
+    '# 技术设计',
+    '',
+    '## 实现落点',
+    '- 页面落在 src/views',
+    '- 路由落在 src/router/modules',
+    '- mock 数据落在 src/mock',
   ].join('\n'));
   writeProjectFile(targetDir, 'openspec/changes/runtime-smoke-demo/tasks.md', [
     '# 实施任务',
@@ -195,7 +211,7 @@ function main() {
   assert.ok(workflow.turn.guidance.review_contract.evidence_targets.includes('src/router/index.ts'));
   assert.ok(workflow.turn.guidance.review_contract.evidence_targets.includes('src/api'));
   assert.ok(workflow.turn.guidance.review_contract.blocking_checks.some((item) => item.includes('src/api')));
-  assert.ok(workflow.turn.guidance.review_contract.scope_guard.some((item) => item.includes('proposal/tasks')));
+  assert.ok(workflow.turn.guidance.review_contract.scope_guard.some((item) => item.includes('proposal/specs/design/tasks')));
   assert.ok(workflow.turn.guidance.review_contract.verification_expectations.includes('pnpm run build'));
   assert.deepStrictEqual(listTurnTargets(workflow.turn), [
     '.ai-spec/internal/tmp/current-execution.json',
@@ -272,6 +288,7 @@ function main() {
   assert.strictEqual(currentRun.events.length, 6);
   assert.ok(currentRun.artifacts.proposal.includes('openspec/changes/archive/'));
   assert.ok(fs.existsSync(path.join(targetDir, 'openspec/specs/ui/spec.md')));
+  assert.ok(fs.existsSync(path.join(targetDir, 'openspec/specs/api/spec.md')));
 
   const runnerStatus = status(targetDir);
   assert.strictEqual(runnerStatus.kind, 'task-orchestrator-runner-status');

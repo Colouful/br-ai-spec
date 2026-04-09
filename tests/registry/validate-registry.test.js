@@ -8,6 +8,19 @@ const validCases = [
     name: 'valid-minimal',
     fixtureDir: path.join(__dirname, 'fixtures', 'valid-minimal'),
     expectedSummary: {
+      profile_count: 1,
+      rule_count: 1,
+      skill_count: 1,
+      role_count: 1,
+      flow_count: 1,
+      scenario_package_count: 1,
+    },
+  },
+  {
+    name: 'valid-custom-profile',
+    fixtureDir: path.join(__dirname, 'fixtures', 'valid-custom-profile'),
+    expectedSummary: {
+      profile_count: 1,
       rule_count: 1,
       skill_count: 1,
       role_count: 1,

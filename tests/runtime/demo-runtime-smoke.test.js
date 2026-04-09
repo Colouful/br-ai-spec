@@ -28,6 +28,7 @@ function main() {
     'openspec/config.yaml',
     'openspec/schemas/expert-delivery/schema.yaml',
     'openspec/specs/ui/spec.md',
+    'openspec/specs/api/spec.md',
     'src/views/products/mock/index.vue',
     'src/router/modules/products.ts',
     'src/mock/products.ts',

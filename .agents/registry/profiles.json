@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "profiles": {
+    "vue": {
+      "status": "active",
+      "label": "Vue",
+      "rules_dir": ".agents/rules/profiles/vue",
+      "skills_dir": ".agents/skills/profiles/vue",
+      "configs_dir": "configs/profiles/vue",
+      "aliases": []
+    },
+    "react": {
+      "status": "active",
+      "label": "React",
+      "rules_dir": ".agents/rules/profiles/react",
+      "skills_dir": ".agents/skills/profiles/react",
+      "configs_dir": "configs/profiles/react",
+      "aliases": []
+    }
+  }
+}

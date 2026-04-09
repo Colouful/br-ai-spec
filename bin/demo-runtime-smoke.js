@@ -187,7 +187,8 @@ function createBootstrapPayload(runId, userInput, changeId) {
       },
       artifacts: [
         `openspec/changes/${changeId}/proposal.md`,
-        `openspec/changes/${changeId}/specs/ui/spec.md`,
+        `openspec/changes/${changeId}/specs/`,
+        `openspec/changes/${changeId}/design.md`,
         `openspec/changes/${changeId}/tasks.md`,
         'code',
         `openspec/changes/${changeId}/checklist.md`,
@@ -231,12 +232,14 @@ function createBootstrapPayload(runId, userInput, changeId) {
       },
       artifacts: {
         proposal: `openspec/changes/${changeId}/proposal.md`,
-        specs: `openspec/changes/${changeId}/specs/ui/spec.md`,
+        specs: `openspec/changes/${changeId}/specs/`,
+        design: `openspec/changes/${changeId}/design.md`,
         tasks: `openspec/changes/${changeId}/tasks.md`,
       },
       expected_output: [
         '补齐 proposal',
-        '输出 spec',
+        '输出 specs',
+        '输出 design',
         '输出 tasks',
         '列出缺失输入',
       ],
@@ -296,6 +299,33 @@ function writeRequirementArtifacts(targetDir, changeId) {
     '- **已知** 当前场景只使用本地 mock 数据',
     '- **当** 用户进入商品 mock 页面',
     '- **则** 页面展示本地商品列表，不请求真实接口',
+  ].join('\n'));
+
+  writeFile(targetDir, `openspec/changes/${changeId}/specs/api/spec.md`, [
+    '## 新增需求',
+    '',
+    '### 需求：演示接口约束',
+    '',
+    '系统必须明确当前示例只消费本地 mock 数据，不发起真实商品接口请求。',
+    '',
+    '#### 场景：页面初始化',
+    '',
+    '- **已知** 当前为 runtime smoke 演示',
+    '- **当** 页面初始化',
+    '- **则** 只读取本地 mock 模块，不调用远程 API',
+  ].join('\n'));
+
+  writeFile(targetDir, `openspec/changes/${changeId}/design.md`, [
+    '# 技术设计',
+    '',
+    '## 实现落点',
+    '- 页面落在 `src/views/products/mock/index.vue`',
+    '- 路由落在 `src/router/modules/products.ts`',
+    '- mock 数据落在 `src/mock/products.ts`',
+    '',
+    '## 约束',
+    '- 当前示例只验证 runtime 主链，不接真实 API',
+    '- 继续复用现有 Vue 目录和路由约定',
   ].join('\n'));
 
   writeFile(targetDir, `openspec/changes/${changeId}/tasks.md`, [
@@ -511,6 +541,7 @@ function runDemoRuntimeSmoke(options = {}) {
     outputs: [
       '.ai-spec/current-run.json',
       'openspec/specs/ui/spec.md',
+      'openspec/specs/api/spec.md',
       'src/views/products/mock/index.vue',
       'src/router/modules/products.ts',
       'src/mock/products.ts',

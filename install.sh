@@ -14,20 +14,24 @@ RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; BLUE='\033[0;34m'; BO
 
 IDE_DIRS=(claude cursor opencode trae)
 PROJECT_SPECIFIC_RULES=("01-项目概述.md" "03-项目结构.md")
-AVAILABLE_PROFILES=("react" "vue")
+AVAILABLE_PROFILES=()
 IDE_AUTOLINK_EXCLUDED_SKILLS=("using-superpowers")
 
 NODE_MIN_VERSION=18
 PKG_MANAGER=""
 
 IDE_FILTER="default"
+IDE_FILTER_EXPLICIT=""
 PROFILE="vue"
+PROFILE_EXPLICIT=""
 LEVEL="L3"
 UIPRO="ask"
 INSTALL_LINT="ask"
 INSTALL_HUSKY="ask"
 REFRESH_CACHE=""
 FORCE=""
+MANIFEST_INPUT=""
+SYNC_DRY_RUN=""
 SPEC_BRANCH="${BR_AI_SPEC_BRANCH:-main}"
 COMMAND=""
 TARGET=""
@@ -198,20 +202,122 @@ detect_source() {
     SOURCE_DIR="$CACHE_DIR"
     ok "规范库缓存就绪"
   fi
+
+  load_available_profiles_from_dir "$SOURCE_DIR"
+}
+
+load_available_profiles_from_dir() {
+  local base_dir="$1"
+  local profiles_file="$base_dir/.agents/registry/profiles.json"
+  local raw=""
+
+  AVAILABLE_PROFILES=()
+  if ! command -v node >/dev/null 2>&1 || [ ! -f "$profiles_file" ]; then
+    AVAILABLE_PROFILES=("vue" "react")
+    return 0
+  fi
+
+  raw="$(node -e '
+    const fs = require("fs");
+    const file = process.argv[1];
+    const data = JSON.parse(fs.readFileSync(file, "utf8"));
+    const ids = Object.keys(data.profiles || {});
+    if (ids.length === 0) process.exit(1);
+    process.stdout.write(ids.join(","));
+  ' "$profiles_file" 2>/dev/null)" || {
+    AVAILABLE_PROFILES=("vue" "react")
+    return 0
+  }
+
+  IFS=',' read -r -a AVAILABLE_PROFILES <<< "$raw"
+}
+
+profile_registry_get_field() {
+  local base_dir="$1" profile="$2" field="$3" fallback="${4:-}"
+  local profiles_file="$base_dir/.agents/registry/profiles.json"
+
+  if ! command -v node >/dev/null 2>&1 || [ ! -f "$profiles_file" ]; then
+    printf '%s\n' "$fallback"
+    return 0
+  fi
+
+  node -e '
+    const fs = require("fs");
+    const [file, profileId, field, fallback] = process.argv.slice(1);
+    const data = JSON.parse(fs.readFileSync(file, "utf8"));
+    const entry = data.profiles?.[profileId];
+    const value = entry && typeof entry[field] === "string" && entry[field].trim()
+      ? entry[field].trim()
+      : fallback;
+    if (value) process.stdout.write(value);
+  ' "$profiles_file" "$profile" "$field" "$fallback" 2>/dev/null
+}
+
+profile_registry_print_options() {
+  local base_dir="$1"
+  local profiles_file="$base_dir/.agents/registry/profiles.json"
+
+  if ! command -v node >/dev/null 2>&1 || [ ! -f "$profiles_file" ]; then
+    printf 'vue\tVue\nreact\tReact\n'
+    return 0
+  fi
+
+  node -e '
+    const fs = require("fs");
+    const file = process.argv[1];
+    const data = JSON.parse(fs.readFileSync(file, "utf8"));
+    for (const [id, entry] of Object.entries(data.profiles || {})) {
+      const label = typeof entry?.label === "string" && entry.label.trim() ? entry.label.trim() : id;
+      process.stdout.write(`${id}\t${label}\n`);
+    }
+  ' "$profiles_file" 2>/dev/null
+}
+
+profile_supported() {
+  local candidate="$1"
+  local item
+  for item in "${AVAILABLE_PROFILES[@]}"; do
+    [ "$item" = "$candidate" ] && return 0
+  done
+  return 1
+}
+
+ensure_profile_ready() {
+  if [ ${#AVAILABLE_PROFILES[@]} -eq 0 ]; then
+    load_available_profiles_from_dir "${SOURCE_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
+  fi
+
+  if [ -z "$PROFILE_EXPLICIT" ] && ! profile_supported "$PROFILE" && [ ${#AVAILABLE_PROFILES[@]} -gt 0 ]; then
+    PROFILE="${AVAILABLE_PROFILES[0]}"
+  fi
+
+  if ! profile_supported "$PROFILE"; then
+    err "无效的 Profile: $PROFILE （可选: ${AVAILABLE_PROFILES[*]}）"
+    exit 1
+  fi
 }
 
 # ---- 交互式选择 Profile ----
 select_profile() {
   echo ""
   info "选择技术栈 Profile："
-  echo "  1) vue    — Vue 3 + TypeScript + Pinia + Vue Router"
-  echo "  2) react  — React + TypeScript + Antd + Zustand"
+  local option_ids=()
+  local option_index=1
+  while IFS=$'\t' read -r profile_id profile_label; do
+    [ -n "$profile_id" ] || continue
+    option_ids+=("$profile_id")
+    echo "  ${option_index}) ${profile_id}    — ${profile_label}"
+    option_index=$((option_index + 1))
+  done < <(profile_registry_print_options "$SOURCE_DIR")
   echo ""
-  read -rp "请选择 (1/2) [默认 1]: " choice
-  case "$choice" in
-    2) PROFILE="react" ;;
-    *) PROFILE="vue" ;;
-  esac
+  read -rp "请选择 [默认 1]: " choice
+
+  if [ -z "$choice" ] || ! [[ "$choice" =~ ^[0-9]+$ ]]; then
+    PROFILE="${option_ids[0]}"
+  else
+    local selected_index=$((choice - 1))
+    PROFILE="${option_ids[$selected_index]:-${option_ids[0]}}"
+  fi
   ok "已选择 Profile: $PROFILE"
 }
 
@@ -493,9 +599,12 @@ copy_agents() {
   mkdir -p "$agents_dst/rules" "$agents_dst/skills"
 
   local src_common_rules="$SOURCE_DIR/.agents/rules/common"
-  local src_profile_rules="$SOURCE_DIR/.agents/rules/profiles/$PROFILE"
   local src_common_skills="$SOURCE_DIR/.agents/skills/common"
-  local src_profile_skills="$SOURCE_DIR/.agents/skills/profiles/$PROFILE"
+  local profile_rules_dir profile_skills_dir
+  profile_rules_dir="$(profile_registry_get_field "$SOURCE_DIR" "$PROFILE" "rules_dir" ".agents/rules/profiles/$PROFILE")"
+  profile_skills_dir="$(profile_registry_get_field "$SOURCE_DIR" "$PROFILE" "skills_dir" ".agents/skills/profiles/$PROFILE")"
+  local src_profile_rules="$SOURCE_DIR/$profile_rules_dir"
+  local src_profile_skills="$SOURCE_DIR/$profile_skills_dir"
 
   # 验证 Profile 存在
   if [ ! -d "$src_profile_rules" ]; then
@@ -504,7 +613,7 @@ copy_agents() {
   fi
 
   # rules: 合并 common + profile 到扁平目录
-  info "同步 rules (common + profiles/$PROFILE) ..."
+  info "同步 rules (common + ${profile_rules_dir}) ..."
 
   for file in "$src_common_rules/"*.md; do
     [ -f "$file" ] || continue
@@ -533,7 +642,7 @@ copy_agents() {
   [ -f "$SOURCE_DIR/.agents/rules/README.md" ] && cp "$SOURCE_DIR/.agents/rules/README.md" "$agents_dst/rules/README.md"
 
   # skills: 合并 common + profile 到扁平目录
-  info "同步 skills (common + profiles/$PROFILE) ..."
+  info "同步 skills (common + ${profile_skills_dir}) ..."
 
   if [ -d "$src_common_skills" ]; then
     for skill_dir in "$src_common_skills"/*/; do
@@ -614,7 +723,9 @@ _copy_config_dir() {
 copy_configs() {
   local target="$1" skip_existing="${2:-}"
   local src_common="$SOURCE_DIR/configs/common"
-  local src_profile="$SOURCE_DIR/configs/profiles/$PROFILE"
+  local profile_configs_dir
+  profile_configs_dir="$(profile_registry_get_field "$SOURCE_DIR" "$PROFILE" "configs_dir" "configs/profiles/$PROFILE")"
+  local src_profile="$SOURCE_DIR/$profile_configs_dir"
   local copied=false
   local skip_husky=""
 
@@ -630,7 +741,7 @@ copy_configs() {
   fi
 
   if [ -d "$src_profile" ]; then
-    info "同步 lint/format 配置 (profiles/$PROFILE) ..."
+    info "同步 lint/format 配置 (${profile_configs_dir}) ..."
     _copy_config_dir "$src_profile" "$target" "$skip_existing" "$skip_husky" && copied=true
   fi
 
@@ -1000,16 +1111,39 @@ setup_openspec() {
   local template="$SOURCE_DIR/openspec/config.yaml.template"
   local config_file="$target/openspec/config.yaml"
   if [ -f "$template" ]; then
+    local template_schema_line
+    template_schema_line="$(awk '/^schema:[[:space:]]*/ { print; exit }' "$template")"
     if [ -f "$config_file" ]; then
       if ! grep -q "^context:" "$config_file" 2>/dev/null; then
         info "合并 ex-ai-spec  context/rules 到 config.yaml ..."
-        tail -n +2 "$template" >> "$config_file"
+        awk '
+          /^context:/ { capture = 1 }
+          capture { print }
+        ' "$template" >> "$config_file"
         ok "config.yaml 已增强"
       else
         info "config.yaml 已包含 context 字段，跳过合并"
       fi
-      if grep -q "^schema:[[:space:]]*spec-driven" "$config_file" 2>/dev/null; then
-        warn "检测到 legacy schema=spec-driven，建议迁移到 expert-delivery 以启用 checklist/iterations 产物"
+      if [ -n "$template_schema_line" ]; then
+        if grep -q "^schema:[[:space:]]*" "$config_file" 2>/dev/null; then
+          awk -v schema_line="$template_schema_line" '
+            BEGIN { replaced = 0 }
+            /^schema:[[:space:]]*/ && !replaced {
+              print schema_line
+              replaced = 1
+              next
+            }
+            { print }
+          ' "$config_file" > "${config_file}.tmp"
+          mv "${config_file}.tmp" "$config_file"
+        else
+          {
+            printf '%s\n\n' "$template_schema_line"
+            cat "$config_file"
+          } > "${config_file}.tmp"
+          mv "${config_file}.tmp" "$config_file"
+        fi
+        ok "config.yaml 的 schema 已同步为模板默认值"
       fi
     else
       mkdir -p "$(dirname "$config_file")"
@@ -1228,12 +1362,15 @@ cmd_init() {
   # 前置环境检查
   check_node_env
   detect_pkg_manager
+  detect_source
+  ensure_profile_ready
 
   # 交互式引导（仅在使用默认值且终端可交互时触发）
-  if [ -t 0 ] && [ "$PROFILE" = "vue" ] && [ "$LEVEL" = "L3" ]; then
+  if [ -t 0 ] && [ -z "$PROFILE_EXPLICIT" ] && [ "$LEVEL" = "L3" ]; then
     select_profile
     select_level
   fi
+  ensure_profile_ready
 
   # UI UX Pro Max 选择（交互模式 + UIPRO=ask 时触发）
   if [ -t 0 ] && [ "$UIPRO" = "ask" ]; then
@@ -1247,8 +1384,6 @@ cmd_init() {
   # 非交互模式下 ask 保持默认值
   [ "$INSTALL_LINT" = "ask" ] && INSTALL_LINT="yes"
   [ "$INSTALL_HUSKY" = "ask" ] && INSTALL_HUSKY="no"
-
-  detect_source
 
   # L1: 只安装 .agents
   copy_agents "$target"
@@ -1301,6 +1436,7 @@ cmd_update() {
   info "更新规范: $target"
   detect_pkg_manager
   detect_source
+  ensure_profile_ready
   copy_agents "$target"
   install_local_ai_spec_cli "$target"
   copy_configs "$target" "skip_existing"
@@ -1330,6 +1466,37 @@ cmd_update() {
     exit 1
   fi
   return 0
+}
+
+cmd_sync() {
+  local target
+  target="$(cd "${1:-.}" 2>/dev/null && pwd || { mkdir -p "${1:-.}"; cd "${1:-.}" && pwd; })"
+
+  check_node_env
+  detect_source
+  if [ -n "$PROFILE_EXPLICIT" ]; then
+    ensure_profile_ready
+  fi
+
+  local cli="$SOURCE_DIR/bin/cli.js"
+  [ -f "$cli" ] || { err "未找到 ai-spec CLI: $cli"; exit 1; }
+
+  local -a cmd=(node "$cli" sync "$target")
+  if [ -n "$MANIFEST_INPUT" ]; then
+    cmd+=(--manifest "$MANIFEST_INPUT")
+  fi
+  if [ -n "$PROFILE_EXPLICIT" ]; then
+    cmd+=(--profile "$PROFILE")
+  fi
+  if [ -n "$IDE_FILTER_EXPLICIT" ]; then
+    cmd+=(--ide "$IDE_FILTER")
+  fi
+  if [ -n "$SYNC_DRY_RUN" ]; then
+    cmd+=(--dry-run)
+  fi
+
+  info "通过 ai-spec sync 同步规范资产..."
+  BR_AI_SPEC_LOCAL="$SOURCE_DIR" "${cmd[@]}"
 }
 
 cmd_check() {
@@ -1498,13 +1665,16 @@ ${BOLD}用法:${NC} install.sh <命令> [目标目录] [选项]
 ${BOLD}命令:${NC}
   init [dir]        首次安装到目标项目（默认当前目录）
   update [dir]      更新通用规范，保留项目特有规则
+  sync [dir]        通过 manifest 安装/同步规范资产
   check [dir]       检查安装状态与链接有效性
   uninstall [dir]   卸载规范库
 
 ${BOLD}选项:${NC}
-  --profile <name>  技术栈 (react|vue)                              默认 vue
+  --profile <name>  技术栈（读取 .agents/registry/profiles.json）   默认 vue
   --level <L>       安装层级 (L1|L2|L3)                             默认 L3
   --ide <name>      指定 IDE (default|cursor|claude|opencode|trae|all)  默认 default(cursor+claude)
+  --manifest <ref>  sync 命令使用的 manifest 文件路径或 URL
+  --dry-run         sync 命令仅解析，不落盘
   --lint            安装 ESLint + Prettier + Stylelint（默认安装）
   --no-lint         跳过 lint/format 工具
   --husky           安装 Husky 提交校验（husky + lint-staged + commitlint）
@@ -1535,6 +1705,8 @@ ${BOLD}示例:${NC}
   bash install.sh init . --package packages/app           # Monorepo 根目录执行，安装到子包
   bash install.sh init . --workspace-root               # Monorepo 下强制在根目录安装
   bash install.sh update                                  # 更新规范
+  bash install.sh sync . --manifest ./manifest.json       # 本地 manifest 同步
+  bash install.sh sync . --manifest https://hub.example.com/manifest.json
   bash install.sh check                                   # 检查安装状态
 
 ${BOLD}远程安装:${NC}
@@ -1552,10 +1724,12 @@ require_arg() {
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    init|update|check|uninstall) COMMAND="$1" ;;
-    --profile)    require_arg "$1" "${2:-}"; PROFILE="$2"; shift ;;
+    init|update|sync|check|uninstall) COMMAND="$1" ;;
+    --profile)    require_arg "$1" "${2:-}"; PROFILE="$2"; PROFILE_EXPLICIT=1; shift ;;
     --level)      require_arg "$1" "${2:-}"; LEVEL="$2"; shift ;;
-    --ide)        require_arg "$1" "${2:-}"; IDE_FILTER="$2"; shift ;;
+    --ide)        require_arg "$1" "${2:-}"; IDE_FILTER="$2"; IDE_FILTER_EXPLICIT=1; shift ;;
+    --manifest)   require_arg "$1" "${2:-}"; MANIFEST_INPUT="$2"; shift ;;
+    --dry-run)    SYNC_DRY_RUN=1 ;;
     --repo)       require_arg "$1" "${2:-}"; SPEC_REPO="$2"; shift ;;
     --lint)       INSTALL_LINT="yes" ;;
     --no-lint)    INSTALL_LINT="no" ;;
@@ -1577,15 +1751,10 @@ done
 
 [ -n "$COMMAND" ] || { usage; exit 1; }
 
-# 验证 Profile
-if [[ ! " ${AVAILABLE_PROFILES[*]} " =~ " $PROFILE " ]]; then
-  err "无效的 Profile: $PROFILE （可选: ${AVAILABLE_PROFILES[*]}）"
-  exit 1
-fi
-
 case "$COMMAND" in
   init)      cmd_init "${TARGET:-.}" ;;
   update)    cmd_update "${TARGET:-.}" ;;
+  sync)      cmd_sync "${TARGET:-.}" ;;
   check)     cmd_check "${TARGET:-.}" ;;
   uninstall) cmd_uninstall "${TARGET:-.}" ;;
 esac

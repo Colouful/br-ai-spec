@@ -1,5 +1,8 @@
 const fs = require('fs');
 const path = require('path');
+const {
+  resolveProfileId,
+} = require('./profile-registry');
 
 const PACKAGE_ROOT = path.join(__dirname, '..');
 
@@ -104,6 +107,10 @@ function loadSkillsRegistry(targetDir) {
   return loadRegistryFile(targetDir, 'skills.json', 'skills');
 }
 
+function loadProfilesRegistry(targetDir) {
+  return loadRegistryFile(targetDir, 'profiles.json', 'profiles');
+}
+
 function getRoleRuntimeConfig(targetDir, roleId) {
   if (!roleId) {
     return null;
@@ -136,8 +143,16 @@ function getSkillRuntimeConfig(targetDir, skillId) {
   return skillsRegistry.skills?.[skillId] || null;
 }
 
+function resolveRuntimeProfileId(targetDir, profileId) {
+  if (!profileId) {
+    return null;
+  }
+  return resolveProfileId(loadProfilesRegistry(targetDir), profileId);
+}
+
 module.exports = {
   PACKAGE_ROOT,
+  loadProfilesRegistry,
   loadRulesRegistry,
   loadSkillsRegistry,
   loadRolesRegistry,
@@ -146,4 +161,5 @@ module.exports = {
   getSkillRuntimeConfig,
   getRoleRuntimeConfig,
   getFlowRuntimeConfig,
+  resolveRuntimeProfileId,
 };

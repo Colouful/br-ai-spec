@@ -79,7 +79,7 @@ rules:
     - "优先复用现有 registry、常量和显式映射，不引入启发式检测、模糊匹配或正则猜测。"
   checklist:
     - "必须明确通过项、未通过项、阻断项和是否建议放行。"
-    - "检查结论必须基于 proposal/tasks、项目规则和实现证据。"
+    - "检查结论必须基于 proposal/specs/design/tasks、项目规则和实现证据。"
   iterations:
     - "必须记录问题、修正动作、残留风险和下轮提醒。"
 ```

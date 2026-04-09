@@ -66,7 +66,8 @@ function buildArchiveDispatch(runId) {
       },
       artifacts: {
         proposal: 'openspec/changes/runtime-smoke-demo/proposal.md',
-        specs: 'openspec/changes/runtime-smoke-demo/specs/ui/spec.md',
+        specs: 'openspec/changes/runtime-smoke-demo/specs/',
+        design: 'openspec/changes/runtime-smoke-demo/design.md',
         tasks: 'openspec/changes/runtime-smoke-demo/tasks.md',
         checklist: 'openspec/changes/runtime-smoke-demo/checklist.md',
         iterations: 'openspec/changes/runtime-smoke-demo/iterations.md',
@@ -158,6 +159,21 @@ function main() {
     '- **当** 用户访问商品演示页',
     '- **则** 页面展示本地 mock 商品列表，不请求真实接口',
   ].join('\n'));
+  writeProjectFile(targetDir, 'openspec/changes/runtime-smoke-demo/specs/api/spec.md', [
+    '## 新增需求',
+    '',
+    '### 需求：接口约束',
+    '',
+    '系统必须明确当前示例不请求真实接口，只读取本地 mock 数据。',
+  ].join('\n'));
+  writeProjectFile(targetDir, 'openspec/changes/runtime-smoke-demo/design.md', [
+    '# 技术设计',
+    '',
+    '## 实现落点',
+    '- 页面放在 src/views/products/mock/index.vue',
+    '- 路由模块放在 src/router/modules/products.ts',
+    '- mock 数据放在 src/mock/products.ts',
+  ].join('\n'));
   writeProjectFile(targetDir, 'openspec/changes/runtime-smoke-demo/tasks.md', [
     '# Tasks',
     '',
@@ -175,7 +191,8 @@ function main() {
   assert.strictEqual(result.payload.openspec_action, 'propose');
   assert.deepStrictEqual(result.validation.required_outputs, [
     'openspec/changes/runtime-smoke-demo/proposal.md',
-    'openspec/changes/runtime-smoke-demo/specs/ui/spec.md',
+    'openspec/changes/runtime-smoke-demo/specs',
+    'openspec/changes/runtime-smoke-demo/design.md',
     'openspec/changes/runtime-smoke-demo/tasks.md',
   ]);
   assert.strictEqual(result.runtime_transition.payload.action, 'handoff');
@@ -195,7 +212,8 @@ function main() {
   assert.strictEqual(result.payload.openspec_action, 'apply');
   assert.deepStrictEqual(result.validation.required_inputs, [
     'openspec/changes/runtime-smoke-demo/proposal.md',
-    'openspec/changes/runtime-smoke-demo/specs/ui/spec.md',
+    'openspec/changes/runtime-smoke-demo/specs',
+    'openspec/changes/runtime-smoke-demo/design.md',
     'openspec/changes/runtime-smoke-demo/tasks.md',
   ]);
   assert.strictEqual(result.runtime_transition.payload.action, 'handoff');
@@ -281,12 +299,14 @@ function main() {
   assert.strictEqual(currentRun.current_role, 'archive-change');
   assert.ok(currentRun.artifacts.proposal.includes('openspec/changes/archive/'));
   assert.ok(fs.existsSync(path.join(targetDir, 'openspec/specs/ui/spec.md')));
+  assert.ok(fs.existsSync(path.join(targetDir, 'openspec/specs/api/spec.md')));
   assertMissingCurrentArtifacts(targetDir);
 
   const runtimeActionTarget = createWorkspace();
   bootstrapRun(runtimeActionTarget);
   writeProjectFile(runtimeActionTarget, 'openspec/changes/runtime-smoke-demo/proposal.md', '# Proposal');
   writeProjectFile(runtimeActionTarget, 'openspec/changes/runtime-smoke-demo/specs/ui/spec.md', '# Spec');
+  writeProjectFile(runtimeActionTarget, 'openspec/changes/runtime-smoke-demo/design.md', '# Design');
   writeProjectFile(runtimeActionTarget, 'openspec/changes/runtime-smoke-demo/tasks.md', '# Tasks');
   writeProjectFile(runtimeActionTarget, 'openspec/changes/runtime-smoke-demo/checklist.md', '# checklist');
   writeProjectFile(runtimeActionTarget, 'openspec/changes/runtime-smoke-demo/iterations.md', '# iterations');
@@ -339,6 +359,12 @@ function main() {
     '### 需求：覆盖 transition',
     '',
     '系统必须支持本地注册表覆盖。',
+  ].join('\n'));
+  writeProjectFile(registryOverrideTarget, 'openspec/changes/runtime-smoke-demo/design.md', [
+    '# 技术设计',
+    '',
+    '## 目标',
+    '- 验证本地 registry override 时 design 也被纳入 requirement 产物检查。',
   ].join('\n'));
   writeProjectFile(registryOverrideTarget, 'openspec/changes/runtime-smoke-demo/tasks.md', [
     '# Tasks',

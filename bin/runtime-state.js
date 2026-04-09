@@ -427,11 +427,27 @@ function inferComplexity({ explicitComplexity, deliveryProfile, riskLevel }) {
   return deliveryProfile === 'micro' ? 'low' : 'medium';
 }
 
+function normalizeSpecsArtifactPath(relPath) {
+  const value = String(relPath || '').trim();
+  if (!value) {
+    return null;
+  }
+
+  const normalized = value.replace(/[\\/]+$/, '');
+  if (/[\\/]specs$/.test(normalized)) {
+    return normalized;
+  }
+
+  const match = normalized.match(/^(.*[\\/]specs)(?:[\\/].+)?$/);
+  return match ? match[1] : normalized;
+}
+
 function buildDefaultArtifacts(changeId) {
   if (!changeId) {
     return {
       proposal: null,
       specs: null,
+      design: null,
       tasks: null,
       checklist: null,
       iterations: null,
@@ -442,7 +458,8 @@ function buildDefaultArtifacts(changeId) {
   const baseDir = `openspec/changes/${changeId}`;
   return {
     proposal: `${baseDir}/proposal.md`,
-    specs: `${baseDir}/specs/ui/spec.md`,
+    specs: `${baseDir}/specs`,
+    design: `${baseDir}/design.md`,
     tasks: `${baseDir}/tasks.md`,
     checklist: `${baseDir}/checklist.md`,
     iterations: `${baseDir}/iterations.md`,
@@ -458,7 +475,8 @@ function mergeArtifacts(baseArtifacts, inferredArtifacts) {
 
   const merged = {
     proposal: inferredArtifacts?.proposal || baseArtifacts?.proposal || null,
-    specs: inferredArtifacts?.specs || baseArtifacts?.specs || null,
+    specs: normalizeSpecsArtifactPath(inferredArtifacts?.specs || baseArtifacts?.specs || null),
+    design: inferredArtifacts?.design || baseArtifacts?.design || null,
     tasks: inferredArtifacts?.tasks || baseArtifacts?.tasks || null,
     checklist: inferredArtifacts?.checklist || baseArtifacts?.checklist || null,
     iterations: inferredArtifacts?.iterations || baseArtifacts?.iterations || null,
@@ -476,6 +494,7 @@ function inferArtifacts(artifacts) {
   const normalized = {
     proposal: null,
     specs: null,
+    design: null,
     tasks: null,
     checklist: null,
     iterations: null,
@@ -487,10 +506,12 @@ function inferArtifacts(artifacts) {
   }
 
   if (artifacts && typeof artifacts === 'object' && !Array.isArray(artifacts)) {
-    const directKeys = ['proposal', 'specs', 'tasks', 'checklist', 'iterations'];
+    const directKeys = ['proposal', 'specs', 'design', 'tasks', 'checklist', 'iterations'];
     for (const key of directKeys) {
       if (typeof artifacts[key] === 'string' && artifacts[key].trim()) {
-        normalized[key] = artifacts[key];
+        normalized[key] = key === 'specs'
+          ? normalizeSpecsArtifactPath(artifacts[key])
+          : artifacts[key];
       }
     }
 
@@ -520,8 +541,12 @@ function inferArtifacts(artifacts) {
       normalized.proposal = item;
       continue;
     }
-    if (/\/specs\/.+\.md$/.test(item)) {
-      normalized.specs = item;
+    if (/[\\/]specs(?:[\\/].+)?$/.test(item)) {
+      normalized.specs = normalizeSpecsArtifactPath(item);
+      continue;
+    }
+    if (item.endsWith('/design.md')) {
+      normalized.design = item;
       continue;
     }
     if (item.endsWith('/tasks.md')) {
@@ -636,7 +661,10 @@ function buildRunState({ runPlan, taskAnchor, options, now, source }) {
           ...(sanitizedAnchor.task || {}),
           change_id: sanitizedAnchor.task?.change_id || changeId,
         },
-        artifacts: sanitizedAnchor.artifacts || artifacts,
+        artifacts: mergeArtifacts(
+          buildDefaultArtifacts(changeId),
+          inferArtifacts(sanitizedAnchor.artifacts || artifacts),
+        ),
       }
     : null;
   const initMessage = source?.bootstrapPayload
@@ -741,9 +769,9 @@ function assertRequiredOpenSpecArtifacts(targetDir, state, action, toRole) {
 
   let requiredArtifacts = [];
   if (action === 'handoff' && toRole === 'frontend-implementer') {
-    requiredArtifacts = ['proposal', 'specs', 'tasks'];
+    requiredArtifacts = ['proposal', 'specs', 'design', 'tasks'];
   } else if (action === 'complete') {
-    requiredArtifacts = ['proposal', 'specs', 'tasks', 'checklist', 'iterations'];
+    requiredArtifacts = ['proposal', 'specs', 'design', 'tasks', 'checklist', 'iterations'];
   }
 
   if (requiredArtifacts.length === 0) {
@@ -1738,6 +1766,7 @@ module.exports = {
   main,
   parseArgs,
   createRunId,
+  normalizeSpecsArtifactPath,
   inferDeliveryProfile,
   inferArtifactProfile,
   inferComplexity,

@@ -22,7 +22,8 @@
     },
     "artifacts": [
       "openspec/changes/runtime-smoke-demo/proposal.md",
-      "openspec/changes/runtime-smoke-demo/specs/ui/spec.md",
+      "openspec/changes/runtime-smoke-demo/specs/",
+      "openspec/changes/runtime-smoke-demo/design.md",
       "openspec/changes/runtime-smoke-demo/tasks.md",
       "code",
       "openspec/changes/runtime-smoke-demo/checklist.md",
@@ -70,12 +71,14 @@
     },
       "artifacts": {
         "proposal": "openspec/changes/runtime-smoke-demo/proposal.md",
-        "specs": "openspec/changes/runtime-smoke-demo/specs/ui/spec.md",
+        "specs": "openspec/changes/runtime-smoke-demo/specs/",
+        "design": "openspec/changes/runtime-smoke-demo/design.md",
         "tasks": "openspec/changes/runtime-smoke-demo/tasks.md"
       },
       "expected_output": [
         "补齐 proposal",
-        "输出 spec",
+        "输出 specs",
+        "输出 design",
         "输出 tasks",
         "列出缺失输入"
       ]

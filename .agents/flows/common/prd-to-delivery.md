@@ -23,9 +23,11 @@ optional_roles:
   - performance-auditor
 approval_gates:
   - before-implementation
-  - before-delivery
+  - before-archive
 artifacts:
   - openspec/changes/<change-id>/proposal.md
+  - openspec/changes/<change-id>/specs/
+  - openspec/changes/<change-id>/design.md
   - openspec/changes/<change-id>/tasks.md
   - code
   - openspec/changes/<change-id>/checklist.md
@@ -103,7 +105,7 @@ domains:
 说明：
 需求边界、关键假设或方案取舍未确认时，不能直接进入实现。
 
-2. `before-delivery`
+2. `before-archive`
 说明：
 存在阻断项、验证结论不清晰或残留风险较高时，不能直接判定交付完成。
 
@@ -112,6 +114,8 @@ domains:
 至少要沉淀以下产物：
 
 - `openspec/changes/<change-id>/proposal.md`
+- `openspec/changes/<change-id>/specs/`
+- `openspec/changes/<change-id>/design.md`
 - `openspec/changes/<change-id>/tasks.md`
 - 与本次变更相关的代码实现
 - `openspec/changes/<change-id>/checklist.md`
@@ -122,6 +126,8 @@ domains:
 当满足以下条件时，模板执行才可视为完成：
 
 - 需求边界已被收敛为 `proposal.md`
+- 增量规范已落在 `specs/`，且允许按 domain 拆分多份 spec
+- 技术方案已沉淀为 `design.md`
 - 实施任务已被拆解为 `tasks.md`
 - 代码实现与任务范围一致
 - 交付前检查已完成并形成 `checklist.md`
@@ -153,7 +159,7 @@ domains:
 约束：
 
 - 仍然必须经过 `requirement-analyst -> frontend-implementer -> code-guardian`
-- `proposal/tasks/checklist/iterations` 仍需真实落盘
+- `proposal/specs/design/tasks/checklist/iterations` 仍需真实落盘
 - 但产物采用短版 compact 规格
 - 机械交接优先由宿主层自动推进
 - 默认不保留运行历史文件
