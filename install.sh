@@ -34,6 +34,7 @@ CUSTOMIZABLE_RULES_DESC=(
 )
 AVAILABLE_PROFILES=()
 IDE_AUTOLINK_EXCLUDED_SKILLS=("using-superpowers")
+TUI_MULTI_DEFAULTS=()
 
 NODE_MIN_VERSION=18
 PKG_MANAGER=""
@@ -260,6 +261,31 @@ load_available_profiles_from_dir() {
   IFS=',' read -r -a AVAILABLE_PROFILES <<< "$raw"
 }
 
+profile_display_label() {
+  local profile_id="$1"
+  local raw_label="$2"
+
+  case "$profile_id" in
+    vue)
+      if [ -z "$raw_label" ] || [ "$raw_label" = "Vue" ]; then
+        printf '%s\n' "Vue 3 + TypeScript + Pinia + Vue Router"
+      else
+        printf '%s\n' "$raw_label"
+      fi
+      ;;
+    react)
+      if [ -z "$raw_label" ] || [ "$raw_label" = "React" ]; then
+        printf '%s\n' "React + TypeScript + Antd + Zustand"
+      else
+        printf '%s\n' "$raw_label"
+      fi
+      ;;
+    *)
+      printf '%s\n' "${raw_label:-$profile_id}"
+      ;;
+  esac
+}
+
 profile_registry_get_field() {
   local base_dir="$1" profile="$2" field="$3" fallback="${4:-}"
   local profiles_file="$base_dir/.agents/registry/profiles.json"
@@ -310,6 +336,117 @@ profile_supported() {
   return 1
 }
 
+# ---- TUI 返回值（兼容 Bash 3.2，不使用 nameref） ----
+_TUI_RESULT=0
+_TUI_RESULTS=()
+_MS_SEL=()
+
+# ---- TUI 单选（箭头键导航 + Enter 确认） ----
+_tui_single_select() {
+  local _ss_count=$#
+  local _ss_cur=0
+  local _ss_key
+
+  printf '\033[?25l'
+  trap 'printf "\033[?25h"' RETURN
+
+  while true; do
+    local i=1
+    for _ss_opt in "$@"; do
+      local idx=$((i - 1))
+      if [ "$idx" -eq "$_ss_cur" ]; then
+        printf '\r\033[K  \033[1;36m❯ %s\033[0m\n' "$_ss_opt"
+      else
+        printf '\r\033[K    %s\n' "$_ss_opt"
+      fi
+      i=$((i + 1))
+    done
+
+    IFS= read -rsn1 _ss_key
+    if [[ "$_ss_key" == $'\x1b' ]]; then
+      read -rsn2 _ss_key
+      case "$_ss_key" in
+        '[A') [ "$_ss_cur" -gt 0 ] && _ss_cur=$((_ss_cur - 1)) ;;
+        '[B') [ "$_ss_cur" -lt $((_ss_count - 1)) ] && _ss_cur=$((_ss_cur + 1)) ;;
+      esac
+    elif [[ "$_ss_key" == "" ]]; then
+      break
+    fi
+
+    printf "\033[%dA" "$_ss_count"
+  done
+
+  _TUI_RESULT=$_ss_cur
+}
+
+# ---- TUI 多选（箭头键导航 + 空格切换 + Enter 确认） ----
+_tui_multi_select() {
+  local _ms_count=$#
+  local _ms_cur=0
+  local _ms_key
+  local i
+
+  _MS_SEL=()
+  i=0
+  while [ "$i" -lt "$_ms_count" ]; do
+    _MS_SEL[$i]=0
+    i=$((i + 1))
+  done
+
+  if [ ${#TUI_MULTI_DEFAULTS[@]} -gt 0 ]; then
+    for _ms_idx in "${TUI_MULTI_DEFAULTS[@]}"; do
+      if [ "$_ms_idx" -ge 0 ] && [ "$_ms_idx" -lt "$_ms_count" ]; then
+        _MS_SEL[$_ms_idx]=1
+      fi
+    done
+  fi
+
+  printf '\033[?25l'
+  trap 'printf "\033[?25h"' RETURN
+
+  while true; do
+    i=0
+    for _ms_opt in "$@"; do
+      local marker="[ ]"
+      [ "${_MS_SEL[$i]}" = "1" ] && marker="[x]"
+      if [ "$i" -eq "$_ms_cur" ]; then
+        printf '\r\033[K  \033[1;36m❯ %s %s\033[0m\n' "$marker" "$_ms_opt"
+      else
+        printf '\r\033[K    %s %s\n' "$marker" "$_ms_opt"
+      fi
+      i=$((i + 1))
+    done
+
+    IFS= read -rsn1 _ms_key
+    if [[ "$_ms_key" == $'\x1b' ]]; then
+      read -rsn2 _ms_key
+      case "$_ms_key" in
+        '[A') [ "$_ms_cur" -gt 0 ] && _ms_cur=$((_ms_cur - 1)) ;;
+        '[B') [ "$_ms_cur" -lt $((_ms_count - 1)) ] && _ms_cur=$((_ms_cur + 1)) ;;
+      esac
+    elif [[ "$_ms_key" == " " ]]; then
+      if [ "${_MS_SEL[$_ms_cur]}" = "0" ]; then
+        _MS_SEL[$_ms_cur]=1
+      else
+        _MS_SEL[$_ms_cur]=0
+      fi
+    elif [[ "$_ms_key" == "" ]]; then
+      break
+    fi
+
+    printf "\033[%dA" "$_ms_count"
+  done
+
+  _TUI_RESULTS=()
+  i=0
+  while [ "$i" -lt "$_ms_count" ]; do
+    [ "${_MS_SEL[$i]}" = "1" ] && _TUI_RESULTS+=("$i")
+    i=$((i + 1))
+  done
+
+  TUI_MULTI_DEFAULTS=()
+}
+
 ensure_profile_ready() {
   if [ ${#AVAILABLE_PROFILES[@]} -eq 0 ]; then
     load_available_profiles_from_dir "${SOURCE_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
@@ -334,11 +471,11 @@ select_profile() {
   while IFS=$'\t' read -r profile_id profile_label; do
     [ -n "$profile_id" ] || continue
     option_ids+=("$profile_id")
-    echo "  ${option_index}) ${profile_id}    — ${profile_label}"
+    echo "  ${option_index}) ${profile_id}    — $(profile_display_label "$profile_id" "$profile_label")"
     option_index=$((option_index + 1))
   done < <(profile_registry_print_options "$SOURCE_DIR")
   echo ""
-  read -rp "请选择 [默认 1]: " choice
+  read -rp "请选择 (1/${#option_ids[@]}) [默认 1]: " choice
 
   if [ -z "$choice" ] || ! [[ "$choice" =~ ^[0-9]+$ ]]; then
     PROFILE="${option_ids[0]}"
@@ -425,68 +562,78 @@ is_custom_rule() {
 select_rules_strategy() {
   echo ""
   info "规则安装策略："
-  echo "  1) 使用标准规范 — 直接同步当前规范库规则"
-  echo "  2) 根据项目自定义 — 选择部分规则不落盘，后续按项目情况补齐"
+  echo "  使用上下箭头选择，按 Enter 确认"
   echo ""
-  read -rp "请选择 (1/2) [默认 1]: " choice
 
-  case "$choice" in
-    2)
-      RULES_STRATEGY="custom"
-      ;;
-    *)
-      RULES_STRATEGY="standard"
-      ok "将使用标准规范"
-      return 0
-      ;;
-  esac
+  _tui_single_select \
+    "使用标准规范 — 直接使用规范库中的规则，适合新项目或愿意遵循统一规范的团队" \
+    "根据项目自定义 — 跳过部分规则，后续由 AI 根据项目实际情况生成"
+
+  if [ "$_TUI_RESULT" -eq 0 ]; then
+    RULES_STRATEGY="standard"
+    ok "将使用标准规范"
+    return 0
+  fi
+
+  RULES_STRATEGY="custom"
 
   echo ""
-  info "可自定义的规则如下："
-  local idx=1
-  local item
-  for item in "${CUSTOMIZABLE_RULES_DESC[@]}"; do
-    echo "  ${idx}) ${item}"
-    idx=$((idx + 1))
-  done
+  info "选择需要根据项目自定义的规则（空格选中/取消，Enter 确认）："
+  echo "  选中的规则将不从规范库复制，而是由 AI 根据项目实际情况生成"
+  echo "  默认已勾选 01/03（项目概述、项目结构），可按空格取消"
   echo ""
-  read -rp "请输入要自定义的规则编号（逗号分隔，默认 1,2）: " choice
-  [ -z "$choice" ] && choice="1,2"
 
-  local -a selected_rules=()
-  local token selected_index
-  IFS=',' read -r -a tokens <<< "$choice"
-  for token in "${tokens[@]}"; do
-    token="$(echo "$token" | tr -d ' ')"
-    [[ "$token" =~ ^[0-9]+$ ]] || continue
-    selected_index=$((token - 1))
-    [ "$selected_index" -ge 0 ] || continue
-    [ "$selected_index" -lt "${#CUSTOMIZABLE_RULES[@]}" ] || continue
-    selected_rules+=("${CUSTOMIZABLE_RULES[$selected_index]}")
-  done
+  TUI_MULTI_DEFAULTS=(0 1)
+  _tui_multi_select "${CUSTOMIZABLE_RULES_DESC[@]}"
 
-  if [ "${#selected_rules[@]}" -eq 0 ]; then
-    warn "未选择任何自定义规则，将回退为标准规范"
+  if [ ${#_TUI_RESULTS[@]} -eq 0 ]; then
+    warn "未选择任何自定义规则，将使用标准规范"
     RULES_STRATEGY="standard"
     return 0
   fi
 
   CUSTOM_RULES=()
-  local seen=""
-  for item in "${selected_rules[@]}"; do
-    case ",$seen," in
-      *,"$item",*) ;;
-      *)
-        CUSTOM_RULES+=("$item")
-        seen="${seen},${item}"
-        ;;
-    esac
+  local idx
+  for idx in "${_TUI_RESULTS[@]}"; do
+    CUSTOM_RULES+=("${CUSTOMIZABLE_RULES[$idx]}")
   done
 
-  ok "以下规则将按项目自定义："
+  ok "以下规则将根据项目自定义："
+  local item
   for item in "${CUSTOM_RULES[@]}"; do
     echo "    • $item"
   done
+}
+
+selected_ai_init_rules() {
+  local -a generated=()
+  local item
+
+  if [ "$RULES_STRATEGY" = "custom" ] && [ "${#CUSTOM_RULES[@]}" -gt 0 ]; then
+    for item in "${CUSTOM_RULES[@]}"; do
+      if [ "${#generated[@]}" -eq 0 ]; then
+        generated+=("$item")
+      else
+        case " ${generated[*]} " in
+          *" $item "*) ;;
+          *) generated+=("$item") ;;
+        esac
+      fi
+    done
+  else
+    for item in "${PROJECT_SPECIFIC_RULES[@]}"; do
+      if [ "${#generated[@]}" -eq 0 ]; then
+        generated+=("$item")
+      else
+        case " ${generated[*]} " in
+          *" $item "*) ;;
+          *) generated+=("$item") ;;
+        esac
+      fi
+    done
+  fi
+
+  printf '%s\n' "${generated[@]}"
 }
 
 # ---- Node 环境前置检查 ----
@@ -1436,6 +1583,7 @@ print_report() {
   echo -e "  Level:    ${BOLD}$LEVEL${NC}"
   echo -e "  IDE:      ${BOLD}$IDE_FILTER${NC}"
   echo -e "  UIPro:    ${BOLD}$UIPRO${NC}"
+  echo -e "  AIInit:   ${BOLD}no${NC}"
   echo ""
   info "已部署内容："
   echo -e "  ${GREEN}✔${NC} .agents/rules + skills (profile: $PROFILE)"
@@ -1458,22 +1606,29 @@ print_report() {
     echo -e "  ${GREEN}✔${NC} IDE 适配 (.cursor, .claude)"
   fi
   echo ""
-  info "后续步骤："
-  echo -e "  1. 编辑 ${BOLD}.agents/rules/01-项目概述.md${NC}  填写项目定位和技术栈"
-  echo -e "  2. 编辑 ${BOLD}.agents/rules/03-项目结构.md${NC}  填写项目目录结构"
+  info "提醒事项："
   if [ "$LEVEL" != "L1" ]; then
-    echo -e "  3. 配置 ${BOLD}.cursor/mcp.json${NC}（按需启用 MCP）"
+    echo -e "  1. 配置 ${BOLD}.cursor/mcp.json${NC}（按需启用 MCP）"
     echo -e "     ${YELLOW}→${NC} Cursor 里各 MCP 默认关闭/未启用是预期行为，并非安装失败"
     echo -e "     ${YELLOW}→${NC} 先在 ${BOLD}设置 → MCP${NC} 中按需打开目标服务，再编辑 JSON"
     echo -e "     ${YELLOW}→${NC} 将 ApiFox 等条目的 ${BOLD}project-id${NC}、${BOLD}access-token${NC} 等占位符换成真实值"
     echo -e "     ${YELLOW}→${NC} 不需要的服务保持关闭即可；若条目含 ${BOLD}disabled${NC}，启用前请先完成凭证配置"
-    echo -e "  4. 首次运行 ${BOLD}/spec-start${NC} / ${BOLD}/spec-continue${NC} 时，若 Cursor 提示执行 ${BOLD}ai-spec${NC} 命令"
+    echo -e "  2. 首次运行 ${BOLD}/spec-start${NC} / ${BOLD}/spec-continue${NC} 时，若 Cursor 提示执行 ${BOLD}ai-spec${NC} 命令"
     echo -e "     ${YELLOW}→${NC} 请选择 ${BOLD}Always allow for this workspace${NC}，避免宿主桥命令被权限弹窗打断"
   fi
   if [ "$LEVEL" = "L3" ]; then
-    echo -e "  5. 使用 ${BOLD}/opsx-propose${NC}              开始第一个变更提案"
+    echo -e "  3. 使用 ${BOLD}/opsx-propose${NC}              开始第一个变更提案"
   fi
-  echo -e "  *  在 AI IDE 中输入 \"初始化项目规范\" 让 AI 自动生成 01/03"
+  echo ""
+  echo -e "${BOLD}────────────────────────────────────────────────────────────${NC}"
+  echo -e "  ${BOLD}★ 项目初始化不会在安装后自动执行，请在 AI IDE 中手动触发：${NC}"
+  echo -e "    推荐触发词：${BOLD}\"初始化项目规范\" / \"project-init\"${NC}"
+  echo -e "    触发后 AI 将生成："
+  local generated_rule
+  while IFS= read -r generated_rule; do
+    [ -n "$generated_rule" ] && echo -e "    • ${generated_rule}"
+  done < <(selected_ai_init_rules)
+  echo -e "${BOLD}────────────────────────────────────────────────────────────${NC}"
   echo ""
 }
 
@@ -1515,15 +1670,98 @@ select_update_modules() {
 
 print_update_summary() {
   local target="$1"
+  local profile_rules_dir profile_skills_dir
+  profile_rules_dir="$(profile_registry_get_field "$SOURCE_DIR" "$PROFILE" "rules_dir" ".agents/rules/profiles/$PROFILE")"
+  profile_skills_dir="$(profile_registry_get_field "$SOURCE_DIR" "$PROFILE" "skills_dir" ".agents/skills/profiles/$PROFILE")"
+
+  local src_common_skills="$SOURCE_DIR/.agents/skills/common"
+  local src_profile_skills="$SOURCE_DIR/$profile_skills_dir"
+  local src_common_rules="$SOURCE_DIR/.agents/rules/common"
+  local src_profile_rules="$SOURCE_DIR/$profile_rules_dir"
+  local agents_dst="$target/.agents"
+
   echo ""
-  info "本次更新模块："
-  echo "  Skills:    $([ "$UPDATE_SKILLS" = "yes" ] && echo "是" || echo "跳过")"
-  echo "  Rules:     $([ "$UPDATE_RULES" = "yes" ] && echo "是" || echo "跳过")"
-  echo "  Configs:   $([ "$UPDATE_CONFIGS" = "yes" ] && echo "是" || echo "跳过")"
-  echo "  Commands:  $([ "$UPDATE_COMMANDS" = "yes" ] && echo "是" || echo "跳过")"
-  echo "  IDE Links: $([ "$UPDATE_IDE_LINKS" = "yes" ] && echo "是" || echo "跳过")"
-  echo "  OpenSpec:  $([ "$UPDATE_OPENSPEC" = "yes" ] && echo "是" || echo "跳过")"
-  echo "  UIPro:     $([ "$UPDATE_UIPRO" = "yes" ] && echo "是" || echo "跳过")"
+  echo -e "${BOLD}── 变更摘要 ──${NC}"
+
+  if [ "$UPDATE_SKILLS" = "yes" ]; then
+    local sk_new=0 sk_update=0
+    local src_dir skill_dir sname
+    for src_dir in "$src_common_skills" "$src_profile_skills"; do
+      [ -d "$src_dir" ] || continue
+      for skill_dir in "$src_dir"/*/; do
+        [ -d "$skill_dir" ] || continue
+        sname="$(basename "$skill_dir")"
+        if [ -d "$agents_dst/skills/$sname" ]; then
+          sk_update=$((sk_update + 1))
+        else
+          sk_new=$((sk_new + 1))
+        fi
+      done
+    done
+    echo -e "  Skills:   ${sk_update} 个将更新, ${sk_new} 个新增"
+  else
+    echo -e "  Skills:   ${YELLOW}跳过${NC}"
+  fi
+
+  if [ "$UPDATE_RULES" = "yes" ]; then
+    local r_update=0 r_skip=0
+    local file rname skip src_dir ps
+    for src_dir in "$src_common_rules" "$src_profile_rules"; do
+      [ -d "$src_dir" ] || continue
+      for file in "$src_dir"/*.md; do
+        [ -f "$file" ] || continue
+        rname="$(basename "$file")"
+        [ "$rname" = "README.md" ] && continue
+        skip=false
+        for ps in "${PROJECT_SPECIFIC_RULES[@]}"; do
+          [ "$rname" = "$ps" ] && [ -f "$agents_dst/rules/$rname" ] && { skip=true; break; }
+        done
+        if is_customizable_rule "$rname" && is_custom_rule "$rname"; then
+          skip=true
+        fi
+        if $skip; then
+          r_skip=$((r_skip + 1))
+        else
+          r_update=$((r_update + 1))
+        fi
+      done
+    done
+    echo -e "  Rules:    ${r_update} 个将更新, ${r_skip} 个跳过（项目特有/自定义）"
+  else
+    echo -e "  Rules:    ${YELLOW}跳过${NC}"
+  fi
+
+  if [ "$UPDATE_CONFIGS" = "yes" ]; then
+    echo -e "  Configs:  同步（已存在的不覆盖）"
+  else
+    echo -e "  Configs:  ${YELLOW}跳过${NC}"
+  fi
+
+  if [ "$UPDATE_COMMANDS" = "yes" ]; then
+    echo -e "  Commands: 同步（覆盖已有命令）"
+  else
+    echo -e "  Commands: 同步（仅补新增，不覆盖已有命令）"
+  fi
+
+  if [ "$UPDATE_IDE_LINKS" = "yes" ]; then
+    echo -e "  IDE Links: 重建"
+  else
+    echo -e "  IDE Links: ${YELLOW}跳过${NC}"
+  fi
+
+  if [ "$LEVEL" = "L3" ] && [ "$UPDATE_OPENSPEC" = "yes" ]; then
+    echo -e "  OpenSpec: 更新"
+  elif [ "$LEVEL" != "L3" ]; then
+    echo -e "  OpenSpec: ${YELLOW}跳过（非 L3）${NC}"
+  else
+    echo -e "  OpenSpec: ${YELLOW}跳过${NC}"
+  fi
+
+  if [ "$UPDATE_UIPRO" = "yes" ]; then
+    echo -e "  UIPro:    重新安装"
+  else
+    echo -e "  UIPro:    ${YELLOW}跳过${NC}"
+  fi
   echo ""
 }
 

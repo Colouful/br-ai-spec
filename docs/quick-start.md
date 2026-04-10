@@ -95,6 +95,12 @@ cd ex-ai-spec
 
 - `.agents/rules/01-项目概述.md` — 项目定位与技术栈
 - `.agents/rules/03-项目结构.md` — 目录结构
+- 若安装时选择了“根据项目自定义”且对应规则文件缺失，AI 还会按项目实际情况补生成：
+  - `.agents/rules/04-组件规范.md`
+  - `.agents/rules/05-API规范.md`
+  - `.agents/rules/06-路由规范.md`
+  - `.agents/rules/07-状态管理.md`
+  - `.agents/rules/09-样式规范.md`
 
 ### 2. 配置 MCP（L2 / L3）（可选：仅在使用 MCP 时配置）
 

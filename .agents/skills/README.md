@@ -22,7 +22,7 @@ description: 技能目录索引。安装到目标项目后此目录为扁平结�
 | `design-analysis` | 设计稿分析，产出 UI 分析清单 | - |
 | `ui-verification` | UI 还原验收 | - |
 | `execute-task` | Superpowers 四步循环执行 | `12-Superpowers执行规范` |
-| `project-init` | 自动分析项目生成 01/03 规范 | - |
+| `project-init` | 自动分析项目生成 01/03，并在自定义规则缺失时补生成 04/05/06/07/09 | - |
 | `using-superpowers` | 技能调度核心规范 | - |
 | `find-skills` | 查找开源 skills | - |
 | `skill-creator` | 创建 skill 指导 | - |

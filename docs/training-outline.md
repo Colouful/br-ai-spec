@@ -144,7 +144,7 @@ bash install.sh init /path/to/project --profile vue
 
 - [ ] 确定试点项目与负责人（前端 Vue 或 React 仓库）
 - [ ] 选择 Profile 并运行安装（推荐 `npx @ex/ai-spec init`，至少 **L2**）
-- [ ] 填写 01-项目概述 和 03-项目结构
+- [ ] 填写 01-项目概述 和 03-项目结构（若自定义规则缺失，补确认 04/05/06/07/09 是否已按项目生成）
 - [ ] 跑通一个组件创建场景
 - [ ] 接通至少一个 MCP（Figma/ApiFox/Playwright）
 - [ ] **（完整闭环）** 升级到 **L3**：`openspec/config.yaml` 存在，能完成一次 `/opsx:propose` → `/opsx:apply` 最小路径（参见 [openspec-guide.md](openspec-guide.md)）

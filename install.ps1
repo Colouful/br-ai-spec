@@ -378,6 +378,20 @@ function Test-IsIdeAutolinkExcludedSkill {
     return $IdeAutolinkExcludedSkills -contains $SkillName
 }
 
+function Get-SelectedAiInitRules {
+    $generated = New-Object System.Collections.Generic.List[string]
+    if ($script:RulesStrategy -eq "custom" -and $script:CustomRules.Count -gt 0) {
+        foreach ($rule in $script:CustomRules) {
+            if (-not $generated.Contains($rule)) { $generated.Add($rule) }
+        }
+    } else {
+        foreach ($rule in $ProjectSpecificRules) {
+            if (-not $generated.Contains($rule)) { $generated.Add($rule) }
+        }
+    }
+    return @($generated.ToArray())
+}
+
 function Select-RulesStrategy {
     Write-Host ""
     Write-Info "规则安装策略："
@@ -1318,6 +1332,7 @@ function Write-Report {
     Write-Host "  Level:    $($script:Level)"
     Write-Host "  IDE:      $($script:IdeFilter)"
     Write-Host "  UIPro:    $($script:Uipro)"
+    Write-Host "  AIInit:   no"
     Write-Host ""
     Write-Info "已部署内容："
     Write-Host "  √ .agents/rules + skills (profile: $($script:Profile))" -ForegroundColor Green
@@ -1338,22 +1353,28 @@ function Write-Report {
         Write-Host "  √ IDE 适配 (.cursor, .claude)" -ForegroundColor Green
     }
     Write-Host ""
-    Write-Info "后续步骤："
-    Write-Host "  1. 编辑 .agents/rules/01-项目概述.md  填写项目定位和技术栈"
-    Write-Host "  2. 编辑 .agents/rules/03-项目结构.md  填写项目目录结构"
+    Write-Info "提醒事项："
     if ($script:Level -ne "L1") {
-        Write-Host "  3. 配置 .cursor/mcp.json（按需启用 MCP）"
+        Write-Host "  1. 配置 .cursor/mcp.json（按需启用 MCP）"
         Write-Host "     -> Cursor 里各 MCP 默认关闭/未启用是预期行为，并非安装失败" -ForegroundColor Yellow
         Write-Host "     -> 先在 设置 -> MCP 中按需打开目标服务，再编辑 JSON" -ForegroundColor Yellow
         Write-Host "     -> 将 ApiFox 等条目的 project-id、access-token 等占位符换成真实值" -ForegroundColor Yellow
         Write-Host "     -> 不需要的服务保持关闭即可；若条目含 disabled，启用前请先完成凭证配置" -ForegroundColor Yellow
-        Write-Host "  4. 首次运行 /spec-start 或 /spec-continue 时，如 Cursor 提示执行 ai-spec 命令" 
+        Write-Host "  2. 首次运行 /spec-start 或 /spec-continue 时，如 Cursor 提示执行 ai-spec 命令" 
         Write-Host "     -> 请选择 Always allow for this workspace，避免宿主桥命令被权限弹窗打断" -ForegroundColor Yellow
     }
     if ($script:Level -eq "L3") {
-        Write-Host "  5. 使用 /opsx-propose              开始第一个变更提案"
+        Write-Host "  3. 使用 /opsx-propose              开始第一个变更提案"
     }
-    Write-Host "  *  在 AI IDE 中输入 `"初始化项目规范`" 让 AI 自动生成 01/03"
+    Write-Host ""
+    Write-Host "------------------------------------------------------------" -ForegroundColor Cyan
+    Write-Host "  ★ 项目初始化不会在安装后自动执行，请在 AI IDE 中手动触发：" -ForegroundColor White
+    Write-Host "    推荐触发词：`"初始化项目规范`" / `"project-init`""
+    Write-Host "    触发后 AI 将生成："
+    foreach ($rule in (Get-SelectedAiInitRules)) {
+        Write-Host "    $rule"
+    }
+    Write-Host "------------------------------------------------------------" -ForegroundColor Cyan
     Write-Host ""
 }
 
@@ -1391,15 +1412,67 @@ function Select-UpdateModules {
 }
 
 function Write-UpdateSummary {
+    param([string]$Target)
+
+    $profileRulesDir = Get-ProfileRegistryField -BaseDir $script:SourceDir -Profile $script:Profile -Field "rules_dir" -Fallback ".agents/rules/profiles/$($script:Profile)"
+    $profileSkillsDir = Get-ProfileRegistryField -BaseDir $script:SourceDir -Profile $script:Profile -Field "skills_dir" -Fallback ".agents/skills/profiles/$($script:Profile)"
+    $srcCommonSkills = Join-Path $script:SourceDir ".agents/skills/common"
+    $srcProfileSkills = Join-Path $script:SourceDir $profileSkillsDir
+    $srcCommonRules = Join-Path $script:SourceDir ".agents/rules/common"
+    $srcProfileRules = Join-Path $script:SourceDir $profileRulesDir
+    $agentsDst = Join-Path $Target ".agents"
+
     Write-Host ""
-    Write-Info "本次更新模块："
-    Write-Host "  Skills:    $(if ($script:UpdateSkills -eq 'yes') { '是' } else { '跳过' })"
-    Write-Host "  Rules:     $(if ($script:UpdateRules -eq 'yes') { '是' } else { '跳过' })"
-    Write-Host "  Configs:   $(if ($script:UpdateConfigs -eq 'yes') { '是' } else { '跳过' })"
-    Write-Host "  Commands:  $(if ($script:UpdateCommands -eq 'yes') { '是' } else { '跳过' })"
-    Write-Host "  IDE Links: $(if ($script:UpdateIdeLinks -eq 'yes') { '是' } else { '跳过' })"
-    Write-Host "  OpenSpec:  $(if ($script:UpdateOpenSpec -eq 'yes') { '是' } else { '跳过' })"
-    Write-Host "  UIPro:     $(if ($script:UpdateUipro -eq 'yes') { '是' } else { '跳过' })"
+    Write-Host "── 变更摘要 ──" -ForegroundColor Cyan
+
+    if ($script:UpdateSkills -eq "yes") {
+        $skNew = 0
+        $skUpdate = 0
+        foreach ($srcDir in @($srcCommonSkills, $srcProfileSkills)) {
+            if (-not (Test-Path $srcDir)) { continue }
+            Get-ChildItem -LiteralPath $srcDir -Directory | ForEach-Object {
+                $dst = Join-Path $agentsDst ("skills/" + $_.Name)
+                if (Test-Path $dst) { $skUpdate++ } else { $skNew++ }
+            }
+        }
+        Write-Host "  Skills:   $skUpdate 个将更新, $skNew 个新增"
+    } else {
+        Write-Host "  Skills:   跳过" -ForegroundColor Yellow
+    }
+
+    if ($script:UpdateRules -eq "yes") {
+        $rUpdate = 0
+        $rSkip = 0
+        foreach ($srcDir in @($srcCommonRules, $srcProfileRules)) {
+            if (-not (Test-Path $srcDir)) { continue }
+            Get-ChildItem -LiteralPath $srcDir -Filter *.md -File | ForEach-Object {
+                if ($_.Name -eq "README.md") { return }
+                $skip = $false
+                if (($ProjectSpecificRules -contains $_.Name) -and (Test-Path (Join-Path $agentsDst ("rules/" + $_.Name)))) {
+                    $skip = $true
+                }
+                if (($CustomizableRules -contains $_.Name) -and (Test-IsCustomRule $_.Name)) {
+                    $skip = $true
+                }
+                if ($skip) { $rSkip++ } else { $rUpdate++ }
+            }
+        }
+        Write-Host "  Rules:    $rUpdate 个将更新, $rSkip 个跳过（项目特有/自定义）"
+    } else {
+        Write-Host "  Rules:    跳过" -ForegroundColor Yellow
+    }
+
+    Write-Host ("  Configs:  {0}" -f ($(if ($script:UpdateConfigs -eq 'yes') { '同步（已存在的不覆盖）' } else { '跳过' })))
+    Write-Host ("  Commands: {0}" -f ($(if ($script:UpdateCommands -eq 'yes') { '同步（覆盖已有命令）' } else { '同步（仅补新增，不覆盖已有命令）' })))
+    Write-Host ("  IDE Links: {0}" -f ($(if ($script:UpdateIdeLinks -eq 'yes') { '重建' } else { '跳过' })))
+    if ($script:Level -eq "L3" -and $script:UpdateOpenSpec -eq "yes") {
+        Write-Host "  OpenSpec: 更新"
+    } elseif ($script:Level -ne "L3") {
+        Write-Host "  OpenSpec: 跳过（非 L3）" -ForegroundColor Yellow
+    } else {
+        Write-Host "  OpenSpec: 跳过" -ForegroundColor Yellow
+    }
+    Write-Host ("  UIPro:    {0}" -f ($(if ($script:UpdateUipro -eq 'yes') { '重新安装' } else { '跳过' })))
     Write-Host ""
 }
 
@@ -1500,7 +1573,7 @@ function Invoke-Update {
     if ($script:Uipro -eq "yes") { $script:UpdateUipro = "yes" }
 
     if ([Environment]::UserInteractive) { Select-UpdateModules -Target $target }
-    Write-UpdateSummary
+    Write-UpdateSummary -Target $target
 
     if ($script:UpdateSkills -eq "yes" -or $script:UpdateRules -eq "yes") {
         $skipRules = ($script:UpdateRules -ne "yes")

@@ -117,7 +117,7 @@ curl -sSL <raw-url>/install.sh | bash -s -- init . --profile vue
 irm <raw-url>/install.ps1 | iex
 ```
 
-安装完成后，在 AI IDE 中输入 **"初始化项目规范"** 即可自动分析项目并生成技术栈描述和目录结构规范。
+安装完成后，在 AI IDE 中输入 **"初始化项目规范"** 即可自动分析项目并生成 `01-项目概述`、`03-项目结构`；若安装时选择了“根据项目自定义”且对应规则仍缺失，还会一并补生成 `04/05/06/07/09`。
 
 ### 技术栈 Profile
 
@@ -338,7 +338,7 @@ ex-ai-spec /
 | design-analysis | 分析设计稿并梳理前端 UI 开发任务 |
 | ui-verification | 以实际页面 vs 设计稿比对完成 UI 验收 |
 | create-test | 按规范创建 Vitest 测试文件（命名、断言、Mock、覆盖率） |
-| project-init | 自动分析项目并生成 01-项目概述 和 03-项目结构 |
+| project-init | 自动分析项目并生成 01/03，并在自定义规则缺失时补生成 04/05/06/07/09 |
 | find-skills | 搜索和安装社区技能 |
 | skill-creator | 创建新的自定义技能 |
 | web-design-guidelines | 审查 UI 代码的 Web 设计规范合规性 |
