@@ -25,15 +25,15 @@ const opts = { stdio: 'inherit', cwd: process.cwd(), env };
     }
 
     if (args[0] === 'task-orchestrator-adapter') {
-      throw new Error('task-orchestrator-adapter is a legacy internal fallback; use ai-spec protocol-step / protocol-advance / protocol-update instead');
+      throw new Error('task-orchestrator-adapter is a legacy internal fallback; use ai-spec-auto protocol-step / protocol-advance / protocol-update instead');
     }
 
     if (args[0] === 'task-orchestrator-extractor') {
-      throw new Error('task-orchestrator-extractor is a legacy internal fallback; use ai-spec protocol-step / protocol-advance / protocol-update instead');
+      throw new Error('task-orchestrator-extractor is a legacy internal fallback; use ai-spec-auto protocol-step / protocol-advance / protocol-update instead');
     }
 
     if (args[0] === 'task-orchestrator-runner') {
-      throw new Error('task-orchestrator-runner is an internal runtime module; call it from the AI host layer instead of ai-spec CLI');
+      throw new Error('task-orchestrator-runner is an internal runtime module; call it from the AI host layer instead of ai-spec-auto CLI');
     }
 
     if (args[0] === 'protocol-step') {
@@ -49,6 +49,16 @@ const opts = { stdio: 'inherit', cwd: process.cwd(), env };
     if (args[0] === 'protocol-update') {
       const protocolWorkflow = require('./protocol-workflow');
       process.exit(protocolWorkflow.main('update', args.slice(1)));
+    }
+
+    if (args[0] === 'protocol-stop') {
+      const protocolWorkflow = require('./protocol-workflow');
+      process.exit(protocolWorkflow.main('stop', args.slice(1)));
+    }
+
+    if (args[0] === 'protocol-status') {
+      const protocolWorkflow = require('./protocol-workflow');
+      process.exit(protocolWorkflow.main('status', args.slice(1)));
     }
 
     if (args[0] === 'expert-dispatch') {

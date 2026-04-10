@@ -266,7 +266,7 @@ function main() {
   assert.ok(workflow.turn.guidance.role_skill_contract.primary_skills.includes('archive-change'));
   assert.strictEqual(workflow.turn.enforcement.execute_current_command_first, true);
   assert.strictEqual(workflow.turn.enforcement.current_command_finalizes_run, true);
-  assert.ok(workflow.turn.enforcement.current_command.includes('ai-spec archive-change --target . --change-id'));
+  assert.ok(workflow.turn.enforcement.current_command.includes('ai-spec-auto archive-change --target . --change-id'));
   assert.ok(workflow.turn.enforcement.current_command.includes('--complete-run'));
   assert.ok(workflow.turn.enforcement.current_command.includes('runtime-smoke-demo'));
   assert.strictEqual(workflow.turn.requires_advance, false);

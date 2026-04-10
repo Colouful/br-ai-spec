@@ -1,4 +1,4 @@
-# ex-ai-spec 
+# ai-spec-auto 
 
 AI Coding 团队规范驱动开发 CLI — 让 AI 编码助手遵循统一的开发规范、工作流程和最佳实践。
 
@@ -16,7 +16,7 @@ AI Coding 团队规范驱动开发 CLI — 让 AI 编码助手遵循统一的开
 | `.agents/skills/` | 操作层（Skills） | 带步骤与清单的过程式技能（含 `create-proposal`、`execute-task` 等） |
 | `.cursor/`、`.claude/` 等（L2+） | IDE 适配 | 通过链接引用 `.agents`，保证多 IDE 读同一套源 |
 | `.cursor/mcp.json`（L2+） | 上下文层 | 接入 ApiFox、Figma、Playwright 等，补全接口与设计稿上下文 |
-| `openspec/`（**L3**） | 流程层（OpenSpec） | `config.yaml` 桥接 ex-ai-spec；`changes/`、`specs/` 管理提案 → 实施 → 归档 |
+| `openspec/`（**L3**） | 流程层（OpenSpec） | `config.yaml` 桥接 ai-spec-auto；`changes/`、`specs/` 管理提案 → 实施 → 归档 |
 | 根目录 lint 等（可选） | 自动化层 | 通过 `configs/` 下发的 ESLint / Prettier / Stylelint；husky 按需安装 |
 
 **L1 / L2 / L3 是渐进安装层级**：**默认主推 L3**（含 OpenSpec 完整闭环）。若仅需规范与 MCP、暂不要需求流程，可选用 **L2**；个人试用可用 **L1**。详见下文「安装层级」与 [docs/openspec-guide.md](docs/openspec-guide.md)。
@@ -35,13 +35,13 @@ AI Coding 团队规范驱动开发 CLI — 让 AI 编码助手遵循统一的开
 
 ```bash
 # 交互式安装（引导选择技术栈和层级）
-npx @ex/ai-spec init
+npx @ex/ai-spec-auto@latest init .
 
 # 指定 Profile（未写 --level 时默认为 L3，含 OpenSpec）
-npx @ex/ai-spec init --profile vue
+npx @ex/ai-spec-auto@latest init . --profile vue
 
 # 不要 OpenSpec 时显式指定 L2
-npx @ex/ai-spec init --profile vue --level L2
+npx @ex/ai-spec-auto@latest init . --profile vue --level L2
 ```
 
 > 首次使用前需配置私有源（仅一次）：在 `~/.npmrc` 中添加 `@ex:registry=http://nodejs.100credit.cn/`
@@ -49,37 +49,37 @@ npx @ex/ai-spec init --profile vue --level L2
 更新规范 / 检查状态 / 卸载：
 
 ```bash
-npx @ex/ai-spec update          # 更新通用规范
-npx @ex/ai-spec check           # 检查安装状态
-npx @ex/ai-spec uninstall       # 卸载规范库
+npx @ex/ai-spec-auto@latest update .          # 更新通用规范
+npx @ex/ai-spec-auto@latest check .           # 检查安装状态
+npx @ex/ai-spec-auto@latest uninstall .       # 卸载规范库
 ```
 
 也可以全局安装后直接使用命令：
 
 ```bash
-npm install -g @ex/ai-spec
-ai-spec init --profile react
+npm install -g @ex/ai-spec-auto@latest
+ai-spec-auto init --profile react
 ```
 
 > 跨平台支持：macOS/Linux 自动使用 Bash 脚本，Windows 自动使用 PowerShell 脚本，无需额外配置。
 
 ### Monorepo / pnpm workspace
 
-在含 **`pnpm-workspace.yaml`** 或根目录 **`package.json` 含 `workspaces`** 的仓库中，于**工作区根**执行 `npx @ex/ai-spec init` 时：
+在含 **`pnpm-workspace.yaml`** 或根目录 **`package.json` 含 `workspaces`** 的仓库中，于**工作区根**执行 `npx @ex/ai-spec-auto@latest init .` 时：
 
 - **交互终端**：脚本会提示选择「在根目录安装」或「输入子包相对路径」（如 `packages/web`），推荐将规范与 lint/husky 依赖落在**具体前端应用包**内，减少与 pnpm workspace 根目录行为的混淆。
 - **非交互**（CI、管道）：不暂停；会打印建议在子包执行的示例。无参时默认仍在根目录继续安装。可显式指定：
-  - `npx @ex/ai-spec init . --package packages/your-app`（路径相对**工作区根**），或
+  - `npx @ex/ai-spec-auto@latest init . --package packages/your-app`（路径相对**工作区根**），或
   - 环境变量 `EX_AI_SPEC_WORKSPACE_PACKAGE=packages/your-app`，或
-  - `npx @ex/ai-spec init . --workspace-root`（强制根目录、跳过交互）。
+  - `npx @ex/ai-spec-auto@latest init . --workspace-root`（强制根目录、跳过交互）。
 - `install.sh` / `install.ps1` 同样支持 **`--package`**、**`--workspace-root`**。pnpm 在根目录为 workspace 添加依赖时请使用 `pnpm add -w`；详见 `.agents/rules/common/08-通用约束.md` 与 [docs/quick-start.md](docs/quick-start.md)。
 
 ### 手动安装（Git 克隆）
 
 ```bash
 # 克隆规范库
-git clone http://git.100credit.cn/zhenwei.li/ex-ai-spec.git
-cd ex-ai-spec
+git clone http://git.100credit.cn/zhenwei.li/ai-spec-auto.git ai-spec-auto
+cd ai-spec-auto
 
 # 交互式安装（引导选择技术栈和层级）
 bash install.sh init /path/to/your-project
@@ -94,8 +94,8 @@ bash install.sh init /path/to/your-project --profile vue
 # 首次使用需放开脚本执行策略（仅需执行一次）
 Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
 
-git clone http://git.100credit.cn/zhenwei.li/ex-ai-spec.git
-cd ex-ai-spec
+git clone http://git.100credit.cn/zhenwei.li/ai-spec-auto.git ai-spec-auto
+cd ai-spec-auto
 
 # 交互式安装（引导选择技术栈和层级）
 .\install.ps1 init C:\path\to\your-project
@@ -117,7 +117,7 @@ curl -sSL <raw-url>/install.sh | bash -s -- init . --profile vue
 irm <raw-url>/install.ps1 | iex
 ```
 
-安装完成后，在 AI IDE 中输入 **"初始化项目规范"** 即可自动分析项目并生成 `01-项目概述`、`03-项目结构`；若安装时选择了“根据项目自定义”且对应规则仍缺失，还会一并补生成 `04/05/06/07/09`。
+安装完成后，优先使用 **`/project-init`**（或输入 **"初始化项目规范"**）自动分析项目并生成 `01-项目概述`、`03-项目结构`；若安装时选择了“根据项目自定义”且对应规则仍缺失，还会一并补生成 `04/05/06/07/09`。
 
 ### 技术栈 Profile
 
@@ -152,10 +152,14 @@ irm <raw-url>/install.ps1 | iex
 | `--profile <name>` | 技术栈选择 (`react` / `vue`) | `vue` |
 | `--level <L>` | 安装层级 (`L1` / `L2` / `L3`) | `L3` |
 | `--ide <name>` | 指定 IDE (`default` / `cursor` / `claude` / `opencode` / `trae` / `all`) | `default`（cursor+claude） |
+| `--standard-rules` / `--custom-rules` | 使用标准规则，或启用“根据项目自定义”的规则选择 | 交互询问 |
 | `--uipro` | 安装 UI UX Pro Max 设计智能技能 | 交互询问；**非交互必须显式传入** |
 | `--no-uipro` | 跳过 UI UX Pro Max | 非交互默认等效于未传 `--uipro`（不安装） |
 | `--lint` / `--no-lint` | 是否部署 ESLint/Prettier/Stylelint 并安装依赖 | 交互询问；非交互默认安装 |
 | `--husky` / `--no-husky` | 是否部署提交校验（`.husky`、`lint-staged`、`commitlint`）并安装依赖 | 交互默认 N；非交互默认跳过 |
+| `--update-rules` / `--no-update-rules` | `update` 时显式更新或跳过 rules | 交互模式可切换 |
+| `--skip-skills` / `--skip-configs` / `--skip-commands` / `--skip-ide-links` / `--skip-openspec` / `--skip-uipro` | `update` 时跳过对应模块 | 见 `install.sh --help` |
+| `--update-commands` / `--update-uipro` | `update` 时覆盖已有命令模板，或显式重装 UI UX Pro Max | 按需显式传入 |
 | `--repo <url>` | 自定义规范库地址 | 内置默认地址 |
 | `--refresh-cache` | 清除本地缓存并重新克隆规范库 | - |
 | `--package <path>` | Monorepo 下相对**工作区根**的子包路径，跳过「根/子包」交互（如 `packages/web`） | - |
@@ -169,8 +173,8 @@ irm <raw-url>/install.ps1 | iex
 该技能依赖全局包 **`uipro-cli`**（命令 **`uipro`**），在临时目录执行 `uipro init --ai cursor` 后，将资源落到 `.agents/skills/ui-ux-pro-max/`。
 
 - **非交互**（CI、`npx` 无 TTY、脚本管道等）下 **`init` 不会自动安装**（与 lint 不同：lint 非交互默认安装，UI UX Pro Max 必须显式开启）。需要时请加上 **`--uipro`**：
-  - `npx @ex/ai-spec init . --uipro`
-  - 已有规范后补装或重装：`npx @ex/ai-spec update . --uipro`
+  - `npx @ex/ai-spec-auto@latest init . --uipro`
+  - 已有规范后补装或重装：`npx @ex/ai-spec-auto@latest update . --uipro`
 - **Windows**：若全局安装后仍提示找不到 `uipro`，请检查 **npm 全局 bin 目录是否已加入 PATH**，或新开终端再试；安装失败时脚本会尽量输出日志路径与尾部内容便于排查。
 - **`check`**：仅当存在 `skills/ui-ux-pro-max/SKILL.md` 时显示「已安装」；未安装与安装不完整（仅有目录、缺 `SKILL.md`）会分别提示，不完整时可执行 `update . --uipro` 修复。
 
@@ -219,7 +223,7 @@ graph LR
 ### 源仓库目录结构
 
 ```
-ex-ai-spec /
+ai-spec-auto /
 ├── .agents/                          # 规范维护源
 │   ├── rules/
 │   │   ├── common/                   # 技术栈无关的通用规范（7 个）
@@ -364,27 +368,27 @@ ex-ai-spec /
 
 ## OpenSpec 集成（L3）
 
-ex-ai-spec 与 OpenSpec 通过 `openspec/config.yaml` 一个文件桥接：**编码规范在 `.agents/`，需求流程在 `openspec/`**，同一套安装流程（`npx @ex/ai-spec init --level L3` 或 `install.sh` / `install.ps1`）即可落地，无需把 OpenSpec 当作与规范库无关的「外挂」。
+ai-spec-auto 与 OpenSpec 通过 `openspec/config.yaml` 一个文件桥接：**编码规范在 `.agents/`，需求流程在 `openspec/`**，同一套安装流程（`npx @ex/ai-spec-auto@latest init . --level L3` 或 `install.sh` / `install.ps1`）即可落地，无需把 OpenSpec 当作与规范库无关的「外挂」。
 
-- **ex-ai-spec** 管理编码规范和业务技能（`.agents/`）
+- **ai-spec-auto** 管理编码规范和业务技能（`.agents/`）
 - **OpenSpec** 管理需求流程（propose → apply → archive）
-- `config.yaml` 的 `context` 和 `rules` 字段让 OpenSpec 流程自动引用 ex-ai-spec 规范
+- `config.yaml` 的 `context` 和 `rules` 字段让 OpenSpec 流程自动引用 ai-spec-auto 规范
 
-L3 安装时，`install.sh` 会在需要时**尝试全局安装** `@fission-ai/openspec` 并运行 `openspec init`（失败时见文末红色待处理事项）；`npx @ex/ai-spec init` 行为以 npm 包实现为准。
+L3 安装时，`install.sh` 会在需要时**尝试全局安装** `@fission-ai/openspec` 并运行 `openspec init`（失败时见文末红色待处理事项）；`npx @ex/ai-spec-auto@latest init` 行为以 npm 包实现为准。
 
 ```bash
 # 完整安装含 OpenSpec
 bash install.sh init /path/to/project --profile react --level L3
 
 # 或使用 npx
-npx @ex/ai-spec init --profile react --level L3
+npx @ex/ai-spec-auto@latest init . --profile react --level L3
 ```
 
 **L3 最简流程**（详版见 [docs/openspec-guide.md](docs/openspec-guide.md)）：
 
 | 阶段 | 做法 |
 |------|------|
-| **创建提案** | **Cursor**：`/opsx-propose [名称或描述]`；**Claude Code** 等：`/opsx:propose …`。或说「帮我创建一个变更提案」→ `create-proposal` 前置分析后再生成提案。 |
+| **创建提案** | **Cursor**：`/opsx-propose [名称或描述]`；**Claude Code** 等：`/opsx:propose …`。Cursor 的连字符命令由本规范库安装时直接同步到 `.cursor/commands/`；自然语言如「帮我创建一个变更提案」会先走 `create-proposal` 前置分析，再生成提案。 |
 | **实施** | **Cursor**：`/opsx-apply`；**Claude Code** 等：`/opsx:apply`。按 **execute-task** 四步执行 `openspec/changes/<name>/tasks.md`，勿跳过流程直写代码。也可说「开始执行任务」「应用变更」。 |
 | **归档** | **Cursor**：`/opsx-archive`；**Claude Code** 等：`/opsx:archive`。 |
 
@@ -406,8 +410,8 @@ npx @ex/ai-spec init --profile react --level L3
 | **MCP 配置** | 模板中 MCP 在 Cursor 里常默认**关闭**；先在「设置 → MCP」按需启用，再将 `.cursor/mcp.json` 中 `project-id`、`access-token` 等占位符换成真实值 |
 | **OpenSpec** | 仅 **L3** 安装 `openspec/`；L1/L2 可先专注编码规范与 MCP，需要需求闭环时再执行 `init --level L3` 升级（与 [docs/openspec-guide.md](docs/openspec-guide.md) 一致） |
 | **Windows 链接** | 使用 Junction（`mklink /J`）替代 symlink，无需管理员权限 |
-| **规范更新** | 定期运行 `npx @ex/ai-spec update`，或 `install.sh update` / `.\install.ps1 update` 同步最新通用规范 |
-| **缓存管理** | 规范库会缓存到 `~/.ex-ai-spec /`，切换分支或强制刷新时使用 `--refresh-cache` |
+| **规范更新** | 定期运行 `npx @ex/ai-spec-auto@latest update .`，或 `install.sh update` / `.\install.ps1 update`；交互模式可细选 Skills / Rules / Configs / Commands / IDE Links / OpenSpec / UI UX Pro Max |
+| **缓存管理** | 规范库会缓存到 `~/.ai-spec-auto /`，切换分支或强制刷新时使用 `--refresh-cache` |
 | **Monorepo** | 根目录 `init` 会触发工作区检测与交互（或 `--package` / `--workspace-root`）；详见上文「Monorepo / pnpm workspace」与 [docs/quick-start.md](docs/quick-start.md) |
 
 ---
@@ -431,10 +435,13 @@ npx @ex/ai-spec init --profile react --level L3
 ## FAQ
 
 **Q: 安装后 AI 没有遵循规范？**
-A: 运行 `npx @ex/ai-spec check`，或 `install.sh check` / `.\install.ps1 check` 确认链接有效。部分 IDE 需要重启才能识别新的规则文件。
+A: 运行 `npx @ex/ai-spec-auto@latest check .`，或 `install.sh check` / `.\install.ps1 check` 确认链接有效。部分 IDE 需要重启才能识别新的规则文件。
 
 **Q: Windows 上运行 `install.ps1` 提示"禁止运行脚本"怎么办？**
 A: Windows PowerShell 默认禁止执行脚本。运行 `Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned` 放开策略（仅需一次），或使用 `powershell -ExecutionPolicy Bypass -File .\install.ps1 init .` 单次绕过。
+
+**Q: Windows 上 `npx` / `install.ps1` 出现 ParserError 或中文乱码怎么办？**
+A: 先确认你运行的是包内 `install.ps1`，不要把脚本从网页或聊天里复制后另存。当前仓库已通过 `.editorconfig` 和 `prepack` 守卫要求 `install.ps1` 使用 **UTF-8 with BOM**；若编辑器或格式化工具去掉了 BOM，PowerShell 5.1 可能会按系统代码页误读中文并报错。
 
 **Q: PowerShell 脚本和 Bash 脚本功能一样吗？**
 A: 是的。`install.ps1` v2.0 已与 `install.sh` 完全功能对齐，支持交互选择、所有参数和全部安装层级。Windows 团队成员也可以使用 Git Bash 运行 `install.sh`。
@@ -443,7 +450,10 @@ A: 是的。`install.ps1` v2.0 已与 `install.sh` 完全功能对齐，支持�
 A: 运行 `install.sh init --profile vue`（或 `.\install.ps1 init --profile vue`）重新安装。会覆盖技术栈相关的规则文件（04/06/07/09），但已修改过的项目特有规则（01/03）会跳过。
 
 **Q: update 会覆盖我修改过的文件吗？**
-A: 不会覆盖 `01-项目概述.md` 和 `03-项目结构.md`（项目特有规则），也不会覆盖已有的 lint/format/husky 配置文件。通用规范和技能会全量更新。
+A: 不会覆盖 `01-项目概述.md` 和 `03-项目结构.md`（项目特有规则），也不会覆盖已有的 lint/format/husky 配置文件。若你在安装时把 `04/05/06/07/09` 选为“根据项目自定义”，这些规则在 `update` 时也会继续跳过。通用规范与技能是否更新，由 `update` 菜单或对应参数控制。
+
+**Q: 如何在 update 时只更新部分模块？**
+A: 直接运行 `npx @ex/ai-spec-auto@latest update .` 或脚本版 `update`，交互菜单里切换 `Skills / Rules / Configs / Commands / IDE Links / OpenSpec / UI UX Pro Max` 即可。非交互场景再使用 `--skip-skills`、`--skip-configs`、`--update-rules`、`--update-commands` 这类参数。
 
 **Q: 如何添加自定义规范？**
 A: 在安装后的 `.agents/rules/` 下新增文件即可，建议使用数字前缀保持排序（如 `14-自定义规范.md`）。添加新技能则在 `.agents/skills/` 下创建目录和 `SKILL.md`。
@@ -452,7 +462,7 @@ A: 在安装后的 `.agents/rules/` 下新增文件即可，建议使用数字�
 A: 支持。安装脚本会检测 **pnpm / npm workspaces**：在**工作区根**交互执行 `init` 时可选择把规范与依赖落在**根包**或**指定子包**（输入相对路径）；非交互场景用 `--package <相对工作区根的路径>`、`EX_AI_SPEC_WORKSPACE_PACKAGE`，或先 `cd` 子包再 `init`。若在根目录向 workspace 添加依赖时遇到 **`ERR_PNPM_ADDING_TO_ROOT`**，请使用 `pnpm add -w <包名>`，或把安装目标切到子包后再装依赖。详见 README「Monorepo / pnpm workspace」与 [docs/quick-start.md](docs/quick-start.md)。
 
 **Q: OpenSpec 是必须的吗？**
-A: **安装层级上可选**：L1/L2 不包含 `openspec/` 目录与 OPSX 工作流。若团队要做 **规范驱动的前端交付闭环**（提案、任务拆分、实施、归档），建议采用 **L3**：OpenSpec 与 ex-ai-spec 在同一安装流程中落地，通过 `config.yaml` 与 `.agents` 联动；日常小改、bug fix 仍可直接对话开发，不必每条都走提案。
+A: **安装层级上可选**：L1/L2 不包含 `openspec/` 目录与 OPSX 工作流。若团队要做 **规范驱动的前端交付闭环**（提案、任务拆分、实施、归档），建议采用 **L3**：OpenSpec 与 ai-spec-auto 在同一安装流程中落地，通过 `config.yaml` 与 `.agents` 联动；日常小改、bug fix 仍可直接对话开发，不必每条都走提案。
 
 **Q: 我选择了不安装 Husky，为什么以前会出现 `.husky` 目录？**
 A: 旧版在同步 lint 配置时会把模板里的 `.husky` 一并复制。当前版本已修复：只有选择安装提交校验（`--husky` 或交互选 Y），或目标项目已有 `.husky`（便于 `update` 维护）时才会下发 `.husky`、`.lintstagedrc` 与 `commitlint.config.js`。

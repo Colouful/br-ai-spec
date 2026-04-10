@@ -17,7 +17,7 @@ description: 定义 task-orchestrator 输出给自动执行适配层消费的最
 当宿主 `Runner（运行器）` 不可用时，需要一个稳定的回退适配入口：
 
 ```bash
-ai-spec task-orchestrator-adapter apply --payload <file>
+ai-spec-auto task-orchestrator-adapter apply --payload <file>
 ```
 
 由适配层自动识别当前属于：
@@ -43,7 +43,7 @@ ai-spec task-orchestrator-adapter apply --payload <file>
 也就是说，这类输入本身就可直接交给适配器：
 
 ```bash
-ai-spec task-orchestrator-adapter apply --payload ./.ai-spec/internal/tmp/task-orchestrator-bootstrap.json
+ai-spec-auto task-orchestrator-adapter apply --payload ./.ai-spec/internal/tmp/task-orchestrator-bootstrap.json
 ```
 
 ### 2.2 运行态动作 payload
@@ -150,4 +150,4 @@ ai-spec task-orchestrator-adapter apply --payload ./.ai-spec/internal/tmp/task-o
 
 ## 5. 一句话约束
 
-> 主代理若要进入自动执行链，应优先输出最小结构化 scratch 交给宿主 `Runner（运行器）` 消费；若 `Runner` 不可用，再回退为 adapter payload，由 `ai-spec task-orchestrator-adapter apply` 统一翻译为 `runtime-state（运行状态）` 更新，而不是在对话里手写命令。 
+> 主代理若要进入自动执行链，应优先输出最小结构化 scratch 交给宿主 `Runner（运行器）` 消费；若 `Runner` 不可用，再回退为 adapter payload，由 `ai-spec-auto task-orchestrator-adapter apply` 统一翻译为 `runtime-state（运行状态）` 更新，而不是在对话里手写命令。 

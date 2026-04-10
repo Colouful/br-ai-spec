@@ -1,4 +1,4 @@
-# ai-spec run（运行）输入输出契约
+# ai-spec-auto run（运行）输入输出契约
 
 本文档定义 `run（运行编排）` 的最小实现契约。
 
@@ -34,7 +34,7 @@
 
 ### 1.2 还没有的内容
 
-- CLI（命令行工具）里还没有真正可执行的 `ai-spec run（运行）` 子命令
+- CLI（命令行工具）里还没有真正可执行的 `ai-spec-auto run（运行）` 子命令
 - 当前 [bin/cli.js](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/bin/cli.js#L1) 仍然只是安装脚本代理，不负责 `run（运行）` 路由
 - 还没有完整的 `run-result（运行结果）` 状态机实现
 - 虽然已经补了 `gate-blocked（阻断） / approve（审批） / resume（恢复） / status（状态） / complete（完成） / fail（失败） / cancel（取消）` 的最小命令，但还没有继续覆盖完整的审批、恢复和结束状态机
@@ -46,7 +46,7 @@
 
 补充说明：
 
-> 当前仓库已经提供 `ai-spec runtime-state init` 作为底层写盘工具，并提供 `ai-spec task-orchestrator-adapter apply` 作为主代理自动执行适配入口；如果上游是自然语言/Markdown（标记文本） 回复，则优先先经过 `ai-spec task-orchestrator-extractor apply` 做结构化抽取，再由适配层统一驱动 `runtime-state bootstrap / handoff / gate-blocked / approve / resume / status / complete / fail / cancel`，把运行态稳定落盘并持续更新。
+> 当前仓库已经提供 `ai-spec-auto runtime-state init` 作为底层写盘工具，并提供 `ai-spec-auto task-orchestrator-adapter apply` 作为主代理自动执行适配入口；如果上游是自然语言/Markdown（标记文本） 回复，则优先先经过 `ai-spec-auto task-orchestrator-extractor apply` 做结构化抽取，再由适配层统一驱动 `runtime-state bootstrap / handoff / gate-blocked / approve / resume / status / complete / fail / cancel`，把运行态稳定落盘并持续更新。
 
 补充说明 2：
 
@@ -71,7 +71,7 @@
 
 ### 3.1 `sync（同步）` 负责什么
 
-`ai-spec sync（同步）` 负责：
+`ai-spec-auto sync（同步）` 负责：
 
 - 读取 `manifest（安装清单）`
 - 安装或同步资产
@@ -122,7 +122,7 @@ run（运行） = 编排与执行
 后续如果需要 CLI（命令行工具）适配器，再支持下面这种形式：
 
 ```bash
-ai-spec run . \
+ai-spec-auto run . \
   --flow prd-to-delivery \
   --change add-user-center \
   --input ./docs/prd.md
@@ -131,7 +131,7 @@ ai-spec run . \
 或者让主代理自动选模板：
 
 ```bash
-ai-spec run . \
+ai-spec-auto run . \
   --change add-user-center \
   --input ./docs/prd.md \
   --mode auto
@@ -225,7 +225,7 @@ ai-spec run . \
 如果当前触发环境允许执行本地命令，则主代理应继续：
 
 1. 组装首轮桥接载荷
-2. 优先调用 `ai-spec task-orchestrator-adapter apply`
+2. 优先调用 `ai-spec-auto task-orchestrator-adapter apply`
 3. 立即写入 `.ai-spec/current-run.json`
 4. 同步写入 `.ai-spec/runs/<run-id>.json`
 5. 为下一轮载荷清出干净状态
@@ -465,7 +465,7 @@ ai-spec run . \
 这份契约与下面几份规范配套使用：
 
 - [Manifest安装清单规范.md](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/paser_two/Manifest安装清单规范.md)
-- [ai-spec-sync输入输出契约-03-27-17-09.md](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/paser_two/ai-spec-sync输入输出契约-03-27-17-09.md)
+- [ai-spec-auto-sync输入输出契约-03-27-17-09.md](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/paser_two/ai-spec-sync输入输出契约-03-27-17-09.md)
 - [lock与sources结构规范-03-27-17-17.md](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/paser_two/lock与sources结构规范-03-27-17-17.md)
 - [运行状态落盘规范-03-30-14-58.md](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/paser_two/运行状态落盘规范-03-30-14-58.md)
 - [IDE里触发run的最小交互协议-03-30-14-04.md](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/paser_two/IDE里触发run的最小交互协议-03-30-14-04.md)

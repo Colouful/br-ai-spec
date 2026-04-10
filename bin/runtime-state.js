@@ -11,18 +11,19 @@ const { syncRepoMap } = require('./repo-map');
 
 function printUsage() {
   console.log(`Usage:
-  ai-spec runtime-state init --run-plan <file> [options]
-  ai-spec runtime-state bootstrap --payload <file> [options]
-  ai-spec runtime-state bootstrap --stdin [options]
-  ai-spec runtime-state handoff --to-role <role> [options]
-  ai-spec runtime-state approve [options]
-  ai-spec runtime-state resume [options]
-  ai-spec runtime-state restore --checkpoint <file> [options]
-  ai-spec runtime-state gate-blocked [options]
-  ai-spec runtime-state complete [options]
-  ai-spec runtime-state fail [options]
-  ai-spec runtime-state cancel [options]
-  ai-spec runtime-state status [options]
+  ai-spec-auto runtime-state init --run-plan <file> [options]
+  ai-spec-auto runtime-state bootstrap --payload <file> [options]
+  ai-spec-auto runtime-state bootstrap --stdin [options]
+  ai-spec-auto runtime-state handoff --to-role <role> [options]
+  ai-spec-auto runtime-state approve [options]
+  ai-spec-auto runtime-state pause [options]
+  ai-spec-auto runtime-state resume [options]
+  ai-spec-auto runtime-state restore --checkpoint <file> [options]
+  ai-spec-auto runtime-state gate-blocked [options]
+  ai-spec-auto runtime-state complete [options]
+  ai-spec-auto runtime-state fail [options]
+  ai-spec-auto runtime-state cancel [options]
+  ai-spec-auto runtime-state status [options]
 
 Options:
   --target <dir>           Target project directory (default: .)
@@ -46,11 +47,18 @@ Options:
   --message <text>         Event message override
   --error <text>           Failure detail appended to errors list
   --event-type <type>      Event type override (default: role-handoff)
-  --status <status>        planned | running | waiting-approval | blocked | success | failed | cancelled
+  --status <status>        planned | running | paused | waiting-confirm | waiting-approval | blocked | success | failed | cancelled
   --trigger-source <src>   Trigger source (default: ide-skill)
   --entry <entry>          Entry role (default: task-orchestrator)
   --raw-input <text>       Raw user input override
   --change-id <id>         Change id override
+  --change-impact <kind>   patch | scope-delta | re-scope | archive-fix | followup-patch
+  --reconcile-strategy <strategy>
+                           in-place | rewind-to-requirement | rewind-to-frontend | rewind-to-guardian | suggest-new-change | followup-patch
+  --reopen-reason <text>   Human-readable reopen / repair reason
+  --parent-change-id <id>  Parent change id for follow-up patch runs
+  --artifacts-to-update <items>
+                           Comma-separated artifact hints to update incrementally
   --json                   Print JSON result
   --pretty                 Print readable summary (default)
   --help                   Show this help
@@ -146,6 +154,24 @@ function parseArgs(argv) {
         break;
       case '--change-id':
         options.changeId = args.shift();
+        break;
+      case '--change-impact':
+        options.changeImpact = args.shift();
+        break;
+      case '--reconcile-strategy':
+        options.reconcileStrategy = args.shift();
+        break;
+      case '--reopen-reason':
+        options.reopenReason = args.shift();
+        break;
+      case '--parent-change-id':
+        options.parentChangeId = args.shift();
+        break;
+      case '--artifacts-to-update':
+        options.artifactsToUpdate = String(args.shift() || '')
+          .split(',')
+          .map((item) => item.trim())
+          .filter(Boolean);
         break;
       case '--json':
         options.json = true;
@@ -278,6 +304,7 @@ const CHECKPOINT_EVENTS = new Set([
   'handoff',
   'gate-blocked',
   'approve',
+  'pause',
   'complete',
   'fail',
   'cancel',
@@ -296,6 +323,42 @@ function buildGateContext(state, options = {}, fallbackGate = null) {
     required_user_action: options.requiredUserAction || state?.gate_context?.required_user_action || null,
     blocked_reason: options.blockedReason || state?.gate_context?.blocked_reason || null,
   };
+}
+
+function buildIncrementalUpdateState(state, options = {}, defaults = {}) {
+  const previous = state?.incremental_update && typeof state.incremental_update === 'object'
+    ? state.incremental_update
+    : {};
+  const next = {
+    change_impact: options.changeImpact || defaults.changeImpact || previous.change_impact || null,
+    reconcile_strategy: options.reconcileStrategy || defaults.reconcileStrategy || previous.reconcile_strategy || null,
+    artifacts_to_update: Array.isArray(options.artifactsToUpdate)
+      ? options.artifactsToUpdate
+      : Array.isArray(defaults.artifactsToUpdate)
+      ? defaults.artifactsToUpdate
+      : Array.isArray(previous.artifacts_to_update)
+      ? previous.artifacts_to_update
+      : [],
+    reopen_reason: options.reopenReason || defaults.reopenReason || previous.reopen_reason || null,
+    parent_change_id: options.parentChangeId || defaults.parentChangeId || previous.parent_change_id || null,
+    target_role: options.toRole || options.nextRole || defaults.targetRole || previous.target_role || null,
+    handoff_gate: options.handoffGate || defaults.handoffGate || previous.handoff_gate || null,
+    updated_at: defaults.updatedAt || previous.updated_at || null,
+  };
+
+  if (
+    !next.change_impact &&
+    !next.reconcile_strategy &&
+    next.artifacts_to_update.length === 0 &&
+    !next.reopen_reason &&
+    !next.parent_change_id &&
+    !next.target_role &&
+    !next.handoff_gate
+  ) {
+    return null;
+  }
+
+  return next;
 }
 
 function buildDefaultAutoFixState() {
@@ -831,10 +894,12 @@ function buildRunState({ runPlan, taskAnchor, options, now, source }) {
     },
     task: {
       change_id: changeId,
+      parent_change_id: options.parentChangeId || runPlan.task?.parent_change_id || taskAnchor?.task?.parent_change_id || null,
       input_kind: runPlan.task?.input_kind || taskAnchor?.task?.input_kind || 'unknown',
       risk_level: riskLevel,
       type: runPlan.task?.type || null,
       complexity,
+      change_impact: options.changeImpact || runPlan.task?.change_impact || null,
     },
     flow: {
       id: runPlan.flow?.id || null,
@@ -856,6 +921,14 @@ function buildRunState({ runPlan, taskAnchor, options, now, source }) {
     pending_input_update: false,
     pending_gate: pendingGate,
     gate_context: buildGateContext(null, options, pendingGate),
+    incremental_update: buildIncrementalUpdateState(null, options, {
+      changeImpact: options.changeImpact || runPlan.task?.change_impact || null,
+      reconcileStrategy: options.reconcileStrategy || runPlan.task?.reconcile_strategy || null,
+      artifactsToUpdate: options.artifactsToUpdate || runPlan.task?.artifacts_to_update || [],
+      reopenReason: options.reopenReason || runPlan.task?.reopen_reason || null,
+      parentChangeId: options.parentChangeId || runPlan.task?.parent_change_id || null,
+      updatedAt: createdAt,
+    }),
     artifacts,
     verification: null,
     auto_fix: buildDefaultAutoFixState(),
@@ -1033,6 +1106,13 @@ function recordRunInputUpdate(options) {
     at: now.toISOString(),
     text: userInput,
     source: options.source || 'protocol-update',
+    change_impact: options.changeImpact || null,
+    reconcile_strategy: options.reconcileStrategy || null,
+    artifacts_to_update: Array.isArray(options.artifactsToUpdate) ? options.artifactsToUpdate : [],
+    reopen_reason: options.reopenReason || null,
+    parent_change_id: options.parentChangeId || null,
+    target_role: options.toRole || options.nextRole || null,
+    handoff_gate: options.handoffGate || null,
   };
 
   const nextInputUpdates = [...(Array.isArray(state.input_updates) ? state.input_updates : []), update].slice(-20);
@@ -1060,7 +1140,12 @@ function recordRunInputUpdate(options) {
       ...(state.trigger || {}),
       latest_user_input: userInput,
       latest_input_at: now.toISOString(),
+      latest_change_impact: options.changeImpact || null,
+      latest_reconcile_strategy: options.reconcileStrategy || null,
     },
+    incremental_update: buildIncrementalUpdateState(state, options, {
+      updatedAt: now.toISOString(),
+    }),
     input_updates: nextInputUpdates,
     events: [...(Array.isArray(state.events) ? state.events : []), event],
     timestamps: {
@@ -1075,6 +1160,7 @@ function recordRunInputUpdate(options) {
     currentRunPath,
     syncCurrent,
     state: updatedState,
+    checkpointEvent: 'pause',
   });
 
   return {
@@ -1347,6 +1433,9 @@ function approveRunState(options) {
     pending_input_update: false,
     pending_gate: null,
     gate_context: null,
+    incremental_update: buildIncrementalUpdateState(state, options, {
+      updatedAt: now.toISOString(),
+    }),
     auto_fix: buildNextAutoFixState(state, options),
     anchor,
     events: [...(Array.isArray(state.events) ? state.events : []), event],
@@ -1385,6 +1474,73 @@ function approveRunState(options) {
   };
 }
 
+function pauseRunState(options) {
+  const targetDir = path.resolve(process.cwd(), options.target || '.');
+  const taskAnchorPath = options.taskAnchor
+    ? path.resolve(process.cwd(), options.taskAnchor)
+    : null;
+  const { currentRunPath, historyRunPath, state, syncCurrent } = resolveRunStatePaths(targetDir, options.runId);
+  if (['success', 'failed', 'cancelled'].includes(String(state.status || '').toLowerCase())) {
+    throw new Error(`Cannot pause terminal run: ${state.run_id}`);
+  }
+
+  const toRole = options.toRole || state.current_role || state.anchor?.stage?.current_role || state.plan?.first_handoff || null;
+  const taskAnchor = loadTaskAnchor(taskAnchorPath, options.taskAnchorData || null);
+  const anchor = updateAnchorForRole(state.anchor || null, taskAnchor, toRole, options.nextRole);
+  const now = new Date();
+  const event = buildStateEvent({
+    state,
+    options: { ...options, toRole, clearPendingGate: false },
+    now,
+    defaults: {
+      status: 'paused',
+      eventType: 'run-paused',
+      message: options.message || 'run paused',
+      pendingGate: state.pending_gate || null,
+    },
+  });
+
+  const updatedState = {
+    ...state,
+    status: options.status || 'paused',
+    current_role: toRole,
+    pending_input_update: false,
+    pending_gate: options.clearPendingGate ? null : state.pending_gate || null,
+    gate_context: options.clearPendingGate ? null : state.gate_context || null,
+    incremental_update: buildIncrementalUpdateState(state, options, {
+      updatedAt: now.toISOString(),
+    }),
+    auto_fix: buildNextAutoFixState(state, options),
+    anchor,
+    events: [...(Array.isArray(state.events) ? state.events : []), event],
+    timestamps: {
+      ...(state.timestamps || {}),
+      updated_at: now.toISOString(),
+    },
+  };
+
+  const persistedState = saveUpdatedRunState({
+    targetDir,
+    historyRunPath,
+    currentRunPath,
+    syncCurrent,
+    state: updatedState,
+  });
+
+  return {
+    status: 'success',
+    target: targetDir,
+    artifacts: {
+      current_run: syncCurrent ? currentRunPath : null,
+      run_history: historyRunPath,
+    },
+    state: persistedState,
+    source: {
+      task_anchor: taskAnchorPath,
+    },
+  };
+}
+
 function resumeRunState(options) {
   const targetDir = path.resolve(process.cwd(), options.target || '.');
   const taskAnchorPath = options.taskAnchor
@@ -1416,6 +1572,9 @@ function resumeRunState(options) {
     pending_input_update: false,
     pending_gate: options.clearPendingGate === false ? state.pending_gate || null : null,
     gate_context: options.clearPendingGate === false ? state.gate_context || null : null,
+    incremental_update: buildIncrementalUpdateState(state, options, {
+      updatedAt: now.toISOString(),
+    }),
     auto_fix: buildNextAutoFixState(state, options),
     anchor,
     events: [...(Array.isArray(state.events) ? state.events : []), event],
@@ -1545,6 +1704,7 @@ function statusRunState(options) {
       input_update_count: Array.isArray(state.input_updates) ? state.input_updates.length : 0,
       pending_gate: state.pending_gate || null,
       gate_context: state.gate_context || null,
+      incremental_update: state.incremental_update || null,
       auto_fix: normalizeAutoFixState(state.auto_fix),
       checkpoint_count: Number(state.checkpoint_count) || 0,
       last_checkpoint: state.last_checkpoint || null,
@@ -1588,6 +1748,9 @@ function gateBlockedRunState(options) {
     pending_input_update: false,
     pending_gate: requestedGate,
     gate_context: buildGateContext(state, options, requestedGate),
+    incremental_update: buildIncrementalUpdateState(state, options, {
+      updatedAt: now.toISOString(),
+    }),
     auto_fix: buildNextAutoFixState(state, options),
     anchor,
     events: [...(Array.isArray(state.events) ? state.events : []), event],
@@ -1659,6 +1822,9 @@ function completeRunState(options) {
     pending_input_update: false,
     pending_gate: null,
     gate_context: null,
+    incremental_update: buildIncrementalUpdateState(state, options, {
+      updatedAt: now.toISOString(),
+    }),
     artifacts: nextArtifacts,
     auto_fix: buildNextAutoFixState(state, options, { active: false }),
     anchor,
@@ -1728,6 +1894,9 @@ function failRunState(options) {
     pending_input_update: false,
     pending_gate: null,
     gate_context: null,
+    incremental_update: buildIncrementalUpdateState(state, options, {
+      updatedAt: now.toISOString(),
+    }),
     auto_fix: buildNextAutoFixState(state, options, { active: false }),
     anchor,
     errors: updatedErrors,
@@ -1793,6 +1962,9 @@ function cancelRunState(options) {
     pending_input_update: false,
     pending_gate: null,
     gate_context: null,
+    incremental_update: buildIncrementalUpdateState(state, options, {
+      updatedAt: now.toISOString(),
+    }),
     auto_fix: buildNextAutoFixState(state, options, { active: false }),
     anchor,
     events: [...(Array.isArray(state.events) ? state.events : []), event],
@@ -1903,6 +2075,8 @@ function printPretty(result, action = 'init') {
     console.log('run-state approved');
   } else if (action === 'resume') {
     console.log('run-state resumed');
+  } else if (action === 'pause') {
+    console.log('run-state paused');
   } else if (action === 'restore') {
     console.log('run-state restored');
   } else if (action === 'gate-blocked') {
@@ -1944,6 +2118,7 @@ function printPretty(result, action = 'init') {
     console.log(`  from_role: ${result.handoff?.from_role || 'n/a'}`);
     console.log(`  to_role: ${result.handoff?.to_role || 'n/a'}`);
   } else if (
+    action === 'pause' ||
     action === 'approve' ||
     action === 'resume' ||
     action === 'restore' ||
@@ -2017,6 +2192,18 @@ function main(argv = process.argv.slice(2)) {
       console.log(JSON.stringify(result, null, 2));
     } else {
       printPretty(result, 'approve');
+    }
+
+    return 0;
+  }
+
+  if (command === 'pause') {
+    const result = pauseRunState(options);
+
+    if (options.json) {
+      console.log(JSON.stringify(result, null, 2));
+    } else {
+      printPretty(result, 'pause');
     }
 
     return 0;
@@ -2111,6 +2298,7 @@ function main(argv = process.argv.slice(2)) {
     command !== 'bootstrap' &&
     command !== 'handoff' &&
     command !== 'approve' &&
+    command !== 'pause' &&
     command !== 'resume' &&
     command !== 'restore' &&
     command !== 'gate-blocked' &&
@@ -2152,6 +2340,7 @@ module.exports = {
   normalizeBootstrapPayload,
   handoffRunState,
   approveRunState,
+  pauseRunState,
   resumeRunState,
   restoreRunState,
   gateBlockedRunState,

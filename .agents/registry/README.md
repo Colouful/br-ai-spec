@@ -5,7 +5,7 @@ description: sync（同步）本地求解使用的最小注册表目录。用于
 
 # sync（同步）注册表目录
 
-本目录用于承载 `ai-spec sync（同步）` 的本地静态注册表。
+本目录用于承载 `ai-spec-auto sync（同步）` 的本地静态注册表。
 
 当前阶段放 5 类数据：
 
@@ -34,8 +34,8 @@ description: sync（同步）本地求解使用的最小注册表目录。用于
 为避免 `registry（注册表）` 数据文件写坏，当前项目提供了专门的校验命令：
 
 ```bash
-ai-spec validate-registry
-ai-spec validate-registry --json
+ai-spec-auto validate-registry
+ai-spec-auto validate-registry --json
 ```
 
 校验范围包括：
@@ -57,4 +57,4 @@ ai-spec validate-registry --json
 - `roles.json.rule_contract_profiles` 的 profile key 与数组字段是否合法
 - `scenario_package（场景方案包）` 引用的 `roles（专家角色） / skills（技能） / rules（规则）` 是否都能在注册表中找到
 
-`ai-spec sync（同步）` 在执行前也会先跑一次注册表校验；若校验失败，会直接中断并提示先执行 `ai-spec validate-registry` 查看详情。
+`ai-spec-auto sync（同步）` 在执行前也会先跑一次注册表校验；若校验失败，会直接中断并提示先执行 `ai-spec-auto validate-registry` 查看详情。

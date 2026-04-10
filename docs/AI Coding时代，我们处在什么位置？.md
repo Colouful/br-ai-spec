@@ -1,7 +1,7 @@
 # AI Coding 时代，我们处在什么位置？
 
-> 本文档用于团队内部分享：厘清 **AI 辅助编程的演进阶段**、**个人与团队应强化的能力**，以及 **ex-ai-spec**（npm：`@ex/ai-spec`）在其中的定位。  
-> 可与 [《项目需求说明》](http://git.100credit.cn/zhenwei.li/ex-ai-spec/-/blob/main/docs/项目需求说明.md)、[《规范驱动开发团队内部培训手册》](http://git.100credit.cn/zhenwei.li/ex-ai-spec/-/blob/main/docs/规范驱动开发团队内部培训手册.md) 配合阅读（仓库 [ex-ai-spec](http://git.100credit.cn/zhenwei.li/ex-ai-spec)，默认分支 `main`）。
+> 本文档用于团队内部分享：厘清 **AI 辅助编程的演进阶段**、**个人与团队应强化的能力**，以及 **ai-spec-auto**（npm：`@ex/ai-spec-auto`）在其中的定位。  
+> 可与 [《项目需求说明》](http://git.100credit.cn/zhenwei.li/ai-spec-auto/-/blob/main/docs/项目需求说明.md)、[《规范驱动开发团队内部培训手册》](http://git.100credit.cn/zhenwei.li/ai-spec-auto/-/blob/main/docs/规范驱动开发团队内部培训手册.md) 配合阅读（仓库 [ai-spec-auto](http://git.100credit.cn/zhenwei.li/ai-spec-auto)，默认分支 `main`）。
 
 ---
 
@@ -67,7 +67,7 @@ Andrej Karpathy 提出的 **Vibe Coding** 描述了一种真实状态：凭感�
 
 ## 4. 提升「内在能力」：与工具进化配套的四件事
 
-工具进化不会自动带来职级进化；以下能力与 **ex-ai-spec 所倡导的规范驱动** 互为表里：
+工具进化不会自动带来职级进化；以下能力与 **ai-spec-auto 所倡导的规范驱动** 互为表里：
 
 1. **架构与边界判断**  
    目录、状态归属、数据流、与后端/产品的契约——AI 可以生成实现，但 **「为什么这样切」** 需要人定调；这正是 Rules 要固化、OpenSpec 要留痕的部分。
@@ -83,15 +83,15 @@ Andrej Karpathy 提出的 **Vibe Coding** 描述了一种真实状态：凭感�
 
 ---
 
-## 5. ex-ai-spec 在版图中的位置：从「会写指令」到「资产化规范」
+## 5. ai-spec-auto 在版图中的位置：从「会写指令」到「资产化规范」
 
-**ex-ai-spec** 的定位是：**AI Coding 团队的规范驱动开发 CLI（当前版本面向前端，内置 Vue 3 / React Profile）**；通过 npm 包 **`@ex/ai-spec`**（`npx @ex/ai-spec init` 等）安装到业务仓库。目标一句话可概括为：
+**ai-spec-auto** 的定位是：**AI Coding 团队的规范驱动开发 CLI（当前版本面向前端，内置 Vue 3 / React Profile）**；通过 npm 包 **`@ex/ai-spec-auto`**（`npx @ex/ai-spec-auto@latest init` 等）安装到业务仓库。目标一句话可概括为：
 
 > **把「提示词能力」改造成「项目内资产」**——从依赖个人记忆与口头约定，转为 **结构化规范文件** 让 AI 自动遵循，并与 **可溯源的需求流程** 一体联动（L3）。
 
 与上文「三阶叙事」的对应关系：
 
-| 能力层次 | 在 ex-ai-spec 中的落点 |
+| 能力层次 | 在 ai-spec-auto 中的落点 |
 |----------|------------------|
 | 声明式约束 | `.agents/rules/`：编码、API、组件/路由/状态/样式、测试等 |
 | 过程式流程 | `.agents/skills/`：提案分析、任务执行、测试与设计稿分析等 |
@@ -108,9 +108,9 @@ Andrej Karpathy 提出的 **Vibe Coding** 描述了一种真实状态：凭感�
 
 - **时代位置**：AI Coding 已从 **初级阶段（纯指令）** 走向 **工程化与 spec 化**；前端尤其暴露在 **Vibe Coding** 的「快」与「糙」之间，**价值锚点上移** 是普遍趋势。  
 - **个人位置**：从 **与 AI 比打字速度**，转向 **指挥、拆解、架构、验证与领域深度**——与 [上文所引用的生存指南](https://mp.weixin.qq.com/s/VxT5DXTdFmd2AV6ifHfGZQ) 中的「指挥家」隐喻一致。  
-- **团队位置**：通过 **ex-ai-spec** 的 **L1 → L2 → L3 渐进安装**，把 **Rules + Skills +（可选）OpenSpec** 变成 **共享资产**，减少对人、对单次会话的依赖，**对齐第三阶：规范驱动 + 可溯源**。
+- **团队位置**：通过 **ai-spec-auto** 的 **L1 → L2 → L3 渐进安装**，把 **Rules + Skills +（可选）OpenSpec** 变成 **共享资产**，减少对人、对单次会话的依赖，**对齐第三阶：规范驱动 + 可溯源**。
 
-**最后一问（与参考文章同构）**：当 AI 与 **ex-ai-spec** 所交付的规范、技能与流程帮你扛住大量重复劳动时，你和团队 **把省下的时间投在什么问题上了？**  
+**最后一问（与参考文章同构）**：当 AI 与 **ai-spec-auto** 所交付的规范、技能与流程帮你扛住大量重复劳动时，你和团队 **把省下的时间投在什么问题上了？**  
 这个问题的答案，决定了在 AI Coding 时代 **我们究竟处在什么位置**——是停留在「更快的粘贴」，还是 **更强的工程与产品判断力**。
 
 ---
@@ -118,10 +118,10 @@ Andrej Karpathy 提出的 **Vibe Coding** 描述了一种真实状态：凭感�
 ## 7. 延伸阅读
 
 - [Vibe Coding 时代，前端工程师的生存指南](https://mp.weixin.qq.com/s/VxT5DXTdFmd2AV6ifHfGZQ)（微信原文，需在可访问环境下打开）  
-- [ex-ai-spec 仓库](http://git.100credit.cn/zhenwei.li/ex-ai-spec)  
-- [项目需求说明](http://git.100credit.cn/zhenwei.li/ex-ai-spec/-/blob/main/docs/项目需求说明.md)  
-- [README](http://git.100credit.cn/zhenwei.li/ex-ai-spec/-/blob/main/README.md)（安装层级、架构与命令）  
-- [OpenSpec 使用指南](http://git.100credit.cn/zhenwei.li/ex-ai-spec/-/blob/main/docs/openspec-guide.md)  
-- [规范驱动开发团队内部培训手册](http://git.100credit.cn/zhenwei.li/ex-ai-spec/-/blob/main/docs/规范驱动开发团队内部培训手册.md)  
+- [ai-spec-auto 仓库](http://git.100credit.cn/zhenwei.li/ai-spec-auto)  
+- [项目需求说明](http://git.100credit.cn/zhenwei.li/ai-spec-auto/-/blob/main/docs/项目需求说明.md)  
+- [README](http://git.100credit.cn/zhenwei.li/ai-spec-auto/-/blob/main/README.md)（安装层级、架构与命令）  
+- [OpenSpec 使用指南](http://git.100credit.cn/zhenwei.li/ai-spec-auto/-/blob/main/docs/openspec-guide.md)  
+- [规范驱动开发团队内部培训手册](http://git.100credit.cn/zhenwei.li/ai-spec-auto/-/blob/main/docs/规范驱动开发团队内部培训手册.md)  
 
-> **说明**：以上链接指向仓库 `http://git.100credit.cn/zhenwei.li/ex-ai-spec` 内文件，路径采用 GitLab 常见格式 `/-/blob/main/…`。若你方 Web 路径不同，或默认分支不是 `main`，请相应替换。本文档在仓库中路径：`docs/AI Coding时代，我们处在什么位置？.md`（网页访问时若打不开，可在 Git 网页界面从目录进入后复制浏览器地址栏链接）。
+> **说明**：以上链接指向仓库 `http://git.100credit.cn/zhenwei.li/ai-spec-auto` 内文件，路径采用 GitLab 常见格式 `/-/blob/main/…`。若你方 Web 路径不同，或默认分支不是 `main`，请相应替换。本文档在仓库中路径：`docs/AI Coding时代，我们处在什么位置？.md`（网页访问时若打不开，可在 Git 网页界面从目录进入后复制浏览器地址栏链接）。

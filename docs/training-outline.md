@@ -60,7 +60,7 @@
 | `.agents/skills/` | 操作层 | `create-component/`、`create-proposal/`、`SKILL.md` |
 | `.cursor/`、`.claude/` 等 | IDE 适配 | 指向 `.agents` 的链接；**L3** 下还有 OpenSpec 生成的 command/skill |
 | `.cursor/mcp.json` | 上下文层 | ApiFox、Figma、Playwright 等 MCP 条目 |
-| `openspec/`（L3） | 流程层 | `config.yaml`（桥接 ex-ai-spec）、`changes/`、`specs/` |
+| `openspec/`（L3） | 流程层 | `config.yaml`（桥接 ai-spec-auto）、`changes/`、`specs/` |
 
 ## 第三部分：现场演示（30 分钟）
 
@@ -86,9 +86,9 @@
 
 ```bash
 # 推荐：在目标项目根目录（npx；未写 --level 时默认为 L3）
-npx @ex/ai-spec init --profile react
-npx @ex/ai-spec init --profile vue
-npx @ex/ai-spec init --profile vue --level L2
+npx @ex/ai-spec-auto@latest init --profile react
+npx @ex/ai-spec-auto@latest init --profile vue
+npx @ex/ai-spec-auto@latest init --profile vue --level L2
 
 # 或：克隆规范库后
 bash install.sh init /path/to/project --profile react
@@ -143,7 +143,7 @@ bash install.sh init /path/to/project --profile vue
 ### 第一轮试点检查表
 
 - [ ] 确定试点项目与负责人（前端 Vue 或 React 仓库）
-- [ ] 选择 Profile 并运行安装（推荐 `npx @ex/ai-spec init`，至少 **L2**）
+- [ ] 选择 Profile 并运行安装（推荐 `npx @ex/ai-spec-auto@latest init`，至少 **L2**）
 - [ ] 填写 01-项目概述 和 03-项目结构（若自定义规则缺失，补确认 04/05/06/07/09 是否已按项目生成）
 - [ ] 跑通一个组件创建场景
 - [ ] 接通至少一个 MCP（Figma/ApiFox/Playwright）

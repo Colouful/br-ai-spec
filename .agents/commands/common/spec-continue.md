@@ -24,7 +24,7 @@
 则优先执行：
 
 ```bash
-./node_modules/.bin/ai-spec protocol-update --target . --user-input "<当前这条用户原话>" --json
+./node_modules/.bin/ai-spec-auto protocol-update --target . --user-input "<当前这条用户原话>" --json
 ```
 
 不要先空跑 `protocol-advance`。
@@ -39,7 +39,7 @@
 其它情况再先执行：
 
 ```bash
-./node_modules/.bin/ai-spec protocol-advance --target . --json
+./node_modules/.bin/ai-spec-auto protocol-advance --target . --json
 ```
 
 然后只按返回的 `turn` 执行：

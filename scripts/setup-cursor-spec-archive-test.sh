@@ -38,8 +38,8 @@ rm -rf \
   "${TARGET_DIR}/openspec"
 rm -f \
   "${TARGET_DIR}/node_modules/.bin/ai-spec" \
-  "${TARGET_DIR}/node_modules/.bin/ai-spec-test" \
-  "${TARGET_DIR}/node_modules/.bin/ex-ai-spec"
+  "${TARGET_DIR}/node_modules/.bin/ai-spec-auto" \
+  "${TARGET_DIR}/node_modules/.bin/ai-spec-auto"
 
 echo "==> write manifest.json"
 cat > "${MANIFEST_PATH}" <<EOF

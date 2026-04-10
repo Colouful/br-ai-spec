@@ -17,8 +17,8 @@ description: 定义如何从 task-orchestrator 的自然语言或 Markdown 回�
 因此新增一层最小抽取器：
 
 ```bash
-ai-spec task-orchestrator-extractor extract --payload <file>
-ai-spec task-orchestrator-extractor apply --payload <file>
+ai-spec-auto task-orchestrator-extractor extract --payload <file>
+ai-spec-auto task-orchestrator-extractor apply --payload <file>
 ```
 
 ## 2. 当前最小能力
@@ -67,13 +67,13 @@ ai-spec task-orchestrator-extractor apply --payload <file>
 ### 5.1 只抽取，不执行
 
 ```bash
-ai-spec task-orchestrator-extractor extract --payload ./.ai-spec/internal/tmp/task-orchestrator-reply.md
+ai-spec-auto task-orchestrator-extractor extract --payload ./.ai-spec/internal/tmp/task-orchestrator-reply.md
 ```
 
 ### 5.2 抽取后直接执行
 
 ```bash
-ai-spec task-orchestrator-extractor apply --payload ./.ai-spec/internal/tmp/task-orchestrator-reply.md
+ai-spec-auto task-orchestrator-extractor apply --payload ./.ai-spec/internal/tmp/task-orchestrator-reply.md
 ```
 
 ## 6. 当前阶段边界

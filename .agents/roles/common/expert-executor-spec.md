@@ -43,19 +43,19 @@ Phase A（第一步） 当前只要求支持 3 个角色：
 当前最稳的接入方式是：
 
 ```bash
-ai-spec expert-executor apply --payload ./.ai-spec/internal/tmp/current-execution.json
+ai-spec-auto expert-executor apply --payload ./.ai-spec/internal/tmp/current-execution.json
 ```
 
 或：
 
 ```bash
-cat ./.ai-spec/internal/tmp/current-execution.json | ai-spec expert-executor apply --stdin
+cat ./.ai-spec/internal/tmp/current-execution.json | ai-spec-auto expert-executor apply --stdin
 ```
 
 如果当前环境希望把执行语义和运行态直接接通，可显式启用：
 
 ```bash
-ai-spec expert-executor apply --payload ./.ai-spec/internal/tmp/current-execution.json --advance-runtime
+ai-spec-auto expert-executor apply --payload ./.ai-spec/internal/tmp/current-execution.json --advance-runtime
 ```
 
 此时工具会：
@@ -70,13 +70,13 @@ ai-spec expert-executor apply --payload ./.ai-spec/internal/tmp/current-executio
 Phase B（第二步） 仍支持继续落盘 `runtime-action（运行动作）` 草案：
 
 ```bash
-ai-spec expert-executor apply-action --payload ./.ai-spec/internal/tmp/current-runtime-action.json
+ai-spec-auto expert-executor apply-action --payload ./.ai-spec/internal/tmp/current-runtime-action.json
 ```
 
 如需直接提交到运行态：
 
 ```bash
-ai-spec expert-executor apply-action --payload ./.ai-spec/internal/tmp/current-runtime-action.json --advance-runtime
+ai-spec-auto expert-executor apply-action --payload ./.ai-spec/internal/tmp/current-runtime-action.json --advance-runtime
 ```
 
 ## 5. 一句话约束

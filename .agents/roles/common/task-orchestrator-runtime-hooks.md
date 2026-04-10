@@ -42,13 +42,13 @@ task-orchestrator-runner.advanceRunner({ target })
 如果当前环境尚未接 `Runner（运行器）`，且当前主代理已经直接产出了结构化 bootstrap JSON，可回退为：
 
 ```bash
-ai-spec task-orchestrator-adapter apply --payload ./.ai-spec/internal/tmp/task-orchestrator-bootstrap.json
+ai-spec-auto task-orchestrator-adapter apply --payload ./.ai-spec/internal/tmp/task-orchestrator-bootstrap.json
 ```
 
 如果当前环境尚未接抽取层和适配层，再回退为：
 
 ```bash
-ai-spec runtime-state bootstrap --payload ./.ai-spec/internal/tmp/task-orchestrator-bootstrap.json
+ai-spec-auto runtime-state bootstrap --payload ./.ai-spec/internal/tmp/task-orchestrator-bootstrap.json
 ```
 
 ### 2.2 进入审批等待或被阻断
@@ -56,13 +56,13 @@ ai-spec runtime-state bootstrap --payload ./.ai-spec/internal/tmp/task-orchestra
 如果当前节点不能继续，需要卡在审批点或阻断点：
 
 ```bash
-ai-spec task-orchestrator-adapter apply --payload ./.ai-spec/internal/tmp/current-runtime-action.json
+ai-spec-auto task-orchestrator-adapter apply --payload ./.ai-spec/internal/tmp/current-runtime-action.json
 ```
 
 如果只是一般阻断，没有审批点：
 
 ```bash
-ai-spec runtime-state gate-blocked --status blocked --message "缺少设计稿，无法继续"
+ai-spec-auto runtime-state gate-blocked --status blocked --message "缺少设计稿，无法继续"
 ```
 
 ### 2.3 审批通过
@@ -70,7 +70,7 @@ ai-spec runtime-state gate-blocked --status blocked --message "缺少设计稿�
 优先由宿主 `Runner（运行器）` 或内部工具消费结构化动作载荷；未接时回退为：
 
 ```bash
-ai-spec runtime-state approve \
+ai-spec-auto runtime-state approve \
   --gate before-implementation \
   --to-role frontend-implementer
 ```
@@ -80,7 +80,7 @@ ai-spec runtime-state approve \
 优先由宿主 `Runner（运行器）` 或内部工具消费结构化动作载荷；未接时回退为：
 
 ```bash
-ai-spec runtime-state handoff \
+ai-spec-auto runtime-state handoff \
   --to-role frontend-implementer \
   --next-role code-guardian \
   --task-anchor ./.ai-spec/internal/tmp/frontend-implementer-anchor.json \
@@ -120,14 +120,14 @@ task-orchestrator-runner.advanceRunner({ target })
 如果暂未接 `Runner（运行器）`，再回退为：
 
 ```bash
-ai-spec expert-executor apply-action --payload ./.ai-spec/internal/tmp/current-runtime-action.json --advance-runtime
+ai-spec-auto expert-executor apply-action --payload ./.ai-spec/internal/tmp/current-runtime-action.json --advance-runtime
 ```
 
 若当前环境仍坚持旧的“两步桥接”模式，则继续使用：
 
 ```bash
-ai-spec expert-executor apply-action --payload ./.ai-spec/internal/tmp/current-runtime-action.json
-ai-spec task-orchestrator-adapter apply --payload ./.ai-spec/internal/current-runtime-action.json
+ai-spec-auto expert-executor apply-action --payload ./.ai-spec/internal/tmp/current-runtime-action.json
+ai-spec-auto task-orchestrator-adapter apply --payload ./.ai-spec/internal/current-runtime-action.json
 ```
 
 ### 2.5 恢复执行
@@ -135,7 +135,7 @@ ai-spec task-orchestrator-adapter apply --payload ./.ai-spec/internal/current-ru
 优先由宿主 `Runner（运行器）` 或内部工具消费结构化动作载荷；未接时回退为：
 
 ```bash
-ai-spec runtime-state resume --to-role frontend-implementer --status running
+ai-spec-auto runtime-state resume --to-role frontend-implementer --status running
 ```
 
 ### 2.6 运行完成
@@ -143,7 +143,7 @@ ai-spec runtime-state resume --to-role frontend-implementer --status running
 优先由宿主 `Runner（运行器）` 或内部工具消费结构化动作载荷；未接时回退为：
 
 ```bash
-ai-spec runtime-state complete
+ai-spec-auto runtime-state complete
 ```
 
 ### 2.7 运行失败
@@ -151,7 +151,7 @@ ai-spec runtime-state complete
 优先由宿主 `Runner（运行器）` 或内部工具消费结构化动作载荷；未接时回退为：
 
 ```bash
-ai-spec runtime-state fail --error "组件规范检查未通过"
+ai-spec-auto runtime-state fail --error "组件规范检查未通过"
 ```
 
 ### 2.8 用户取消
@@ -159,7 +159,7 @@ ai-spec runtime-state fail --error "组件规范检查未通过"
 优先由宿主 `Runner（运行器）` 或内部工具消费结构化动作载荷；未接时回退为：
 
 ```bash
-ai-spec runtime-state cancel --message "用户主动取消当前任务"
+ai-spec-auto runtime-state cancel --message "用户主动取消当前任务"
 ```
 
 ### 2.9 查询当前状态
@@ -167,7 +167,7 @@ ai-spec runtime-state cancel --message "用户主动取消当前任务"
 优先由宿主 `Runner（运行器）` 或内部工具消费结构化动作载荷；未接时回退为：
 
 ```bash
-ai-spec runtime-state status
+ai-spec-auto runtime-state status
 ```
 
 ## 3. 推荐自动链顺序

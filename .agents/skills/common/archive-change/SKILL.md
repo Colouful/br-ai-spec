@@ -15,7 +15,7 @@ description: 变更归档增强层。在执行 /opsx:archive 时确保增量规�
 |----|------|----------|
 | **本技能** | 规范合并 + 目录创建 + 路径校验 + 摘要输出 | `openspec/specs/` |
 | **OpenSpec** | 归档命令调度、产物完整性检查 | `openspec/changes/archive/` |
-| **config.yaml** | 桥接 ex-ai-spec  规范到 OpenSpec rules | `openspec/config.yaml` |
+| **config.yaml** | 桥接 ai-spec-auto  规范到 OpenSpec rules | `openspec/config.yaml` |
 
 ## 使用时机
 
@@ -29,7 +29,7 @@ description: 变更归档增强层。在执行 /opsx:archive 时确保增量规�
 优先执行命令：
 
 ```bash
-./node_modules/.bin/ai-spec archive-change --target . --change-id <name> --complete-run --json
+./node_modules/.bin/ai-spec-auto archive-change --target . --change-id <name> --complete-run --json
 ```
 
 除非该命令不可用，否则不要手工执行 `mkdir`、`cp`、`mv` 去合并或迁移目录。

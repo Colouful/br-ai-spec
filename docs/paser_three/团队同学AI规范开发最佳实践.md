@@ -125,7 +125,7 @@
 例如：
 
 ```bash
-ai-spec protocol-step --target . --user-input "新增一个商品 mock 页面" --json
+ai-spec-auto protocol-step --target . --user-input "新增一个商品 mock 页面" --json
 ```
 
 这一步不是直接编码，而是先创建当前协议轮次。
@@ -191,26 +191,26 @@ ai-spec protocol-step --target . --user-input "新增一个商品 mock 页面" -
 ### 6.1 发起一轮新需求
 
 ```bash
-ai-spec protocol-step --target . --user-input "新增一个商品 mock 页面" --json
+ai-spec-auto protocol-step --target . --user-input "新增一个商品 mock 页面" --json
 ```
 
 ### 6.2 推进当前流程
 
 ```bash
-ai-spec protocol-advance --target . --json
+ai-spec-auto protocol-advance --target . --json
 ```
 
 ### 6.3 补充需求或表达审批意见
 
 ```bash
-ai-spec protocol-update --target . --user-input "同意归档" --json
+ai-spec-auto protocol-update --target . --user-input "同意归档" --json
 ```
 
 排障时再补两个命令：
 
 ```bash
-ai-spec runtime-state status --target .
-ai-spec validate-registry
+ai-spec-auto runtime-state status --target .
+ai-spec-auto validate-registry
 ```
 
 ---
@@ -393,7 +393,7 @@ ai-spec validate-registry
 先看：
 
 ```bash
-ai-spec runtime-state status --target .
+ai-spec-auto runtime-state status --target .
 ```
 
 或者直接看：
@@ -420,7 +420,7 @@ ai-spec runtime-state status --target .
 如果怀疑流程配置有问题，再执行：
 
 ```bash
-ai-spec validate-registry
+ai-spec-auto validate-registry
 ```
 
 ---

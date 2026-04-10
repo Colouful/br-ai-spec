@@ -2,13 +2,13 @@
 set -euo pipefail
 
 # ============================================================================
-# ex-ai-spec  规范库安装脚本 (Bash)
+# ai-spec-auto  规范库安装脚本 (Bash)
 # 适用于 macOS / Linux / Git Bash / WSL
 # ============================================================================
 
 VERSION="2.0.0"
-SPEC_REPO="${BR_AI_SPEC_REPO:-http://git.100credit.cn/zhenwei.li/ex-ai-spec.git}"
-CACHE_DIR="${BR_AI_SPEC_CACHE:-$HOME/.ex-ai-spec}"
+SPEC_REPO="${BR_AI_SPEC_REPO:-http://git.100credit.cn/zhenwei.li/ai-spec-auto.git}"
+CACHE_DIR="${BR_AI_SPEC_CACHE:-$HOME/.ai-spec-auto}"
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; BLUE='\033[0;34m'; BOLD='\033[1m'; NC='\033[0m'
 
@@ -801,8 +801,8 @@ monorepo_resolve_target() {
   if [ ! -t 0 ]; then
     _mr_warn "检测到 Monorepo（工作区根: $ws_root），当前在根目录执行 init。"
     _mr_warn "若规范与依赖应落在某个前端子包，建议在子包目录执行，例如:"
-    echo "    npx @ex/ai-spec init ./packages/your-app" >&2
-    echo "  或: npx @ex/ai-spec init . --package packages/your-app" >&2
+    echo "    npx @ex/ai-spec-auto@latest init ./packages/your-app" >&2
+    echo "  或: npx @ex/ai-spec-auto@latest init . --package packages/your-app" >&2
     echo "  若确需在根目录安装，请使用: --workspace-root" >&2
     _mr_warn "非交互模式将继续在根目录安装。"
     printf '%s\n' "$t_canon"
@@ -849,8 +849,8 @@ monorepo_resolve_target() {
   done
 
   _mr_err "多次输入无效子包路径。请使用显式路径重新执行，例如:"
-  echo "  npx @ex/ai-spec init ./packages/your-app" >&2
-  echo "  npx @ex/ai-spec init . --package packages/your-app" >&2
+  echo "  npx @ex/ai-spec-auto@latest init ./packages/your-app" >&2
+  echo "  npx @ex/ai-spec-auto@latest init . --package packages/your-app" >&2
   return 1
 }
 
@@ -1082,12 +1082,12 @@ install_local_ai_spec_cli() {
   local target_canon source_canon manual_hint install_spec install_label source_pkg_ident source_pkg_name source_pkg_registry
   local scope_name=""
   local -a install_cmd=()
-  [ -f "$target/package.json" ] || { warn "未找到 package.json，跳过本地 ai-spec CLI 安装"; return 0; }
-  [ -n "$PKG_MANAGER" ] || { warn "无可用的包管理器，跳过本地 ai-spec CLI 安装"; return 0; }
+  [ -f "$target/package.json" ] || { warn "未找到 package.json，跳过本地 ai-spec-auto CLI 安装"; return 0; }
+  [ -n "$PKG_MANAGER" ] || { warn "无可用的包管理器，跳过本地 ai-spec-auto CLI 安装"; return 0; }
 
   target_canon="$(cd "$target" 2>/dev/null && pwd -P)" || return 0
   source_canon="$(cd "$SOURCE_DIR" 2>/dev/null && pwd -P)" || return 0
-  [ "$target_canon" = "$source_canon" ] && { info "当前就在规范仓库目录，跳过本地 ai-spec CLI 自安装"; return 0; }
+  [ "$target_canon" = "$source_canon" ] && { info "当前就在规范仓库目录，跳过本地 ai-spec-auto CLI 自安装"; return 0; }
 
   if [ -n "${BR_AI_SPEC_FORCE_LOCAL_CLI:-}" ]; then
     install_spec="$SOURCE_DIR"
@@ -1138,17 +1138,17 @@ install_local_ai_spec_cli() {
     fi
   fi
 
-  info "正在使用 $PKG_MANAGER 安装项目内 ai-spec CLI ..."
+  info "正在使用 $PKG_MANAGER 安装项目内 ai-spec-auto CLI ..."
   info "  source: $install_label"
   if ! (cd "$target" && "${install_cmd[@]}"); then
-    install_fail "本地 ai-spec CLI 安装失败" "请手动执行: $manual_hint"
+    install_fail "本地 ai-spec-auto CLI 安装失败" "请手动执行: $manual_hint"
     return 0
   fi
 
-  if [ -x "$target/node_modules/.bin/ai-spec" ] || [ -f "$target/node_modules/.bin/ai-spec" ]; then
-    ok "项目内 ai-spec CLI 已就绪 (./node_modules/.bin/ai-spec)"
+  if [ -x "$target/node_modules/.bin/ai-spec-auto" ] || [ -f "$target/node_modules/.bin/ai-spec-auto" ]; then
+    ok "项目内 ai-spec-auto CLI 已就绪 (./node_modules/.bin/ai-spec-auto)"
   else
-    warn "已完成依赖安装，但未检测到 ./node_modules/.bin/ai-spec，请检查包管理器输出"
+    warn "已完成依赖安装，但未检测到 ./node_modules/.bin/ai-spec-auto，请检查包管理器输出"
   fi
 }
 
@@ -1413,7 +1413,7 @@ setup_openspec() {
     template_schema_line="$(awk '/^schema:[[:space:]]*/ { print; exit }' "$template")"
     if [ -f "$config_file" ]; then
       if ! grep -q "^context:" "$config_file" 2>/dev/null; then
-        info "合并 ex-ai-spec  context/rules 到 config.yaml ..."
+        info "合并 ai-spec-auto  context/rules 到 config.yaml ..."
         awk '
           /^context:/ { capture = 1 }
           capture { print }
@@ -1613,16 +1613,16 @@ print_report() {
     echo -e "     ${YELLOW}→${NC} 先在 ${BOLD}设置 → MCP${NC} 中按需打开目标服务，再编辑 JSON"
     echo -e "     ${YELLOW}→${NC} 将 ApiFox 等条目的 ${BOLD}project-id${NC}、${BOLD}access-token${NC} 等占位符换成真实值"
     echo -e "     ${YELLOW}→${NC} 不需要的服务保持关闭即可；若条目含 ${BOLD}disabled${NC}，启用前请先完成凭证配置"
-    echo -e "  2. 首次运行 ${BOLD}/spec-start${NC} / ${BOLD}/spec-continue${NC} 时，若 Cursor 提示执行 ${BOLD}ai-spec${NC} 命令"
+    echo -e "  2. 首次运行 ${BOLD}/spec-start${NC} / ${BOLD}/spec-continue${NC} 时，若 Cursor 提示执行 ${BOLD}ai-spec-auto${NC} 命令"
     echo -e "     ${YELLOW}→${NC} 请选择 ${BOLD}Always allow for this workspace${NC}，避免宿主桥命令被权限弹窗打断"
   fi
   if [ "$LEVEL" = "L3" ]; then
-    echo -e "  3. 使用 ${BOLD}/opsx-propose${NC}              开始第一个变更提案"
+    echo -e "  3. 使用 ${BOLD}/opsx-propose${NC}              开始第一个变更提案（Cursor 命令模板已同步）"
   fi
   echo ""
   echo -e "${BOLD}────────────────────────────────────────────────────────────${NC}"
   echo -e "  ${BOLD}★ 项目初始化不会在安装后自动执行，请在 AI IDE 中手动触发：${NC}"
-  echo -e "    推荐触发词：${BOLD}\"初始化项目规范\" / \"project-init\"${NC}"
+  echo -e "    推荐触发方式：${BOLD}/project-init${NC}（或输入“初始化项目规范” / “project-init”）"
   echo -e "    触发后 AI 将生成："
   local generated_rule
   while IFS= read -r generated_rule; do
@@ -1781,7 +1781,7 @@ cmd_init() {
   init_pending_reset
 
   echo ""
-  info "ex-ai-spec  v${VERSION} | $(uname -s) $(uname -m) | Node $(node --version 2>/dev/null || echo 'N/A')"
+  info "ai-spec-auto  v${VERSION} | $(uname -s) $(uname -m) | Node $(node --version 2>/dev/null || echo 'N/A')"
   info "初始化项目: $target"
   echo ""
 
@@ -1950,7 +1950,7 @@ cmd_sync() {
   fi
 
   local cli="$SOURCE_DIR/bin/cli.js"
-  [ -f "$cli" ] || { err "未找到 ai-spec CLI: $cli"; exit 1; }
+  [ -f "$cli" ] || { err "未找到 ai-spec-auto CLI: $cli"; exit 1; }
 
   local -a cmd=(node "$cli" sync "$target")
   if [ -n "$MANIFEST_INPUT" ]; then
@@ -1966,7 +1966,7 @@ cmd_sync() {
     cmd+=(--dry-run)
   fi
 
-  info "通过 ai-spec sync 同步规范资产..."
+  info "通过 ai-spec-auto sync 同步规范资产..."
   BR_AI_SPEC_LOCAL="$SOURCE_DIR" "${cmd[@]}"
 }
 
@@ -2001,10 +2001,10 @@ cmd_check() {
     err ".agents/ 不存在"; has_issue=true
   fi
 
-  if [ -x "$target/node_modules/.bin/ai-spec" ] || [ -f "$target/node_modules/.bin/ai-spec" ]; then
-    ok "./node_modules/.bin/ai-spec 可用"
+  if [ -x "$target/node_modules/.bin/ai-spec-auto" ] || [ -f "$target/node_modules/.bin/ai-spec-auto" ]; then
+    ok "./node_modules/.bin/ai-spec-auto 可用"
   else
-    err "./node_modules/.bin/ai-spec 缺失"; has_issue=true
+    err "./node_modules/.bin/ai-spec-auto 缺失"; has_issue=true
   fi
 
   # IDE 链接
@@ -2129,7 +2129,7 @@ cmd_uninstall() {
 
 usage() {
   cat <<EOF
-${BOLD}ex-ai-spec ${NC} 规范库安装工具 v${VERSION}
+${BOLD}ai-spec-auto ${NC} 规范库安装工具 v${VERSION}
 
 ${BOLD}用法:${NC} install.sh <命令> [目标目录] [选项]
 

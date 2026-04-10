@@ -6,10 +6,10 @@ const { resolveRuntimePaths, getCandidatePaths } = require('./runtime-paths');
 
 function printUsage() {
   console.log(`Usage:
-  ai-spec task-orchestrator-extractor extract --payload <file> [options]
-  ai-spec task-orchestrator-extractor extract --stdin [options]
-  ai-spec task-orchestrator-extractor apply --payload <file> [options]
-  ai-spec task-orchestrator-extractor apply --stdin [options]
+  ai-spec-auto task-orchestrator-extractor extract --payload <file> [options]
+  ai-spec-auto task-orchestrator-extractor extract --stdin [options]
+  ai-spec-auto task-orchestrator-extractor apply --payload <file> [options]
+  ai-spec-auto task-orchestrator-extractor apply --stdin [options]
 
 Options:
   --target <dir>         Target project directory (default: .; apply only)

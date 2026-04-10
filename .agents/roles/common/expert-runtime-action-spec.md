@@ -35,19 +35,19 @@ description: 定义如何把 task-orchestrator（任务主代理） 产出的 ta
 ## 3. 当前最小命令
 
 ```bash
-ai-spec expert-executor apply-action --payload ./.ai-spec/internal/tmp/current-runtime-action.json
+ai-spec-auto expert-executor apply-action --payload ./.ai-spec/internal/tmp/current-runtime-action.json
 ```
 
 或：
 
 ```bash
-cat ./.ai-spec/internal/tmp/current-runtime-action.json | ai-spec expert-executor apply-action --stdin
+cat ./.ai-spec/internal/tmp/current-runtime-action.json | ai-spec-auto expert-executor apply-action --stdin
 ```
 
 如果当前环境已经确认由 `expert-executor（专家执行器）` 负责把动作提交到运行态，可显式启用：
 
 ```bash
-ai-spec expert-executor apply-action --payload ./.ai-spec/internal/tmp/current-runtime-action.json --advance-runtime
+ai-spec-auto expert-executor apply-action --payload ./.ai-spec/internal/tmp/current-runtime-action.json --advance-runtime
 ```
 
 补充约束：

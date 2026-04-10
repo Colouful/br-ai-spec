@@ -382,12 +382,12 @@ CLI 读取 `manifest（安装清单）` 后，建议按下面顺序做校验：
 
 `sync（同步）` 的输入输出契约详见：
 
-- [ai-spec-sync输入输出契约-03-27-17-09.md](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/paser_two/ai-spec-sync输入输出契约-03-27-17-09.md)
+- [ai-spec-auto-sync输入输出契约-03-27-17-09.md](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/paser_two/ai-spec-sync输入输出契约-03-27-17-09.md)
 
 ### 10.1 初始化安装
 
 ```bash
-npx @ex/ai-spec init . \
+npx @ex/ai-spec-auto@latest init . \
   --profile vue \
   --ide default \
   --manifest https://hub.example.com/manifests/vue-frontend-basic.json
@@ -396,14 +396,14 @@ npx @ex/ai-spec init . \
 ### 10.2 增量同步
 
 ```bash
-npx @ex/ai-spec sync . \
+npx @ex/ai-spec-auto@latest sync . \
   --manifest https://hub.example.com/manifests/project-abc-20260327.json
 ```
 
 ### 10.3 本地文件清单
 
 ```bash
-npx @ex/ai-spec sync . \
+npx @ex/ai-spec-auto@latest sync . \
   --manifest ./ai-spec.manifest.json
 ```
 

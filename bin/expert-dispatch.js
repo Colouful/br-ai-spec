@@ -9,9 +9,9 @@ const {
 
 function printUsage() {
   console.log(`Usage:
-  ai-spec expert-dispatch apply --payload <file> [options]
-  ai-spec expert-dispatch apply --stdin [options]
-  ai-spec expert-dispatch clear [options]
+  ai-spec-auto expert-dispatch apply --payload <file> [options]
+  ai-spec-auto expert-dispatch apply --stdin [options]
+  ai-spec-auto expert-dispatch clear [options]
 
 Options:
   --target <dir>         Target project directory (default: .)

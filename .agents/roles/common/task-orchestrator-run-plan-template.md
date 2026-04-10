@@ -275,7 +275,7 @@ description: 定义 task-orchestrator 在首次识别任务时必须输出的最
 4. 回退时调用：
 
 ```bash
-ai-spec runtime-state bootstrap --payload ./.ai-spec/internal/tmp/task-orchestrator-bootstrap.json
+ai-spec-auto runtime-state bootstrap --payload ./.ai-spec/internal/tmp/task-orchestrator-bootstrap.json
 ```
 
 对应规范见：

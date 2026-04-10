@@ -15,7 +15,7 @@ description: 提案前置分析与 OpenSpec 增强层。在调用 /opsx:propose 
 |----|------|----------|
 | **本技能** | 需求前置分析 + 上下文注入 + 后置检查 | 无独立产物（分析结论注入 OpenSpec 上下文） |
 | **OpenSpec** | 生成 proposal.md / specs/ / design.md / tasks.md | `openspec/changes/<name>/` |
-| **config.yaml** | 桥接 ex-ai-spec  规范到 OpenSpec rules | `openspec/config.yaml` |
+| **config.yaml** | 桥接 ai-spec-auto  规范到 OpenSpec rules | `openspec/config.yaml` |
 
 ## 使用时机
 
@@ -69,7 +69,7 @@ openspec/changes/<change-name>/
 └── tasks.md            # 实施任务清单
 ```
 
-**上下文注入**：OpenSpec 通过 `openspec/config.yaml` 中的 `context` 和 `rules` 字段自动读取 ex-ai-spec  的规范约束（路由、组件、API、样式等），无需本技能额外干预。
+**上下文注入**：OpenSpec 通过 `openspec/config.yaml` 中的 `context` 和 `rules` 字段自动读取 ai-spec-auto  的规范约束（路由、组件、API、样式等），无需本技能额外干预。
 
 **传递给 OpenSpec 的信息**（作为 propose 描述的一部分）：
 - 步骤 1 确认的条件（交付形态、接口情况、设计稿情况）
@@ -171,4 +171,4 @@ create-route、create-component 等技能中「涉及 UI 还原时」可引用�
 - `.agents/skills/execute-task/SKILL.md` - Superpowers 四步循环执行
 - `.agents/skills/design-analysis/SKILL.md` - 设计稿分析（有设计稿时使用，产出 UI 分析清单）
 - `.agents/skills/ui-verification/SKILL.md` - UI 验收（实现后需验收时使用）
-- `openspec/config.yaml` - OpenSpec 配置（含 ex-ai-spec  上下文注入）
+- `openspec/config.yaml` - OpenSpec 配置（含 ai-spec-auto  上下文注入）

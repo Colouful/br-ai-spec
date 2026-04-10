@@ -1,6 +1,6 @@
-# ai-spec sync（同步）输入输出契约
+# ai-spec-auto sync（同步）输入输出契约
 
-本文档定义 `ai-spec sync（同步）` 的最小实现契约。
+本文档定义 `ai-spec-auto sync（同步）` 的最小实现契约。
 
 目标是让这条命令未来能同时服务：
 
@@ -18,7 +18,7 @@
 
 ## 1. 命令定位
 
-`ai-spec sync（同步）` 的职责不是初始化整个项目，而是：
+`ai-spec-auto sync（同步）` 的职责不是初始化整个项目，而是：
 
 > 根据 `manifest（安装清单）` 或显式传入的资产选择，增量同步当前项目的 AI 规范驱动能力。
 
@@ -36,7 +36,7 @@
 当前代码已先支持本地 `manifest.json` 文件：
 
 ```bash
-ai-spec sync . --manifest ./manifest.json
+ai-spec-auto sync . --manifest ./manifest.json
 ```
 
 远程 URL（链接） 清单仍保留在契约设计中，但当前版本会明确提示“暂未支持”。
@@ -44,7 +44,7 @@ ai-spec sync . --manifest ./manifest.json
 ### 2.2 推荐命令形式（后续扩展）
 
 ```bash
-ai-spec sync . --manifest https://hub.example.com/manifests/project-abc.json
+ai-spec-auto sync . --manifest https://hub.example.com/manifests/project-abc.json
 ```
 
 ### 2.3 当前建议支持的最小参数
@@ -135,7 +135,7 @@ ai-spec sync . --manifest https://hub.example.com/manifests/project-abc.json
 
 ## 4. 输出契约
 
-建议 `ai-spec sync（同步）` 输出两类结果：
+建议 `ai-spec-auto sync（同步）` 输出两类结果：
 
 - `sync-plan（同步计划）`
 - `sync-result（同步结果）`
@@ -335,7 +335,7 @@ ai-spec sync . --manifest https://hub.example.com/manifests/project-abc.json
 
 - [Manifest安装清单规范.md](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/paser_two/Manifest安装清单规范.md)
 - [lock与sources结构规范-03-27-17-17.md](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/paser_two/lock与sources结构规范-03-27-17-17.md)
-- [ai-spec-run输入输出契约-03-27-17-55.md](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/paser_two/ai-spec-run输入输出契约-03-27-17-55.md)
+- [ai-spec-auto-run输入输出契约-03-27-17-55.md](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/paser_two/ai-spec-run输入输出契约-03-27-17-55.md)
 - [RUN_OUTPUT.md](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/.agents/flows/RUN_OUTPUT.md)
 
 关系是：
@@ -358,4 +358,4 @@ ai-spec sync . --manifest https://hub.example.com/manifests/project-abc.json
 
 ## 12. 一句话收束
 
-> `ai-spec sync（同步）` 负责把 Hub 的选择结果转换成项目里的真实安装状态，并把这个过程结构化输出出来；它不是专家协同执行器，而是专家协同执行之前的安装与求解层。
+> `ai-spec-auto sync（同步）` 负责把 Hub 的选择结果转换成项目里的真实安装状态，并把这个过程结构化输出出来；它不是专家协同执行器，而是专家协同执行之前的安装与求解层。

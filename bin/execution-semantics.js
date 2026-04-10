@@ -17,11 +17,41 @@ const FLOW_RUNTIME_TRANSITIONS = {
       next_role: 'code-guardian',
       message: 'handoff to frontend-implementer after requirement convergence',
     },
+    'design-collaborator': {
+      action: 'handoff',
+      to_role: 'frontend-implementer',
+      next_role: 'code-guardian',
+      message: 'handoff to frontend-implementer after design collaboration',
+    },
+    'api-contract-specialist': {
+      action: 'handoff',
+      to_role: 'frontend-implementer',
+      next_role: 'code-guardian',
+      message: 'handoff to frontend-implementer after API contract clarification',
+    },
     'frontend-implementer': {
       action: 'handoff',
       to_role: 'code-guardian',
       next_role: null,
       message: 'handoff to code-guardian after implementation delivery',
+    },
+    'unit-test-specialist': {
+      action: 'handoff',
+      to_role: 'code-guardian',
+      next_role: null,
+      message: 'handoff to code-guardian after targeted test supplementation',
+    },
+    'verification-reviewer': {
+      action: 'handoff',
+      to_role: 'code-guardian',
+      next_role: null,
+      message: 'handoff to code-guardian after verification review',
+    },
+    'performance-auditor': {
+      action: 'handoff',
+      to_role: 'code-guardian',
+      next_role: null,
+      message: 'handoff to code-guardian after performance audit',
     },
     'code-guardian': {
       action: 'gate-blocked',

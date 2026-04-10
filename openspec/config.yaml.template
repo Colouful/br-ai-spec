@@ -1,4 +1,4 @@
-# OpenSpec 项目配置（由 ex-ai-spec 提供的增强版模板）
+# OpenSpec 项目配置（由 ai-spec-auto 提供的增强版模板）
 # install.sh / install.ps1 在 L3 安装时会将此模板写入 openspec/config.yaml，
 # 并同步 openspec/schemas/expert-delivery 到目标项目。
 # 详见 https://github.com/Fission-AI/OpenSpec
@@ -6,7 +6,7 @@
 schema: expert-delivery
 
 context: |
-  本项目接入 ex-ai-spec 专家协同平台：
+  本项目接入 ai-spec-auto 专家协同平台：
   - rules: .agents/rules/
   - skills: .agents/skills/
   - roles: .agents/roles/

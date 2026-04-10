@@ -9,7 +9,7 @@
 先执行：
 
 ```bash
-./node_modules/.bin/ai-spec protocol-step --target . --user-input "<本次 /spec-start 的用户原始需求>" --json
+./node_modules/.bin/ai-spec-auto protocol-step --target . --user-input "<本次 /spec-start 的用户原始需求>" --json
 ```
 
 然后只按返回的 `turn` 执行：

@@ -54,7 +54,7 @@ function parseArgs(argv) {
 
 function printUsage() {
   console.log(`Usage:
-  ai-spec demo-runtime-smoke [target] [options]
+  ai-spec-auto demo-runtime-smoke [target] [options]
 
 Options:
   --target <dir>         Demo target directory (default: ./.tmp/runtime-smoke-demo)

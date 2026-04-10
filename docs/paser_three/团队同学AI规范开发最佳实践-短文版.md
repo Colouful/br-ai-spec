@@ -62,7 +62,7 @@ flowchart LR
 1. 在试点项目完成接入。Vue 项目可以直接执行：
 
 ```bash
-npx @ex/ai-spec init . --profile vue --level L3
+npx @ex/ai-spec-auto@latest init . --profile vue --level L3
 ```
 
 React 项目只需要把 `--profile vue` 换成 `--profile react`。
@@ -95,12 +95,12 @@ React 项目只需要把 `--profile vue` 换成 `--profile react`。
 3. 在目标项目执行同步：
 
 ```bash
-npx @ex/ai-spec sync . --manifest ./manifest.json
+npx @ex/ai-spec-auto@latest sync . --manifest ./manifest.json
 ```
 
 4. 让团队在统一资产上继续运行和复用，而不是每个项目重新从零搭一遍。
 
-可以把这条链理解成四句话：Hub 负责“选资产”，安装清单负责“描述要装什么”，`@ex/ai-spec` 负责“解析并安装”，目标项目负责“承接并运行”。如果要看安装清单的详细结构，再继续看 [Manifest安装清单规范.md](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/paser_two/Manifest安装清单规范.md)。
+可以把这条链理解成四句话：Hub 负责“选资产”，安装清单负责“描述要装什么”，`@ex/ai-spec-auto` 负责“解析并安装”，目标项目负责“承接并运行”。如果要看安装清单的详细结构，再继续看 [Manifest安装清单规范.md](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/paser_two/Manifest安装清单规范.md)。
 
 **一句话收口：人工方案解决“先开始”，工具方案解决“可复制、可扩展、可持续”。**
 

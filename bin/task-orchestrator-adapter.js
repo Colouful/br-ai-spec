@@ -7,8 +7,8 @@ const expertExecutor = require('./expert-executor');
 
 function printUsage() {
   console.log(`Usage:
-  ai-spec task-orchestrator-adapter apply --payload <file> [options]
-  ai-spec task-orchestrator-adapter apply --stdin [options]
+  ai-spec-auto task-orchestrator-adapter apply --payload <file> [options]
+  ai-spec-auto task-orchestrator-adapter apply --stdin [options]
 
 Options:
   --target <dir>         Target project directory (default: .)

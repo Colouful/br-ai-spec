@@ -2,7 +2,7 @@
 
 ## 你将获得什么
 
-安装 **ex-ai-spec** 后，在前端项目（Vue / React Profile）中，AI 编码助手会按团队约定处理 **目录结构、组件拆分、API 命名、样式变量** 等，减少每次对话重复「背诵」项目规则。
+安装 **ai-spec-auto** 后，在前端项目（Vue / React Profile）中，AI 编码助手会按团队约定处理 **目录结构、组件拆分、API 命名、样式变量** 等，减少每次对话重复「背诵」项目规则。
 
 **一体化能力**：`.agents/rules` 与 `.agents/skills` 负责编码约束与操作步骤；**L2** 起通过 **IDE 链接** 与 **`.cursor/mcp.json`** 接入接口文档、设计稿、浏览器验收等上下文；**L3** 再增加 **`openspec/`**（OpenSpec），与 `.agents` 通过 **`openspec/config.yaml`** 桥接，支撑 **`/opsx:*` 提案 → 实施 → 归档** 与 `create-proposal` 等技能的完整闭环。详见仓库根目录 README 中的「一体化能力与关键路径」。
 
@@ -14,10 +14,10 @@
 
 ```bash
 # 交互式安装（引导选择技术栈与层级）
-npx @ex/ai-spec init
+npx @ex/ai-spec-auto@latest init .
 
 # 指定参数（示例：Vue + 团队完整方案含 OpenSpec）
-npx @ex/ai-spec init --profile vue --level L3
+npx @ex/ai-spec-auto@latest init . --profile vue --level L3
 ```
 
 > 首次使用前需配置私有源（仅一次）：在 `~/.npmrc` 中添加  
@@ -26,22 +26,22 @@ npx @ex/ai-spec init --profile vue --level L3
 更新 / 检查 / 卸载：
 
 ```bash
-npx @ex/ai-spec update
-npx @ex/ai-spec check
-npx @ex/ai-spec uninstall
+npx @ex/ai-spec-auto@latest update .
+npx @ex/ai-spec-auto@latest check .
+npx @ex/ai-spec-auto@latest uninstall .
 ```
 
-也可全局安装后使用：`npm install -g @ex/ai-spec`，再执行 `ai-spec init ...`。
+也可全局安装后使用：`npm install -g @ex/ai-spec-auto@latest`，再执行 `ai-spec-auto init ...`。
 
 > Windows 下 npx 安装器会自动选用 PowerShell 脚本，无需额外配置。
 
-**UI UX Pro Max（可选）**：非交互执行 `npx @ex/ai-spec init` 时**不会**自动安装该技能；需要时请显式执行 `npx @ex/ai-spec init . --uipro`，或事后 `npx @ex/ai-spec update . --uipro`。详见根目录 README「UI UX Pro Max」小节。
+**UI UX Pro Max（可选）**：非交互执行 `npx @ex/ai-spec-auto@latest init` 时**不会**自动安装该技能；需要时请显式执行 `npx @ex/ai-spec-auto@latest init . --uipro`，或事后 `npx @ex/ai-spec-auto@latest update . --uipro`。详见根目录 README「UI UX Pro Max」小节。
 
 ### 方式二：克隆规范库后使用脚本
 
 ```bash
-git clone http://git.100credit.cn/zhenwei.li/ex-ai-spec.git
-cd ex-ai-spec
+git clone http://git.100credit.cn/zhenwei.li/ai-spec-auto.git ai-spec-auto
+cd ai-spec-auto
 
 bash install.sh init /path/to/your-project
 # 或显式指定（与脚本默认一致：L3）
@@ -52,8 +52,8 @@ bash install.sh init /path/to/your-project --profile vue --level L3
 **Windows PowerShell**（首次可执行 `Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned`）：
 
 ```powershell
-git clone http://git.100credit.cn/zhenwei.li/ex-ai-spec.git
-cd ex-ai-spec
+git clone http://git.100credit.cn/zhenwei.li/ai-spec-auto.git ai-spec-auto
+cd ai-spec-auto
 .\install.ps1 init C:\path\to\your-project --profile vue --level L3
 ```
 
@@ -76,16 +76,29 @@ cd ex-ai-spec
 
 ### Monorepo / pnpm workspace
 
-若仓库根目录存在 **`pnpm-workspace.yaml`** 或根 **`package.json`** 含 **`workspaces`**，在安装脚本看来即 **Monorepo**。在**工作区根**执行 `npx @ex/ai-spec init` 时：
+若仓库根目录存在 **`pnpm-workspace.yaml`** 或根 **`package.json`** 含 **`workspaces`**，在安装脚本看来即 **Monorepo**。在**工作区根**执行 `npx @ex/ai-spec-auto@latest init` 时：
 
 - **交互终端**：会提示选择「在根目录安装」或「输入子包相对路径」（如 `packages/web`），推荐把规范与 lint/husky 依赖落在**具体前端应用包**内。
 - **非交互**（CI、管道输入）：不会停顿；脚本会打印建议在子包执行的示例命令，并**默认仍在根目录**继续安装。若要在子包安装且无需交互，请使用：
-  - `npx @ex/ai-spec init . --package packages/your-app`（路径相对**工作区根**），或
-  - 先 `cd` 到子包再执行 `npx @ex/ai-spec init`，或
+  - `npx @ex/ai-spec-auto@latest init . --package packages/your-app`（路径相对**工作区根**），或
+  - 先 `cd` 到子包再执行 `npx @ex/ai-spec-auto@latest init`，或
   - 环境变量 `EX_AI_SPEC_WORKSPACE_PACKAGE=packages/your-app`（与 `--package` 等价）。
 - **确需在根 `package.json` 安装依赖**（pnpm）：使用 `pnpm add -w <包名>`；详见 `.agents/rules/common/08-通用约束.md` 中「pnpm workspace」说明。
 
 `install.sh` / `install.ps1` 同样支持 **`--package <path>`** 与 **`--workspace-root`**（强制根目录、跳过上述交互）。
+
+### 交互安装你会看到什么
+
+默认交互式 `init` 会依次让你选择：
+
+- `Profile`
+- `Level`
+- 规则安装策略（标准规范 / 根据项目自定义）
+- 是否安装 UI UX Pro Max
+- 是否安装 lint/format
+- 是否安装 Husky
+
+如果选了“根据项目自定义”，还会继续让你勾选要交给 `project-init` 按项目生成的规则。
 
 ## 安装后必做事项
 
@@ -114,7 +127,7 @@ cd ex-ai-spec
 
 ### 4. 首次放行宿主桥命令
 
-`/spec-start`、`/spec-continue` 会在 IDE 内静默执行 `ai-spec protocol-step`、`ai-spec protocol-advance`、`ai-spec protocol-update`。
+`/spec-start`、`/spec-continue` 会在 IDE 内静默执行 `ai-spec-auto protocol-step`、`ai-spec-auto protocol-advance`、`ai-spec-auto protocol-update`。
 
 - 首次弹出终端权限确认时，请选择 **Always allow for this workspace**
 - 如果误点拒绝，请到 IDE 的终端权限设置里重置该工作区授权
@@ -122,7 +135,7 @@ cd ex-ai-spec
 
 ### L3 最简操作流程（命令速查）
 
-1. **创建提案**：**Cursor** 用 `/opsx-propose [名称或描述]`；**Claude Code** 等用 `/opsx:propose [名称或描述]`。自然语言如「帮我创建一个变更提案」会先走 `create-proposal` 前置分析，再委托上述命令生成产物。
+1. **创建提案**：**Cursor** 用 `/opsx-propose [名称或描述]`；**Claude Code** 等用 `/opsx:propose [名称或描述]`。Cursor 的连字符命令由本规范库安装时直接同步到 `.cursor/commands/`；自然语言如「帮我创建一个变更提案」会先走 `create-proposal` 前置分析，再委托上述命令生成产物。
 2. **产物位置**：`openspec/changes/<change-name>/`（含 `proposal.md`、`tasks.md`、`design.md` 等）。实施清单以该目录下的 **`tasks.md`** 为准，勿与仓库根目录其它待办文件混用。
 3. **实施（execute-task）**：**Cursor** 用 `/opsx-apply`；**Claude Code** 等用 `/opsx:apply`。该路径会按 **execute-task** 四步循环逐条执行（头脑风暴 → TDD → 双重审查 → 状态更新），不要跳过流程、对照清单直接写代码。同义说法：「开始执行任务」「应用变更」。
 4. **归档**：**Cursor** 用 `/opsx-archive`；**Claude Code** 等用 `/opsx:archive`。
@@ -146,7 +159,7 @@ cd ex-ai-spec
 ## 验证安装
 
 ```bash
-npx @ex/ai-spec check
+npx @ex/ai-spec-auto@latest check .
 # 或（在克隆的规范库目录下）
 bash install.sh check /path/to/your-project
 ```
@@ -154,12 +167,24 @@ bash install.sh check /path/to/your-project
 ## 更新规范
 
 ```bash
-npx @ex/ai-spec update
+npx @ex/ai-spec-auto@latest update .
 # 或
 bash install.sh update /path/to/your-project --profile vue
 ```
 
 更新**不会**覆盖 `01-项目概述.md` 和 `03-项目结构.md`（项目特有规则）。
+
+交互式 `update` 会先让你切换要更新的模块：
+
+- Skills
+- Rules
+- Configs
+- Commands
+- IDE Links
+- OpenSpec
+- UI UX Pro Max
+
+如果你只想更新其中一部分，也可以直接在这个菜单里完成，不必先记参数。
 
 ## 延伸阅读
 

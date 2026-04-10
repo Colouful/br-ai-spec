@@ -8,6 +8,7 @@
   - 所有 `IDE（开发工具）` 共用的命令模板主源
 - `cursor/`
   - 仅在 `Cursor（开发工具）` 需要差异化覆盖时才放文件
+  - 例如 `/opsx-propose`、`/opsx-apply` 这类连字符兼容入口
 - `claude/`
   - 仅在 `Claude（开发工具）` 需要差异化覆盖时才放文件
 

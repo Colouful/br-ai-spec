@@ -23,7 +23,7 @@ function buildHistoryEntry(targetDir, relPathSegments, legacyRelPath = null) {
   const targetHash = crypto.createHash('sha1').update(path.resolve(targetDir)).digest('hex').slice(0, 12);
   const historyRoot = explicitRoot
     ? path.resolve(explicitRoot)
-    : path.join(os.homedir(), '.cache', 'ex-ai-spec', 'history', targetHash);
+    : path.join(os.homedir(), '.cache', 'ai-spec-auto', 'history', targetHash);
   const absolutePath = path.join(historyRoot, ...relPathSegments);
   return buildEntry(targetDir, absolutePath, legacyRelPath);
 }

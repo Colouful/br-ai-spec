@@ -195,7 +195,7 @@ openspec/
 schema: expert-delivery
 
 context: |
-  本项目接入 ex-ai-spec 专家协同平台。
+  本项目接入 ai-spec-auto 专家协同平台。
   约束与执行入口如下：
   - rules: .agents/rules/
   - skills: .agents/skills/

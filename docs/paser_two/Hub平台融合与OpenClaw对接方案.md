@@ -161,7 +161,7 @@ flowchart LR
 示例命令：
 
 ```bash
-npx @ex/ai-spec init . \
+npx @ex/ai-spec-auto@latest init . \
   --profile vue \
   --ide default \
   --manifest https://hub.example.com/manifests/vue-frontend-basic.json
@@ -174,14 +174,14 @@ npx @ex/ai-spec init . \
 用户在 Hub 上勾选若干内容后，Hub 生成：
 
 ```bash
-npx @ex/ai-spec sync . \
+npx @ex/ai-spec-auto@latest sync . \
   --manifest https://hub.example.com/manifests/project-abc-20260326.json
 ```
 
 或者：
 
 ```bash
-npx @ex/ai-spec add . \
+npx @ex/ai-spec-auto@latest add . \
   --skills create-proposal,design-analysis \
   --rules api-standard,route-standard
 ```
@@ -365,7 +365,7 @@ flowchart LR
     D --> E["查看关联技能（Skills）与规则（Rules）"]
     E --> F["确认技术栈（Profile）与 IDE 列表（IDEs）"]
     F --> G["生成 Manifest（安装清单）与安装命令"]
-    G --> H["在目标项目执行 ai-spec init / sync"]
+    G --> H["在目标项目执行 ai-spec-auto init / sync"]
     H --> I["CLI 内部校验并安装资产，汇总能力域标签，并可选登记已安装流程模板"]
     I --> J["编译安装到项目目录"]
 ```
@@ -424,7 +424,7 @@ CLI 读取这份清单后：
 
 如果需要实现侧的详细输入输出定义，建议配套阅读：
 
-- [ai-spec-sync输入输出契约-03-27-17-09.md](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/paser_two/ai-spec-sync输入输出契约-03-27-17-09.md)
+- [ai-spec-auto-sync输入输出契约-03-27-17-09.md](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/paser_two/ai-spec-sync输入输出契约-03-27-17-09.md)
 
 ### 7.3 为什么不要只“复制 prompt 给 IDE”
 

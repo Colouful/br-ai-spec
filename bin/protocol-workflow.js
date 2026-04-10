@@ -51,9 +51,13 @@ function printUsage(mode) {
     ? 'protocol-advance'
     : mode === 'update'
     ? 'protocol-update'
+    : mode === 'stop'
+    ? 'protocol-stop'
+    : mode === 'status'
+    ? 'protocol-status'
     : 'protocol-step';
   console.log(`Usage:
-  ai-spec ${command} [target] [options]
+  ai-spec-auto ${command} [target] [options]
 
 Options:
   --target <dir>         Target project directory (default: .)
@@ -102,6 +106,11 @@ function printTurn(turn) {
   console.log('summary:');
   for (const [key, value] of Object.entries(turn.summary || {})) {
     console.log(`  ${key}: ${value ?? '(none)'}`);
+  }
+  if (turn.input?.change_impact || turn.input?.reconcile_strategy) {
+    console.log('input_reconcile:');
+    console.log(`  change_impact: ${turn.input.change_impact || '(none)'}`);
+    console.log(`  reconcile_strategy: ${turn.input.reconcile_strategy || '(none)'}`);
   }
   console.log('reads:');
   for (const item of formatTargets(turn.reads)) {
@@ -178,11 +187,38 @@ function printTurn(turn) {
       console.log(`guidance.approval_contract.expected_gate: ${turn.guidance.approval_contract.expected_gate || '(none)'}`);
       console.log(`guidance.approval_contract.pending_gate: ${turn.guidance.approval_contract.pending_gate || '(none)'}`);
     }
+    if (turn.guidance.update_contract) {
+      console.log(`guidance.update_contract.change_impact: ${turn.guidance.update_contract.change_impact || '(none)'}`);
+      console.log(`guidance.update_contract.reconcile_strategy: ${turn.guidance.update_contract.reconcile_strategy || '(none)'}`);
+      console.log(`guidance.update_contract.target_role: ${turn.guidance.update_contract.target_role || '(none)'}`);
+      if (Array.isArray(turn.guidance.update_contract.artifacts_to_update) && turn.guidance.update_contract.artifacts_to_update.length > 0) {
+        console.log('guidance.update_contract.artifacts_to_update:');
+        for (const item of turn.guidance.update_contract.artifacts_to_update) {
+          console.log(`  - ${item}`);
+        }
+      }
+    }
+    if (turn.guidance.pause_contract) {
+      console.log(`guidance.pause_contract.status: ${turn.guidance.pause_contract.status || '(none)'}`);
+      console.log(`guidance.pause_contract.resume_rule: ${turn.guidance.pause_contract.resume_rule || '(none)'}`);
+    }
     if (turn.guidance.orchestration_contract) {
       console.log(`guidance.orchestration_contract.handoff_policy: ${turn.guidance.orchestration_contract.handoff_policy || '(none)'}`);
+      if (turn.guidance.orchestration_contract.handoff_gate_policy) {
+        console.log('guidance.orchestration_contract.handoff_gate_policy:');
+        for (const [pair, gate] of Object.entries(turn.guidance.orchestration_contract.handoff_gate_policy)) {
+          console.log(`  ${pair}: ${gate}`);
+        }
+      }
       console.log('guidance.orchestration_contract.required_experts:');
       for (const item of turn.guidance.orchestration_contract.required_experts || []) {
         console.log(`  - ${item}`);
+      }
+      if (Array.isArray(turn.guidance.orchestration_contract.activated_optional_roles) && turn.guidance.orchestration_contract.activated_optional_roles.length > 0) {
+        console.log('guidance.orchestration_contract.activated_optional_roles:');
+        for (const item of turn.guidance.orchestration_contract.activated_optional_roles) {
+          console.log(`  - ${item}`);
+        }
       }
     }
     if (turn.guidance.role?.goal) {
@@ -293,6 +329,14 @@ function printUpdate(result) {
   printTurn(result.turn);
 }
 
+function printStop(result) {
+  console.log(`kind: ${result.kind}`);
+  console.log(`target: ${result.target}`);
+  console.log(`stopped: ${result.stopped?.status || '(none)'}`);
+  console.log('turn:');
+  printTurn(result.turn);
+}
+
 function buildStepPreview(options) {
   return {
     kind: 'ai-protocol-step-preview',
@@ -322,6 +366,14 @@ function main(mode, argv) {
       target: options.target,
       userInput: options.userInput || null,
     })
+    : mode === 'stop'
+    ? workflow.stopProtocolStep({
+      target: options.target,
+    })
+    : mode === 'status'
+    ? workflow.statusProtocolStep({
+      target: options.target,
+    })
     : buildStepPreview(options);
 
   if (options.json) {
@@ -331,6 +383,8 @@ function main(mode, argv) {
       printStep(result);
     } else if (mode === 'update') {
       printUpdate(result);
+    } else if (mode === 'stop') {
+      printStop(result);
     } else {
       printTurn(result.turn);
     }

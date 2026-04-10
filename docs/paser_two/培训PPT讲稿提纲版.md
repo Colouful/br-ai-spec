@@ -1,4 +1,4 @@
-# ex-ai-spec  规范驱动开发 — 培训 PPT 讲稿提纲
+# ai-spec-auto  规范驱动开发 — 培训 PPT 讲稿提纲
 
 > 总时长：约 120 分钟 | 建议听众：前端开发团队全员
 > 本文档为 PPT 制作与讲师备课使用，每页标注标题、要点、讲师备注和时间。
@@ -14,7 +14,7 @@
 **标题**：规范驱动开发 — 让 AI 写出团队认可的代码
 
 **要点**：
-- ex-ai-spec  v2.0 团队培训
+- ai-spec-auto  v2.0 团队培训
 - 副标题：从"能跑的代码"到"团队认可的代码"
 
 **讲师备注**：
@@ -95,9 +95,9 @@
 
 ---
 
-### 第 6 页 | ex-ai-spec  是什么
+### 第 6 页 | ai-spec-auto  是什么
 
-**标题**：ex-ai-spec  — AI Coding 团队规范库
+**标题**：ai-spec-auto  — AI Coding 团队规范库
 
 **要点**：
 - 一套结构化的规范 + 技能文件，让 AI IDE 自动遵循团队规范
@@ -113,7 +113,7 @@
 
 ---
 
-## Part 2：ex-ai-spec  架构总览（15 分钟）
+## Part 2：ai-spec-auto  架构总览（15 分钟）
 
 ---
 
@@ -453,7 +453,7 @@ MCP 是锦上添花。没有 MCP，规范依然生效；有了 MCP，AI 能做�
 - 可跳过：拼写修复、Bug fix、依赖更新
 
 **讲师备注**：
-这是 ex-ai-spec  最独特的规范。它确保 AI 不是"一股脑输出代码"，而是像有经验的开发者一样"先想清楚再动手"。
+这是 ai-spec-auto  最独特的规范。它确保 AI 不是"一股脑输出代码"，而是像有经验的开发者一样"先想清楚再动手"。
 
 **时间**：2 分钟
 
@@ -529,7 +529,7 @@ Step 4: 状态更新
 5. 输出 proposal.md + tasks.md + spec.md
 
 **讲师备注**：
-create-proposal 是"需求入口"，它做前置分析后委托 `/opsx:propose` 生成提案，再做后置检查确保符合 ex-ai-spec  规范。
+create-proposal 是"需求入口"，它做前置分析后委托 `/opsx:propose` 生成提案，再做后置检查确保符合 ai-spec-auto  规范。
 
 **时间**：2 分钟
 
@@ -812,7 +812,7 @@ src/components/UserCard/
 8. 文档习惯：JSDoc、ADR、API 文档？
 
 **讲师备注**：
-这些问题不需要当场全部回答，但接入前必须对齐。ex-ai-spec  默认提供了一套答案（Vue: views + Element Plus + SCSS Modules + api/ + Pinia + 手写路由），团队可以根据实际调整。
+这些问题不需要当场全部回答，但接入前必须对齐。ai-spec-auto  默认提供了一套答案（Vue: views + Element Plus + SCSS Modules + api/ + Pinia + 手写路由），团队可以根据实际调整。
 
 **时间**：3 分钟
 
@@ -820,7 +820,7 @@ src/components/UserCard/
 
 ### 第 42 页 | 改造顺序
 
-**标题**：如何把 ex-ai-spec  改造成你的规范
+**标题**：如何把 ai-spec-auto  改造成你的规范
 
 **要点**：
 1. **先改 Rule 标题与模块边界**（调整规范编号和范围）
@@ -960,7 +960,7 @@ src/components/UserCard/
 **标题**：学习资源
 
 **要点**：
-- 规范库：`git clone http://git.100credit.cn/zhenwei.li/ex-ai-spec .git`
+- 规范库：`git clone http://git.100credit.cn/zhenwei.li/ai-spec-auto .git`
 - 快速上手：`docs/quick-start.md`
 - 安装指南：`docs/install-guide.md`
 - 培训手册：`docs/规范驱动开发团队内部培训手册.md`

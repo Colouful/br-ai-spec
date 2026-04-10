@@ -3,11 +3,11 @@
 规则：
 
 - 在任何项目搜索、文件读取、技能调用、代码修改之前，必须先执行当前轮次命令
-- 新任务：先执行 `./node_modules/.bin/ai-spec protocol-step --target . --user-input "<用户需求>" --json`
+- 新任务：先执行 `./node_modules/.bin/ai-spec-auto protocol-step --target . --user-input "<用户需求>" --json`
 - 已有运行态：
-  - 若当前这条用户输入本身是在表达审批/放行（如“我同意继续实现 / 同意 / 继续 / 开始 / 愿意”），优先执行 `./node_modules/.bin/ai-spec protocol-update --target . --user-input "<当前用户原话>" --json`
-  - 若当前在归档确认门禁，且用户输入是在表达“归档 / 不归档”决定（如“归档 / 同意归档 / 先不归档 / 暂不归档”），同样优先执行 `./node_modules/.bin/ai-spec protocol-update --target . --user-input "<当前用户原话>" --json`
-  - 否则执行 `./node_modules/.bin/ai-spec protocol-advance --target . --json`
+  - 若当前这条用户输入本身是在表达审批/放行（如“我同意继续实现 / 同意 / 继续 / 开始 / 愿意”），优先执行 `./node_modules/.bin/ai-spec-auto protocol-update --target . --user-input "<当前用户原话>" --json`
+  - 若当前在归档确认门禁，且用户输入是在表达“归档 / 不归档”决定（如“归档 / 同意归档 / 先不归档 / 暂不归档”），同样优先执行 `./node_modules/.bin/ai-spec-auto protocol-update --target . --user-input "<当前用户原话>" --json`
+  - 否则执行 `./node_modules/.bin/ai-spec-auto protocol-advance --target . --json`
 - 之后一律按返回的 `turn.enforcement`、`turn.actor`、`turn.announcements`、`turn.reads`、`turn.writes`、`turn.guidance`、`turn.execution_contract` 执行
 - 若存在 `turn.commands`、`turn.requires_advance`、`turn.finalize_contract`，以它们为最终执行契约，不要自行拼命令
 - 每进入新 `turn` 前，必须原样播报 `turn.announcements.enter`

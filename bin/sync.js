@@ -20,7 +20,7 @@ function printUsage(profilesRegistry = null) {
     ? formatSupportedProfiles(profilesRegistry)
     : 'see .agents/registry/profiles.json';
   console.log(`Usage:
-  ai-spec sync [target] --manifest <manifest.json|url> [options]
+  ai-spec-auto sync [target] --manifest <manifest.json|url> [options]
 
 Options:
   --manifest <file|url>   Local manifest JSON file path or remote manifest URL
@@ -687,6 +687,15 @@ function installIdeAssets(sourceDir, targetDir, ides, resolvedSkills, changes) {
       copyFileTracked(sourceDir, targetDir, `.agents/commands/common/${fileName}`, `.${ide}/commands/${fileName}`, changes);
     }
 
+    const ideCommandsDir = path.join(sourceDir, '.agents/commands', ide);
+    const ideCommandFiles = fs.existsSync(ideCommandsDir)
+      ? fs.readdirSync(ideCommandsDir).filter((name) => name.endsWith('.md')).sort()
+      : [];
+
+    for (const fileName of ideCommandFiles) {
+      copyFileTracked(sourceDir, targetDir, `.agents/commands/${ide}/${fileName}`, `.${ide}/commands/${fileName}`, changes);
+    }
+
     if (ide === 'cursor') {
       const sourceMcp = path.join(sourceDir, '.cursor/mcp.json');
       if (fs.existsSync(sourceMcp)) {
@@ -730,7 +739,7 @@ function buildLock(manifest, targetDir, manifestSource, resolved, cliVersion) {
       flows: resolved.installed_flows.map((id) => ({ id, version: 'workspace' })),
     },
     installer: {
-      command: 'ai-spec sync',
+      command: 'ai-spec-auto sync',
       cli_version: cliVersion,
       mode: 'normal',
     },
@@ -903,7 +912,7 @@ async function main(argv) {
 
     const registryValidation = require('./validate-registry').validateRegistry(sourceDir);
     if (registryValidation.status !== 'success') {
-      throw new Error(`Registry validation failed with ${registryValidation.errors.length} error(s). Run "ai-spec validate-registry" for details.`);
+      throw new Error(`Registry validation failed with ${registryValidation.errors.length} error(s). Run "ai-spec-auto validate-registry" for details.`);
     }
     const targetDir = path.resolve(options.target || '.');
     const cliVersion = require(path.join(sourceDir, 'package.json')).version || '0.0.0';

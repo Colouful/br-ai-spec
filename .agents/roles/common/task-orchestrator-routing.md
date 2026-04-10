@@ -232,7 +232,7 @@ description: 为任务主代理提供“先选模板、再动态加减专家”�
 - `missing_inputs`
 - `first_handoff`
 
-后续如果接入 `ai-spec run`，建议将本节内容映射到统一 JSON 输出：
+后续如果接入 `ai-spec-auto run`，建议将本节内容映射到统一 JSON 输出：
 
 - 结构约定见 [RUN_OUTPUT.md](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/.agents/flows/RUN_OUTPUT.md)
 

@@ -85,13 +85,13 @@ description: 定义当前运行态如何生成并更新当前专家执行载荷�
 当前最稳的接入方式是：
 
 ```bash
-ai-spec expert-dispatch apply --payload ./.ai-spec/internal/tmp/current-dispatch.json
+ai-spec-auto expert-dispatch apply --payload ./.ai-spec/internal/tmp/current-dispatch.json
 ```
 
 或：
 
 ```bash
-cat ./.ai-spec/internal/tmp/current-dispatch.json | ai-spec expert-dispatch apply --stdin
+cat ./.ai-spec/internal/tmp/current-dispatch.json | ai-spec-auto expert-dispatch apply --stdin
 ```
 
 也就是说：

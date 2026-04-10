@@ -20,12 +20,12 @@ const {
 
 function printUsage() {
   console.log(`Usage:
-  ai-spec expert-executor apply --payload <file> [options]
-  ai-spec expert-executor apply --stdin [options]
-  ai-spec expert-executor apply-action --payload <file> [options]
-  ai-spec expert-executor apply-action --stdin [options]
-  ai-spec expert-executor clear [options]
-  ai-spec expert-executor clear-action [options]
+  ai-spec-auto expert-executor apply --payload <file> [options]
+  ai-spec-auto expert-executor apply --stdin [options]
+  ai-spec-auto expert-executor apply-action --payload <file> [options]
+  ai-spec-auto expert-executor apply-action --stdin [options]
+  ai-spec-auto expert-executor clear [options]
+  ai-spec-auto expert-executor clear-action [options]
 
 Options:
   --target <dir>         Target project directory (default: .)

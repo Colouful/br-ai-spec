@@ -57,14 +57,14 @@ description: 定义 task-orchestrator 在首轮输出后，供宿主 Runner 回�
 ## 4. 推荐调用方式
 
 ```bash
-ai-spec runtime-state bootstrap \
+ai-spec-auto runtime-state bootstrap \
   --payload ./.ai-spec/internal/tmp/task-orchestrator-bootstrap.json
 ```
 
 如果运行环境支持标准输入，也可以：
 
 ```bash
-cat ./.ai-spec/internal/tmp/task-orchestrator-bootstrap.json | ai-spec runtime-state bootstrap --stdin
+cat ./.ai-spec/internal/tmp/task-orchestrator-bootstrap.json | ai-spec-auto runtime-state bootstrap --stdin
 ```
 
 ## 5. 示例

@@ -9,7 +9,7 @@ const {
 
 function printUsage() {
   console.log(`Usage:
-  ai-spec archive-change --target <dir> [--change-id <id>] [options]
+  ai-spec-auto archive-change --target <dir> [--change-id <id>] [options]
 
 Options:
   --target <dir>         Target project directory (default: .)

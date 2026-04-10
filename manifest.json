@@ -2,7 +2,7 @@
   "schema_version": 1,
   "manifest_type": "hub-install",
   "name": "cursor-manual-test",
-  "description": "Manual test manifest for @ex/ai-spec-test@0.0.1",
+  "description": "Manual test manifest for @ex/ai-spec-auto@0.0.1",
   "version": "0.0.1",
   "profile": "vue",
   "ides": [

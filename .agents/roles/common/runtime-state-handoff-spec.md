@@ -36,7 +36,7 @@ description: 定义专家交接以及审批、恢复、状态查询时如何更�
 当前最小实现使用：
 
 ```bash
-ai-spec runtime-state handoff \
+ai-spec-auto runtime-state handoff \
   --to-role frontend-implementer \
   --next-role code-guardian \
   --task-anchor ./.ai-spec/internal/tmp/frontend-implementer-anchor.json \
@@ -46,7 +46,7 @@ ai-spec runtime-state handoff \
 如果当前运行不是 `current-run.json`，也可以显式指定：
 
 ```bash
-ai-spec runtime-state handoff \
+ai-spec-auto runtime-state handoff \
   --run-id run_20260330_001 \
   --to-role code-guardian \
   --status running
@@ -55,7 +55,7 @@ ai-spec runtime-state handoff \
 审批放行：
 
 ```bash
-ai-spec runtime-state approve \
+ai-spec-auto runtime-state approve \
   --gate before-implementation \
   --to-role frontend-implementer \
   --status running
@@ -64,7 +64,7 @@ ai-spec runtime-state approve \
 恢复执行：
 
 ```bash
-ai-spec runtime-state resume \
+ai-spec-auto runtime-state resume \
   --to-role frontend-implementer \
   --status running
 ```
@@ -72,31 +72,31 @@ ai-spec runtime-state resume \
 查询状态：
 
 ```bash
-ai-spec runtime-state status
+ai-spec-auto runtime-state status
 ```
 
 进入阻断：
 
 ```bash
-ai-spec runtime-state gate-blocked --gate before-implementation --status waiting-approval
+ai-spec-auto runtime-state gate-blocked --gate before-implementation --status waiting-approval
 ```
 
 标记完成：
 
 ```bash
-ai-spec runtime-state complete
+ai-spec-auto runtime-state complete
 ```
 
 标记失败：
 
 ```bash
-ai-spec runtime-state fail --error "组件规范检查未通过"
+ai-spec-auto runtime-state fail --error "组件规范检查未通过"
 ```
 
 用户取消：
 
 ```bash
-ai-spec runtime-state cancel --message "用户主动取消当前任务"
+ai-spec-auto runtime-state cancel --message "用户主动取消当前任务"
 ```
 
 ## 4. 推荐更新规则

@@ -8,7 +8,7 @@ const {
 
 function printUsage() {
   console.log(`Usage:
-  ai-spec validate-registry [options]
+  ai-spec-auto validate-registry [options]
 
 Options:
   --source <dir>          Source workspace root (default: current package)

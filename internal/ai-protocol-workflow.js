@@ -8,7 +8,10 @@ const {
   inferComplexity,
   inferRiskLevel,
   recordRunInputUpdate,
+  bootstrapRunState,
+  pauseRunState,
   approveRunState,
+  resumeRunState,
   completeRunState,
 } = require('../bin/runtime-state');
 const {
@@ -89,6 +92,11 @@ const FALLBACK_ROLE_RULE_IDS = {
   'requirement-analyst': ['project-overview', 'project-structure', 'api-standard', 'route-standard', 'style-standard'],
   'frontend-implementer': ['project-structure', 'component-standard', 'route-standard', 'api-standard', 'store-standard', 'style-standard'],
   'code-guardian': ['coding-standard', 'api-standard', 'route-standard', 'style-standard', 'test-standard', 'format-check-standard', 'audit-report-standard'],
+  'design-collaborator': ['project-structure', 'component-standard', 'route-standard', 'style-standard'],
+  'api-contract-specialist': ['project-overview', 'api-standard', 'route-standard'],
+  'unit-test-specialist': ['coding-standard', 'test-standard', 'audit-report-standard'],
+  'verification-reviewer': ['test-standard', 'style-standard', 'audit-report-standard'],
+  'performance-auditor': ['project-structure', 'coding-standard', 'format-check-standard'],
 };
 
 const FALLBACK_SKILL_SOURCE_CANDIDATES = {
@@ -140,6 +148,11 @@ const FALLBACK_ROLE_SKILL_PRIORITY = {
   'requirement-analyst': ['create-proposal', 'design-analysis'],
   'frontend-implementer': ['create-view', 'create-route', 'create-api', 'theme-variables', 'create-component', 'create-store', 'execute-task'],
   'code-guardian': ['ui-verification', 'web-design-guidelines', 'create-test'],
+  'design-collaborator': ['design-analysis'],
+  'api-contract-specialist': ['create-api', 'design-analysis'],
+  'unit-test-specialist': ['create-test'],
+  'verification-reviewer': ['ui-verification', 'web-design-guidelines'],
+  'performance-auditor': ['web-design-guidelines'],
 };
 
 const FALLBACK_ROLE_OPENSPEC_RULE_SECTIONS = {
@@ -154,6 +167,12 @@ const DEFAULT_FLOW_CONSTRAINTS = {
   required_roles: ['requirement-analyst', 'frontend-implementer', 'code-guardian'],
   approval_gates: ['before-implementation', 'before-archive'],
   required_artifacts: ['proposal.md', 'specs', 'design.md', 'tasks.md', 'checklist.md', 'iterations.md'],
+};
+
+const DEFAULT_HANDOFF_GATE_POLICY = {
+  'requirement-analyst->frontend-implementer': 'silent',
+  'frontend-implementer->code-guardian': 'silent',
+  'code-guardian->archive-change': 'approval',
 };
 
 const MICRO_ROLE_EXTRAS = {
@@ -278,6 +297,56 @@ const ROLE_GUIDANCE = {
     must_not: [
       '不要在 checklist.md 和 iterations.md 未落盘前给 complete 结论',
       '不要把明显问题写成模糊建议',
+    ],
+  },
+  'design-collaborator': {
+    goal: '把设计稿、交互说明和视觉约束整理成可执行的设计协作结论，不直接承担业务实现。',
+    must_do: [
+      '明确页面结构、关键状态与交互歧义',
+      '把设计约束落到当前项目的页面、组件、样式变量与路由上下文',
+    ],
+    must_not: [
+      '不要直接替代 frontend-implementer 写业务实现',
+    ],
+  },
+  'api-contract-specialist': {
+    goal: '在实现前把接口契约、字段边界和 mock/真实接口切换规则说清楚。',
+    must_do: [
+      '明确输入输出、状态和值域约束',
+      '把接口约束回写到当前变更需要更新的章节，而不是只给抽象建议',
+    ],
+    must_not: [
+      '不要把尚未确认的接口假设伪装成已批准事实',
+    ],
+  },
+  'unit-test-specialist': {
+    goal: '补充关键逻辑的单测策略与高回归风险保护点。',
+    must_do: [
+      '识别最值得补测的逻辑和边界场景',
+      '优先给出最小必要测试增量，不为覆盖率而覆盖率',
+    ],
+    must_not: [
+      '不要用大面积补测试掩盖需求边界或实现问题',
+    ],
+  },
+  'verification-reviewer': {
+    goal: '从验收视角补强验证结论，确保交付不是“代码完成但验证不足”。',
+    must_do: [
+      '对照 proposal/specs/design/tasks 检查验收口径是否闭环',
+      '明确哪些验证已完成、哪些仍需补充',
+    ],
+    must_not: [
+      '不要重复 code-guardian 已给出的泛化审查意见',
+    ],
+  },
+  'performance-auditor': {
+    goal: '识别页面、资源和交互层面的主要性能风险，并给出最值得先做的优化建议。',
+    must_do: [
+      '优先定位高收益性能问题，而不是罗列泛泛建议',
+      '将性能风险与当前页面结构、数据量和交互路径绑定',
+    ],
+    must_not: [
+      '不要把性能优化扩展成不必要的大范围重构',
     ],
   },
 };
@@ -788,6 +857,8 @@ function buildOrchestratorGuidance(targetDir, runState = null, userInput = null)
     repoConventions,
   );
   const riskDrivers = inferRiskDrivers(rawInput, repoConventions);
+  const activatedOptionalRoles = inferOptionalRoles(rawInput);
+  const skippedOptionalRoles = (flowDefinition.optional_roles || []).filter((roleId) => !activatedOptionalRoles.includes(roleId));
   const pendingGate = runState?.pending_gate || null;
   const hasBeforeImplementationGate = flowDefinition.approval_gates.includes('before-implementation');
   const expectedGate = pendingGate || (riskLevel === 'high' && hasBeforeImplementationGate ? 'before-implementation' : null);
@@ -804,6 +875,8 @@ function buildOrchestratorGuidance(targetDir, runState = null, userInput = null)
     routing_constraints: {
       selected_flow: flowDefinition.id,
       required_experts: flowDefinition.required_roles,
+      activated_optional_roles: activatedOptionalRoles,
+      skipped_optional_roles: skippedOptionalRoles,
       first_handoff: runState?.plan?.first_handoff || flowDefinition.first_handoff,
       route_strategy: inferRoutingStrategy(repoConventions, rawInput),
       api_strategy: inferApiStrategy(repoConventions, rawInput),
@@ -844,6 +917,8 @@ function buildOrchestratorGuidance(targetDir, runState = null, userInput = null)
       change_id: runState?.task?.change_id || null,
       required_experts: flowDefinition.required_roles,
       required_artifacts: flowDefinition.required_artifacts,
+      activated_optional_roles: activatedOptionalRoles,
+      skipped_optional_roles: skippedOptionalRoles,
       assumptions_policy: [
         '仓库结构、项目规则和现有代码可推断的信息优先转成 assumptions',
         '只在高风险、不可逆或规则冲突时把缺口升级为审批或阻断',
@@ -853,6 +928,7 @@ function buildOrchestratorGuidance(targetDir, runState = null, userInput = null)
         '高风险且无法可靠推断的边界必须显式升级为审批点',
       ],
       handoff_policy: flowDefinition.handoff_policy,
+      handoff_gate_policy: flowDefinition.handoff_gate_policy,
       completion_policy: flowDefinition.completion_policy,
       repo_alignment: [
         repoConventions.viewsDir ? `页面目录优先对齐 ${repoConventions.viewsDir}` : '页面目录需先与仓库结构对齐',
@@ -1079,6 +1155,18 @@ function normalizeFlowArtifactHints(values) {
   });
 }
 
+function normalizeHandoffGatePolicy(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(value)
+      .map(([pair, gate]) => [String(pair || '').trim(), String(gate || '').trim()])
+      .filter(([pair, gate]) => pair && gate),
+  );
+}
+
 function loadFlowDefinition(targetDir, flowId = DEFAULT_FLOW_ID) {
   const registryEntry = getFlowRuntimeConfig(targetDir, flowId) || {};
   const sourceRel = registryEntry.source || null;
@@ -1092,6 +1180,7 @@ function loadFlowDefinition(targetDir, flowId = DEFAULT_FLOW_ID) {
   }
 
   const requiredRoles = normalizeStringArray(registryEntry.required_roles || frontmatter.required_roles);
+  const optionalRoles = normalizeStringArray(registryEntry.optional_roles || frontmatter.optional_roles);
   const approvalGates = normalizeStringArray(registryEntry.approval_gates || frontmatter.approval_gates);
   const requiredArtifacts = normalizeFlowArtifactHints(
     registryEntry.required_artifacts ||
@@ -1108,6 +1197,11 @@ function loadFlowDefinition(targetDir, flowId = DEFAULT_FLOW_ID) {
     ? requiredArtifacts
     : DEFAULT_FLOW_CONSTRAINTS.required_artifacts;
   const firstHandoff = registryEntry.first_handoff || resolvedRequiredRoles[0] || null;
+  const handoffGatePolicy = {
+    ...DEFAULT_HANDOFF_GATE_POLICY,
+    ...normalizeHandoffGatePolicy(frontmatter.handoff_gates || frontmatter.handoff_gate_policy),
+    ...normalizeHandoffGatePolicy(registryEntry.handoff_gates || registryEntry.handoff_gate_policy),
+  };
 
   return {
     id: flowId,
@@ -1116,10 +1210,12 @@ function loadFlowDefinition(targetDir, flowId = DEFAULT_FLOW_ID) {
     default_schema: registryEntry.default_schema || null,
     artifact_profile: registryEntry.artifact_profile || null,
     required_roles: resolvedRequiredRoles,
+    optional_roles: optionalRoles,
     approval_gates: resolvedApprovalGates,
     required_artifacts: resolvedRequiredArtifacts,
     first_handoff: firstHandoff,
     handoff_policy: registryEntry.handoff_policy || `task-orchestrator -> ${resolvedRequiredRoles.join(' -> ')} -> terminal`,
+    handoff_gate_policy: handoffGatePolicy,
     completion_policy: registryEntry.completion_policy || `${resolvedRequiredArtifacts.join(', ')} 缺一不可`,
   };
 }
@@ -1171,6 +1267,72 @@ function inferPendingGateResumeRole(targetDir, runState, flowDefinition, pending
   }
 
   return runState?.anchor?.stage?.next_role || runState?.current_role || null;
+}
+
+function inferOptionalRoles(rawInput) {
+  const text = String(rawInput || '');
+  const roles = [];
+
+  if (/设计稿|还原|高保真|视觉|交互稿|像素级|ui/i.test(text)) {
+    roles.push('design-collaborator');
+  }
+  if (/接口|api|字段|契约|mock|联调|分页|筛选|搜索|状态切换|重试/i.test(text)) {
+    roles.push('api-contract-specialist');
+  }
+  if (/测试|回归|断言|单元测试|vitest/i.test(text)) {
+    roles.push('unit-test-specialist');
+  }
+  if (/验收|验证|校验|截图|比对|review/i.test(text)) {
+    roles.push('verification-reviewer');
+  }
+  if (/性能|首屏|卡顿|lcp|cls|inp|大列表|虚拟滚动/i.test(text)) {
+    roles.push('performance-auditor');
+  }
+
+  return [...new Set(roles)];
+}
+
+function inferChangeImpactTargetRole(currentRole, changeImpact, latestInput) {
+  if (changeImpact === 'archive-fix') {
+    const text = String(latestInput || '');
+    if (/验收|风险|阻断|审查|检查|结论/i.test(text)) {
+      return 'code-guardian';
+    }
+    if (/范围|方案|边界|需求|接口字段|设计|详情联动/i.test(text)) {
+      return 'requirement-analyst';
+    }
+    return 'frontend-implementer';
+  }
+
+  if (changeImpact === 'scope-delta') {
+    return 'requirement-analyst';
+  }
+
+  if (changeImpact === 'patch') {
+    if (currentRole === 'code-guardian') {
+      return 'frontend-implementer';
+    }
+    return currentRole || 'frontend-implementer';
+  }
+
+  return null;
+}
+
+function inferArtifactsToUpdate(changeImpact) {
+  switch (changeImpact) {
+    case 'scope-delta':
+      return ['proposal.md', 'specs/', 'design.md', 'tasks.md', 'checklist.md', 'iterations.md'];
+    case 'archive-fix':
+      return ['tasks.md', 'design.md', 'checklist.md', 'iterations.md', 'code'];
+    case 'followup-patch':
+      return ['proposal.md', 'specs/', 'design.md', 'tasks.md', 'checklist.md', 'iterations.md', 'code'];
+    case 'patch':
+      return ['tasks.md', 'design.md', 'checklist.md', 'iterations.md', 'code'];
+    case 're-scope':
+      return ['proposal.md', 'specs/', 'design.md', 'tasks.md'];
+    default:
+      return [];
+  }
 }
 
 function describeApprovalGate(pendingGate, resumeRole) {
@@ -1260,6 +1422,9 @@ function buildSummary(status, runState = null) {
     complexity: runState?.complexity || runState?.task?.complexity || null,
     pending_input_update: Boolean(runState?.pending_input_update),
     input_update_count: Array.isArray(runState?.input_updates) ? runState.input_updates.length : 0,
+    change_impact: runState?.incremental_update?.change_impact || runState?.task?.change_impact || null,
+    reconcile_strategy: runState?.incremental_update?.reconcile_strategy || null,
+    parent_change_id: runState?.task?.parent_change_id || runState?.incremental_update?.parent_change_id || null,
     auto_fix_active: Boolean(runState?.auto_fix?.active),
     auto_fix_attempts: Number(runState?.auto_fix?.attempts) || 0,
   };
@@ -1365,18 +1530,22 @@ function shellQuote(value) {
 }
 
 function buildProtocolCommands(userInput = null) {
-  const advance = './node_modules/.bin/ai-spec protocol-advance --target . --json';
+  const advance = './node_modules/.bin/ai-spec-auto protocol-advance --target . --json';
   const step = userInput
-    ? `./node_modules/.bin/ai-spec protocol-step --target . --user-input ${shellQuote(userInput)} --json`
-    : './node_modules/.bin/ai-spec protocol-step --target . --json';
+    ? `./node_modules/.bin/ai-spec-auto protocol-step --target . --user-input ${shellQuote(userInput)} --json`
+    : './node_modules/.bin/ai-spec-auto protocol-step --target . --json';
   const update = userInput
-    ? `./node_modules/.bin/ai-spec protocol-update --target . --user-input ${shellQuote(userInput)} --json`
-    : './node_modules/.bin/ai-spec protocol-update --target . --user-input "<补充需求>" --json';
+    ? `./node_modules/.bin/ai-spec-auto protocol-update --target . --user-input ${shellQuote(userInput)} --json`
+    : './node_modules/.bin/ai-spec-auto protocol-update --target . --user-input "<补充需求>" --json';
+  const stop = './node_modules/.bin/ai-spec-auto protocol-stop --target . --json';
+  const status = './node_modules/.bin/ai-spec-auto protocol-status --target . --json';
 
   return {
     step,
     advance,
     update,
+    stop,
+    status,
   };
 }
 
@@ -1388,15 +1557,21 @@ function buildRoleCurrentCommand(turn) {
 
   const changeId = turn.input?.change_id || null;
   if (!changeId) {
-    return './node_modules/.bin/ai-spec archive-change --target . --complete-run --json';
+    return './node_modules/.bin/ai-spec-auto archive-change --target . --complete-run --json';
   }
 
-  return `./node_modules/.bin/ai-spec archive-change --target . --change-id ${shellQuote(changeId)} --complete-run --json`;
+  return `./node_modules/.bin/ai-spec-auto archive-change --target . --change-id ${shellQuote(changeId)} --complete-run --json`;
 }
 
 function attachProtocolContracts(turn, options = {}) {
   const commands = buildProtocolCommands(options.userInput || turn.input?.latest_user_input || turn.input?.user_request || null);
-  commands.current = turn.mode === 'start' ? commands.step : commands.advance;
+  commands.current = turn.mode === 'start'
+    ? commands.step
+    : turn.mode === 'update-review'
+    ? commands.update
+    : turn.mode === 'paused'
+    ? commands.advance
+    : commands.advance;
   const actorId = turn.actor?.id || null;
   const currentCommand = buildRoleCurrentCommand(turn);
   const currentCommandFinalizesRun = actorId === 'archive-change' && Boolean(currentCommand);
@@ -1883,14 +2058,74 @@ function buildRoleSpecificContract(
     };
   }
 
+  if (roleId === 'design-collaborator') {
+    return {
+      ...base,
+      summary: '先把设计输入转成可执行的 UI 约束、歧义点和待确认问题，再交还需求/实现链路。',
+      expected_outputs: ['ui-analysis-notes', 'design-open-questions'],
+      must_resolve: [
+        '设计稿中的关键交互、状态和视觉约束需落到当前项目页面结构',
+        '把会影响实现范围的设计歧义显式转成待确认项',
+      ],
+    };
+  }
+
+  if (roleId === 'api-contract-specialist') {
+    return {
+      ...base,
+      summary: '在实现前明确接口契约、字段边界和 mock/真实接口切换策略。',
+      expected_outputs: ['api-contract-notes', 'open-questions'],
+      must_resolve: [
+        '接口输入输出、字段命名和值域约束要能回写到当前变更章节',
+        '需要明确哪些地方可以先 mock，哪些必须等真实契约确认',
+      ],
+    };
+  }
+
+  if (roleId === 'unit-test-specialist') {
+    return {
+      ...base,
+      summary: '补充最值得做的单测策略与边界场景，降低 patch / 增量改动的回归风险。',
+      expected_outputs: ['test-plan', 'unit-test-suggestions'],
+      must_resolve: [
+        '指出哪些逻辑必须被测试保护',
+        '优先最小测试增量，不要求一次补全全部测试',
+      ],
+    };
+  }
+
+  if (roleId === 'verification-reviewer') {
+    return {
+      ...base,
+      summary: '从验收视角检查验证链路是否闭环，并补强交付前的验证结论。',
+      expected_outputs: ['verification-review-notes', 'acceptance-risks'],
+      must_resolve: [
+        'proposal/specs/design/tasks 的关键验收项是否已有对应验证',
+        '指出仍需补充的验证动作或残留风险',
+      ],
+    };
+  }
+
+  if (roleId === 'performance-auditor') {
+    return {
+      ...base,
+      summary: '定位主要性能瓶颈与高收益优化点，为后续实现或守护提供性能审计意见。',
+      expected_outputs: ['performance-audit-notes', 'priority-suggestions'],
+      must_resolve: [
+        '说明性能问题是首屏、运行时还是资源层瓶颈',
+        '给出最值得优先处理的优化顺序，而不是泛化建议',
+      ],
+    };
+  }
+
   if (roleId === 'archive-change') {
     return {
       ...base,
       summary: '在用户明确同意后合并增量规范并归档 change 目录，不跳过任何收尾步骤。',
-      archive_command: './node_modules/.bin/ai-spec archive-change --target . --change-id <change-id> --complete-run --json',
+      archive_command: './node_modules/.bin/ai-spec-auto archive-change --target . --change-id <change-id> --complete-run --json',
       must_use_internal_command: true,
       archive_focus: [
-        '优先执行 ai-spec archive-change --complete-run 内置命令，不手工 mkdir/cp/mv',
+        '优先执行 ai-spec-auto archive-change --complete-run 内置命令，不手工 mkdir/cp/mv',
         '先把 openspec/changes/<change-id>/specs/ 合并到 openspec/specs/',
         '再把 change 目录迁移到 openspec/changes/archive/YYYY-MM-DD-<change-id>/',
         '归档命令成功后直接结束本次运行，不再补写 runtime-state complete 或额外执行 protocol-advance',
@@ -1920,6 +2155,23 @@ function looksLikeApprovalInput(input) {
     /按 proposal 继续/,
     /按提案继续/,
     /审批通过/,
+  ].some((pattern) => pattern.test(text));
+}
+
+function looksLikeResumeInput(input) {
+  const text = String(input || '').trim();
+  if (!text) {
+    return false;
+  }
+
+  return [
+    /^继续$/,
+    /^继续执行$/,
+    /^恢复$/,
+    /^恢复执行$/,
+    /^继续推进$/,
+    /^接着来$/,
+    /^继续做$/,
   ].some((pattern) => pattern.test(text));
 }
 
@@ -1953,6 +2205,135 @@ function looksLikeArchiveSkipInput(input) {
     /不用归档/,
     /无需归档/,
   ].some((pattern) => pattern.test(text));
+}
+
+function looksLikeArchiveFixInput(input) {
+  const text = String(input || '').trim();
+  if (!text) {
+    return false;
+  }
+
+  return [
+    /先别归档/,
+    /别归档/,
+    /不要归档/,
+    /不归档.*改/,
+    /实现不对/,
+    /不是我想要的/,
+    /改一下/,
+    /改成/,
+    /调一下/,
+    /还得调/,
+  ].some((pattern) => pattern.test(text));
+}
+
+function looksLikeFollowupPatchInput(input) {
+  const text = String(input || '').trim();
+  if (!text) {
+    return false;
+  }
+
+  return [
+    /上个.*归档.*修/,
+    /补一个修正/,
+    /开个补丁/,
+    /follow-?up patch/i,
+    /patch/i,
+    /已归档.*改/,
+  ].some((pattern) => pattern.test(text));
+}
+
+function classifyChangeImpact(runState, latestInput) {
+  const text = String(latestInput || '').trim();
+  const pendingGate = runState?.pending_gate || null;
+  const currentRole = runState?.current_role || null;
+  const status = String(runState?.status || '').trim().toLowerCase();
+
+  if (!text) {
+    return {
+      change_impact: null,
+      reconcile_strategy: null,
+      artifacts_to_update: [],
+      reopen_reason: null,
+      target_role: null,
+      handoff_gate: null,
+    };
+  }
+
+  if (pendingGate === 'before-archive' && looksLikeArchiveFixInput(text) && !looksLikeArchiveSkipInput(text) && !looksLikeArchiveApproveInput(text)) {
+    const targetRole = inferChangeImpactTargetRole(currentRole, 'archive-fix', text);
+    return {
+      change_impact: 'archive-fix',
+      reconcile_strategy: targetRole === 'requirement-analyst'
+        ? 'rewind-to-requirement'
+        : targetRole === 'code-guardian'
+        ? 'rewind-to-guardian'
+        : 'rewind-to-frontend',
+      artifacts_to_update: inferArtifactsToUpdate('archive-fix'),
+      reopen_reason: '归档前发现实现或验收不符合预期，需要先修正再归档',
+      target_role: targetRole,
+      handoff_gate: targetRole === 'requirement-analyst' ? 'confirm' : 'silent',
+    };
+  }
+
+  if (status === 'success' && looksLikeFollowupPatchInput(text)) {
+    return {
+      change_impact: 'followup-patch',
+      reconcile_strategy: 'followup-patch',
+      artifacts_to_update: inferArtifactsToUpdate('followup-patch'),
+      reopen_reason: '原变更已归档，当前输入更适合作为补丁变更单独修正',
+      target_role: /范围|设计|接口|字段|验收/i.test(text) ? 'requirement-analyst' : 'frontend-implementer',
+      handoff_gate: 'silent',
+    };
+  }
+
+  if (/顺便|另外再做|改成.*模块|真实支付|生产收银台|权限系统|风控规则/i.test(text)) {
+    return {
+      change_impact: 're-scope',
+      reconcile_strategy: 'suggest-new-change',
+      artifacts_to_update: inferArtifactsToUpdate('re-scope'),
+      reopen_reason: '新输入明显超出当前 change 范围，建议拆成新的 change',
+      target_role: 'task-orchestrator',
+      handoff_gate: 'confirm',
+    };
+  }
+
+  if (/范围|方案|边界|改成.*详情|详情联动|新增接口|字段调整|验收口径|路由|流程/i.test(text)) {
+    return {
+      change_impact: 'scope-delta',
+      reconcile_strategy: 'rewind-to-requirement',
+      artifacts_to_update: inferArtifactsToUpdate('scope-delta'),
+      reopen_reason: '补充输入影响任务拆分、接口边界或验收范围，需要回需求阶段做增量修订',
+      target_role: 'requirement-analyst',
+      handoff_gate: 'confirm',
+    };
+  }
+
+  return {
+    change_impact: 'patch',
+    reconcile_strategy: 'in-place',
+    artifacts_to_update: inferArtifactsToUpdate('patch'),
+    reopen_reason: '补充输入属于当前 change 内的小修正，按最小 diff 吸收即可',
+    target_role: inferChangeImpactTargetRole(currentRole, 'patch', text),
+    handoff_gate: 'silent',
+  };
+}
+
+function createFollowupPatchChangeId(parentChangeId, userInput) {
+  const base = String(parentChangeId || 'followup-patch')
+    .replace(/[^a-zA-Z0-9-_]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    .toLowerCase() || 'followup-patch';
+  const hint = String(userInput || '')
+    .replace(/[^\u4e00-\u9fa5a-zA-Z0-9\s-]/g, ' ')
+    .trim()
+    .split(/\s+/)
+    .slice(0, 4)
+    .join('-')
+    .replace(/-+/g, '-')
+    .toLowerCase();
+  return `${base}-patch${hint ? `-${hint}` : ''}`.slice(0, 96);
 }
 
 function buildRoleGuidance(roleId, deliveryProfile) {
@@ -2007,7 +2388,7 @@ function buildExecutionContract(targetDir, runtimePaths, dispatch, roleDefinitio
       'next_action',
     ],
     required_artifacts: artifactWrites,
-    next_advance_command: './node_modules/.bin/ai-spec protocol-advance --target . --json',
+    next_advance_command: './node_modules/.bin/ai-spec-auto protocol-advance --target . --json',
   };
 
   if (dispatch.role?.id === 'frontend-implementer') {
@@ -2340,6 +2721,59 @@ function buildContinueTurn(targetDir, status, currentArtifacts) {
   });
 }
 
+function buildPausedTurn(targetDir, status, currentArtifacts) {
+  const runState = currentArtifacts.run || null;
+  return attachProtocolContracts(attachActorPresentation({
+    kind: 'ai-protocol-turn',
+    status: 'blocked',
+    mode: 'paused',
+    actor: {
+      id: 'task-orchestrator',
+      type: 'orchestrator',
+    },
+    command: '/spec-continue',
+    reason: 'current run has been paused and is waiting for an explicit resume',
+    summary: buildSummary(status, runState),
+    input: {
+      user_request: runState?.trigger?.raw_input || null,
+      current_role: runState?.current_role || null,
+      pending_gate: runState?.pending_gate || null,
+      delivery_profile: runState?.delivery_profile || null,
+      artifact_profile: runState?.artifact_profile || null,
+    },
+    reads: [
+      buildFileTarget(targetDir, path.join('.ai-spec', 'current-run.json'), {
+        required: true,
+        label: 'current run-state',
+      }),
+    ],
+    writes: [],
+    expected_output: [
+      '当前运行已暂停，保留当前产物与上下文',
+      '等待用户继续推进或补充新的修正输入',
+      '只用简洁摘要说明当前停点与恢复方式',
+    ],
+    guidance: {
+      ...buildOrchestratorGuidance(
+        targetDir,
+        runState,
+        runState?.trigger?.latest_user_input || runState?.trigger?.raw_input || null,
+      ),
+      pause_contract: {
+        status: 'paused',
+        resume_rule: '用户执行 /spec-continue，或通过自然语言表达“继续 / 恢复执行”后，再恢复到当前停点继续。',
+        preserved_state: [
+          '当前 run',
+          '当前专家停点',
+          '当前产物与增量修订上下文',
+        ],
+      },
+    },
+  }), {
+    userInput: runState?.trigger?.latest_user_input || runState?.trigger?.raw_input || null,
+  });
+}
+
 function buildApprovalGateTurn(targetDir, status, currentArtifacts) {
   const pendingGate = currentArtifacts.run?.pending_gate || null;
   const gateContext = currentArtifacts.run?.gate_context || null;
@@ -2487,6 +2921,7 @@ function buildUpdateReviewTurn(targetDir, status, currentArtifacts) {
     ? (looksLikeArchiveApproveInput(latestInput) || looksLikeApprovalInput(latestInput))
     : (pendingGate ? looksLikeApprovalInput(latestInput) : false);
   const archiveSkipIntent = pendingGate === 'before-archive' ? looksLikeArchiveSkipInput(latestInput) : false;
+  const changeDecision = currentArtifacts.run?.incremental_update || classifyChangeImpact(currentArtifacts.run, latestInput);
   const resumeRole = gateContext?.resume_to_role || inferPendingGateResumeRole(targetDir, currentArtifacts.run, flowDefinition, pendingGate);
   const useCompactArchiveGate = pendingGate === 'before-archive' && (approvalIntent || archiveSkipIntent);
   const orchestratorGuidance = useCompactArchiveGate
@@ -2543,7 +2978,7 @@ function buildUpdateReviewTurn(targetDir, status, currentArtifacts) {
       id: 'task-orchestrator',
       type: 'orchestrator',
     },
-    command: '/spec-continue',
+    command: '/spec-update',
     reason: 'new user input has been appended; task-orchestrator must reconcile it before normal progression',
     summary: buildSummary(status, currentArtifacts.run),
     input: {
@@ -2552,6 +2987,8 @@ function buildUpdateReviewTurn(targetDir, status, currentArtifacts) {
       input_updates: recentUpdates,
       current_role: currentArtifacts.run?.current_role || null,
       pending_gate: currentArtifacts.run?.pending_gate || null,
+      change_impact: changeDecision?.change_impact || null,
+      reconcile_strategy: changeDecision?.reconcile_strategy || null,
       delivery_profile: currentArtifacts.run?.delivery_profile || null,
       artifact_profile: currentArtifacts.run?.artifact_profile || null,
     },
@@ -2576,11 +3013,30 @@ function buildUpdateReviewTurn(targetDir, status, currentArtifacts) {
         ]
       : [
           '吸收新的用户输入并更新当前假设、边界或交接策略',
-          '若补充输入会影响当前阶段，优先产出最小 runtime-action 或 gate 结论',
+          changeDecision?.reconcile_strategy === 'suggest-new-change'
+            ? '给出“建议新建 change”的最小结论，不要把明显超范围输入吞进当前 run'
+            : `按照 ${changeDecision?.reconcile_strategy || 'in-place'} 策略决定是否回退到 ${changeDecision?.target_role || '当前专家'}`,
+          changeDecision?.artifacts_to_update?.length > 0
+            ? `只增量更新这些产物：${changeDecision.artifacts_to_update.join('、')}`
+            : '若补充输入会影响当前阶段，优先产出最小 runtime-action 或 gate 结论',
           '处理完成后清除 pending_input_update 标记',
     ],
     guidance: {
       ...orchestratorGuidance,
+      update_contract: {
+        latest_user_input: latestInput,
+        change_impact: changeDecision?.change_impact || null,
+        reconcile_strategy: changeDecision?.reconcile_strategy || null,
+        artifacts_to_update: changeDecision?.artifacts_to_update || [],
+        reopen_reason: changeDecision?.reopen_reason || null,
+        target_role: changeDecision?.target_role || null,
+        handoff_gate: changeDecision?.handoff_gate || null,
+        delta_rules: [
+          'proposal/specs/design/tasks/checklist/iterations 只改受影响章节，不整份重写',
+          '优先在同一 change 内吸收 patch / scope-delta / archive-fix',
+          '只有明显跨范围时才建议新建 change',
+        ],
+      },
       approval_gate: pendingGate
         ? {
             gate: pendingGate,
@@ -2590,18 +3046,22 @@ function buildUpdateReviewTurn(targetDir, status, currentArtifacts) {
             required_user_action: gateContext?.required_user_action || null,
             approval_intent_detected: approvalIntent,
             archive_skip_intent_detected: archiveSkipIntent,
+            archive_fix_intent_detected: pendingGate === 'before-archive' && changeDecision?.change_impact === 'archive-fix',
             latest_user_input: latestInput,
             resume_to_role: resumeRole,
             next_step: approvalIntent
               ? `生成 action=approve 的 runtime-action，清除 pending_gate，并恢复到 ${resumeRole || '下一位专家'}`
               : archiveSkipIntent
               ? '生成 action=complete 的 runtime-action，保持现有交付结果并结束当前运行'
+              : changeDecision?.change_impact === 'archive-fix'
+              ? `生成 action=handoff 的 runtime-action，清除 pending_gate，并回退到 ${changeDecision?.target_role || 'frontend-implementer'} 修正后再回归归档确认`
               : '若未获得明确批准，保持 waiting-approval，不要放行到实现阶段',
           }
         : null,
       orchestrator_contract: {
         write_to: runtimePaths.tmpTaskOrchestratorTurn.relPath,
         allowed_kinds: ['run-plan', 'task-orchestrator-runtime-action'],
+        allowed_actions: ['handoff', 'approve', 'resume', 'gate-blocked', 'complete', 'fail', 'cancel'],
       },
     },
   }), {
@@ -2874,6 +3334,10 @@ function buildProtocolTurn(options = {}) {
 
   const currentArtifacts = loadCurrentArtifacts(targetDir);
 
+  if (String(currentArtifacts.run?.status || '').trim().toLowerCase() === 'paused') {
+    return buildPausedTurn(targetDir, status, currentArtifacts);
+  }
+
   if (currentArtifacts.run?.pending_input_update) {
     return buildUpdateReviewTurn(targetDir, status, currentArtifacts);
   }
@@ -2898,7 +3362,21 @@ function advanceProtocolStep(options = {}) {
   const before = runner.buildStatus(targetDir);
   let advanced = null;
 
-  if (before.pending_inputs.length > 0) {
+  if (String(before.current.run_status || '').trim().toLowerCase() === 'paused') {
+    advanced = {
+      kind: 'runtime-resume-fast-path',
+      applied: {
+        adapter_action: 'resume',
+      },
+      runtime: resumeRunState({
+        target: targetDir,
+        clearPendingGate: false,
+        message: '用户继续推进，恢复到上一个停点。',
+      }),
+    };
+  }
+
+  if (!advanced && before.pending_inputs.length > 0) {
     advanced = runner.advanceRunner({
       target: targetDir,
     });
@@ -2912,6 +3390,65 @@ function advanceProtocolStep(options = {}) {
     turn: buildProtocolTurn({
       target: targetDir,
       userInput: options.userInput || null,
+    }),
+  };
+}
+
+function statusProtocolStep(options = {}) {
+  const targetDir = resolveTargetDir(options.target);
+  return {
+    kind: 'ai-protocol-status',
+    target: targetDir,
+    runner_status: runner.buildStatus(targetDir),
+    turn: buildProtocolTurn({
+      target: targetDir,
+      userInput: null,
+    }),
+  };
+}
+
+function stopProtocolStep(options = {}) {
+  const targetDir = resolveTargetDir(options.target);
+  const currentArtifacts = loadCurrentArtifacts(targetDir);
+  if (!currentArtifacts.run) {
+    return {
+      kind: 'ai-protocol-stop',
+      target: targetDir,
+      stopped: null,
+      runner_status: runner.buildStatus(targetDir),
+      turn: buildProtocolTurn({
+        target: targetDir,
+        userInput: null,
+      }),
+    };
+  }
+
+  if (['success', 'failed', 'cancelled'].includes(String(currentArtifacts.run.status || '').toLowerCase())) {
+    return {
+      kind: 'ai-protocol-stop',
+      target: targetDir,
+      stopped: null,
+      runner_status: runner.buildStatus(targetDir),
+      turn: buildProtocolTurn({
+        target: targetDir,
+        userInput: null,
+      }),
+    };
+  }
+
+  const stopped = pauseRunState({
+    target: targetDir,
+    message: options.message || '用户主动暂停当前运行。',
+  });
+
+  return {
+    kind: 'ai-protocol-stop',
+    target: targetDir,
+    stopped,
+    runner_status: runner.buildStatus(targetDir),
+    turn: buildProtocolTurn({
+      target: targetDir,
+      userInput: null,
     }),
   };
 }
@@ -2981,11 +3518,112 @@ function tryApplyBeforeArchiveFastPath(targetDir, userInput) {
   };
 }
 
+function tryOpenFollowupPatchFastPath(targetDir, userInput) {
+  const currentArtifacts = loadCurrentArtifacts(targetDir);
+  const runState = currentArtifacts.run || null;
+  if (!runState || String(runState.status || '').trim().toLowerCase() !== 'success') {
+    return null;
+  }
+
+  const changeDecision = classifyChangeImpact(runState, userInput);
+  if (changeDecision.change_impact !== 'followup-patch') {
+    return null;
+  }
+
+  const parentChangeId = runState.task?.change_id || runState.anchor?.task?.change_id || null;
+  const patchChangeId = createFollowupPatchChangeId(parentChangeId, userInput);
+  const firstHandoff = changeDecision.target_role === 'requirement-analyst'
+    ? 'requirement-analyst'
+    : 'frontend-implementer';
+  const flowDefinition = loadFlowDefinition(targetDir, runState.flow?.id || DEFAULT_FLOW_ID);
+  const bootstrap = bootstrapRunState({
+    target: targetDir,
+    payloadData: {
+      kind: 'run-plan',
+      schema_version: 1,
+      mode: 'auto',
+      status: 'planned',
+      delivery_profile: runState.delivery_profile || 'standard',
+      artifact_profile: runState.artifact_profile || 'full',
+      complexity: runState.complexity || runState.task?.complexity || 'medium',
+      task: {
+        type: 'followup-patch',
+        change_id: patchChangeId,
+        parent_change_id: parentChangeId,
+        raw_input: `针对已归档变更 ${parentChangeId || '(unknown)'} 的补丁修正：${userInput}`,
+        risk_level: runState.task?.risk_level || 'low',
+        change_impact: 'followup-patch',
+        reconcile_strategy: 'followup-patch',
+        artifacts_to_update: changeDecision.artifacts_to_update || [],
+        reopen_reason: changeDecision.reopen_reason || null,
+      },
+      flow: {
+        id: runState.flow?.id || DEFAULT_FLOW_ID,
+        name: runState.flow?.name || flowDefinition.name,
+        source: runState.flow?.source || flowDefinition.source,
+      },
+      plan: {
+        required_roles: flowDefinition.required_roles,
+        activated_optional_roles: /测试|回归/.test(String(userInput || '')) ? ['unit-test-specialist'] : [],
+        skipped_optional_roles: [],
+        approval_gates: ['before-archive'],
+        first_handoff: firstHandoff,
+        delivery_profile: runState.delivery_profile || 'standard',
+        artifact_profile: runState.artifact_profile || 'full',
+      },
+      assumptions: [
+        `这是针对已归档变更 ${parentChangeId || '(unknown)'} 的 follow-up patch`,
+        '默认沿用原变更的项目上下文与目录约定，只做最小补丁修正',
+      ],
+      missing_inputs: [],
+      artifacts: runState.artifacts || null,
+    },
+    parentChangeId,
+    changeImpact: 'followup-patch',
+    reconcileStrategy: 'followup-patch',
+    artifactsToUpdate: changeDecision.artifacts_to_update || [],
+    reopenReason: changeDecision.reopen_reason || null,
+  });
+
+  return {
+    executed: true,
+    action: 'followup-patch-opened',
+    bootstrap,
+  };
+}
+
 function updateProtocolInput(options = {}) {
   const targetDir = resolveTargetDir(options.target);
   const userInput = options.userInput || null;
   if (!userInput) {
     throw new Error('Missing required argument: --user-input <text>');
+  }
+
+  const currentArtifacts = loadCurrentArtifacts(targetDir);
+  if (String(currentArtifacts.run?.status || '').trim().toLowerCase() === 'paused' && looksLikeResumeInput(userInput)) {
+    const resumed = resumeRunState({
+      target: targetDir,
+      clearPendingGate: false,
+      message: '用户通过补充输入恢复当前运行。',
+    });
+    return {
+      kind: 'ai-protocol-input-update',
+      target: targetDir,
+      updated: null,
+      fast_path: {
+        executed: true,
+        action: 'resume-paused-run',
+        archived_to: null,
+        run_status: resumed.state?.status || null,
+        current_role: resumed.state?.current_role || null,
+        requires_followup_turn: true,
+      },
+      runner_status: runner.buildStatus(targetDir),
+      turn: buildProtocolTurn({
+        target: targetDir,
+        userInput: null,
+      }),
+    };
   }
 
   const fastPath = tryApplyBeforeArchiveFastPath(targetDir, userInput);
@@ -3010,10 +3648,41 @@ function updateProtocolInput(options = {}) {
     };
   }
 
+  const followupPatch = tryOpenFollowupPatchFastPath(targetDir, userInput);
+  if (followupPatch) {
+    return {
+      kind: 'ai-protocol-input-update',
+      target: targetDir,
+      updated: null,
+      fast_path: {
+        executed: true,
+        action: followupPatch.action,
+        archived_to: null,
+        run_status: followupPatch.bootstrap.state?.status || null,
+        current_role: followupPatch.bootstrap.state?.current_role || null,
+        requires_followup_turn: true,
+      },
+      runner_status: runner.buildStatus(targetDir),
+      turn: buildProtocolTurn({
+        target: targetDir,
+        userInput: null,
+      }),
+    };
+  }
+
+  const changeDecision = classifyChangeImpact(currentArtifacts.run, userInput);
+
   const updated = recordRunInputUpdate({
     target: targetDir,
     userInput,
     source: 'protocol-update',
+    changeImpact: changeDecision.change_impact,
+    reconcileStrategy: changeDecision.reconcile_strategy,
+    artifactsToUpdate: changeDecision.artifacts_to_update,
+    reopenReason: changeDecision.reopen_reason,
+    parentChangeId: currentArtifacts.run?.task?.parent_change_id || currentArtifacts.run?.task?.change_id || null,
+    toRole: changeDecision.target_role,
+    handoffGate: changeDecision.handoff_gate,
   });
 
   return {
@@ -3039,6 +3708,8 @@ function updateProtocolInput(options = {}) {
 module.exports = {
   buildProtocolTurn,
   advanceProtocolStep,
+  statusProtocolStep,
+  stopProtocolStep,
   updateProtocolInput,
   loadRoleDefinition,
   parseFrontmatter,

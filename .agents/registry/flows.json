@@ -15,6 +15,11 @@
       "required_roles": ["requirement-analyst", "frontend-implementer", "code-guardian"],
       "first_handoff": "requirement-analyst",
       "approval_gates": ["before-implementation", "before-archive"],
+      "handoff_gate_policy": {
+        "requirement-analyst->frontend-implementer": "silent",
+        "frontend-implementer->code-guardian": "silent",
+        "code-guardian->archive-change": "approval"
+      },
       "core_artifacts": ["proposal", "specs", "design", "tasks", "checklist", "iterations"],
       "required_artifacts": ["proposal.md", "specs", "design.md", "tasks.md", "checklist.md", "iterations.md"],
       "handoff_policy": "task-orchestrator -> requirement-analyst -> frontend-implementer -> code-guardian -> before-archive -> archive-change(可选) -> terminal",

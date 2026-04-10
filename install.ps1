@@ -1,6 +1,6 @@
-<#
+﻿<#
 .SYNOPSIS
-    ex-ai-spec  规范库安装脚本 (PowerShell)
+    ai-spec-auto  规范库安装脚本 (PowerShell)
     适用于 Windows PowerShell 5.1+ / PowerShell Core 7+
 
 .EXAMPLE
@@ -18,7 +18,7 @@ $ErrorActionPreference = "Stop"
 # ============================================================================
 
 $Version = "2.0.0"
-$DefaultRepo = "http://git.100credit.cn/zhenwei.li/ex-ai-spec.git"
+$DefaultRepo = "http://git.100credit.cn/zhenwei.li/ai-spec-auto.git"
 
 $script:Command = ""
 $script:TargetDir = "."
@@ -26,7 +26,7 @@ $script:Profile = "vue"
 $script:Level = "L3"
 $script:IdeFilter = "default"
 $script:SpecRepo = if ($env:BR_AI_SPEC_REPO) { $env:BR_AI_SPEC_REPO } else { $DefaultRepo }
-$script:CacheDir = if ($env:BR_AI_SPEC_CACHE) { $env:BR_AI_SPEC_CACHE } else { Join-Path $HOME ".ex-ai-spec" }
+$script:CacheDir = if ($env:BR_AI_SPEC_CACHE) { $env:BR_AI_SPEC_CACHE } else { Join-Path $HOME ".ai-spec-auto" }
 $script:SpecBranch = if ($env:BR_AI_SPEC_BRANCH) { $env:BR_AI_SPEC_BRANCH } else { "main" }
 $script:Uipro = "ask"
 $script:InstallLint = "ask"
@@ -525,8 +525,8 @@ function Resolve-MonorepoInstallTarget {
     if (-not (Test-StdinInteractive)) {
         Write-Warn "检测到 Monorepo（工作区根: $wsRoot），当前在根目录执行 init。"
         Write-Warn "若规范与依赖应落在某个前端子包，建议在子包目录执行，例如:"
-        Write-Host "    npx @ex/ai-spec init .\packages\your-app"
-        Write-Host "  或: npx @ex/ai-spec init . --package packages/your-app"
+        Write-Host "    npx @ex/ai-spec-auto@latest init .\packages\your-app"
+        Write-Host "  或: npx @ex/ai-spec-auto@latest init . --package packages/your-app"
         Write-Host "  若确需在根目录安装，请使用: --workspace-root"
         Write-Warn "非交互模式将继续在根目录安装。"
         return $tCanon
@@ -566,8 +566,8 @@ function Resolve-MonorepoInstallTarget {
     }
 
     Write-Err "多次输入无效子包路径。请使用显式路径重新执行，例如:"
-    Write-Host "  npx @ex/ai-spec init .\packages\your-app"
-    Write-Host "  npx @ex/ai-spec init . --package packages/your-app"
+    Write-Host "  npx @ex/ai-spec-auto@latest init .\packages\your-app"
+    Write-Host "  npx @ex/ai-spec-auto@latest init . --package packages/your-app"
     exit 1
 }
 
@@ -644,17 +644,17 @@ process.stdout.write(String(value));
 function Install-LocalAiSpecCli {
     param([string]$Target)
     if (-not (Test-Path (Join-Path $Target "package.json"))) {
-        Write-Warn "未找到 package.json，跳过本地 ai-spec CLI 安装"; return
+        Write-Warn "未找到 package.json，跳过本地 ai-spec-auto CLI 安装"; return
     }
     if (-not $script:PkgManager) {
-        Write-Warn "无可用的包管理器，跳过本地 ai-spec CLI 安装"; return
+        Write-Warn "无可用的包管理器，跳过本地 ai-spec-auto CLI 安装"; return
     }
 
     try {
         $targetCanon = (Resolve-Path -LiteralPath $Target -ErrorAction Stop).Path
         $sourceCanon = (Resolve-Path -LiteralPath $script:SourceDir -ErrorAction Stop).Path
         if ($targetCanon -eq $sourceCanon) {
-            Write-Info "当前就在规范仓库目录，跳过本地 ai-spec CLI 自安装"
+            Write-Info "当前就在规范仓库目录，跳过本地 ai-spec-auto CLI 自安装"
             return
         }
     } catch {}
@@ -723,7 +723,7 @@ function Install-LocalAiSpecCli {
         }
     }
 
-    Write-Info "正在使用 $($script:PkgManager) 安装项目内 ai-spec CLI ..."
+    Write-Info "正在使用 $($script:PkgManager) 安装项目内 ai-spec-auto CLI ..."
     Write-Info "  source: $installLabel"
     try {
         Push-Location $Target
@@ -738,17 +738,17 @@ function Install-LocalAiSpecCli {
             Pop-Location
         }
     } catch {
-        Write-Warn "本地 ai-spec CLI 安装失败，请手动执行:"
+        Write-Warn "本地 ai-spec-auto CLI 安装失败，请手动执行:"
         Write-Host "  $manualCmd"
         return
     }
 
-    $localCli = Join-Path $Target "node_modules/.bin/ai-spec"
-    $localCliCmd = Join-Path $Target "node_modules/.bin/ai-spec.cmd"
+    $localCli = Join-Path $Target "node_modules/.bin/ai-spec-auto"
+    $localCliCmd = Join-Path $Target "node_modules/.bin/ai-spec-auto.cmd"
     if ((Test-Path $localCli) -or (Test-Path $localCliCmd)) {
-        Write-Ok "项目内 ai-spec CLI 已就绪 (./node_modules/.bin/ai-spec)"
+        Write-Ok "项目内 ai-spec-auto CLI 已就绪 (./node_modules/.bin/ai-spec-auto)"
     } else {
-        Write-Warn "已完成依赖安装，但未检测到 ./node_modules/.bin/ai-spec，请检查包管理器输出"
+        Write-Warn "已完成依赖安装，但未检测到 ./node_modules/.bin/ai-spec-auto，请检查包管理器输出"
     }
 }
 
@@ -1095,7 +1095,7 @@ function Install-Uipro {
 
     if (-not (Get-Command uipro -ErrorAction SilentlyContinue)) {
         Write-Info "安装 uipro-cli ..."
-        $logCli = Join-Path ([System.IO.Path]::GetTempPath()) "ex-ai-spec-uipro-cli-$([guid]::NewGuid().ToString('n')).log"
+        $logCli = Join-Path ([System.IO.Path]::GetTempPath()) "ai-spec-auto-uipro-cli-$([guid]::NewGuid().ToString('n')).log"
         if ($script:PkgManager -eq "pnpm") {
             cmd /c "pnpm add -g uipro-cli 1>`"$logCli`" 2>&1" | Out-Null
         } else {
@@ -1117,9 +1117,9 @@ function Install-Uipro {
         Write-Ok "uipro-cli 可用"
     }
 
-    $tmpDir = Join-Path ([System.IO.Path]::GetTempPath()) "ex-ai-spec-uipro-$(Get-Random)"
+    $tmpDir = Join-Path ([System.IO.Path]::GetTempPath()) "ai-spec-auto-uipro-$(Get-Random)"
     New-Item -ItemType Directory -Path $tmpDir -Force | Out-Null
-    $logInit = Join-Path ([System.IO.Path]::GetTempPath()) "ex-ai-spec-uipro-init-$([guid]::NewGuid().ToString('n')).log"
+    $logInit = Join-Path ([System.IO.Path]::GetTempPath()) "ai-spec-auto-uipro-init-$([guid]::NewGuid().ToString('n')).log"
     Write-Info "下载 UI UX Pro Max 资源 ..."
     $uiproCmd = (Get-Command uipro -ErrorAction SilentlyContinue).Source
     if (-not $uiproCmd) {
@@ -1258,7 +1258,7 @@ function Install-OpenSpec {
         if (Test-Path $configFile) {
             $content = Get-Content $configFile -Raw -ErrorAction SilentlyContinue
             if ($content -notmatch '(?m)^context:') {
-                Write-Info "合并 ex-ai-spec  context/rules 到 config.yaml ..."
+                Write-Info "合并 ai-spec-auto  context/rules 到 config.yaml ..."
                 if ($contextAndRules) {
                     Add-Content -Path $configFile -Value $contextAndRules
                 }
@@ -1360,16 +1360,16 @@ function Write-Report {
         Write-Host "     -> 先在 设置 -> MCP 中按需打开目标服务，再编辑 JSON" -ForegroundColor Yellow
         Write-Host "     -> 将 ApiFox 等条目的 project-id、access-token 等占位符换成真实值" -ForegroundColor Yellow
         Write-Host "     -> 不需要的服务保持关闭即可；若条目含 disabled，启用前请先完成凭证配置" -ForegroundColor Yellow
-        Write-Host "  2. 首次运行 /spec-start 或 /spec-continue 时，如 Cursor 提示执行 ai-spec 命令" 
+        Write-Host "  2. 首次运行 /spec-start 或 /spec-continue 时，如 Cursor 提示执行 ai-spec-auto 命令" 
         Write-Host "     -> 请选择 Always allow for this workspace，避免宿主桥命令被权限弹窗打断" -ForegroundColor Yellow
     }
     if ($script:Level -eq "L3") {
-        Write-Host "  3. 使用 /opsx-propose              开始第一个变更提案"
+        Write-Host "  3. 使用 /opsx-propose              开始第一个变更提案（Cursor 命令模板已同步）"
     }
     Write-Host ""
     Write-Host "------------------------------------------------------------" -ForegroundColor Cyan
     Write-Host "  ★ 项目初始化不会在安装后自动执行，请在 AI IDE 中手动触发：" -ForegroundColor White
-    Write-Host "    推荐触发词：`"初始化项目规范`" / `"project-init`""
+    Write-Host "    推荐触发方式：/project-init（或输入 `"初始化项目规范`" / `"project-init`"）"
     Write-Host "    触发后 AI 将生成："
     foreach ($rule in (Get-SelectedAiInitRules)) {
         Write-Host "    $rule"
@@ -1490,7 +1490,7 @@ function Invoke-Init {
 
     Write-Host ""
     $nodeVer = try { node --version 2>$null } catch { "N/A" }
-    Write-Info "ex-ai-spec  v$Version | Windows | Node $nodeVer"
+    Write-Info "ai-spec-auto  v$Version | Windows | Node $nodeVer"
     Write-Info "初始化项目: $target"
     Write-Host ""
 
@@ -1515,7 +1515,7 @@ function Invoke-Init {
     if ($script:RulesStrategy -eq "ask") { $script:RulesStrategy = "standard" }
     if ([Environment]::UserInteractive -and $script:Uipro -eq "ask") { Select-Uipro }
     if ($script:Uipro -eq "ask") {
-        Write-Info "未安装 UI UX Pro Max：非交互环境或未参与询问时默认跳过。需要时请执行: npx @ex/ai-spec init . --uipro（已有项目可: npx @ex/ai-spec update . --uipro）"
+        Write-Info "未安装 UI UX Pro Max：非交互环境或未参与询问时默认跳过。需要时请执行: npx @ex/ai-spec-auto@latest init . --uipro（已有项目可: npx @ex/ai-spec-auto@latest update . --uipro）"
         $script:Uipro = "no"
     }
 
@@ -1645,19 +1645,19 @@ function Invoke-Check {
             Write-Ok "  UI UX Pro Max: 已安装"
         } elseif (Test-Path $uiproSkillDir) {
             Write-Warn "  UI UX Pro Max: 目录存在但缺少 SKILL.md（安装不完整）"
-            Write-Host "    建议执行: npx @ex/ai-spec update . --uipro"
+            Write-Host "    建议执行: npx @ex/ai-spec-auto@latest update . --uipro"
             $hasIssue = $true
         } else {
             Write-Info "  UI UX Pro Max: 未安装（可选）。非交互 init 不会自动安装，需要请加 --uipro"
         }
     } else { Write-Err ".agents/ 不存在"; $hasIssue = $true }
 
-    $localCli = Join-Path $target "node_modules/.bin/ai-spec"
-    $localCliCmd = Join-Path $target "node_modules/.bin/ai-spec.cmd"
+    $localCli = Join-Path $target "node_modules/.bin/ai-spec-auto"
+    $localCliCmd = Join-Path $target "node_modules/.bin/ai-spec-auto.cmd"
     if ((Test-Path $localCli) -or (Test-Path $localCliCmd)) {
-        Write-Ok "./node_modules/.bin/ai-spec 可用"
+        Write-Ok "./node_modules/.bin/ai-spec-auto 可用"
     } else {
-        Write-Err "./node_modules/.bin/ai-spec 缺失"; $hasIssue = $true
+        Write-Err "./node_modules/.bin/ai-spec-auto 缺失"; $hasIssue = $true
     }
 
     foreach ($ide in $IdeDirs) {
@@ -1779,7 +1779,7 @@ if (pkg.scripts && pkg.scripts.prepare && pkg.scripts.prepare.includes('husky'))
 
 function Show-Usage {
     Write-Host ""
-    Write-Host "ex-ai-spec  规范库安装工具 v$Version" -ForegroundColor Cyan
+    Write-Host "ai-spec-auto  规范库安装工具 v$Version" -ForegroundColor Cyan
     Write-Host ""
     Write-Host "用法: .\install.ps1 <命令> [目标目录] [选项]"
     Write-Host ""

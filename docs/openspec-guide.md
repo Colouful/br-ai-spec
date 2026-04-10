@@ -1,24 +1,24 @@
 # L3 OpenSpec 集成使用指南
 
-> ex-ai-spec  v2.0 | 适用于需要需求治理与变更归档的团队
+> ai-spec-auto  v2.0 | 适用于需要需求治理与变更归档的团队
 
 ---
 
 ## 一、OpenSpec 是什么
 
-OpenSpec 是一个**规范驱动开发（Spec-Driven Development）**框架，通过结构化的**提案 → 实施 → 归档**流程管理代码变更。它与 ex-ai-spec  的关系是：
+OpenSpec 是一个**规范驱动开发（Spec-Driven Development）**框架，通过结构化的**提案 → 实施 → 归档**流程管理代码变更。它与 ai-spec-auto  的关系是：
 
 | 组件 | 管理范围 | 目录 |
 |------|----------|------|
-| **ex-ai-spec ** | 编码规范 + 实践技能 | `.agents/rules/` + `.agents/skills/` |
+| **ai-spec-auto ** | 编码规范 + 实践技能 | `.agents/rules/` + `.agents/skills/` |
 | **OpenSpec** | 需求流程（提案 → 实施 → 归档） | `openspec/` |
 
-两者通过 `openspec/config.yaml` 桥接 — OpenSpec 在执行流程时自动引用 ex-ai-spec  的规范和技能。
+两者通过 `openspec/config.yaml` 桥接 — OpenSpec 在执行流程时自动引用 ai-spec-auto  的规范和技能。
 
 ```
 需求 → /opsx:propose（创建提案、拆解任务）
              ↓
-       /opsx:apply（按 ex-ai-spec  规范执行任务）
+       /opsx:apply（按 ai-spec-auto  规范执行任务）
              ↓
        /opsx:archive（归档变更、合并规范）
 ```
@@ -41,14 +41,14 @@ OpenSpec 是一个**规范驱动开发（Spec-Driven Development）**框架，�
 
 ```bash
 cd /path/to/your-project
-npx @ex/ai-spec init --profile vue --level L3
+npx @ex/ai-spec-auto@latest init --profile vue --level L3
 ```
 
 ### 2.2 手动安装
 
 ```bash
-git clone http://git.100credit.cn/zhenwei.li/ex-ai-spec .git
-cd ex-ai-spec 
+git clone http://git.100credit.cn/zhenwei.li/ai-spec-auto.git ai-spec-auto
+cd ai-spec-auto 
 bash install.sh init /path/to/your-project --profile vue --level L3
 ```
 
@@ -58,7 +58,7 @@ L3 安装完成后，项目中会多出以下内容（相比 L2）：
 
 ```
 your-project/
-├── .agents/                  # ex-ai-spec  规范与技能（L1 已有）
+├── .agents/                  # ai-spec-auto  规范与技能（L1 已有）
 │   ├── rules/
 │   └── skills/
 ├── .cursor/                  # IDE 适配（L2 已有）
@@ -74,7 +74,7 @@ your-project/
 │   └── skills/
 │
 ├── openspec/                 ← L3 新增
-│   ├── config.yaml           # OpenSpec 配置（含 ex-ai-spec  上下文）
+│   ├── config.yaml           # OpenSpec 配置（含 ai-spec-auto  上下文）
 │   ├── AGENTS.md             # OpenSpec 命令说明
 │   ├── specs/                # 已归档的规范（随项目积累）
 │   └── changes/              # 进行中 + 已归档的变更
@@ -87,7 +87,7 @@ your-project/
 ### 2.4 验证安装
 
 ```bash
-npx @ex/ai-spec check
+npx @ex/ai-spec-auto@latest check
 ```
 
 检查项中应看到：
@@ -145,11 +145,11 @@ AI：创建变更 add-user-management...
 | `design.md` | 技术设计：方案选型、数据结构、组件拆分 |
 | `tasks.md` | 任务清单：可逐项勾选的实施步骤 |
 
-**与 ex-ai-spec  的联动：**
+**与 ai-spec-auto  的联动：**
 
-- AI 会自动读取 `openspec/config.yaml` 中的 `context` 字段，了解项目使用 ex-ai-spec  规范体系
+- AI 会自动读取 `openspec/config.yaml` 中的 `context` 字段，了解项目使用 ai-spec-auto  规范体系
 - 创建的技术设计会遵循 `.agents/rules/` 中的架构约束
-- 任务拆分由 OpenSpec 根据 `config.yaml` 中的 rules 自动生成，ex-ai-spec  通过 rules 注入规范约束而不干预产物生成
+- 任务拆分由 OpenSpec 根据 `config.yaml` 中的 rules 自动生成，ai-spec-auto  通过 rules 注入规范约束而不干预产物生成
 
 ### 3.2 /opsx:apply — 实施任务
 
@@ -179,7 +179,7 @@ AI：开始实施 add-user-management...
 
 - 每个任务执行前会读取 `.agents/rules/12-Superpowers执行规范.md`
 - 按 `.agents/skills/execute-task/SKILL.md` 的四步循环执行（头脑风暴 → TDD → 实现 → 审查）
-- 涉及组件、接口、路由等操作时自动引用对应的 ex-ai-spec  规范和技能
+- 涉及组件、接口、路由等操作时自动引用对应的 ai-spec-auto  规范和技能
 - 每完成一个任务，自动在 `tasks.md` 中勾选
 
 ### 3.3 /opsx:archive — 归档变更
@@ -223,14 +223,14 @@ openspec/
 
 ## 四、config.yaml 详解
 
-`openspec/config.yaml` 是 ex-ai-spec 与 OpenSpec 的桥梁。当前 L3 实施方案会同步一个项目级自定义 schema：`openspec/schemas/expert-delivery/`，并将 `config.yaml` 默认 schema 指向它。
+`openspec/config.yaml` 是 ai-spec-auto 与 OpenSpec 的桥梁。当前 L3 实施方案会同步一个项目级自定义 schema：`openspec/schemas/expert-delivery/`，并将 `config.yaml` 默认 schema 指向它。
 
 ```yaml
-# OpenSpec 项目配置（由 ex-ai-spec 提供的增强版模板）
+# OpenSpec 项目配置（由 ai-spec-auto 提供的增强版模板）
 schema: expert-delivery
 
 context: |
-  本项目接入 ex-ai-spec 专家协同平台：
+  本项目接入 ai-spec-auto 专家协同平台：
   - rules: .agents/rules/
   - skills: .agents/skills/
   - roles: .agents/roles/
@@ -354,7 +354,7 @@ AI：基于探索结果创建提案...
 2. 使用 design-analysis 技能分析设计稿
    → 产出 docs/样式还原/<名称>-UI分析清单.md
       ↓
-3. /opsx:propose（OpenSpec 生成提案，自动读取 config.yaml 中的 ex-ai-spec  规则）
+3. /opsx:propose（OpenSpec 生成提案，自动读取 config.yaml 中的 ai-spec-auto  规则）
    → openspec/changes/<name>/ 下生成 proposal.md / specs/ / design.md / tasks.md
       ↓
 4. 后置检查：确认 tasks.md 包含 UI 验收任务
@@ -660,6 +660,10 @@ openspec update            # 应用配置
 | Cursor | `/opsx-propose`、`/opsx-apply` | 连字符分隔 |
 | Windsurf | `/opsx-propose`、`/opsx-apply` | 连字符分隔 |
 | Copilot (IDE) | `/opsx-propose`、`/opsx-apply` | 连字符分隔，仅 IDE 扩展支持 |
+
+说明：
+- Cursor 的 `/opsx-*` 连字符命令由 ai-spec-auto 安装时直接同步到 `.cursor/commands/`
+- 不依赖 OpenSpec 额外“碰巧生成”这些命令文件
 | Trae | `/openspec-propose`、`/openspec-apply` | 技能调用方式，无 `opsx-*` 命令文件 |
 
 > **注意**：GitHub Copilot 的 prompt 文件仅在 IDE 扩展（VS Code、JetBrains、Visual Studio）中可用，Copilot CLI 暂不支持。
@@ -687,7 +691,7 @@ openspec update            # 应用配置
 可以。在已安装 L2 的项目中运行：
 
 ```bash
-npx @ex/ai-spec init --level L3
+npx @ex/ai-spec-auto@latest init --level L3
 ```
 
 脚本会检测到 `.agents/` 已存在，只补充 OpenSpec 部分。
@@ -703,7 +707,7 @@ npx openspec init --tools cursor,claude
 
 **Q：config.yaml 被覆盖了怎么办？**
 
-运行 `npx @ex/ai-spec update --level L3`，脚本会检测 `config.yaml` 中是否已有 `context:` 字段，没有才追加，不会覆盖已有配置。
+运行 `npx @ex/ai-spec-auto@latest update --level L3`，脚本会检测 `config.yaml` 中是否已有 `context:` 字段，没有才追加，不会覆盖已有配置。
 
 **Q：不是所有需求都需要走 OpenSpec 吧？**
 

@@ -59,6 +59,26 @@ const ROLE_METADATA = {
     name: '归档专家',
     source: '.agents/roles/common/archive-change.md',
   },
+  'design-collaborator': {
+    name: '设计协作专家',
+    source: '.agents/roles/domains/demand-design/design-collaborator.md',
+  },
+  'api-contract-specialist': {
+    name: 'API 契约专家',
+    source: '.agents/roles/domains/demand-design/api-contract-specialist.md',
+  },
+  'unit-test-specialist': {
+    name: '单元测试专家',
+    source: '.agents/roles/domains/testing/unit-test-specialist.md',
+  },
+  'verification-reviewer': {
+    name: '验证评审专家',
+    source: '.agents/roles/domains/testing/verification-reviewer.md',
+  },
+  'performance-auditor': {
+    name: '性能审计专家',
+    source: '.agents/roles/domains/performance/performance-auditor.md',
+  },
 };
 const ROLE_EXPECTED_OUTPUTS = {
   'requirement-analyst': {
@@ -76,6 +96,26 @@ const ROLE_EXPECTED_OUTPUTS = {
   'archive-change': {
     compact: ['合并当前增量规范', '完成变更归档', '结束本次运行'],
     full: ['合并当前增量规范到 openspec/specs', '完成变更归档', '结束本次运行'],
+  },
+  'design-collaborator': {
+    compact: ['补充最小 UI 约束与设计疑问'],
+    full: ['补充 UI 分析清单与设计待确认项'],
+  },
+  'api-contract-specialist': {
+    compact: ['补充最小接口契约约束'],
+    full: ['补充接口契约说明与待确认字段'],
+  },
+  'unit-test-specialist': {
+    compact: ['补充关键测试建议'],
+    full: ['补充单元测试策略与高风险边界场景'],
+  },
+  'verification-reviewer': {
+    compact: ['补充关键验收结论'],
+    full: ['补充验证评审意见与验收风险'],
+  },
+  'performance-auditor': {
+    compact: ['补充关键性能风险'],
+    full: ['补充性能审计结论与优化优先级'],
   },
 };
 
@@ -362,6 +402,14 @@ function buildNextExpected(targetDir) {
     };
   }
 
+  if (String(current.run.status || '').trim().toLowerCase() === 'paused') {
+    return {
+      producer: 'task-orchestrator',
+      files: [],
+      reason: 'run is paused and waiting for resume',
+    };
+  }
+
   if (current.execution) {
     return {
       producer: 'task-orchestrator',
@@ -551,6 +599,10 @@ function applyRuntimeMutation({ targetDir, action, payload, payloadSource }) {
       case 'resume':
         result = runtimeState.resumeRunState(runtimeOptions);
         break;
+      case 'pause':
+      case 'paused':
+        result = runtimeState.pauseRunState(runtimeOptions);
+        break;
       case 'gate-blocked':
       case 'blocked':
         result = runtimeState.gateBlockedRunState(runtimeOptions);
@@ -581,7 +633,7 @@ function applyRuntimeMutation({ targetDir, action, payload, payloadSource }) {
     result,
   };
 
-  if (['bootstrap', 'handoff', 'approve', 'resume', 'gate-blocked', 'complete', 'fail', 'cancel'].includes(applied.adapter_action)) {
+  if (['bootstrap', 'handoff', 'approve', 'resume', 'pause', 'gate-blocked', 'complete', 'fail', 'cancel'].includes(applied.adapter_action)) {
     return {
       ...applied,
       ...clearCurrentExpertArtifacts(targetDir),

@@ -45,7 +45,7 @@ handoff_to: []
 
 ## 执行契约
 
-- 优先执行 `./node_modules/.bin/ai-spec archive-change --target . --change-id <change-id> --complete-run --json`
+- 优先执行 `./node_modules/.bin/ai-spec-auto archive-change --target . --change-id <change-id> --complete-run --json`
 - 不手工执行 `mkdir`、`cp`、`mv` 去合并或迁移归档目录，除非内置命令不可用
 - 优先读取 `archive-change` skill，按其中的目录与合并规则执行
 - 若存在同名规范文件，必须保留既有内容并追加本次增量，不得直接覆盖

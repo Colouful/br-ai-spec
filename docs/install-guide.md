@@ -1,16 +1,16 @@
 # install.sh 安装脚本详解
 
-ex-ai-spec 规范库安装工具 v0.0.16，适用于 macOS / Linux / Git Bash / WSL。
+ai-spec-auto 规范库安装工具（当前安装层实现），适用于 macOS / Linux / Git Bash / WSL。
 
 ## 推荐入口（npx）
 
 在**目标前端项目根目录**优先使用 **npx**（无需先克隆本仓库），与仓库根目录 [README.md](../README.md) 一致：
 
 ```bash
-npx @ex/ai-spec init
-npx @ex/ai-spec update
-npx @ex/ai-spec check
-npx @ex/ai-spec uninstall
+npx @ex/ai-spec-auto@latest init .
+npx @ex/ai-spec-auto@latest update .
+npx @ex/ai-spec-auto@latest check .
+npx @ex/ai-spec-auto@latest uninstall .
 ```
 
 > 首次使用需在 `~/.npmrc` 配置私有源：`@ex:registry=http://nodejs.100credit.cn/`
@@ -30,7 +30,7 @@ bash install.sh <命令> [目标目录] [选项]
 | 命令 | 说明 | 示例 |
 |------|------|------|
 | `init` | 首次安装到目标项目 | `bash install.sh init ~/my-project` |
-| `update` | 更新规范（保留项目特有规则） | `bash install.sh update ~/my-project` |
+| `update` | 更新规范：支持交互式模块选择与细粒度参数控制 | `bash install.sh update ~/my-project` |
 | `check` | 检查安装状态与链接有效性 | `bash install.sh check ~/my-project` |
 | `uninstall` | 卸载规范库 | `bash install.sh uninstall ~/my-project` |
 
@@ -72,6 +72,53 @@ bash install.sh <命令> [目标目录] [选项]
 
 覆盖默认的规范库 Git 地址。也可通过环境变量 `BR_AI_SPEC_REPO` 设置。
 
+### 规则安装策略（init / update）
+
+| 参数 | 说明 |
+|------|------|
+| `--standard-rules` | 使用标准规则集，不进入自定义规则选择 |
+| `--custom-rules` | 启用自定义规则模式；交互终端下会继续选择具体规则，非交互下默认保留全部可自定义规则 |
+
+可自定义规则固定范围为：
+
+- `01-项目概述.md`
+- `03-项目结构.md`
+- `04-组件规范.md`
+- `05-API规范.md`
+- `06-路由规范.md`
+- `07-状态管理.md`
+- `09-样式规范.md`
+
+其中：
+
+- `01/03` 始终按“项目特有规则”处理
+- 其它被选为自定义的规则在安装时不会从规范库落盘，后续由 `project-init` 按项目真实情况补生成
+
+### Monorepo 参数
+
+| 参数 | 说明 |
+|------|------|
+| `--package <path>` | 相对工作区根的子包路径，跳过「根/子包」交互 |
+| `--workspace-root` | 强制在工作区根安装，跳过上述交互 |
+
+环境变量 `EX_AI_SPEC_WORKSPACE_PACKAGE` 与 `--package` 等价。
+
+### update 专用参数
+
+| 参数 | 说明 |
+|------|------|
+| `--update-rules` / `--no-update-rules` | 显式更新或跳过 rules |
+| `--skip-skills` | update 时跳过 skills |
+| `--skip-configs` | update 时跳过 lint/format 配置 |
+| `--skip-commands` | update 时保留已有命令模板，仅补新增 |
+| `--update-commands` | update 时覆盖已有命令模板 |
+| `--skip-ide-links` | update 时跳过 IDE 软链接重建 |
+| `--skip-openspec` | update 时跳过 OpenSpec 更新 |
+| `--skip-uipro` | update 时跳过 UI UX Pro Max 更新 |
+| `--update-uipro` | update 时显式更新 UI UX Pro Max |
+
+交互式 `update` 会先展示模块选择菜单；这些参数主要给 CI、脚本化执行或精确控制使用。
+
 ---
 
 ## 三、安装流程详解
@@ -88,11 +135,13 @@ bash install.sh init /path/to/project --profile vue
 ```
 1. 交互式引导（无参数时）
    ├── 选择技术栈 Profile（react / vue）
-   └── 选择安装层级（L1 / L2 / L3）
+   ├── 选择安装层级（L1 / L2 / L3）
+   ├── 选择规则安装策略（标准规范 / 根据项目自定义）
+   └── 选择 UIPro、lint/format、husky
 
 2. 检测规范源
    ├── 从规范库目录运行？→ 使用本地文件
-   └── 否 → 克隆/更新到 ~/.ex-ai-spec / 缓存
+   └── 否 → 克隆/更新到 ~/.ai-spec-auto / 缓存
 
 3. 复制 .agents/（Profile 合并）
    ├── rules: common/*.md + profiles/<profile>/*.md → 扁平 .agents/rules/
@@ -109,7 +158,7 @@ bash install.sh init /path/to/project --profile vue
 6.（仅 L3）配置 OpenSpec
    ├── 检测 openspec CLI 是否安装
    ├── 运行 openspec init --tools <ide>
-   └── 合并增强版 config.yaml（注入 context + rules）
+   └── 不存在时写入模板；已存在时增量补齐 schema / context / rules 缺失项
 
 7. 检查工具环境（git / node / npx / openspec）
 
@@ -119,9 +168,23 @@ bash install.sh init /path/to/project --profile vue
 ### update 命令流程
 
 与 init 类似，但要求 `.agents/` 已存在。核心差异：
-- 通用规范和技能会全量更新
-- `01-项目概述.md` 和 `03-项目结构.md` 若已存在则**跳过不覆盖**
-- IDE 链接会重新校验和创建
+
+1. 交互终端下会先展示更新模块菜单：
+   - Skills
+   - Rules
+   - Configs
+   - Commands
+   - IDE Links
+   - OpenSpec
+   - UI UX Pro Max
+2. 菜单确认后会输出本轮更新摘要，再执行实际同步。
+3. Rules 更新时：
+   - `01-项目概述.md`
+   - `03-项目结构.md`
+   - 已选为自定义的规则
+   都会跳过，不覆盖。
+4. Configs 始终按“增量补缺”策略处理，不覆盖已有配置文件。
+5. Commands 默认仅补新增；显式 `--update-commands` 时才覆盖已有命令模板。
 
 ### check 命令检查项
 
@@ -164,7 +227,12 @@ bash install.sh init /path/to/project --profile vue
 `01-项目概述.md` 和 `03-项目结构.md` 是项目特有规则：
 - **init** 时：如已存在则跳过，不覆盖
 - **update** 时：同样跳过，不覆盖
-- 其他规范文件：每次 update 全量覆盖
+
+对“根据项目自定义”选择出来的规则（如 `04/05/06/07/09`）：
+
+- **init** 时：不会从规范库直接落盘
+- **project-init** 时：若文件缺失，则由 AI 按项目真实情况补生成
+- **update** 时：默认继续跳过，避免把项目化规则覆盖回模板
 
 ### Skills 链接策略
 
@@ -172,8 +240,8 @@ Skills 目录采用**逐个 skill 目录链接**（而非整体软链接），�
 
 ```
 .cursor/skills/
-├── create-component/ -> ../../.agents/skills/create-component  # ex-ai-spec （链接）
-├── create-api/ -> ../../.agents/skills/create-api              # ex-ai-spec （链接）
+├── create-component/ -> ../../.agents/skills/create-component  # ai-spec-auto （链接）
+├── create-api/ -> ../../.agents/skills/create-api              # ai-spec-auto （链接）
 ├── openspec-propose/                                           # OpenSpec 自动生成
 └── openspec-apply-change/                                      # OpenSpec 自动生成
 ```
@@ -185,9 +253,9 @@ L3 安装时的 OpenSpec 配置流程：
 1. 检测 `openspec` CLI 是否可用
 2. 未安装 → 提示安装命令，创建基础骨架目录
 3. 已安装 → 运行 `openspec init --tools <ide>` 自动生成 skills + commands
-4. 将 `config.yaml.template` 中的 `context` 和 `rules` 字段合并到 `openspec/config.yaml`
+4. 若目标项目尚无 `openspec/config.yaml`，则从模板创建；若已存在，则按模板增量补齐 `schema`、`context` 与 `rules` 所需键，不覆盖用户已有配置
 
-这让 OpenSpec 流程自动引用 ex-ai-spec 的规范和技能，两者通过 **`openspec/config.yaml`** 桥接，与 **`.agents`** 同属本规范库交付的一体能力（非独立外挂）。
+这让 OpenSpec 流程自动引用 ai-spec-auto 的规范和技能，两者通过 **`openspec/config.yaml`** 桥接，与 **`.agents`** 同属本规范库交付的一体能力（非独立外挂）。
 
 ### 规范源检测
 
@@ -196,7 +264,7 @@ L3 安装时的 OpenSpec 配置流程：
 | 场景 | 行为 |
 |------|------|
 | 从规范库目录直接运行 | 使用本地 `.agents/` 文件 |
-| 从其他位置运行 | 克隆/更新规范库到 `~/.ex-ai-spec /` 缓存 |
+| 从其他位置运行 | 克隆/更新规范库到 `~/.ai-spec-auto /` 缓存 |
 
 缓存目录可通过环境变量 `BR_AI_SPEC_CACHE` 自定义。
 
@@ -206,8 +274,9 @@ L3 安装时的 OpenSpec 配置流程：
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
-| `BR_AI_SPEC_REPO` | `http://git.100credit.cn/zhenwei.li/ex-ai-spec.git` | 规范库 Git 地址 |
-| `BR_AI_SPEC_CACHE` | `~/.ex-ai-spec ` | 本地缓存目录 |
+| `BR_AI_SPEC_REPO` | `http://git.100credit.cn/zhenwei.li/ai-spec-auto.git` | 规范库 Git 地址 |
+| `BR_AI_SPEC_CACHE` | `~/.ai-spec-auto` | 本地缓存目录 |
+| `EX_AI_SPEC_WORKSPACE_PACKAGE` | - | Monorepo 下指定目标子包（相对工作区根） |
 
 ---
 
@@ -215,9 +284,9 @@ L3 安装时的 OpenSpec 配置流程：
 
 ```bash
 # npx（在目标项目根目录，与 README 一致；未写 --level 时默认为 L3）
-npx @ex/ai-spec init --profile vue
-npx @ex/ai-spec init --profile vue --level L2
-npx @ex/ai-spec init --profile react
+npx @ex/ai-spec-auto@latest init . --profile vue
+npx @ex/ai-spec-auto@latest init . --profile vue --level L2
+npx @ex/ai-spec-auto@latest init . --profile react
 
 # 交互式安装（推荐新用户，会引导选择）
 bash install.sh init
@@ -229,8 +298,14 @@ bash install.sh init ~/projects/my-react-app --profile react
 # 仅安装 Cursor 适配
 bash install.sh init ~/projects/my-app --ide cursor
 
-# 更新规范（保留项目特有规则）
+# 更新规范（交互式选择模块）
 bash install.sh update ~/projects/my-app --profile vue
+
+# 只更新规则
+bash install.sh update ~/projects/my-app --skip-skills --skip-configs --skip-commands --skip-ide-links --skip-openspec --skip-uipro --update-rules
+
+# 安装时启用自定义规则选择
+bash install.sh init ~/projects/my-app --custom-rules
 
 # 检查安装状态
 bash install.sh check ~/projects/my-app
@@ -270,3 +345,9 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 # 方式三：单次绕过，不修改任何策略
 powershell -ExecutionPolicy Bypass -File .\install.ps1 init .
 ```
+
+若通过 `npx` 在 Windows PowerShell 5.1 下执行时出现解析异常或中文乱码，请优先确认：
+
+- 使用的是包内 `install.ps1`，而不是网页复制后另存的脚本
+- `install.ps1` 保持 **UTF-8 with BOM**
+- 仓库根目录 `.editorconfig` 中的 `charset = utf-8-bom` 未被格式化工具破坏
