@@ -18,7 +18,7 @@ $ErrorActionPreference = "Stop"
 # ============================================================================
 
 $Version = "2.0.0"
-$DefaultRepo = "http://git.100credit.cn/zhenwei.li/ex-ai-spec .git"
+$DefaultRepo = "http://git.100credit.cn/zhenwei.li/ex-ai-spec.git"
 
 $script:Command = ""
 $script:TargetDir = "."
@@ -26,11 +26,20 @@ $script:Profile = "vue"
 $script:Level = "L3"
 $script:IdeFilter = "default"
 $script:SpecRepo = if ($env:BR_AI_SPEC_REPO) { $env:BR_AI_SPEC_REPO } else { $DefaultRepo }
-$script:CacheDir = if ($env:BR_AI_SPEC_CACHE) { $env:BR_AI_SPEC_CACHE } else { Join-Path $HOME ".ex-ai-spec " }
+$script:CacheDir = if ($env:BR_AI_SPEC_CACHE) { $env:BR_AI_SPEC_CACHE } else { Join-Path $HOME ".ex-ai-spec" }
 $script:SpecBranch = if ($env:BR_AI_SPEC_BRANCH) { $env:BR_AI_SPEC_BRANCH } else { "main" }
 $script:Uipro = "ask"
 $script:InstallLint = "ask"
 $script:InstallHusky = "ask"
+$script:RulesStrategy = "ask"
+$script:CustomRules = @()
+$script:UpdateSkills = "yes"
+$script:UpdateRules = "yes"
+$script:UpdateConfigs = "yes"
+$script:UpdateCommands = "yes"
+$script:UpdateIdeLinks = "yes"
+$script:UpdateOpenSpec = "yes"
+$script:UpdateUipro = "no"
 $script:RefreshCache = $false
 $script:Force = $false
 $script:WorkspacePackageSubpath = ""
@@ -41,7 +50,26 @@ $script:SourceDir = ""
 $script:PkgManager = ""
 
 $IdeDirs = @("claude", "cursor", "opencode", "trae")
+$IdeAutolinkExcludedSkills = @("using-superpowers")
 $ProjectSpecificRules = @("01-项目概述.md", "03-项目结构.md")
+$CustomizableRules = @(
+    "01-项目概述.md",
+    "03-项目结构.md",
+    "04-组件规范.md",
+    "05-API规范.md",
+    "06-路由规范.md",
+    "07-状态管理.md",
+    "09-样式规范.md"
+)
+$CustomizableRulesDesc = @(
+    "01-项目概述 -- 项目定位、技术栈、业务边界、关键约束",
+    "03-项目结构 -- 目录树、分层设计、模块职责、组织约定",
+    "04-组件规范 -- SFC 结构、Props/Emits、组件目录、拆分策略",
+    "05-API规范 -- 接口目录、请求封装、命名约定、错误处理",
+    "06-路由规范 -- 路由配置、懒加载、导航守卫、目录结构",
+    "07-状态管理 -- Store 目录、模块划分、命名约定",
+    "09-样式规范 -- CSS Modules/Scoped、主题变量、全局样式"
+)
 $AvailableProfiles = @("react", "vue")
 $NodeMinVersion = 18
 
@@ -82,6 +110,18 @@ while ($i -lt $args.Count) {
         "^--no-lint$" { $script:InstallLint = "no" }
         "^--husky$" { $script:InstallHusky = "yes" }
         "^--no-husky$" { $script:InstallHusky = "no" }
+        "^--standard-rules$" { $script:RulesStrategy = "standard"; $script:CustomRules = @() }
+        "^--custom-rules$" { $script:RulesStrategy = "custom"; $script:CustomRules = @($CustomizableRules) }
+        "^--update-rules$" { $script:UpdateRules = "yes" }
+        "^--no-update-rules$" { $script:UpdateRules = "no" }
+        "^--skip-skills$" { $script:UpdateSkills = "no" }
+        "^--skip-configs$" { $script:UpdateConfigs = "no" }
+        "^--skip-commands$" { $script:UpdateCommands = "no" }
+        "^--update-commands$" { $script:UpdateCommands = "yes" }
+        "^--skip-ide-links$" { $script:UpdateIdeLinks = "no" }
+        "^--skip-openspec$" { $script:UpdateOpenSpec = "no" }
+        "^--skip-uipro$" { $script:UpdateUipro = "no" }
+        "^--update-uipro$" { $script:UpdateUipro = "yes" }
         "^--uipro$" { $script:Uipro = "yes" }
         "^--no-uipro$" { $script:Uipro = "no" }
         "^--refresh-cache$" { $script:RefreshCache = $true }
@@ -325,6 +365,65 @@ function Select-LintTools {
         $script:InstallHusky = "yes"; Write-Ok "将安装提交校验"
     } else {
         $script:InstallHusky = "no"; Write-Info "跳过提交校验"
+    }
+}
+
+function Test-IsCustomRule {
+    param([string]$RuleName)
+    return $script:CustomRules -contains $RuleName
+}
+
+function Test-IsIdeAutolinkExcludedSkill {
+    param([string]$SkillName)
+    return $IdeAutolinkExcludedSkills -contains $SkillName
+}
+
+function Select-RulesStrategy {
+    Write-Host ""
+    Write-Info "规则安装策略："
+    Write-Host "  1) 使用标准规范 -- 直接同步当前规范库规则"
+    Write-Host "  2) 根据项目自定义 -- 选择部分规则不落盘，后续按项目情况补齐"
+    Write-Host ""
+    $choice = Read-Host "请选择 (1/2) [默认 1]"
+    if ($choice -eq "2") {
+        $script:RulesStrategy = "custom"
+    } else {
+        $script:RulesStrategy = "standard"
+        Write-Ok "将使用标准规范"
+        return
+    }
+
+    Write-Host ""
+    Write-Info "可自定义的规则如下："
+    for ($idx = 0; $idx -lt $CustomizableRulesDesc.Count; $idx++) {
+        Write-Host ("  {0}) {1}" -f ($idx + 1), $CustomizableRulesDesc[$idx])
+    }
+    Write-Host ""
+    $selected = Read-Host "请输入要自定义的规则编号（逗号分隔，默认 1,2）"
+    if ([string]::IsNullOrWhiteSpace($selected)) { $selected = "1,2" }
+
+    $resolved = New-Object System.Collections.Generic.List[string]
+    foreach ($token in ($selected -split ',')) {
+        $raw = $token.Trim()
+        [int]$n = 0
+        if (-not [int]::TryParse($raw, [ref]$n)) { continue }
+        $idx = $n - 1
+        if ($idx -lt 0 -or $idx -ge $CustomizableRules.Count) { continue }
+        $rule = $CustomizableRules[$idx]
+        if (-not $resolved.Contains($rule)) { $resolved.Add($rule) }
+    }
+
+    if ($resolved.Count -eq 0) {
+        Write-Warn "未选择任何自定义规则，将回退为标准规范"
+        $script:RulesStrategy = "standard"
+        $script:CustomRules = @()
+        return
+    }
+
+    $script:CustomRules = @($resolved.ToArray())
+    Write-Ok "以下规则将按项目自定义："
+    foreach ($rule in $script:CustomRules) {
+        Write-Host "    * $rule"
     }
 }
 
@@ -644,7 +743,11 @@ function Install-LocalAiSpecCli {
 # ============================================================================
 
 function Copy-Agents {
-    param([string]$Target)
+    param(
+        [string]$Target,
+        [switch]$SkipRules,
+        [switch]$SkipSkills
+    )
     $agentsDst = Join-Path $Target ".agents"
     New-Item -ItemType Directory -Path (Join-Path $agentsDst "rules") -Force | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $agentsDst "skills") -Force | Out-Null
@@ -659,54 +762,62 @@ function Copy-Agents {
         exit 1
     }
 
-    Write-Info "同步 rules (common + profiles/$($script:Profile)) ..."
     $rulesDst = Join-Path $agentsDst "rules"
-
-    # common rules
-    Get-ChildItem -Path $srcCommonRules -Filter "*.md" -File -ErrorAction SilentlyContinue | ForEach-Object {
-        Copy-Item $_.FullName -Destination (Join-Path $rulesDst $_.Name) -Force
-    }
-
-    # profile rules (protect project-specific)
-    Get-ChildItem -Path $srcProfileRules -Filter "*.md" -File -ErrorAction SilentlyContinue | ForEach-Object {
-        $dstFile = Join-Path $rulesDst $_.Name
-        $isSpecific = $ProjectSpecificRules -contains $_.Name
-        if ($isSpecific -and (Test-Path $dstFile)) {
-            Write-Warn "跳过项目特有规则: $($_.Name)（已存在）"
-        } else {
-            Copy-Item $_.FullName -Destination $dstFile -Force
-            if ($isSpecific) { Write-Info "已生成模板: $($_.Name) -> 请根据项目实际情况修改" }
+    if ($SkipRules) {
+        Write-Info "跳过 rules 同步（用户选择不更新规则）"
+    } else {
+        Write-Info "同步 rules (common + profiles/$($script:Profile)) ..."
+        Get-ChildItem -Path $srcCommonRules -Filter "*.md" -File -ErrorAction SilentlyContinue | ForEach-Object {
+            if (Test-IsCustomRule $_.Name) {
+                Write-Info "跳过自定义规则: $($_.Name)（保留项目自定义）"
+            } else {
+                Copy-Item $_.FullName -Destination (Join-Path $rulesDst $_.Name) -Force
+            }
         }
+
+        Get-ChildItem -Path $srcProfileRules -Filter "*.md" -File -ErrorAction SilentlyContinue | ForEach-Object {
+            if (Test-IsCustomRule $_.Name) {
+                Write-Info "跳过自定义规则: $($_.Name)（保留项目自定义）"
+            } else {
+                $dstFile = Join-Path $rulesDst $_.Name
+                $isSpecific = $ProjectSpecificRules -contains $_.Name
+                if ($isSpecific -and (Test-Path $dstFile)) {
+                    Write-Warn "跳过项目特有规则: $($_.Name)（已存在）"
+                } else {
+                    Copy-Item $_.FullName -Destination $dstFile -Force
+                    if ($isSpecific) { Write-Info "已生成模板: $($_.Name) -> 请根据项目实际情况修改" }
+                }
+            }
+        }
+
+        $rulesReadme = Join-Path $script:SourceDir ".agents/rules/README.md"
+        if (Test-Path $rulesReadme) { Copy-Item $rulesReadme -Destination (Join-Path $rulesDst "README.md") -Force }
     }
 
-    # rules README
-    $rulesReadme = Join-Path $script:SourceDir ".agents/rules/README.md"
-    if (Test-Path $rulesReadme) { Copy-Item $rulesReadme -Destination (Join-Path $rulesDst "README.md") -Force }
-
-    Write-Info "同步 skills (common + profiles/$($script:Profile)) ..."
     $skillsDst = Join-Path $agentsDst "skills"
-
-    # common skills
-    if (Test-Path $srcCommonSkills) {
-        Get-ChildItem -Path $srcCommonSkills -Directory | ForEach-Object {
-            $dst = Join-Path $skillsDst $_.Name
-            if (Test-Path $dst) { Remove-Item $dst -Recurse -Force }
-            Copy-Item $_.FullName -Destination $dst -Recurse
+    if ($SkipSkills) {
+        Write-Info "跳过 skills 同步（用户选择不更新技能）"
+    } else {
+        Write-Info "同步 skills (common + profiles/$($script:Profile)) ..."
+        if (Test-Path $srcCommonSkills) {
+            Get-ChildItem -Path $srcCommonSkills -Directory | ForEach-Object {
+                $dst = Join-Path $skillsDst $_.Name
+                if (Test-Path $dst) { Remove-Item $dst -Recurse -Force }
+                Copy-Item $_.FullName -Destination $dst -Recurse
+            }
         }
-    }
 
-    # profile skills
-    if (Test-Path $srcProfileSkills) {
-        Get-ChildItem -Path $srcProfileSkills -Directory | ForEach-Object {
-            $dst = Join-Path $skillsDst $_.Name
-            if (Test-Path $dst) { Remove-Item $dst -Recurse -Force }
-            Copy-Item $_.FullName -Destination $dst -Recurse
+        if (Test-Path $srcProfileSkills) {
+            Get-ChildItem -Path $srcProfileSkills -Directory | ForEach-Object {
+                $dst = Join-Path $skillsDst $_.Name
+                if (Test-Path $dst) { Remove-Item $dst -Recurse -Force }
+                Copy-Item $_.FullName -Destination $dst -Recurse
+            }
         }
-    }
 
-    # skills README
-    $skillsReadme = Join-Path $script:SourceDir ".agents/skills/README.md"
-    if (Test-Path $skillsReadme) { Copy-Item $skillsReadme -Destination (Join-Path $skillsDst "README.md") -Force }
+        $skillsReadme = Join-Path $script:SourceDir ".agents/skills/README.md"
+        if (Test-Path $skillsReadme) { Copy-Item $skillsReadme -Destination (Join-Path $skillsDst "README.md") -Force }
+    }
 
     Write-Ok ".agents/ 同步完成 (profile: $($script:Profile))"
 }
@@ -715,7 +826,7 @@ function Copy-ConfigDir {
     param(
         [string]$Src,
         [string]$Dst,
-        [bool]$SkipExisting = $false,
+        [bool]$SkipExisting = $true,
         [bool]$SkipHuskyArtifacts = $false
     )
     if (-not (Test-Path $Src)) { return $false }
@@ -730,15 +841,21 @@ function Copy-ConfigDir {
         $dstPath = Join-Path $Dst $name
 
         if ($_.PSIsContainer) {
-            if ($SkipExisting -and (Test-Path $dstPath)) {
-                Write-Info "  跳过已存在: $name/"
-                return
-            }
             New-Item -ItemType Directory -Path $dstPath -Force | Out-Null
-            Get-ChildItem $_.FullName -File | ForEach-Object {
-                Copy-Item $_.FullName -Destination (Join-Path $dstPath $_.Name) -Force
+            Get-ChildItem $_.FullName -File -Recurse | ForEach-Object {
+                $relativePath = $_.FullName.Substring($_.FullName.IndexOf($name) + $name.Length + 1)
+                $childDst = Join-Path $dstPath $relativePath
+                $childParent = Split-Path $childDst -Parent
+                if (-not (Test-Path $childParent)) {
+                    New-Item -ItemType Directory -Path $childParent -Force | Out-Null
+                }
+                if ($SkipExisting -and (Test-Path $childDst)) {
+                    Write-Info "  跳过已存在: $name/$relativePath"
+                } else {
+                    Copy-Item $_.FullName -Destination $childDst -Force
+                    $hasCopied.Value = $true
+                }
             }
-            $hasCopied.Value = $true
         } else {
             if ($SkipExisting -and (Test-Path $dstPath)) {
                 Write-Info "  跳过已存在: $name"
@@ -752,7 +869,7 @@ function Copy-ConfigDir {
 }
 
 function Copy-Configs {
-    param([string]$Target, [bool]$SkipExisting = $false)
+    param([string]$Target, [bool]$SkipExisting = $true)
     $srcCommon  = Join-Path $script:SourceDir "configs/common"
     $srcProfile = Join-Path $script:SourceDir "configs/profiles/$($script:Profile)"
     $anyCopied = $false
@@ -869,7 +986,7 @@ function New-IdeLinks {
         $agentsSkillsDir = Join-Path $Target ".agents/skills"
         if (Test-Path $agentsSkillsDir) {
             Get-ChildItem -Path $agentsSkillsDir -Directory | Where-Object {
-                $_.Name -ne "common" -and $_.Name -ne "profiles"
+                $_.Name -ne "common" -and $_.Name -ne "profiles" -and -not (Test-IsIdeAutolinkExcludedSkill $_.Name)
             } | ForEach-Object {
                 $linkTarget = "../../.agents/skills/$($_.Name)"
                 $linkPath = Join-Path $skillsIdeDir $_.Name
@@ -923,7 +1040,14 @@ function Copy-CommonCommands {
 
     $cmdsDst = Join-Path (Join-Path $Target ".$IdeName") "commands"
     New-Item -ItemType Directory -Path $cmdsDst -Force | Out-Null
-    Copy-Item -Path (Join-Path $cmdsSrc "*.md") -Destination $cmdsDst -Force -ErrorAction SilentlyContinue
+    Get-ChildItem -Path $cmdsSrc -Filter "*.md" -File -ErrorAction SilentlyContinue | ForEach-Object {
+        $dstFile = Join-Path $cmdsDst $_.Name
+        if ((Test-Path $dstFile) -and $script:UpdateCommands -ne "yes") {
+            Write-Info "  跳过已存在命令: $($_.Name)"
+        } else {
+            Copy-Item -Path $_.FullName -Destination $dstFile -Force -ErrorAction SilentlyContinue
+        }
+    }
 }
 
 function Copy-IdeCommandOverrides {
@@ -933,7 +1057,14 @@ function Copy-IdeCommandOverrides {
 
     $cmdsDst = Join-Path (Join-Path $Target ".$IdeName") "commands"
     New-Item -ItemType Directory -Path $cmdsDst -Force | Out-Null
-    Copy-Item -Path (Join-Path $cmdsSrc "*.md") -Destination $cmdsDst -Force -ErrorAction SilentlyContinue
+    Get-ChildItem -Path $cmdsSrc -Filter "*.md" -File -ErrorAction SilentlyContinue | ForEach-Object {
+        $dstFile = Join-Path $cmdsDst $_.Name
+        if ((Test-Path $dstFile) -and $script:UpdateCommands -ne "yes") {
+            Write-Info "  跳过已存在命令: $($_.Name)"
+        } else {
+            Copy-Item -Path $_.FullName -Destination $dstFile -Force -ErrorAction SilentlyContinue
+        }
+    }
 }
 
 function Install-Uipro {
@@ -1226,6 +1357,52 @@ function Write-Report {
     Write-Host ""
 }
 
+function Select-UpdateModules {
+    param([string]$Target)
+    if ((Test-Path (Join-Path $Target ".agents/skills/ui-ux-pro-max")) -and $script:UpdateUipro -ne "yes") {
+        $script:UpdateUipro = "yes"
+    }
+
+    Write-Host ""
+    Write-Info "请选择要更新的模块（回车保持默认）："
+    Write-Host ""
+    Write-Host ("  [1] Skills（技能）          {0} — 覆盖内置技能目录" -f ($(if ($script:UpdateSkills -eq "yes") { "[Y]" } else { "[N]" })))
+    Write-Host ("  [2] Rules（规范规则）        {0} — 同步规则文件（01/03 和自定义规则除外）" -f ($(if ($script:UpdateRules -eq "yes") { "[Y]" } else { "[N]" })))
+    Write-Host ("  [3] Configs（lint/format）   {0} — 已存在的配置文件不覆盖" -f ($(if ($script:UpdateConfigs -eq "yes") { "[Y]" } else { "[N]" })))
+    Write-Host ("  [4] Commands（命令模板）     {0} — Y=覆盖已有命令 / N=仅补新增" -f ($(if ($script:UpdateCommands -eq "yes") { "[Y]" } else { "[N]" })))
+    Write-Host ("  [5] IDE Links（IDE 链接）    {0} — 重建软链接" -f ($(if ($script:UpdateIdeLinks -eq "yes") { "[Y]" } else { "[N]" })))
+    Write-Host ("  [6] OpenSpec（L3）           {0} — 运行 openspec update" -f ($(if ($script:UpdateOpenSpec -eq "yes") { "[Y]" } else { "[N]" })))
+    Write-Host ("  [7] UI UX Pro Max            {0} — 重新安装 UI 设计技能" -f ($(if ($script:UpdateUipro -eq "yes") { "[Y]" } else { "[N]" })))
+    Write-Host ""
+    $ans = Read-Host "输入要切换的模块编号（逗号分隔，如 2,4），或回车继续"
+    if ([string]::IsNullOrWhiteSpace($ans)) { return }
+
+    foreach ($token in ($ans -split ',')) {
+        switch ($token.Trim()) {
+            "1" { if ($script:UpdateSkills -eq "yes") { $script:UpdateSkills = "no" } else { $script:UpdateSkills = "yes" } }
+            "2" { if ($script:UpdateRules -eq "yes") { $script:UpdateRules = "no" } else { $script:UpdateRules = "yes" } }
+            "3" { if ($script:UpdateConfigs -eq "yes") { $script:UpdateConfigs = "no" } else { $script:UpdateConfigs = "yes" } }
+            "4" { if ($script:UpdateCommands -eq "yes") { $script:UpdateCommands = "no" } else { $script:UpdateCommands = "yes" } }
+            "5" { if ($script:UpdateIdeLinks -eq "yes") { $script:UpdateIdeLinks = "no" } else { $script:UpdateIdeLinks = "yes" } }
+            "6" { if ($script:UpdateOpenSpec -eq "yes") { $script:UpdateOpenSpec = "no" } else { $script:UpdateOpenSpec = "yes" } }
+            "7" { if ($script:UpdateUipro -eq "yes") { $script:UpdateUipro = "no" } else { $script:UpdateUipro = "yes" } }
+        }
+    }
+}
+
+function Write-UpdateSummary {
+    Write-Host ""
+    Write-Info "本次更新模块："
+    Write-Host "  Skills:    $(if ($script:UpdateSkills -eq 'yes') { '是' } else { '跳过' })"
+    Write-Host "  Rules:     $(if ($script:UpdateRules -eq 'yes') { '是' } else { '跳过' })"
+    Write-Host "  Configs:   $(if ($script:UpdateConfigs -eq 'yes') { '是' } else { '跳过' })"
+    Write-Host "  Commands:  $(if ($script:UpdateCommands -eq 'yes') { '是' } else { '跳过' })"
+    Write-Host "  IDE Links: $(if ($script:UpdateIdeLinks -eq 'yes') { '是' } else { '跳过' })"
+    Write-Host "  OpenSpec:  $(if ($script:UpdateOpenSpec -eq 'yes') { '是' } else { '跳过' })"
+    Write-Host "  UIPro:     $(if ($script:UpdateUipro -eq 'yes') { '是' } else { '跳过' })"
+    Write-Host ""
+}
+
 # ============================================================================
 # 子命令实现
 # ============================================================================
@@ -1259,10 +1436,10 @@ function Invoke-Init {
     Test-NodeEnv
     Get-PkgManager
 
-    if ([Environment]::UserInteractive -and -not $script:ProfileExplicit -and -not $script:LevelExplicit) {
-        Select-Profile
-        Select-Level
-    }
+    if ([Environment]::UserInteractive -and -not $script:ProfileExplicit) { Select-Profile }
+    if ([Environment]::UserInteractive -and -not $script:LevelExplicit) { Select-Level }
+    if ([Environment]::UserInteractive -and $script:RulesStrategy -eq "ask") { Select-RulesStrategy }
+    if ($script:RulesStrategy -eq "ask") { $script:RulesStrategy = "standard" }
     if ([Environment]::UserInteractive -and $script:Uipro -eq "ask") { Select-Uipro }
     if ($script:Uipro -eq "ask") {
         Write-Info "未安装 UI UX Pro Max：非交互环境或未参与询问时默认跳过。需要时请执行: npx @ex/ai-spec init . --uipro（已有项目可: npx @ex/ai-spec update . --uipro）"
@@ -1314,23 +1491,54 @@ function Invoke-Update {
 
     Get-PkgManager
     Get-SourceDir
-    Copy-Agents -Target $target
-    Install-LocalAiSpecCli -Target $target
-    Copy-Configs -Target $target -SkipExisting $true
+    if ([Environment]::UserInteractive -and $script:RulesStrategy -eq "ask") { Select-RulesStrategy }
+    if ($script:RulesStrategy -eq "ask") { $script:RulesStrategy = "standard" }
 
-    if ($script:Uipro -eq "yes" -or (Test-Path (Join-Path $target ".agents/skills/ui-ux-pro-max"))) {
-        $script:Uipro = "yes"
+    if ((Test-Path (Join-Path $target ".agents/skills/ui-ux-pro-max")) -and $script:UpdateUipro -ne "yes") {
+        $script:UpdateUipro = "yes"
+    }
+    if ($script:Uipro -eq "yes") { $script:UpdateUipro = "yes" }
+
+    if ([Environment]::UserInteractive) { Select-UpdateModules -Target $target }
+    Write-UpdateSummary
+
+    if ($script:UpdateSkills -eq "yes" -or $script:UpdateRules -eq "yes") {
+        $skipRules = ($script:UpdateRules -ne "yes")
+        $skipSkills = ($script:UpdateSkills -ne "yes")
+        Copy-Agents -Target $target -SkipRules:$skipRules -SkipSkills:$skipSkills
+    } else {
+        Write-Info "跳过 Skills 和 Rules 更新"
+    }
+
+    Install-LocalAiSpecCli -Target $target
+
+    if ($script:UpdateConfigs -eq "yes") {
+        Copy-Configs -Target $target -SkipExisting $true
+    } else {
+        Write-Info "跳过 Configs 更新"
+    }
+
+    if ($script:Level -eq "L2" -or $script:Level -eq "L3") {
+        if ($script:UpdateIdeLinks -eq "yes") {
+            New-IdeLinks -Target $target
+        } else {
+            Write-Info "跳过 IDE Links 更新"
+        }
+        Copy-CursorExtras -Target $target
+        Copy-ClaudeExtras -Target $target
+    }
+
+    if ($script:Level -eq "L3" -and $script:UpdateOpenSpec -eq "yes") {
+        Install-OpenSpec -Target $target
+    } elseif ($script:Level -eq "L3") {
+        Write-Info "跳过 OpenSpec 更新"
+    }
+
+    if ($script:UpdateUipro -eq "yes") {
         $uiproDir = Join-Path $target ".agents/skills/ui-ux-pro-max"
         if (Test-Path $uiproDir) { Remove-Item $uiproDir -Recurse -Force }
         Install-Uipro -Target $target
     }
-
-    if ($script:Level -eq "L2" -or $script:Level -eq "L3") {
-        New-IdeLinks -Target $target
-        Copy-CursorExtras -Target $target
-        Copy-ClaudeExtras -Target $target
-    }
-    if ($script:Level -eq "L3") { Install-OpenSpec -Target $target }
 
     Write-Ok "更新完成 (profile: $($script:Profile), level: $($script:Level))"
 }
@@ -1516,6 +1724,18 @@ function Show-Usage {
     Write-Host "  --no-lint         跳过 lint/format 工具"
     Write-Host "  --husky           安装 Husky 提交校验（husky + lint-staged + commitlint）"
     Write-Host "  --no-husky        跳过提交校验（默认跳过）"
+    Write-Host "  --standard-rules  使用标准规则集（不做自定义规则选择）"
+    Write-Host "  --custom-rules    启用规则自定义选择（非交互模式下保留全部可自定义规则）"
+    Write-Host "  --update-rules    update 时显式更新 rules"
+    Write-Host "  --no-update-rules update 时跳过 rules"
+    Write-Host "  --skip-skills     update 时跳过 skills"
+    Write-Host "  --skip-configs    update 时跳过 lint/format 配置"
+    Write-Host "  --skip-commands   update 时仅保留已有命令模板"
+    Write-Host "  --update-commands update 时覆盖已有命令模板"
+    Write-Host "  --skip-ide-links  update 时跳过 IDE 软链接重建"
+    Write-Host "  --skip-openspec   update 时跳过 OpenSpec 更新"
+    Write-Host "  --skip-uipro      update 时跳过 UI UX Pro Max 更新"
+    Write-Host "  --update-uipro    update 时显式更新 UI UX Pro Max"
     Write-Host "  --uipro           安装 UI UX Pro Max 设计智能技能"
     Write-Host "  --no-uipro        跳过 UI UX Pro Max（非交互模式默认跳过）"
     Write-Host "  --repo <url>      自定义规范库地址"
@@ -1536,11 +1756,13 @@ function Show-Usage {
     Write-Host "  .\install.ps1 init                                    # 交互式安装"
     Write-Host "  .\install.ps1 init C:\projects\my-app                 # Vue 项目标准安装"
     Write-Host "  .\install.ps1 init . --profile react --level L3       # React + OpenSpec"
+    Write-Host "  .\install.ps1 init . --custom-rules                   # 自定义规则安装"
     Write-Host "  .\install.ps1 init . --ide all                        # 为所有 IDE 创建适配"
     Write-Host "  .\install.ps1 init . --uipro                          # 安装含 UI UX Pro Max"
     Write-Host "  .\install.ps1 init . --package packages/app           # Monorepo 根执行，安装到子包"
     Write-Host "  .\install.ps1 init . --workspace-root                 # Monorepo 下强制根目录安装"
     Write-Host "  .\install.ps1 update                                  # 更新规范"
+    Write-Host "  .\install.ps1 update . --skip-skills --update-rules   # 仅更新规则"
     Write-Host "  .\install.ps1 check                                   # 检查安装状态"
     Write-Host ""
     Write-Host "远程安装:" -ForegroundColor White

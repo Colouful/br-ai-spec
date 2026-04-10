@@ -7,13 +7,31 @@ set -euo pipefail
 # ============================================================================
 
 VERSION="2.0.0"
-SPEC_REPO="${BR_AI_SPEC_REPO:-http://git.100credit.cn/zhenwei.li/ex-ai-spec .git}"
-CACHE_DIR="${BR_AI_SPEC_CACHE:-$HOME/.ex-ai-spec }"
+SPEC_REPO="${BR_AI_SPEC_REPO:-http://git.100credit.cn/zhenwei.li/ex-ai-spec.git}"
+CACHE_DIR="${BR_AI_SPEC_CACHE:-$HOME/.ex-ai-spec}"
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; BLUE='\033[0;34m'; BOLD='\033[1m'; NC='\033[0m'
 
 IDE_DIRS=(claude cursor opencode trae)
 PROJECT_SPECIFIC_RULES=("01-项目概述.md" "03-项目结构.md")
+CUSTOMIZABLE_RULES=(
+  "01-项目概述.md"
+  "03-项目结构.md"
+  "04-组件规范.md"
+  "05-API规范.md"
+  "06-路由规范.md"
+  "07-状态管理.md"
+  "09-样式规范.md"
+)
+CUSTOMIZABLE_RULES_DESC=(
+  "01-项目概述 — 项目定位、技术栈、业务边界、关键约束"
+  "03-项目结构 — 目录树、分层设计、模块职责、组织约定"
+  "04-组件规范 — SFC 结构、Props/Emits、组件目录、拆分策略"
+  "05-API规范 — 接口目录、请求封装、命名约定、错误处理"
+  "06-路由规范 — 路由配置、懒加载、导航守卫、目录结构"
+  "07-状态管理 — Store 目录、模块划分、命名约定"
+  "09-样式规范 — CSS Modules/Scoped、主题变量、全局样式"
+)
 AVAILABLE_PROFILES=()
 IDE_AUTOLINK_EXCLUDED_SKILLS=("using-superpowers")
 
@@ -25,9 +43,19 @@ IDE_FILTER_EXPLICIT=""
 PROFILE="vue"
 PROFILE_EXPLICIT=""
 LEVEL="L3"
+LEVEL_EXPLICIT=""
 UIPRO="ask"
 INSTALL_LINT="ask"
 INSTALL_HUSKY="ask"
+RULES_STRATEGY="ask"
+CUSTOM_RULES=()
+UPDATE_SKILLS="yes"
+UPDATE_RULES="yes"
+UPDATE_CONFIGS="yes"
+UPDATE_COMMANDS="yes"
+UPDATE_IDE_LINKS="yes"
+UPDATE_OPENSPEC="yes"
+UPDATE_UIPRO="no"
 REFRESH_CACHE=""
 FORCE=""
 MANIFEST_INPUT=""
@@ -375,6 +403,92 @@ select_lint_tools() {
   esac
 }
 
+is_customizable_rule() {
+  local rule_name="$1"
+  local item
+  for item in "${CUSTOMIZABLE_RULES[@]}"; do
+    [ "$item" = "$rule_name" ] && return 0
+  done
+  return 1
+}
+
+is_custom_rule() {
+  local rule_name="$1"
+  [ "${#CUSTOM_RULES[@]}" -eq 0 ] && return 1
+  local item
+  for item in "${CUSTOM_RULES[@]}"; do
+    [ "$item" = "$rule_name" ] && return 0
+  done
+  return 1
+}
+
+select_rules_strategy() {
+  echo ""
+  info "规则安装策略："
+  echo "  1) 使用标准规范 — 直接同步当前规范库规则"
+  echo "  2) 根据项目自定义 — 选择部分规则不落盘，后续按项目情况补齐"
+  echo ""
+  read -rp "请选择 (1/2) [默认 1]: " choice
+
+  case "$choice" in
+    2)
+      RULES_STRATEGY="custom"
+      ;;
+    *)
+      RULES_STRATEGY="standard"
+      ok "将使用标准规范"
+      return 0
+      ;;
+  esac
+
+  echo ""
+  info "可自定义的规则如下："
+  local idx=1
+  local item
+  for item in "${CUSTOMIZABLE_RULES_DESC[@]}"; do
+    echo "  ${idx}) ${item}"
+    idx=$((idx + 1))
+  done
+  echo ""
+  read -rp "请输入要自定义的规则编号（逗号分隔，默认 1,2）: " choice
+  [ -z "$choice" ] && choice="1,2"
+
+  local -a selected_rules=()
+  local token selected_index
+  IFS=',' read -r -a tokens <<< "$choice"
+  for token in "${tokens[@]}"; do
+    token="$(echo "$token" | tr -d ' ')"
+    [[ "$token" =~ ^[0-9]+$ ]] || continue
+    selected_index=$((token - 1))
+    [ "$selected_index" -ge 0 ] || continue
+    [ "$selected_index" -lt "${#CUSTOMIZABLE_RULES[@]}" ] || continue
+    selected_rules+=("${CUSTOMIZABLE_RULES[$selected_index]}")
+  done
+
+  if [ "${#selected_rules[@]}" -eq 0 ]; then
+    warn "未选择任何自定义规则，将回退为标准规范"
+    RULES_STRATEGY="standard"
+    return 0
+  fi
+
+  CUSTOM_RULES=()
+  local seen=""
+  for item in "${selected_rules[@]}"; do
+    case ",$seen," in
+      *,"$item",*) ;;
+      *)
+        CUSTOM_RULES+=("$item")
+        seen="${seen},${item}"
+        ;;
+    esac
+  done
+
+  ok "以下规则将按项目自定义："
+  for item in "${CUSTOM_RULES[@]}"; do
+    echo "    • $item"
+  done
+}
+
 # ---- Node 环境前置检查 ----
 check_node_env() {
   if ! command -v node >/dev/null 2>&1; then
@@ -595,7 +709,7 @@ monorepo_resolve_target() {
 
 # ---- 复制 .agents/（Profile 合并） ----
 copy_agents() {
-  local target="$1" agents_dst="$1/.agents"
+  local target="$1" skip_rules="${2:-}" skip_skills="${3:-}" agents_dst="$1/.agents"
   mkdir -p "$agents_dst/rules" "$agents_dst/skills"
 
   local src_common_rules="$SOURCE_DIR/.agents/rules/common"
@@ -612,58 +726,71 @@ copy_agents() {
     exit 1
   fi
 
-  # rules: 合并 common + profile 到扁平目录
-  info "同步 rules (common + ${profile_rules_dir}) ..."
+  if [ "$skip_rules" = "skip_rules" ]; then
+    info "跳过 rules 同步（用户选择不更新规则）"
+  else
+    info "同步 rules (common + ${profile_rules_dir}) ..."
 
-  for file in "$src_common_rules/"*.md; do
-    [ -f "$file" ] || continue
-    local name; name="$(basename "$file")"
-    cp "$file" "$agents_dst/rules/$name"
-  done
-
-  for file in "$src_profile_rules/"*.md; do
-    [ -f "$file" ] || continue
-    local name; name="$(basename "$file")"
-
-    local is_specific=false
-    for ps in "${PROJECT_SPECIFIC_RULES[@]}"; do
-      [ "$name" = "$ps" ] && { is_specific=true; break; }
-    done
-
-    if $is_specific && [ -f "$agents_dst/rules/$name" ]; then
-      warn "跳过项目特有规则: ${name}（已存在）"
-    else
+    for file in "$src_common_rules/"*.md; do
+      [ -f "$file" ] || continue
+      local name; name="$(basename "$file")"
+      if is_custom_rule "$name"; then
+        info "跳过自定义规则: ${name}（保留项目自定义）"
+        continue
+      fi
       cp "$file" "$agents_dst/rules/$name"
-      $is_specific && info "已生成模板: $name → 请根据项目实际情况修改"
+    done
+
+    for file in "$src_profile_rules/"*.md; do
+      [ -f "$file" ] || continue
+      local name; name="$(basename "$file")"
+
+      if is_custom_rule "$name"; then
+        info "跳过自定义规则: ${name}（保留项目自定义）"
+        continue
+      fi
+
+      local is_specific=false
+      for ps in "${PROJECT_SPECIFIC_RULES[@]}"; do
+        [ "$name" = "$ps" ] && { is_specific=true; break; }
+      done
+
+      if $is_specific && [ -f "$agents_dst/rules/$name" ]; then
+        warn "跳过项目特有规则: ${name}（已存在）"
+      else
+        cp "$file" "$agents_dst/rules/$name"
+        $is_specific && info "已生成模板: $name → 请根据项目实际情况修改"
+      fi
+    done
+
+    [ -f "$SOURCE_DIR/.agents/rules/README.md" ] && cp "$SOURCE_DIR/.agents/rules/README.md" "$agents_dst/rules/README.md"
+  fi
+
+  if [ "$skip_skills" = "skip_skills" ]; then
+    info "跳过 skills 同步（用户选择不更新技能）"
+  else
+    info "同步 skills (common + ${profile_skills_dir}) ..."
+
+    if [ -d "$src_common_skills" ]; then
+      for skill_dir in "$src_common_skills"/*/; do
+        [ -d "$skill_dir" ] || continue
+        local skill_name; skill_name="$(basename "$skill_dir")"
+        rm -rf "$agents_dst/skills/$skill_name"
+        cp -R "$skill_dir" "$agents_dst/skills/$skill_name"
+      done
     fi
-  done
 
-  # 复制 rules README
-  [ -f "$SOURCE_DIR/.agents/rules/README.md" ] && cp "$SOURCE_DIR/.agents/rules/README.md" "$agents_dst/rules/README.md"
+    if [ -d "$src_profile_skills" ]; then
+      for skill_dir in "$src_profile_skills"/*/; do
+        [ -d "$skill_dir" ] || continue
+        local skill_name; skill_name="$(basename "$skill_dir")"
+        rm -rf "$agents_dst/skills/$skill_name"
+        cp -R "$skill_dir" "$agents_dst/skills/$skill_name"
+      done
+    fi
 
-  # skills: 合并 common + profile 到扁平目录
-  info "同步 skills (common + ${profile_skills_dir}) ..."
-
-  if [ -d "$src_common_skills" ]; then
-    for skill_dir in "$src_common_skills"/*/; do
-      [ -d "$skill_dir" ] || continue
-      local skill_name; skill_name="$(basename "$skill_dir")"
-      rm -rf "$agents_dst/skills/$skill_name"
-      cp -R "$skill_dir" "$agents_dst/skills/$skill_name"
-    done
+    [ -f "$SOURCE_DIR/.agents/skills/README.md" ] && cp "$SOURCE_DIR/.agents/skills/README.md" "$agents_dst/skills/README.md"
   fi
-
-  if [ -d "$src_profile_skills" ]; then
-    for skill_dir in "$src_profile_skills"/*/; do
-      [ -d "$skill_dir" ] || continue
-      local skill_name; skill_name="$(basename "$skill_dir")"
-      rm -rf "$agents_dst/skills/$skill_name"
-      cp -R "$skill_dir" "$agents_dst/skills/$skill_name"
-    done
-  fi
-
-  # 复制 skills README
-  [ -f "$SOURCE_DIR/.agents/skills/README.md" ] && cp "$SOURCE_DIR/.agents/skills/README.md" "$agents_dst/skills/README.md"
 
   ok ".agents/ 同步完成 (profile: $PROFILE)"
 }
@@ -691,13 +818,19 @@ _copy_config_dir() {
       cp "$f" "$target/$name"
       copied=true
     elif [ -d "$f" ]; then
-      if [ -n "$skip_existing" ] && [ -d "$target/$name" ]; then
-        info "  跳过已存在: $name/"
-        continue
-      fi
       mkdir -p "$target/$name"
-      cp -R "$f"/* "$target/$name/" 2>/dev/null || true
-      copied=true
+      local child rel dst_child
+      while IFS= read -r -d '' child; do
+        rel="${child#$f/}"
+        dst_child="$target/$name/$rel"
+        mkdir -p "$(dirname "$dst_child")"
+        if [ -n "$skip_existing" ] && [ -e "$dst_child" ]; then
+          info "  跳过已存在: $name/$rel"
+          continue
+        fi
+        cp "$child" "$dst_child"
+        copied=true
+      done < <(find "$f" -type f -print0 2>/dev/null)
     fi
   done
 
@@ -721,7 +854,7 @@ _copy_config_dir() {
 
 # 参数: $1=目标目录 $2=skip_existing（非空则跳过已存在的文件）
 copy_configs() {
-  local target="$1" skip_existing="${2:-}"
+  local target="$1" skip_existing="${2:-skip_existing}"
   local src_common="$SOURCE_DIR/configs/common"
   local profile_configs_dir
   profile_configs_dir="$(profile_registry_get_field "$SOURCE_DIR" "$PROFILE" "configs_dir" "configs/profiles/$PROFILE")"
@@ -985,7 +1118,16 @@ copy_common_commands() {
 
   local cmds_dst="$target/.${ide_name}/commands"
   mkdir -p "$cmds_dst"
-  cp "$cmds_src"/*.md "$cmds_dst/" 2>/dev/null || true
+  local file fname
+  for file in "$cmds_src"/*.md; do
+    [ -f "$file" ] || continue
+    fname="$(basename "$file")"
+    if [ -f "$cmds_dst/$fname" ] && [ "$UPDATE_COMMANDS" != "yes" ]; then
+      info "  跳过已存在命令: $fname"
+      continue
+    fi
+    cp "$file" "$cmds_dst/$fname"
+  done
 }
 
 # ---- 复制 IDE 专属命令模板 ----
@@ -996,7 +1138,16 @@ copy_ide_command_overrides() {
 
   local cmds_dst="$target/.${ide_name}/commands"
   mkdir -p "$cmds_dst"
-  cp "$cmds_src"/*.md "$cmds_dst/" 2>/dev/null || true
+  local file fname
+  for file in "$cmds_src"/*.md; do
+    [ -f "$file" ] || continue
+    fname="$(basename "$file")"
+    if [ -f "$cmds_dst/$fname" ] && [ "$UPDATE_COMMANDS" != "yes" ]; then
+      info "  跳过已存在命令: $fname"
+      continue
+    fi
+    cp "$file" "$cmds_dst/$fname"
+  done
 }
 
 # ---- 复制 Cursor 额外文件 ----
@@ -1326,6 +1477,56 @@ print_report() {
   echo ""
 }
 
+select_update_modules() {
+  local target="$1"
+  if [ -d "$target/.agents/skills/ui-ux-pro-max" ] && [ "$UPDATE_UIPRO" != "yes" ]; then
+    UPDATE_UIPRO="yes"
+  fi
+
+  echo ""
+  info "请选择要更新的模块（回车保持默认）："
+  echo ""
+  echo "  [1] Skills（技能）          $([ "$UPDATE_SKILLS" = "yes" ] && echo "[Y]" || echo "[N]") — 覆盖内置技能目录"
+  echo "  [2] Rules（规范规则）        $([ "$UPDATE_RULES" = "yes" ] && echo "[Y]" || echo "[N]") — 同步规则文件（01/03 和自定义规则除外）"
+  echo "  [3] Configs（lint/format）   $([ "$UPDATE_CONFIGS" = "yes" ] && echo "[Y]" || echo "[N]") — 已存在的配置文件不覆盖"
+  echo "  [4] Commands（命令模板）     $([ "$UPDATE_COMMANDS" = "yes" ] && echo "[Y]" || echo "[N]") — Y=覆盖已有命令 / N=仅补新增"
+  echo "  [5] IDE Links（IDE 链接）    $([ "$UPDATE_IDE_LINKS" = "yes" ] && echo "[Y]" || echo "[N]") — 重建软链接"
+  echo "  [6] OpenSpec（L3）           $([ "$UPDATE_OPENSPEC" = "yes" ] && echo "[Y]" || echo "[N]") — 运行 openspec update"
+  echo "  [7] UI UX Pro Max            $([ "$UPDATE_UIPRO" = "yes" ] && echo "[Y]" || echo "[N]") — 重新安装 UI 设计技能"
+  echo ""
+  read -rp "输入要切换的模块编号（逗号分隔，如 2,4），或回车继续: " ans
+  [ -z "$ans" ] && return 0
+
+  local token
+  IFS=',' read -r -a toggles <<< "$ans"
+  for token in "${toggles[@]}"; do
+    token="$(echo "$token" | tr -d ' ')"
+    case "$token" in
+      1) [ "$UPDATE_SKILLS" = "yes" ] && UPDATE_SKILLS="no" || UPDATE_SKILLS="yes" ;;
+      2) [ "$UPDATE_RULES" = "yes" ] && UPDATE_RULES="no" || UPDATE_RULES="yes" ;;
+      3) [ "$UPDATE_CONFIGS" = "yes" ] && UPDATE_CONFIGS="no" || UPDATE_CONFIGS="yes" ;;
+      4) [ "$UPDATE_COMMANDS" = "yes" ] && UPDATE_COMMANDS="no" || UPDATE_COMMANDS="yes" ;;
+      5) [ "$UPDATE_IDE_LINKS" = "yes" ] && UPDATE_IDE_LINKS="no" || UPDATE_IDE_LINKS="yes" ;;
+      6) [ "$UPDATE_OPENSPEC" = "yes" ] && UPDATE_OPENSPEC="no" || UPDATE_OPENSPEC="yes" ;;
+      7) [ "$UPDATE_UIPRO" = "yes" ] && UPDATE_UIPRO="no" || UPDATE_UIPRO="yes" ;;
+    esac
+  done
+}
+
+print_update_summary() {
+  local target="$1"
+  echo ""
+  info "本次更新模块："
+  echo "  Skills:    $([ "$UPDATE_SKILLS" = "yes" ] && echo "是" || echo "跳过")"
+  echo "  Rules:     $([ "$UPDATE_RULES" = "yes" ] && echo "是" || echo "跳过")"
+  echo "  Configs:   $([ "$UPDATE_CONFIGS" = "yes" ] && echo "是" || echo "跳过")"
+  echo "  Commands:  $([ "$UPDATE_COMMANDS" = "yes" ] && echo "是" || echo "跳过")"
+  echo "  IDE Links: $([ "$UPDATE_IDE_LINKS" = "yes" ] && echo "是" || echo "跳过")"
+  echo "  OpenSpec:  $([ "$UPDATE_OPENSPEC" = "yes" ] && echo "是" || echo "跳过")"
+  echo "  UIPro:     $([ "$UPDATE_UIPRO" = "yes" ] && echo "是" || echo "跳过")"
+  echo ""
+}
+
 # ============================================================================
 # 子命令
 # ============================================================================
@@ -1365,12 +1566,19 @@ cmd_init() {
   detect_source
   ensure_profile_ready
 
-  # 交互式引导（仅在使用默认值且终端可交互时触发）
-  if [ -t 0 ] && [ -z "$PROFILE_EXPLICIT" ] && [ "$LEVEL" = "L3" ]; then
+  # 交互式引导（仅在终端可交互且未显式指定时触发）
+  if [ -t 0 ] && [ -z "$PROFILE_EXPLICIT" ]; then
     select_profile
+  fi
+  if [ -t 0 ] && [ -z "$LEVEL_EXPLICIT" ]; then
     select_level
   fi
   ensure_profile_ready
+
+  if [ -t 0 ] && [ "$RULES_STRATEGY" = "ask" ]; then
+    select_rules_strategy
+  fi
+  [ "$RULES_STRATEGY" = "ask" ] && RULES_STRATEGY="standard"
 
   # UI UX Pro Max 选择（交互模式 + UIPRO=ask 时触发）
   if [ -t 0 ] && [ "$UIPRO" = "ask" ]; then
@@ -1437,25 +1645,50 @@ cmd_update() {
   detect_pkg_manager
   detect_source
   ensure_profile_ready
-  copy_agents "$target"
-  install_local_ai_spec_cli "$target"
-  copy_configs "$target" "skip_existing"
 
-  # UI UX Pro Max：已安装则更新，或用户显式指定 --uipro
-  if [ "$UIPRO" = "yes" ] || [ -d "$target/.agents/skills/ui-ux-pro-max" ]; then
-    UIPRO="yes"
-    rm -rf "$target/.agents/skills/ui-ux-pro-max"
-    setup_uipro "$target"
+  if [ -t 0 ] && [ "$RULES_STRATEGY" = "ask" ]; then
+    select_rules_strategy
+  fi
+  [ "$RULES_STRATEGY" = "ask" ] && RULES_STRATEGY="standard"
+
+  if [ -d "$target/.agents/skills/ui-ux-pro-max" ] && [ "$UPDATE_UIPRO" != "yes" ]; then
+    UPDATE_UIPRO="yes"
+  fi
+  [ "$UIPRO" = "yes" ] && UPDATE_UIPRO="yes"
+
+  if [ -t 0 ]; then
+    select_update_modules "$target"
+  fi
+  print_update_summary "$target"
+
+  if [ "$UPDATE_SKILLS" = "yes" ] || [ "$UPDATE_RULES" = "yes" ]; then
+    local rules_mode="" skills_mode=""
+    [ "$UPDATE_RULES" = "no" ] && rules_mode="skip_rules"
+    [ "$UPDATE_SKILLS" = "no" ] && skills_mode="skip_skills"
+    copy_agents "$target" "$rules_mode" "$skills_mode"
+  fi
+
+  install_local_ai_spec_cli "$target"
+
+  if [ "$UPDATE_CONFIGS" = "yes" ]; then
+    copy_configs "$target" "skip_existing"
   fi
 
   if [ "$LEVEL" = "L2" ] || [ "$LEVEL" = "L3" ]; then
-    create_ide_links "$target"
+    if [ "$UPDATE_IDE_LINKS" = "yes" ]; then
+      create_ide_links "$target"
+    fi
     copy_cursor_extras "$target"
     copy_claude_extras "$target"
   fi
 
-  if [ "$LEVEL" = "L3" ]; then
+  if [ "$LEVEL" = "L3" ] && [ "$UPDATE_OPENSPEC" = "yes" ]; then
     setup_openspec "$target"
+  fi
+
+  if [ "$UPDATE_UIPRO" = "yes" ]; then
+    rm -rf "$target/.agents/skills/ui-ux-pro-max"
+    setup_uipro "$target"
   fi
 
   TARGET="$target"
@@ -1675,10 +1908,22 @@ ${BOLD}选项:${NC}
   --ide <name>      指定 IDE (default|cursor|claude|opencode|trae|all)  默认 default(cursor+claude)
   --manifest <ref>  sync 命令使用的 manifest 文件路径或 URL
   --dry-run         sync 命令仅解析，不落盘
+  --standard-rules  使用标准规则集（不做自定义规则选择）
+  --custom-rules    启用规则自定义选择
   --lint            安装 ESLint + Prettier + Stylelint（默认安装）
   --no-lint         跳过 lint/format 工具
   --husky           安装 Husky 提交校验（husky + lint-staged + commitlint）
   --no-husky        跳过提交校验（默认跳过）
+  --update-rules    update 时显式更新 rules
+  --no-update-rules update 时跳过 rules
+  --skip-skills     update 时跳过 skills
+  --skip-configs    update 时跳过 lint/format 配置
+  --skip-commands   update 时仅保留已有命令模板
+  --update-commands update 时覆盖已有命令模板
+  --skip-ide-links  update 时跳过 IDE 软链接重建
+  --skip-openspec   update 时跳过 OpenSpec 更新
+  --skip-uipro      update 时跳过 UI UX Pro Max 更新
+  --update-uipro    update 时显式更新 UI UX Pro Max
   --uipro           安装 UI UX Pro Max 设计智能技能
   --no-uipro        跳过 UI UX Pro Max（非交互模式默认跳过）
   --repo <url>      自定义规范库地址
@@ -1699,12 +1944,14 @@ ${BOLD}示例:${NC}
   bash install.sh init                                    # 交互式安装（默认 vue + default IDE）
   bash install.sh init ~/projects/my-app                  # Vue 项目标准安装
   bash install.sh init . --profile react --level L3       # React + OpenSpec
+  bash install.sh init . --custom-rules                   # 交互式选择自定义规则
   bash install.sh init . --ide all                        # 为所有 IDE 创建适配
   bash install.sh init . --uipro                          # 安装含 UI UX Pro Max
   bash install.sh init . --no-uipro                       # 跳过 UI UX Pro Max
   bash install.sh init . --package packages/app           # Monorepo 根目录执行，安装到子包
   bash install.sh init . --workspace-root               # Monorepo 下强制在根目录安装
   bash install.sh update                                  # 更新规范
+  bash install.sh update --skip-skills --update-rules    # 只更新规则
   bash install.sh sync . --manifest ./manifest.json       # 本地 manifest 同步
   bash install.sh sync . --manifest https://hub.example.com/manifest.json
   bash install.sh check                                   # 检查安装状态
@@ -1726,15 +1973,27 @@ while [ $# -gt 0 ]; do
   case "$1" in
     init|update|sync|check|uninstall) COMMAND="$1" ;;
     --profile)    require_arg "$1" "${2:-}"; PROFILE="$2"; PROFILE_EXPLICIT=1; shift ;;
-    --level)      require_arg "$1" "${2:-}"; LEVEL="$2"; shift ;;
+    --level)      require_arg "$1" "${2:-}"; LEVEL="$2"; LEVEL_EXPLICIT=1; shift ;;
     --ide)        require_arg "$1" "${2:-}"; IDE_FILTER="$2"; IDE_FILTER_EXPLICIT=1; shift ;;
     --manifest)   require_arg "$1" "${2:-}"; MANIFEST_INPUT="$2"; shift ;;
     --dry-run)    SYNC_DRY_RUN=1 ;;
+    --standard-rules) RULES_STRATEGY="standard"; CUSTOM_RULES=() ;;
+    --custom-rules) RULES_STRATEGY="custom"; CUSTOM_RULES=("${CUSTOMIZABLE_RULES[@]}") ;;
     --repo)       require_arg "$1" "${2:-}"; SPEC_REPO="$2"; shift ;;
     --lint)       INSTALL_LINT="yes" ;;
     --no-lint)    INSTALL_LINT="no" ;;
     --husky)      INSTALL_HUSKY="yes" ;;
     --no-husky)   INSTALL_HUSKY="no" ;;
+    --update-rules) UPDATE_RULES="yes" ;;
+    --no-update-rules) UPDATE_RULES="no" ;;
+    --skip-skills) UPDATE_SKILLS="no" ;;
+    --skip-configs) UPDATE_CONFIGS="no" ;;
+    --skip-commands) UPDATE_COMMANDS="no" ;;
+    --update-commands) UPDATE_COMMANDS="yes" ;;
+    --skip-ide-links) UPDATE_IDE_LINKS="no" ;;
+    --skip-openspec) UPDATE_OPENSPEC="no" ;;
+    --skip-uipro) UPDATE_UIPRO="no" ;;
+    --update-uipro) UPDATE_UIPRO="yes" ;;
     --uipro)      UIPRO="yes" ;;
     --no-uipro)   UIPRO="no" ;;
     --refresh-cache) REFRESH_CACHE="true" ;;
