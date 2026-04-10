@@ -690,6 +690,7 @@ function applyRuntimeMutation(targetDir, payload, payloadSource) {
     status: payload.status,
     artifactsData: payload.artifacts || null,
     verificationData: payload.verification || null,
+    autoFixData: payload.auto_fix || null,
     skipArtifactCheck:
       Object.prototype.hasOwnProperty.call(payload, 'skip_artifact_check') ||
       Object.prototype.hasOwnProperty.call(payload, 'skipArtifactCheck')

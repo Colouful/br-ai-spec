@@ -1260,6 +1260,103 @@ function buildSummary(status, runState = null) {
     complexity: runState?.complexity || runState?.task?.complexity || null,
     pending_input_update: Boolean(runState?.pending_input_update),
     input_update_count: Array.isArray(runState?.input_updates) ? runState.input_updates.length : 0,
+    auto_fix_active: Boolean(runState?.auto_fix?.active),
+    auto_fix_attempts: Number(runState?.auto_fix?.attempts) || 0,
+  };
+}
+
+function trimArtifactExcerpt(content, maxChars = 500) {
+  const normalized = String(content || '')
+    .split('\n')
+    .map((line) => line.trimEnd())
+    .filter((line, index, array) => !(line === '' && array[index - 1] === ''))
+    .join('\n')
+    .trim();
+  if (!normalized) {
+    return null;
+  }
+  return normalized.length > maxChars ? `${normalized.slice(0, maxChars)}...` : normalized;
+}
+
+function listMarkdownFilesRecursive(rootPath) {
+  if (!rootPath || !fs.existsSync(rootPath)) {
+    return [];
+  }
+
+  const rootStat = fs.statSync(rootPath);
+  if (!rootStat.isDirectory()) {
+    return rootPath.endsWith('.md') ? [rootPath] : [];
+  }
+
+  const files = [];
+  const stack = [rootPath];
+  while (stack.length > 0) {
+    const current = stack.pop();
+    const entries = fs.readdirSync(current, { withFileTypes: true });
+    for (const entry of entries) {
+      const nextPath = path.join(current, entry.name);
+      if (entry.isDirectory()) {
+        stack.push(nextPath);
+      } else if (entry.isFile() && entry.name.endsWith('.md')) {
+        files.push(nextPath);
+      }
+    }
+  }
+
+  return files.sort();
+}
+
+function readArtifactExcerpt(targetDir, relPath, options = {}) {
+  if (!relPath) {
+    return null;
+  }
+
+  const absolutePath = path.join(targetDir, relPath);
+  if (!fs.existsSync(absolutePath)) {
+    return null;
+  }
+
+  const maxFiles = options.maxFiles || 2;
+  const maxChars = options.maxChars || 500;
+  const files = listMarkdownFilesRecursive(absolutePath).slice(0, maxFiles);
+  if (files.length === 0) {
+    return null;
+  }
+
+  const content = files
+    .map((filePath) => {
+      const relative = path.relative(targetDir, filePath);
+      const raw = fs.readFileSync(filePath, 'utf8');
+      const excerpt = trimArtifactExcerpt(raw, Math.floor(maxChars / Math.max(files.length, 1)));
+      return excerpt ? `## ${relative}\n${excerpt}` : null;
+    })
+    .filter(Boolean)
+    .join('\n\n');
+
+  return trimArtifactExcerpt(content, maxChars);
+}
+
+function buildFrontendAutoFixContract(targetDir, runState) {
+  const autoFix = runState?.auto_fix;
+  if (!autoFix?.active) {
+    return null;
+  }
+
+  return {
+    active: true,
+    attempts: Number(autoFix.attempts) || 0,
+    max_attempts: Number(autoFix.max_attempts) || 1,
+    failed_steps: Array.isArray(autoFix.last_failed_steps) ? autoFix.last_failed_steps : [],
+    repair_scope: [
+      '只修复 verification 失败步骤对应的问题，不新增功能',
+      '只允许修改本轮已变更文件或与失败直接相关的最小文件集',
+      '不要顺手重构、不要补新的 OpenSpec 任务',
+    ],
+    context_fragments: {
+      tasks: readArtifactExcerpt(targetDir, runState?.artifacts?.tasks, { maxFiles: 1, maxChars: 420 }),
+      design: readArtifactExcerpt(targetDir, runState?.artifacts?.design, { maxFiles: 1, maxChars: 420 }),
+      specs: readArtifactExcerpt(targetDir, runState?.artifacts?.specs, { maxFiles: 2, maxChars: 520 }),
+    },
   };
 }
 
@@ -2542,6 +2639,10 @@ function buildExpertTurn(targetDir, status, currentArtifacts) {
   const projectProfile = detectProjectProfile(targetDir);
   const repoConventions = collectRepoConventions(targetDir, projectProfile);
   const projectContextGuidance = buildProjectContextGuidance(targetDir, projectProfile, currentArtifacts.run);
+  const frontendAutoFixContract = dispatch.role?.id === 'frontend-implementer'
+    ? buildFrontendAutoFixContract(targetDir, currentArtifacts.run)
+    : null;
+  const autoFixActive = Boolean(frontendAutoFixContract?.active);
 
   const reads = [
     buildFileTarget(targetDir, path.join('.ai-spec', 'current-run.json'), {
@@ -2559,6 +2660,9 @@ function buildExpertTurn(targetDir, status, currentArtifacts) {
 
   for (const item of roleDefinition.reads) {
     const resolvedValue = resolveTemplateVariables(item, context);
+    if (autoFixActive && resolvedValue.startsWith('openspec/')) {
+      continue;
+    }
     if (resolvedValue === '.agents/rules/' || resolvedValue === '.agents/rules') {
       continue;
     }
@@ -2589,6 +2693,10 @@ function buildExpertTurn(targetDir, status, currentArtifacts) {
   const expectedOutput = Array.isArray(dispatch.execution?.expected_output) && dispatch.execution.expected_output.length > 0
     ? [...dispatch.execution.expected_output]
     : [];
+  if (autoFixActive) {
+    expectedOutput.push('只修复 verification 失败步骤对应的问题，不新增功能或顺手重构');
+    expectedOutput.push('完成修复后重新产出 verification，并准备再次推进协议');
+  }
   for (const item of buildExpertExpectedOutput(dispatch, writes, runtimePaths, deliveryProfile)) {
     expectedOutput.push(item);
   }
@@ -2626,6 +2734,13 @@ function buildExpertTurn(targetDir, status, currentArtifacts) {
         targetDir,
         projectContextGuidance,
       )
+    : null;
+  const implementationContract = dispatch.role?.id === 'frontend-implementer'
+    ? {
+        ...(roleSpecificContract || {}),
+        latest_verification: currentArtifacts.run?.verification || null,
+        auto_fix: frontendAutoFixContract,
+      }
     : null;
   const projectContextRead = repoConventions.projectContextPath
     ? buildReadableTarget(targetDir, repoConventions.projectContextPath, {
@@ -2684,13 +2799,12 @@ function buildExpertTurn(targetDir, status, currentArtifacts) {
       analysis_contract: dispatch.role?.id === 'requirement-analyst'
         ? roleSpecificContract
         : null,
-      implementation_contract: dispatch.role?.id === 'frontend-implementer'
-        ? roleSpecificContract
-        : null,
+      implementation_contract: implementationContract,
       review_contract: dispatch.role?.id === 'code-guardian'
         ? {
             ...(roleSpecificContract || {}),
             latest_verification: currentArtifacts.run?.verification || null,
+            latest_auto_fix: currentArtifacts.run?.auto_fix || null,
           }
         : null,
       repo_map_source: '.ai-spec/repo-map.json',

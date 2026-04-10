@@ -45,6 +45,7 @@ handoff_to:
 - 优先复用现有规则、组件、目录结构和技能
 - 按技术栈选择对应 profile skill，不混用无关框架做法
 - 修改范围尽量贴近本次变更，不顺手大改无关代码
+- 若 verification 失败触发 auto-fix，只修失败步骤对应的问题，不新增功能、不顺手重构
 - 若 `proposal.md`、`specs/`、`design.md` 或 `tasks.md` 缺失，必须退回要求补齐，不能跳过需求阶段直接实现
 - 优先执行协议下发的 `project_context / repo_conventions / implementation_contract`
 - 实现方式必须由 `role_skill_contract` 和 `role_rule_contract` 共同约束，而不是自由发挥
@@ -67,6 +68,7 @@ handoff_to:
   - 接口优先 `create-api`
   - 样式优先 `theme-variables`
 - `role_rule_contract` 中的 source rules 属于硬约束；若实现与规则冲突，应回写 residual risk 或上抛，而不是直接绕过
+- 若进入 `implementation_contract.auto_fix` 模式，优先依据 `latest_verification` 与失败步骤修补，不把运行时报错扩写成新需求或新的 OpenSpec 任务
 
 ## 技能选择原则
 

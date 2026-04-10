@@ -89,6 +89,66 @@ function normalizeStringList(value) {
   return value.map((item) => String(item || '').trim()).filter(Boolean);
 }
 
+function trimExcerpt(value, maxLength = 240) {
+  const text = String(value || '').trim();
+  if (!text) {
+    return null;
+  }
+  return text.length > maxLength ? `${text.slice(0, maxLength)}...` : text;
+}
+
+function normalizeAutoFixState(value) {
+  const merged = value && typeof value === 'object'
+    ? value
+    : {};
+  const maxAttempts = Number.isFinite(Number(merged.max_attempts))
+    ? Math.max(1, Number(merged.max_attempts))
+    : 1;
+  const attempts = Number.isFinite(Number(merged.attempts))
+    ? Math.max(0, Math.min(Number(merged.attempts), maxAttempts))
+    : 0;
+  const lastFailedSteps = Array.isArray(merged.last_failed_steps)
+    ? merged.last_failed_steps
+      .map((step) => ({
+        name: typeof step?.name === 'string' && step.name.trim() ? step.name.trim() : 'unknown',
+        status: typeof step?.status === 'string' && step.status.trim() ? step.status.trim() : null,
+        command: typeof step?.command === 'string' && step.command.trim() ? step.command.trim() : null,
+        exit_code: typeof step?.exit_code === 'number' ? step.exit_code : null,
+        reason: typeof step?.reason === 'string' && step.reason.trim() ? step.reason.trim() : null,
+        error: typeof step?.error === 'string' && step.error.trim() ? step.error.trim() : null,
+        stdout_excerpt: trimExcerpt(step?.stdout_excerpt),
+        stderr_excerpt: trimExcerpt(step?.stderr_excerpt),
+      }))
+      .filter(Boolean)
+    : [];
+
+  return {
+    attempts,
+    max_attempts: maxAttempts,
+    active: Boolean(merged.active),
+    last_failed_steps: lastFailedSteps,
+  };
+}
+
+function extractFailedVerificationSteps(verification) {
+  if (!verification || !Array.isArray(verification.steps)) {
+    return [];
+  }
+
+  return verification.steps
+    .filter((step) => String(step?.status || '').trim().toLowerCase() === 'failed')
+    .map((step) => ({
+      name: typeof step?.name === 'string' && step.name.trim() ? step.name.trim() : 'unknown',
+      status: 'failed',
+      command: typeof step?.command === 'string' && step.command.trim() ? step.command.trim() : null,
+      exit_code: typeof step?.exit_code === 'number' ? step.exit_code : null,
+      reason: typeof step?.reason === 'string' && step.reason.trim() ? step.reason.trim() : null,
+      error: typeof step?.error === 'string' && step.error.trim() ? step.error.trim() : null,
+      stdout_excerpt: trimExcerpt(step?.stdout_excerpt),
+      stderr_excerpt: trimExcerpt(step?.stderr_excerpt),
+    }));
+}
+
 function listMarkdownFilesRecursive(rootDir) {
   if (!rootDir || !fs.existsSync(rootDir)) {
     return [];
@@ -328,6 +388,59 @@ function buildAutoRuntimeAction(targetDir, executionPayload) {
     return null;
   }
 
+  if (roleId === 'frontend-implementer') {
+    const verification = executionPayload.verification || currentRun.verification || null;
+    const failedSteps = extractFailedVerificationSteps(verification);
+    const autoFixState = normalizeAutoFixState(currentRun.auto_fix);
+
+    if (failedSteps.length > 0) {
+      if (autoFixState.attempts < autoFixState.max_attempts) {
+        const nextAttempts = autoFixState.attempts + 1;
+        return {
+          schema_version: 1,
+          kind: 'task-orchestrator-runtime-action',
+          action: 'handoff',
+          run_id: executionPayload.run_id,
+          from_role: roleId,
+          to_role: roleId,
+          next_role: transition.to_role || 'code-guardian',
+          status: 'running',
+          clear_pending_gate: true,
+          message: `verification failed; retry frontend-implementer auto-fix (${nextAttempts}/${autoFixState.max_attempts})`,
+          source: 'expert-executor-auto-transition',
+          verification,
+          auto_fix: {
+            attempts: nextAttempts,
+            max_attempts: autoFixState.max_attempts,
+            active: true,
+            last_failed_steps: failedSteps,
+          },
+        };
+      }
+
+      return {
+        schema_version: 1,
+        kind: 'task-orchestrator-runtime-action',
+        action: 'handoff',
+        run_id: executionPayload.run_id,
+        from_role: roleId,
+        to_role: transition.to_role || 'code-guardian',
+        next_role: transition.next_role || null,
+        status: 'running',
+        clear_pending_gate: true,
+        message: 'verification still failed after auto-fix; handoff to code-guardian for blocking review',
+        source: 'expert-executor-auto-transition',
+        verification,
+        auto_fix: {
+          attempts: autoFixState.attempts,
+          max_attempts: autoFixState.max_attempts,
+          active: false,
+          last_failed_steps: failedSteps,
+        },
+      };
+    }
+  }
+
   if (transition.action === 'handoff' && roleId === 'requirement-analyst') {
     const gateCheck = validatePreImplementationGate(targetDir, currentRun, executionPayload);
     if (!gateCheck.ok) {
@@ -378,6 +491,15 @@ function buildAutoRuntimeAction(targetDir, executionPayload) {
     : transition.next_role;
   const toRole = executionPayload.next_role || transition.to_role || null;
   const action = transition.action;
+  const currentAutoFix = roleId === 'frontend-implementer'
+    ? normalizeAutoFixState(currentRun.auto_fix)
+    : null;
+  const normalizedAutoFix = currentAutoFix && (currentAutoFix.active || currentAutoFix.attempts > 0 || currentAutoFix.last_failed_steps.length > 0)
+    ? {
+        ...currentAutoFix,
+        active: false,
+      }
+    : null;
 
   return {
     schema_version: 1,
@@ -394,6 +516,7 @@ function buildAutoRuntimeAction(targetDir, executionPayload) {
     openspec_action: action === 'complete' ? 'archive' : null,
     skip_artifact_check: action === 'complete' && roleId === 'archive-change',
     verification: executionPayload.verification || null,
+    auto_fix: normalizedAutoFix,
   };
 }
 

@@ -298,6 +298,76 @@ function buildGateContext(state, options = {}, fallbackGate = null) {
   };
 }
 
+function buildDefaultAutoFixState() {
+  return {
+    attempts: 0,
+    max_attempts: 1,
+    active: false,
+    last_failed_steps: [],
+  };
+}
+
+function normalizeAutoFixStep(step) {
+  if (!step || typeof step !== 'object') {
+    return null;
+  }
+
+  return {
+    name: typeof step.name === 'string' && step.name.trim() ? step.name.trim() : 'unknown',
+    status: typeof step.status === 'string' && step.status.trim() ? step.status.trim() : null,
+    command: typeof step.command === 'string' && step.command.trim() ? step.command.trim() : null,
+    exit_code: typeof step.exit_code === 'number' ? step.exit_code : null,
+    reason: typeof step.reason === 'string' && step.reason.trim() ? step.reason.trim() : null,
+    error: typeof step.error === 'string' && step.error.trim() ? step.error.trim() : null,
+    stdout_excerpt: typeof step.stdout_excerpt === 'string' && step.stdout_excerpt.trim() ? step.stdout_excerpt.trim() : null,
+    stderr_excerpt: typeof step.stderr_excerpt === 'string' && step.stderr_excerpt.trim() ? step.stderr_excerpt.trim() : null,
+  };
+}
+
+function normalizeAutoFixState(value) {
+  const defaults = buildDefaultAutoFixState();
+  const merged = value && typeof value === 'object'
+    ? { ...defaults, ...value }
+    : defaults;
+  const maxAttempts = Number.isFinite(Number(merged.max_attempts))
+    ? Math.max(1, Number(merged.max_attempts))
+    : defaults.max_attempts;
+  const attempts = Number.isFinite(Number(merged.attempts))
+    ? Math.max(0, Math.min(Number(merged.attempts), maxAttempts))
+    : defaults.attempts;
+  const lastFailedSteps = Array.isArray(merged.last_failed_steps)
+    ? merged.last_failed_steps
+      .map((item) => normalizeAutoFixStep(item))
+      .filter(Boolean)
+    : [];
+
+  return {
+    attempts,
+    max_attempts: maxAttempts,
+    active: Boolean(merged.active),
+    last_failed_steps: lastFailedSteps,
+  };
+}
+
+function buildNextAutoFixState(state, options = {}, defaults = {}) {
+  const current = normalizeAutoFixState(state?.auto_fix);
+  if (options.autoFixData && typeof options.autoFixData === 'object') {
+    return normalizeAutoFixState({
+      ...current,
+      ...options.autoFixData,
+    });
+  }
+
+  if (defaults && typeof defaults === 'object' && Object.keys(defaults).length > 0) {
+    return normalizeAutoFixState({
+      ...current,
+      ...defaults,
+    });
+  }
+
+  return current;
+}
+
 function buildCheckpointMetadata(state, eventName, relPath, timestamp) {
   return {
     sequence: (Number(state?.checkpoint_count) || 0) + 1,
@@ -788,6 +858,7 @@ function buildRunState({ runPlan, taskAnchor, options, now, source }) {
     gate_context: buildGateContext(null, options, pendingGate),
     artifacts,
     verification: null,
+    auto_fix: buildDefaultAutoFixState(),
     last_checkpoint: null,
     checkpoint_count: 0,
     assumptions: Array.isArray(runPlan.assumptions) ? runPlan.assumptions : [],
@@ -1200,6 +1271,7 @@ function handoffRunState(options) {
       ? null
       : buildGateContext(state, options),
     verification: options.verificationData || state.verification || null,
+    auto_fix: buildNextAutoFixState(state, options),
     anchor: sanitizedAnchor,
     events: [...(Array.isArray(state.events) ? state.events : []), event],
     timestamps: {
@@ -1275,6 +1347,7 @@ function approveRunState(options) {
     pending_input_update: false,
     pending_gate: null,
     gate_context: null,
+    auto_fix: buildNextAutoFixState(state, options),
     anchor,
     events: [...(Array.isArray(state.events) ? state.events : []), event],
     timestamps: {
@@ -1343,6 +1416,7 @@ function resumeRunState(options) {
     pending_input_update: false,
     pending_gate: options.clearPendingGate === false ? state.pending_gate || null : null,
     gate_context: options.clearPendingGate === false ? state.gate_context || null : null,
+    auto_fix: buildNextAutoFixState(state, options),
     anchor,
     events: [...(Array.isArray(state.events) ? state.events : []), event],
     timestamps: {
@@ -1471,6 +1545,7 @@ function statusRunState(options) {
       input_update_count: Array.isArray(state.input_updates) ? state.input_updates.length : 0,
       pending_gate: state.pending_gate || null,
       gate_context: state.gate_context || null,
+      auto_fix: normalizeAutoFixState(state.auto_fix),
       checkpoint_count: Number(state.checkpoint_count) || 0,
       last_checkpoint: state.last_checkpoint || null,
       updated_at: state.timestamps?.updated_at || null,
@@ -1513,6 +1588,7 @@ function gateBlockedRunState(options) {
     pending_input_update: false,
     pending_gate: requestedGate,
     gate_context: buildGateContext(state, options, requestedGate),
+    auto_fix: buildNextAutoFixState(state, options),
     anchor,
     events: [...(Array.isArray(state.events) ? state.events : []), event],
     timestamps: {
@@ -1584,6 +1660,7 @@ function completeRunState(options) {
     pending_gate: null,
     gate_context: null,
     artifacts: nextArtifacts,
+    auto_fix: buildNextAutoFixState(state, options, { active: false }),
     anchor,
     events: [...(Array.isArray(state.events) ? state.events : []), event],
     timestamps: {
@@ -1651,6 +1728,7 @@ function failRunState(options) {
     pending_input_update: false,
     pending_gate: null,
     gate_context: null,
+    auto_fix: buildNextAutoFixState(state, options, { active: false }),
     anchor,
     errors: updatedErrors,
     events: [...(Array.isArray(state.events) ? state.events : []), event],
@@ -1715,6 +1793,7 @@ function cancelRunState(options) {
     pending_input_update: false,
     pending_gate: null,
     gate_context: null,
+    auto_fix: buildNextAutoFixState(state, options, { active: false }),
     anchor,
     events: [...(Array.isArray(state.events) ? state.events : []), event],
     timestamps: {

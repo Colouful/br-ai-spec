@@ -91,7 +91,8 @@
         "default": {
           "must_follow": [
             "优先复用现有目录、路由、请求封装、状态管理和样式变量约定。",
-            "实现前先对齐 proposal/specs/design/tasks 的范围与落点，不要自行扩 scope。"
+            "实现前先对齐 proposal/specs/design/tasks 的范围与落点，不要自行扩 scope。",
+            "若 verification 失败触发 auto-fix，只修失败步骤对应的问题，不新增功能、不顺手重构。"
           ],
           "blocked_when": [
             "proposal/specs/design/tasks 未落盘或仍处于 before-implementation 审批门禁时，禁止改业务代码。"
@@ -131,7 +132,8 @@
         "default": {
           "must_follow": [
             "以 proposal/specs/design/tasks 和项目规则为准检查实现，而不是只做泛化 lint。",
-            "必须给出阻断项、非阻断项和交付建议，不能写成模糊建议列表。"
+            "必须给出阻断项、非阻断项和交付建议，不能写成模糊建议列表。",
+            "若实现阶段经历过 auto-fix 仍未通过 verification，必须按阻断项处理，不能以“后续再看”放行。"
           ],
           "blocked_when": [
             "存在与项目规范冲突的目录、路由、API、样式或测试问题时，不得给 complete 结论。"

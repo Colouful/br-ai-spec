@@ -508,6 +508,9 @@ function buildRuntimeOptionsFromPayload(payload, targetDir) {
   if (payload.verification && typeof payload.verification === 'object') {
     options.verificationData = payload.verification;
   }
+  if (payload.auto_fix && typeof payload.auto_fix === 'object') {
+    options.autoFixData = payload.auto_fix;
+  }
   if (Object.prototype.hasOwnProperty.call(payload, 'skip_artifact_check') || Object.prototype.hasOwnProperty.call(payload, 'skipArtifactCheck')) {
     options.skipArtifactCheck = Boolean(
       Object.prototype.hasOwnProperty.call(payload, 'skip_artifact_check')
