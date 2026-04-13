@@ -1,6 +1,6 @@
-# L3 OpenSpec 集成使用指南
+# OpenSpec 集成使用指南
 
-> ai-spec-auto  v2.0 | 适用于需要需求治理与变更归档的团队
+> ai-spec-auto v2.0 | 适用于需要需求治理与变更归档的团队
 
 ---
 
@@ -35,26 +35,28 @@ OpenSpec 是一个**规范驱动开发（Spec-Driven Development）**框架，�
 
 ---
 
-## 二、安装（L3 级别）
+## 二、安装
 
 ### 2.1 npx 安装（推荐）
 
 ```bash
 cd /path/to/your-project
-npx @ex/ai-spec-auto@latest init --profile vue --level L3
+npx @ex/ai-spec-auto@latest init . --profile vue
 ```
+
+默认安装已经包含 OpenSpec。`--level L1/L2/L3` 现在只保留为兼容参数；只有你明确需要兼容旧安装模型时才再显式传入。
 
 ### 2.2 手动安装
 
 ```bash
 git clone http://git.100credit.cn/zhenwei.li/ai-spec-auto.git ai-spec-auto
 cd ai-spec-auto 
-bash install.sh init /path/to/your-project --profile vue --level L3
+bash install.sh init /path/to/your-project --profile vue
 ```
 
 ### 2.3 安装后的目录结构
 
-L3 安装完成后，项目中会多出以下内容（相比 L2）：
+默认完整安装完成后，项目中会多出以下内容：
 
 ```
 your-project/

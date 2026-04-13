@@ -282,6 +282,11 @@ function inferApprovalResumeRole(state, options = {}) {
     return options.toRole || options.nextRole;
   }
 
+  const gateResumeRole = state.gate_context?.resume_to_role || null;
+  if (gateResumeRole) {
+    return gateResumeRole;
+  }
+
   const anchorNextRole = state.anchor?.stage?.next_role || null;
   if (anchorNextRole) {
     return anchorNextRole;

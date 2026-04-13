@@ -85,9 +85,11 @@
 ### Profile 机制
 
 ```bash
-# 推荐：在目标项目根目录（npx；未写 --level 时默认为 L3）
+# 推荐：在目标项目根目录使用默认完整安装
 npx @ex/ai-spec-auto@latest init --profile react
 npx @ex/ai-spec-auto@latest init --profile vue
+
+# 仅在兼容旧安装模型时才显式传 --level
 npx @ex/ai-spec-auto@latest init --profile vue --level L2
 
 # 或：克隆规范库后
@@ -136,18 +138,18 @@ bash install.sh init /path/to/project --profile vue
 |------|------|
 | "写规则太麻烦" | 规则不是额外成本，而是把反复口头解释的成本一次性沉淀 |
 | "AI 已经会写代码了" | AI 会写"通用代码"，Skill 是让它写"团队认可的代码" |
-| "OpenSpec 太重" | 只在新功能、跨模块变更时走 `/opsx:*`；bug fix 可跳过；团队完整闭环仍建议以 L3 为目标 |
+| "OpenSpec 太重" | 只在新功能、跨模块变更时走 `/opsx:*`；bug fix 可跳过；默认完整安装已经包含 OpenSpec，不需要先理解 L1/L2/L3 |
 
 ## 第六部分：Q&A + 行动计划（15 分钟）
 
 ### 第一轮试点检查表
 
 - [ ] 确定试点项目与负责人（前端 Vue 或 React 仓库）
-- [ ] 选择 Profile 并运行安装（推荐 `npx @ex/ai-spec-auto@latest init`，至少 **L2**）
+- [ ] 选择 Profile 并运行安装（推荐 `npx @ex/ai-spec-auto@latest init`）
 - [ ] 填写 01-项目概述 和 03-项目结构（若自定义规则缺失，补确认 04/05/06/07/09 是否已按项目生成）
 - [ ] 跑通一个组件创建场景
 - [ ] 接通至少一个 MCP（Figma/ApiFox/Playwright）
-- [ ] **（完整闭环）** 升级到 **L3**：`openspec/config.yaml` 存在，能完成一次 `/opsx:propose` → `/opsx:apply` 最小路径（参见 [openspec-guide.md](openspec-guide.md)）
+- [ ] **（完整闭环）** 确认默认安装已带上 OpenSpec：`openspec/config.yaml` 存在，能完成一次 `/opsx:propose` → `/opsx:apply` 最小路径（参见 [openspec-guide.md](openspec-guide.md)）
 - [ ] 两周后复盘，调整 rules/skills
 
 ### 90 分钟工作坊方法

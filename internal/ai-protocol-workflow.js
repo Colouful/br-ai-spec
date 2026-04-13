@@ -2175,9 +2175,30 @@ function looksLikeResumeInput(input) {
   ].some((pattern) => pattern.test(text));
 }
 
+function looksLikeConfirmProceedInput(input) {
+  const text = String(input || '').trim();
+  if (!text) {
+    return false;
+  }
+
+  return [
+    /确认/,
+    /按当前方案继续/,
+    /按这个方案继续/,
+    /按方案.*继续/,
+    /选方案/,
+    /就这样继续/,
+    /可以按这个做/,
+  ].some((pattern) => pattern.test(text));
+}
+
 function looksLikeArchiveApproveInput(input) {
   const text = String(input || '').trim();
   if (!text) {
+    return false;
+  }
+
+  if (looksLikeArchiveSkipInput(text) || looksLikeArchiveFixInput(text)) {
     return false;
   }
 
@@ -2774,6 +2795,77 @@ function buildPausedTurn(targetDir, status, currentArtifacts) {
   });
 }
 
+function buildConfirmGateTurn(targetDir, status, currentArtifacts) {
+  const runState = currentArtifacts.run || null;
+  const gateContext = runState?.gate_context || null;
+  const gateId = gateContext?.gate_id || runState?.pending_gate || 'handoff-confirm';
+
+  return attachProtocolContracts(attachActorPresentation({
+    kind: 'ai-protocol-turn',
+    status: 'blocked',
+    mode: 'confirm-gate',
+    actor: {
+      id: 'task-orchestrator',
+      type: 'orchestrator',
+    },
+    command: '/spec-continue',
+    reason: 'current run is waiting for a lightweight confirm decision before continuing',
+    summary: buildSummary(status, runState),
+    input: {
+      user_request: runState?.trigger?.raw_input || null,
+      latest_user_input: runState?.trigger?.latest_user_input || null,
+      current_role: runState?.current_role || null,
+      pending_gate: runState?.pending_gate || null,
+      delivery_profile: runState?.delivery_profile || null,
+      artifact_profile: runState?.artifact_profile || null,
+    },
+    reads: [
+      buildFileTarget(targetDir, path.join('.ai-spec', 'current-run.json'), {
+        required: true,
+        label: 'current run-state',
+      }),
+    ],
+    writes: [],
+    expected_output: [
+      '当前停在轻确认门禁，等待用户决定是否按当前方案继续',
+      '只用简洁摘要说明当前状态、关键原因、下一步',
+      '用户确认后恢复到指定专家继续，不升级成重审批',
+    ],
+    guidance: {
+      ...buildOrchestratorGuidance(
+        targetDir,
+        runState,
+        runState?.trigger?.latest_user_input || runState?.trigger?.raw_input || null,
+      ),
+      confirm_gate: {
+        gate: gateId,
+        status: 'waiting-confirm',
+        required_user_action: gateContext?.required_user_action || '请确认是否按当前方案继续',
+        blocked_reason: gateContext?.blocked_reason || '当前方案存在轻量分歧或待确认项',
+        blocked_by_role: gateContext?.blocked_by_role || runState?.current_role || null,
+        resume_to_role: gateContext?.resume_to_role || runState?.current_role || null,
+        resume_rule: '用户用自然语言确认（如“按当前方案继续”）或执行 /spec-continue 后，恢复到指定专家继续。',
+        user_report_contract: {
+          style: 'confirm-compact',
+          max_lines: 4,
+          required_sections: ['当前状态', '关键原因', '下一步'],
+          one_sentence_per_section: true,
+          max_bullets_per_section: 1,
+          preferred_sentence_count: 3,
+          forbidden_items: [
+            '长篇阶段说明',
+            '协议推进细节',
+            '文件路径或文件清单',
+            '对内说明、内部注释或实现者自述',
+          ],
+        },
+      },
+    },
+  }), {
+    userInput: runState?.trigger?.latest_user_input || runState?.trigger?.raw_input || null,
+  });
+}
+
 function buildApprovalGateTurn(targetDir, status, currentArtifacts) {
   const pendingGate = currentArtifacts.run?.pending_gate || null;
   const gateContext = currentArtifacts.run?.gate_context || null;
@@ -3342,6 +3434,10 @@ function buildProtocolTurn(options = {}) {
     return buildUpdateReviewTurn(targetDir, status, currentArtifacts);
   }
 
+  if (String(currentArtifacts.run?.status || '').trim().toLowerCase() === 'waiting-confirm') {
+    return buildConfirmGateTurn(targetDir, status, currentArtifacts);
+  }
+
   if (status.current.execution_role) {
     return buildContinueTurn(targetDir, status, currentArtifacts);
   }
@@ -3613,6 +3709,35 @@ function updateProtocolInput(options = {}) {
       fast_path: {
         executed: true,
         action: 'resume-paused-run',
+        archived_to: null,
+        run_status: resumed.state?.status || null,
+        current_role: resumed.state?.current_role || null,
+        requires_followup_turn: true,
+      },
+      runner_status: runner.buildStatus(targetDir),
+      turn: buildProtocolTurn({
+        target: targetDir,
+        userInput: null,
+      }),
+    };
+  }
+
+  if (
+    String(currentArtifacts.run?.status || '').trim().toLowerCase() === 'waiting-confirm' &&
+    (looksLikeApprovalInput(userInput) || looksLikeResumeInput(userInput) || looksLikeConfirmProceedInput(userInput))
+  ) {
+    const resumed = resumeRunState({
+      target: targetDir,
+      clearPendingGate: true,
+      message: '用户确认当前方案，恢复继续推进。',
+    });
+    return {
+      kind: 'ai-protocol-input-update',
+      target: targetDir,
+      updated: null,
+      fast_path: {
+        executed: true,
+        action: 'confirm-resume',
         archived_to: null,
         run_status: resumed.state?.status || null,
         current_role: resumed.state?.current_role || null,

@@ -1,193 +1,157 @@
 # 5 分钟快速上手
 
-## 你将获得什么
+这份文档只讲一条主路径：**默认完整安装**。  
+如果你只是想尽快把项目接起来，先按这里走，不需要先理解 `L1 / L2 / L3`。
 
-安装 **ai-spec-auto** 后，在前端项目（Vue / React Profile）中，AI 编码助手会按团队约定处理 **目录结构、组件拆分、API 命名、样式变量** 等，减少每次对话重复「背诵」项目规则。
+## 0. 准备一次内网 registry
 
-**一体化能力**：`.agents/rules` 与 `.agents/skills` 负责编码约束与操作步骤；**L2** 起通过 **IDE 链接** 与 **`.cursor/mcp.json`** 接入接口文档、设计稿、浏览器验收等上下文；**L3** 再增加 **`openspec/`**（OpenSpec），与 `.agents` 通过 **`openspec/config.yaml`** 桥接，支撑 **`/opsx:*` 提案 → 实施 → 归档** 与 `create-proposal` 等技能的完整闭环。详见仓库根目录 README 中的「一体化能力与关键路径」。
+当前包通过**内网 npm registry**分发。  
+这不是运行时代码依赖，而是**安装来源依赖**。
 
-## 安装（与 README 一致）
+在 `~/.npmrc` 里加入：
 
-### 方式一：npx 一键安装（推荐）
+```ini
+@ex:registry=http://nodejs.100credit.cn/
+```
 
-在**目标前端项目根目录**执行，无需先克隆规范库：
+## 1. 安装
+
+在目标项目根目录执行：
 
 ```bash
-# 交互式安装（引导选择技术栈与层级）
 npx @ex/ai-spec-auto@latest init .
-
-# 指定参数（示例：Vue + 团队完整方案含 OpenSpec）
-npx @ex/ai-spec-auto@latest init . --profile vue --level L3
 ```
 
-> 首次使用前需配置私有源（仅一次）：在 `~/.npmrc` 中添加  
-> `@ex:registry=http://nodejs.100credit.cn/`
+这条命令默认会安装：
 
-更新 / 检查 / 卸载：
+- `.agents/rules`
+- `.agents/skills`
+- `.cursor` / `.claude` 命令与链接
+- `openspec/`
+
+交互过程中默认只会问这些：
+
+- Profile
+- Monorepo 安装目标（如果命中）
+- 规则策略（标准 / 根据项目自定义）
+- UIPro
+- lint/format
+- husky
+
+如果你在 Monorepo 根目录执行，它会优先提醒你选根目录还是子包。
+
+## 2. 初始化项目规范
+
+安装完成后，在 AI IDE 中执行：
+
+- `/project-init`
+- 或直接输入：`初始化项目规范`
+
+它会始终刷新：
+
+- `01-项目概述.md`
+- `03-项目结构.md`
+- `context/PROJECT.md`
+
+如果安装时选择了“根据项目自定义”，并且这些规则还缺失，也会一起补出来：
+
+- `04-组件规范.md`
+- `05-API规范.md`
+- `06-路由规范.md`
+- `07-状态管理.md`
+- `09-样式规范.md`
+
+## 3. 开始真实需求
+
+最常用的协议命令：
+
+| 命令 | 用途 |
+|------|------|
+| `/spec-start` | 新建一个需求交付 run |
+| `/spec-update` | 增量补充需求、修正方向、归档前修正说明 |
+| `/spec-continue` | 继续或恢复当前 run |
+| `/spec-stop` | 暂停当前 run |
+| `/spec-status` | 查看当前阶段、门禁和下一步 |
+
+如果你走 OpenSpec 提案流：
+
+- Cursor：`/opsx-propose`、`/opsx-apply`、`/opsx-archive`、`/opsx-explore`
+- Claude Code 等：`/opsx:propose`、`/opsx:apply`、`/opsx:archive`、`/opsx:explore`
+
+## 4. 最短体验路径
+
+推荐这样试一轮：
+
+1. `npx @ex/ai-spec-auto@latest init .`
+2. 在 IDE 里执行 `/project-init`
+3. 执行 `/spec-start`
+4. 说一个真实需求，比如：
+
+```text
+/spec-start 创建一个订单列表页面，接真实接口，支持分页、筛选、状态切换和错误重试
+```
+
+如果中途要增量改需求：
+
+```text
+/spec-update 把筛选区改成状态 Tab，先不要高级筛选
+```
+
+如果要暂停：
+
+```text
+/spec-stop
+```
+
+如果要继续：
+
+```text
+/spec-continue
+```
+
+## 5. 常见变体
+
+指定技术栈：
+
+```bash
+npx @ex/ai-spec-auto@latest init . --profile vue
+npx @ex/ai-spec-auto@latest init . --profile react
+```
+
+Monorepo 直接指定子包：
+
+```bash
+npx @ex/ai-spec-auto@latest init . --package packages/web
+```
+
+启用自定义规则：
+
+```bash
+npx @ex/ai-spec-auto@latest init . --custom-rules
+```
+
+更新规范：
 
 ```bash
 npx @ex/ai-spec-auto@latest update .
-npx @ex/ai-spec-auto@latest check .
-npx @ex/ai-spec-auto@latest uninstall .
 ```
 
-也可全局安装后使用：`npm install -g @ex/ai-spec-auto@latest`，再执行 `ai-spec-auto init ...`。
-
-> Windows 下 npx 安装器会自动选用 PowerShell 脚本，无需额外配置。
-
-**UI UX Pro Max（可选）**：非交互执行 `npx @ex/ai-spec-auto@latest init` 时**不会**自动安装该技能；需要时请显式执行 `npx @ex/ai-spec-auto@latest init . --uipro`，或事后 `npx @ex/ai-spec-auto@latest update . --uipro`。详见根目录 README「UI UX Pro Max」小节。
-
-### 方式二：克隆规范库后使用脚本
+只更新一部分：
 
 ```bash
-git clone http://git.100credit.cn/zhenwei.li/ai-spec-auto.git ai-spec-auto
-cd ai-spec-auto
-
-bash install.sh init /path/to/your-project
-# 或显式指定（与脚本默认一致：L3）
-bash install.sh init /path/to/your-project --profile vue --level L3
-# 不要 OpenSpec 时用 --level L2
+npx @ex/ai-spec-auto@latest update . --skip-skills --skip-configs --skip-openspec
 ```
 
-**Windows PowerShell**（首次可执行 `Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned`）：
+## 6. 兼容参数说明
 
-```powershell
-git clone http://git.100credit.cn/zhenwei.li/ai-spec-auto.git ai-spec-auto
-cd ai-spec-auto
-.\install.ps1 init C:\path\to\your-project --profile vue --level L3
-```
+`--level L1/L2/L3` 仍然保留，但现在属于**兼容参数**：
 
-与 npx 相同，支持 `update`、`check`、`uninstall` 子命令。
+- 默认不需要理解它
+- 默认安装已经等价于原来的完整安装
+- 如果你确实需要“少装一点”，再显式使用兼容层级参数
 
-### 安装层级
+## 7. 继续阅读
 
-| 层级 | 内容 | 适合场景 |
-|------|------|----------|
-| **L1** | 只安装 `.agents`（规范 + 技能） | 快速试用、个人体验 |
-| **L2** | `.agents` + IDE 适配层 + MCP 模板 | 团队编码规范 + 外部上下文（**不含** OpenSpec，需显式 `--level L2`） |
-| **L3** | L2 + OpenSpec（`openspec/`） | **默认安装层级、团队主推**：需求治理与归档闭环，与 `.agents` 一体联动 |
-
-### 技术栈 Profile
-
-| Profile | 技术栈 |
-|---------|--------|
-| **react** | React + TypeScript（优先；纯 JS 见 02-编码规范）+ Vite + Zustand + Ant Design |
-| **vue** | Vue 3 + TypeScript（优先；纯 JS 见 02-编码规范）+ Vite + Pinia + Vue Router |
-
-### Monorepo / pnpm workspace
-
-若仓库根目录存在 **`pnpm-workspace.yaml`** 或根 **`package.json`** 含 **`workspaces`**，在安装脚本看来即 **Monorepo**。在**工作区根**执行 `npx @ex/ai-spec-auto@latest init` 时：
-
-- **交互终端**：会提示选择「在根目录安装」或「输入子包相对路径」（如 `packages/web`），推荐把规范与 lint/husky 依赖落在**具体前端应用包**内。
-- **非交互**（CI、管道输入）：不会停顿；脚本会打印建议在子包执行的示例命令，并**默认仍在根目录**继续安装。若要在子包安装且无需交互，请使用：
-  - `npx @ex/ai-spec-auto@latest init . --package packages/your-app`（路径相对**工作区根**），或
-  - 先 `cd` 到子包再执行 `npx @ex/ai-spec-auto@latest init`，或
-  - 环境变量 `EX_AI_SPEC_WORKSPACE_PACKAGE=packages/your-app`（与 `--package` 等价）。
-- **确需在根 `package.json` 安装依赖**（pnpm）：使用 `pnpm add -w <包名>`；详见 `.agents/rules/common/08-通用约束.md` 中「pnpm workspace」说明。
-
-`install.sh` / `install.ps1` 同样支持 **`--package <path>`** 与 **`--workspace-root`**（强制根目录、跳过上述交互）。
-
-### 交互安装你会看到什么
-
-默认交互式 `init` 会依次让你选择：
-
-- `Profile`
-- `Level`
-- 规则安装策略（标准规范 / 根据项目自定义）
-- 是否安装 UI UX Pro Max
-- 是否安装 lint/format
-- 是否安装 Husky
-
-如果选了“根据项目自定义”，还会继续让你勾选要交给 `project-init` 按项目生成的规则。
-
-## 安装后必做事项
-
-### 1. 填写项目信息
-
-编辑（或在 AI IDE 中说 **「初始化项目规范」** 让 AI 生成）：
-
-- `.agents/rules/01-项目概述.md` — 项目定位与技术栈
-- `.agents/rules/03-项目结构.md` — 目录结构
-- 若安装时选择了“根据项目自定义”且对应规则文件缺失，AI 还会按项目实际情况补生成：
-  - `.agents/rules/04-组件规范.md`
-  - `.agents/rules/05-API规范.md`
-  - `.agents/rules/06-路由规范.md`
-  - `.agents/rules/07-状态管理.md`
-  - `.agents/rules/09-样式规范.md`
-
-### 2. 配置 MCP（L2 / L3）（可选：仅在使用 MCP 时配置）
-
-- **默认状态**：Cursor 中各 MCP 服务多为**关闭/未启用**，属于正常情况，不代表安装失败。
-- **建议顺序**：打开 **Cursor → 设置 → MCP**，按需**启用**目标服务 → 再编辑 `.cursor/mcp.json`，把 ApiFox 等条目中的 **`project-id`**、**`access-token`** 等占位符换成真实值。
-- **不需要的服务**可保持关闭；若配置里某条目带有 **`disabled`**（或与 IDE 版本对应的禁用字段），请在**填好凭证后再启用**，避免未配置即连接报错。
-
-### 3. L3：确认 OpenSpec
-
-若使用 **`--level L3`**，确认已生成 **`openspec/`**（含 `config.yaml`、`changes/` 等），并阅读 [openspec-guide.md](openspec-guide.md) 跑通最小工作流。`create-proposal` 委托的 **`/opsx:propose`** 等命令依赖该目录与 OpenSpec CLI。
-
-### 4. 首次放行宿主桥命令
-
-`/spec-start`、`/spec-continue` 会在 IDE 内静默执行 `ai-spec-auto protocol-step`、`ai-spec-auto protocol-advance`、`ai-spec-auto protocol-update`。
-
-- 首次弹出终端权限确认时，请选择 **Always allow for this workspace**
-- 如果误点拒绝，请到 IDE 的终端权限设置里重置该工作区授权
-- AI 侧默认走 `--json` 协议输出，不需要人工去解析终端文本
-
-### L3 最简操作流程（命令速查）
-
-1. **创建提案**：**Cursor** 用 `/opsx-propose [名称或描述]`；**Claude Code** 等用 `/opsx:propose [名称或描述]`。Cursor 的连字符命令由本规范库安装时直接同步到 `.cursor/commands/`；自然语言如「帮我创建一个变更提案」会先走 `create-proposal` 前置分析，再委托上述命令生成产物。
-2. **产物位置**：`openspec/changes/<change-name>/`（含 `proposal.md`、`tasks.md`、`design.md` 等）。实施清单以该目录下的 **`tasks.md`** 为准，勿与仓库根目录其它待办文件混用。
-3. **实施（execute-task）**：**Cursor** 用 `/opsx-apply`；**Claude Code** 等用 `/opsx:apply`。该路径会按 **execute-task** 四步循环逐条执行（头脑风暴 → TDD → 双重审查 → 状态更新），不要跳过流程、对照清单直接写代码。同义说法：「开始执行任务」「应用变更」。
-4. **归档**：**Cursor** 用 `/opsx-archive`；**Claude Code** 等用 `/opsx:archive`。
-
-更多命令、参数与 IDE 差异见 [openspec-guide.md](openspec-guide.md)。
-
-## 开始使用
-
-安装完成后，在 AI IDE 中正常对话即可；AI 会按 `.agents` 中的 Rules / Skills 执行。
-
-### 高频场景
-
-| 你想做什么 | 对 AI 说 |
-|------------|----------|
-| 新建组件 | 「创建一个用户列表组件」 |
-| 新建页面 | 「新增一个订单详情页」 |
-| 接新接口 | 「对接用户列表接口」 |
-| 分析设计稿 | 「分析这个 Figma 设计稿」 |
-| 创建提案（L3） | 「帮我创建一个变更提案」 |
-
-## 验证安装
-
-```bash
-npx @ex/ai-spec-auto@latest check .
-# 或（在克隆的规范库目录下）
-bash install.sh check /path/to/your-project
-```
-
-## 更新规范
-
-```bash
-npx @ex/ai-spec-auto@latest update .
-# 或
-bash install.sh update /path/to/your-project --profile vue
-```
-
-更新**不会**覆盖 `01-项目概述.md` 和 `03-项目结构.md`（项目特有规则）。
-
-交互式 `update` 会先让你切换要更新的模块：
-
-- Skills
-- Rules
-- Configs
-- Commands
-- IDE Links
-- OpenSpec
-- UI UX Pro Max
-
-如果你只想更新其中一部分，也可以直接在这个菜单里完成，不必先记参数。
-
-## 延伸阅读
-
-- [install-guide.md](install-guide.md) — 安装脚本参数与机制
-- [openspec-guide.md](openspec-guide.md) — L3 / OpenSpec 使用说明
-- [training-outline.md](training-outline.md) — 团队培训大纲
+- [安装指南](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/install-guide.md)
+- [OpenSpec / 协议流说明](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/openspec-guide.md)
+- [文档索引](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/README.md)

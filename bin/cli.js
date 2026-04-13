@@ -1,22 +1,22 @@
 #!/usr/bin/env node
-const { execFileSync } = require('child_process');
 const path = require('path');
 
 const pkgRoot = path.join(__dirname, '..');
 const args = process.argv.slice(2);
 const env = { ...process.env, BR_AI_SPEC_LOCAL: pkgRoot };
 const opts = { stdio: 'inherit', cwd: process.cwd(), env };
+const INSTALL_COMMANDS = new Set(['init', 'update', 'check', 'uninstall', 'sync', 'help']);
 
 (async () => {
   try {
+    if (args.length === 0 || INSTALL_COMMANDS.has(args[0])) {
+      const installWorkflow = require('./install-workflow');
+      process.exit(await installWorkflow.main(args));
+    }
+
     if (args[0] === 'runtime-state') {
       const runtimeState = require('./runtime-state');
       process.exit(runtimeState.main(args.slice(1)));
-    }
-
-    if (args[0] === 'sync') {
-      const sync = require('./sync');
-      process.exit(await sync.main(args.slice(1)));
     }
 
     if (args[0] === 'validate-registry') {
@@ -81,15 +81,7 @@ const opts = { stdio: 'inherit', cwd: process.cwd(), env };
       process.exit(archiveChange.main(args.slice(1)));
     }
 
-    if (process.platform === 'win32') {
-      const ps1 = path.join(pkgRoot, 'install.ps1');
-      execFileSync('powershell', [
-        '-ExecutionPolicy', 'Bypass', '-File', ps1, ...args
-      ], opts);
-    } else {
-      const sh = path.join(pkgRoot, 'install.sh');
-      execFileSync('bash', [sh, ...args], opts);
-    }
+    throw new Error(`Unknown command: ${args[0]}`);
   } catch (e) {
     if (e && e.message && !e.cmd) {
       console.error(e.message);

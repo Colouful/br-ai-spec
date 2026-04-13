@@ -202,6 +202,12 @@ function printTurn(turn) {
       console.log(`guidance.pause_contract.status: ${turn.guidance.pause_contract.status || '(none)'}`);
       console.log(`guidance.pause_contract.resume_rule: ${turn.guidance.pause_contract.resume_rule || '(none)'}`);
     }
+    if (turn.guidance.confirm_gate) {
+      console.log(`guidance.confirm_gate.status: ${turn.guidance.confirm_gate.status || '(none)'}`);
+      console.log(`guidance.confirm_gate.gate: ${turn.guidance.confirm_gate.gate || '(none)'}`);
+      console.log(`guidance.confirm_gate.resume_to_role: ${turn.guidance.confirm_gate.resume_to_role || '(none)'}`);
+      console.log(`guidance.confirm_gate.required_user_action: ${turn.guidance.confirm_gate.required_user_action || '(none)'}`);
+    }
     if (turn.guidance.orchestration_contract) {
       console.log(`guidance.orchestration_contract.handoff_policy: ${turn.guidance.orchestration_contract.handoff_policy || '(none)'}`);
       if (turn.guidance.orchestration_contract.handoff_gate_policy) {
