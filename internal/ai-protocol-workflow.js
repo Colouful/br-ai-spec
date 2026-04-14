@@ -1064,6 +1064,26 @@ function buildRunRouteDecision(targetDir, runState, userInput, flowDefinition) {
   };
 }
 
+function buildBugfixRouteContract() {
+  return {
+    allowed_as_quick_fix: [
+      '单页面、单组件、单模块的 bug 修复',
+      '样式微调、文案调整、小交互修正',
+      '低风险且不需要长期 OpenSpec 沉淀的小改动',
+    ],
+    must_escalate_to_full_change: [
+      '新增真实 API、路由、全局状态或跨模块联动',
+      '需求边界、方案决策、验收口径发生变化',
+      '涉及权限、支付、风控、合规或其他中高风险领域',
+    ],
+    prefer_same_change: [
+      '当前存在 active/open change 且输入只是在当前范围内小修正时，优先复用原 change',
+      '归档前修正继续走 archive-fix，已归档补修继续走 followup-patch',
+    ],
+    must_wait_confirm_when_multiple_open_changes: '同时存在多个 open change 且输入未明确目标时，必须进入 waiting-confirm，不得猜测。',
+  };
+}
+
 function buildOrchestratorGuidance(targetDir, runState = null, userInput = null, routeDecisionOverride = null) {
   const selectedFlowId = routeDecisionOverride?.selected_flow || runState?.flow?.id || DEFAULT_FLOW_ID;
   const flowDefinition = loadFlowDefinition(targetDir, selectedFlowId);
@@ -1113,6 +1133,9 @@ function buildOrchestratorGuidance(targetDir, runState = null, userInput = null,
   const expectedGate = pendingGate || (riskLevel === 'high' && hasBeforeImplementationGate ? 'before-implementation' : null);
   const resumeRole = expectedGate === 'before-implementation'
     ? inferApprovalResumeRoleFromFlow(targetDir, runState, flowDefinition)
+    : null;
+  const bugfixRouteContract = selectedFlowId === QUICK_FIX_FLOW_ID
+    ? buildBugfixRouteContract()
     : null;
 
   return {
@@ -1200,6 +1223,9 @@ function buildOrchestratorGuidance(targetDir, runState = null, userInput = null,
       waiting_confirm_required: Boolean(routeDecision?.waiting_confirm_required),
       reason: routeDecision?.reason || null,
     },
+    bugfix_route_contract: bugfixRouteContract,
+    quick_fix_boundary: bugfixRouteContract?.allowed_as_quick_fix || null,
+    upgrade_to_full_change_when: bugfixRouteContract?.must_escalate_to_full_change || null,
   };
 }
 
@@ -1542,13 +1568,13 @@ function inferOptionalRoles(rawInput) {
   if (/接口|api|字段|契约|mock|联调|分页|筛选|搜索|状态切换|重试/i.test(text)) {
     roles.push('api-contract-specialist');
   }
-  if (/测试|回归|断言|单元测试|vitest/i.test(text)) {
+  if (/测试|回归|断言|单元测试|vitest|store|pinia|zustand|工具函数|边界逻辑|临界|回归风险/i.test(text)) {
     roles.push('unit-test-specialist');
   }
-  if (/验收|验证|校验|截图|比对|review/i.test(text)) {
+  if (/验收|验证|校验|截图|比对|review|复核|复审|多人确认/i.test(text)) {
     roles.push('verification-reviewer');
   }
-  if (/性能|首屏|卡顿|lcp|cls|inp|大列表|虚拟滚动/i.test(text)) {
+  if (/性能|首屏|卡顿|lcp|cls|inp|大列表|虚拟滚动|掉帧|滚动|动画|渲染慢|性能退化/i.test(text)) {
     roles.push('performance-auditor');
   }
 
@@ -2384,6 +2410,51 @@ function buildArtifactContract(roleId, roleRuleContract, roleSkillContract, flow
     ];
   }
 
+  if (flowId === QUICK_FIX_FLOW_ID && roleId === 'unit-test-specialist') {
+    return [
+      {
+        artifact: 'unit-test-suggestions',
+        required_rules: ruleIds.filter((id) => ['coding-standard', 'test-standard', 'audit-report-standard'].includes(id)),
+        preferred_skills: primarySkills.filter((id) => ['create-test'].includes(id)),
+        done_when: '已明确哪些逻辑必须补测、哪些只需记录风险，并说明测试落点与断言重点。',
+      },
+    ];
+  }
+
+  if (flowId === QUICK_FIX_FLOW_ID && roleId === 'verification-reviewer') {
+    return [
+      {
+        artifact: 'verification-review-notes',
+        required_rules: ruleIds.filter((id) => ['style-standard', 'test-standard', 'audit-report-standard'].includes(id)),
+        preferred_skills: primarySkills.filter((id) => ['ui-verification', 'web-design-guidelines'].includes(id)),
+        done_when: '已基于 bugfix、实现说明和守护证据补强验收结论，不重新定义需求边界。',
+      },
+      {
+        artifact: 'acceptance-risks',
+        required_rules: ruleIds.filter((id) => ['audit-report-standard'].includes(id)),
+        preferred_skills: primarySkills.filter((id) => ['ui-verification', 'web-design-guidelines'].includes(id)),
+        done_when: '已明确仍需补充的验证项、残留风险以及是否需要升级到完整 OpenSpec。',
+      },
+    ];
+  }
+
+  if (flowId === QUICK_FIX_FLOW_ID && roleId === 'performance-auditor') {
+    return [
+      {
+        artifact: 'performance-audit-notes',
+        required_rules: ruleIds.filter((id) => ['coding-standard', 'style-standard', 'audit-report-standard'].includes(id)),
+        preferred_skills: primarySkills,
+        done_when: '已说明问题属于首屏、运行时还是资源层，并把现象与证据对应起来。',
+      },
+      {
+        artifact: 'priority-suggestions',
+        required_rules: ruleIds.filter((id) => ['audit-report-standard'].includes(id)),
+        preferred_skills: primarySkills,
+        done_when: '已给出最值得优先处理的优化顺序，并说明哪些情况应升级为完整变更。',
+      },
+    ];
+  }
+
   if (roleId === 'requirement-analyst') {
     return [
       {
@@ -2473,7 +2544,7 @@ function buildArtifactContract(roleId, roleRuleContract, roleSkillContract, flow
   return [];
 }
 
-function buildSkillSelectionPolicy(roleId, roleSkillContract) {
+function buildSkillSelectionPolicy(roleId, roleSkillContract, flowId = DEFAULT_FLOW_ID) {
   const primaryOrder = Array.isArray(roleSkillContract?.primary_skills) ? roleSkillContract.primary_skills : [];
   const ruleFirst = '当项目规则、repo_conventions 与 skill 示例冲突时，以规则与仓库事实为准，skill 只负责给出执行方法。';
 
@@ -2514,6 +2585,41 @@ function buildSkillSelectionPolicy(roleId, roleSkillContract) {
     };
   }
 
+  if (roleId === 'unit-test-specialist') {
+    return {
+      primary_order: primaryOrder,
+      use_when: [
+        { when: flowId === QUICK_FIX_FLOW_ID ? 'quick-fix 涉及 store、工具函数、边界逻辑或明显回归风险' : '工具函数、store、复杂逻辑存在回归风险', skills: ['create-test'] },
+      ],
+      fallback_rule: flowId === QUICK_FIX_FLOW_ID
+        ? '先基于 bugfix.md 与 implementation-notes.md 判断是否必须补测，再决定是补测试建议还是要求升级流程。'
+        : '先判断哪些逻辑必须被测试保护，再决定是否启用 create-test。',
+    };
+  }
+
+  if (roleId === 'verification-reviewer') {
+    return {
+      primary_order: primaryOrder,
+      use_when: [
+        { when: '页面/UI 需要实核或补强验收证据', skills: ['ui-verification'] },
+        { when: '交互、体验或设计规范需要复核', skills: ['web-design-guidelines'] },
+      ],
+      fallback_rule: flowId === QUICK_FIX_FLOW_ID
+        ? 'quick-fix 下优先读取 bugfix.md、implementation-notes.md 与 checklist.md（若已存在），只补强验收证据，不重新定义需求。'
+        : ruleFirst,
+    };
+  }
+
+  if (roleId === 'performance-auditor') {
+    return {
+      primary_order: primaryOrder,
+      use_when: [],
+      fallback_rule: flowId === QUICK_FIX_FLOW_ID
+        ? '当前没有专门性能 skill 时，先依据现象描述、实现说明和相关代码给出轻量审计结论；若问题超出小修正边界，直接建议升级主流程。'
+        : '当前没有专门性能 skill 时，优先依据规则、实现说明和性能现象给出证据化优先级建议。',
+    };
+  }
+
   if (roleId === 'archive-change') {
     return {
       primary_order: primaryOrder,
@@ -2545,6 +2651,30 @@ function buildHandoffChecklist(roleId, repoConventions, flowId = DEFAULT_FLOW_ID
       'checklist.md 已区分通过 / 未通过 / 阻断项 / 证据 / 是否放行。',
       'iterations.md 已记录问题、修正动作、残留风险和下轮提醒。',
       '若发现需求已越出 quick-fix 边界，已明确阻断并要求升级到完整 OpenSpec 主流程。',
+    ];
+  }
+
+  if (flowId === QUICK_FIX_FLOW_ID && roleId === 'unit-test-specialist') {
+    return [
+      '已基于 bugfix.md、implementation-notes.md 和相关代码判断是否必须补测。',
+      '若仅给测试建议，已写清不立即补测的风险和优先级。',
+      '若发现问题已超出 quick-fix 边界，已提醒 code-guardian 或 task-orchestrator 升级主流程。',
+    ];
+  }
+
+  if (flowId === QUICK_FIX_FLOW_ID && roleId === 'verification-reviewer') {
+    return [
+      '已基于 bugfix.md、implementation-notes.md 和 checklist.md（若存在）补强验收证据。',
+      '没有把轻量复核重新扩写成需求澄清或方案重定义。',
+      '若验证证据仍不足，已明确指出缺口与残留风险。',
+    ];
+  }
+
+  if (flowId === QUICK_FIX_FLOW_ID && roleId === 'performance-auditor') {
+    return [
+      '已明确性能问题属于首屏、运行时或资源层中的哪一类。',
+      '已给出轻量优先级建议，而不是泛化罗列所有性能优化项。',
+      '若问题需要架构级改造或跨模块重构，已明确建议升级到完整变更流程。',
     ];
   }
 
@@ -2585,7 +2715,7 @@ function buildHandoffChecklist(roleId, repoConventions, flowId = DEFAULT_FLOW_ID
   return [];
 }
 
-function buildOptionalRoleTriggers(roleId) {
+function buildOptionalRoleTriggers(roleId, flowId = DEFAULT_FLOW_ID) {
   if (roleId === 'requirement-analyst') {
     return [
       { role_id: 'design-collaborator', use_when: '输入包含设计稿、视觉还原、像素级交互或复杂 UI 约束，需要先把设计歧义收口。' },
@@ -2594,6 +2724,12 @@ function buildOptionalRoleTriggers(roleId) {
   }
 
   if (roleId === 'frontend-implementer') {
+    if (flowId === QUICK_FIX_FLOW_ID) {
+      return [
+        { role_id: 'unit-test-specialist', use_when: 'quick-fix 涉及 store、工具函数、边界逻辑修复，或明显存在回归风险，需要补最小测试策略。' },
+        { role_id: 'performance-auditor', use_when: 'quick-fix 明确命中列表卡顿、首屏慢、动画/滚动掉帧或用户直接反馈性能退化。' },
+      ];
+    }
     return [
       { role_id: 'unit-test-specialist', use_when: '改动涉及 store、复杂逻辑、关键回归路径，且现有测试不足以覆盖风险。' },
       { role_id: 'performance-auditor', use_when: '页面存在大列表、首屏卡顿、性能指标退化或明确性能目标。' },
@@ -2601,6 +2737,13 @@ function buildOptionalRoleTriggers(roleId) {
   }
 
   if (roleId === 'code-guardian') {
+    if (flowId === QUICK_FIX_FLOW_ID) {
+      return [
+        { role_id: 'verification-reviewer', use_when: '轻流程需要更强验收证据、多人复核或现有 history 产物不足以支撑放行。' },
+        { role_id: 'unit-test-specialist', use_when: '守护阶段识别出 store、工具函数、边界逻辑修复或明显回归风险，需要补最小测试建议。' },
+        { role_id: 'performance-auditor', use_when: '守护阶段识别出首屏慢、列表卡顿、动画/滚动掉帧等性能症状，需要补轻量性能结论。' },
+      ];
+    }
     return [
       { role_id: 'verification-reviewer', use_when: '交付需要更强验收证据、多人协作确认或现有验证口径不完整。' },
       { role_id: 'unit-test-specialist', use_when: '规则检查命中工具函数、store 或复杂逻辑未补测，需补充测试策略。' },
@@ -2664,15 +2807,27 @@ function buildRoleSpecificContract(
     required_rules: roleRuleContract.source_rules.map((item) => item.path),
     repo_alignment: roleRuleContract.repo_specific,
     artifact_contract: buildArtifactContract(roleId, roleRuleContract, roleSkillContract, flowId),
-    skill_selection_policy: buildSkillSelectionPolicy(roleId, roleSkillContract),
+    skill_selection_policy: buildSkillSelectionPolicy(roleId, roleSkillContract, flowId),
     handoff_checklist: buildHandoffChecklist(roleId, repoConventions, flowId),
-    optional_role_triggers: buildOptionalRoleTriggers(roleId),
+    optional_role_triggers: buildOptionalRoleTriggers(roleId, flowId),
   };
 
   if (flowId === QUICK_FIX_FLOW_ID && roleId === 'frontend-implementer') {
     return {
       ...base,
       summary: '按用户输入与 bugfix.md 完成最小修复，不创建新的 OpenSpec change，不擅自扩大需求边界。',
+      bugfix_route_contract: buildBugfixRouteContract(),
+      quick_fix_boundary: [
+        '只允许处理单页面、单组件、单模块中的 bug、样式、文案、小交互修复',
+        '输出固定为 code + bugfix.md + implementation-notes.md',
+        '优先按规则判断仍属小修正，再选最小 skill 路径实现',
+      ],
+      upgrade_to_full_change_when: [
+        '需要新增真实 API、路由、全局状态',
+        '需要改动需求边界、接口边界或验收口径',
+        '涉及权限、支付、风控、合规或其他中高风险逻辑',
+      ],
+      expected_outputs: ['code', 'bugfix.md', 'implementation-notes.md'],
       implementation_focus: [
         '优先修复单页面、单组件或单模块中的 bug、样式、文案、小交互问题',
         repoConventions.viewsDir ? `页面落点继续对齐 ${repoConventions.viewsDir}` : '页面落点继续对齐现有项目结构',
@@ -2693,6 +2848,23 @@ function buildRoleSpecificContract(
     return {
       ...base,
       summary: '基于 bugfix.md、implementation-notes.md、代码与验证结果做轻量放行判断；越界时阻断并要求升级主流程。',
+      bugfix_route_contract: buildBugfixRouteContract(),
+      quick_fix_boundary: [
+        '仍按低风险小需求守门，不把轻流程当作跳过验证的捷径',
+        '只对当前修复范围给结论，不顺势扩写需求或方案',
+        'history 产物和验证证据不足时不能放行',
+      ],
+      upgrade_to_full_change_when: [
+        '守护阶段发现新增 API、路由、store 或跨模块范围扩张',
+        '验收口径或需求边界已经变化，需要回到 requirement-analyst',
+        '残留风险已超出 quick-fix 可接受范围',
+      ],
+      bugfix_blocking_checks: [
+        '是否仍属于低风险小需求',
+        '是否偷偷新增 API、路由、store',
+        '是否改变验收口径或需求范围',
+        '是否需要升级回完整 OpenSpec 主流程',
+      ],
       review_focus: [
         '修复是否仍限定在低风险小需求边界内',
         '代码落点、样式变量、路由/API 约束是否仍符合仓库规范',
@@ -2707,6 +2879,69 @@ function buildRoleSpecificContract(
       output_requirements: [
         'checklist.md 必须使用轻量结构，但仍要明确证据和放行结论。',
         'iterations.md 必须记录问题、修正动作、残留风险与是否建议升级主流程。',
+      ],
+    };
+  }
+
+  if (flowId === QUICK_FIX_FLOW_ID && roleId === 'unit-test-specialist') {
+    return {
+      ...base,
+      summary: '基于 bugfix.md、implementation-notes.md 和相关代码判断 quick-fix 是否必须补测，并给最小测试策略。',
+      quick_fix_boundary: [
+        '仅围绕当前修复涉及的 store、工具函数、边界逻辑和回归路径给建议',
+        '不把轻量补测默认扩成全量测试重构',
+      ],
+      upgrade_to_full_change_when: [
+        '要补的测试已经暴露出需求边界、接口边界或架构职责变化',
+        '测试缺口意味着当前修复并非低风险小改动',
+      ],
+      expected_outputs: ['unit-test-suggestions'],
+      input_priority: ['bugfix.md', 'implementation-notes.md', '相关代码', '现有测试'],
+      must_resolve: [
+        '指出哪些逻辑必须被测试保护，哪些只需记录残留风险',
+        '说明建议补测的落点、断言重点和不立即补测的影响',
+      ],
+    };
+  }
+
+  if (flowId === QUICK_FIX_FLOW_ID && roleId === 'verification-reviewer') {
+    return {
+      ...base,
+      summary: '在 quick-fix 下补强验收证据与验证口径，不重新定义需求。',
+      quick_fix_boundary: [
+        '优先读取 bugfix.md、implementation-notes.md 与 checklist.md（若存在）',
+        '只补强交付证据，不倒推需求或方案重写',
+      ],
+      upgrade_to_full_change_when: [
+        '现有 history 产物不足以支撑验收，且补证据已经变成重新定义需求',
+        '验证缺口暴露出范围或验收口径变化，需要升级到完整 OpenSpec',
+      ],
+      expected_outputs: ['verification-review-notes', 'acceptance-risks'],
+      input_priority: ['bugfix.md', 'implementation-notes.md', 'checklist.md', '相关页面代码'],
+      must_resolve: [
+        '指出现有轻流程证据是否足以支撑放行',
+        '明确仍需补充的验证动作、截图或残留风险',
+      ],
+    };
+  }
+
+  if (flowId === QUICK_FIX_FLOW_ID && roleId === 'performance-auditor') {
+    return {
+      ...base,
+      summary: '在 quick-fix 下给出轻量性能诊断与优先级建议，判断是否仍可保持小修正语义。',
+      quick_fix_boundary: [
+        '只针对当前性能症状给判断和优先级，不发散成完整性能治理',
+        '优先基于现象描述、实现说明和相关页面代码形成结论',
+      ],
+      upgrade_to_full_change_when: [
+        '性能问题需要跨模块重构、架构调整或长期专项治理',
+        '性能退化已经超出 quick-fix 可接受范围',
+      ],
+      expected_outputs: ['performance-audit-notes', 'priority-suggestions'],
+      input_priority: ['性能现象描述', 'implementation-notes.md', '相关页面代码'],
+      must_resolve: [
+        '明确性能问题属于首屏、运行时还是资源层',
+        '给出最值得优先处理的建议，并说明是否需要升级主流程',
       ],
     };
   }
@@ -3205,6 +3440,12 @@ function buildExpertExpectedOutput(dispatch, writes, runtimePaths, deliveryProfi
     } else if (dispatch.role?.id === 'code-guardian') {
       outputs.push('完成 .ai-spec/history/<run-id>/checklist.md');
       outputs.push('完成 .ai-spec/history/<run-id>/iterations.md');
+    } else if (dispatch.role?.id === 'unit-test-specialist') {
+      outputs.push('在 expert-execution.summary 中给出 unit-test-suggestions 与边界场景建议');
+    } else if (dispatch.role?.id === 'verification-reviewer') {
+      outputs.push('在 expert-execution.summary 中给出 verification-review-notes 与 acceptance-risks');
+    } else if (dispatch.role?.id === 'performance-auditor') {
+      outputs.push('在 expert-execution.summary 中给出 performance-audit-notes 与 priority-suggestions');
     }
 
     outputs.push(`写入 ${runtimePaths.tmpCurrentExecution.relPath}`);
@@ -3258,7 +3499,7 @@ function resolveFlowRoleTargets(flowId, roleId, currentRun) {
 
   if (['unit-test-specialist', 'verification-reviewer', 'performance-auditor'].includes(roleId)) {
     return {
-      reads: [artifacts.bugfix, artifacts.implementation_notes].filter(Boolean),
+      reads: [artifacts.bugfix, artifacts.implementation_notes, artifacts.checklist].filter(Boolean),
       writes: [],
     };
   }
@@ -4122,7 +4363,8 @@ function buildExpertTurn(targetDir, status, currentArtifacts) {
     } else {
       const isProjectContext = resolvedValue === 'context/PROJECT.md';
       const isOpenSpecPath = resolvedValue.startsWith('openspec/');
-      if (isProjectContext || isOpenSpecPath) {
+      const isConcretePath = resolvedValue.includes('/');
+      if (isProjectContext || isOpenSpecPath || isConcretePath) {
         reads.push(buildReadableTarget(targetDir, resolvedValue));
       }
     }
@@ -4267,6 +4509,10 @@ function buildExpertTurn(targetDir, status, currentArtifacts) {
       skill_selection_policy: roleSpecificContract?.skill_selection_policy || null,
       handoff_checklist: roleSpecificContract?.handoff_checklist || [],
       optional_role_triggers: roleSpecificContract?.optional_role_triggers || [],
+      bugfix_route_contract: roleSpecificContract?.bugfix_route_contract || null,
+      quick_fix_boundary: roleSpecificContract?.quick_fix_boundary || null,
+      upgrade_to_full_change_when: roleSpecificContract?.upgrade_to_full_change_when || null,
+      bugfix_blocking_checks: roleSpecificContract?.bugfix_blocking_checks || null,
       archive_preflight: roleSpecificContract?.archive_preflight || null,
       analysis_contract: dispatch.role?.id === 'requirement-analyst'
         ? roleSpecificContract

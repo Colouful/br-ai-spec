@@ -32,18 +32,32 @@ handoff_to:
 - 对照需求目标检查验证口径
 - 发现“代码完成但验收不完整”的问题
 - 强化交付前的验证闭环
+- 在 quick-fix 模式下只补强验收证据，不重新定义需求边界
 
 ## 建议输入
 
 - `proposal.md`
 - `tasks.md`
 - `checklist.md`
+- 若当前 flow 是 `bugfix-to-verification`，优先读取 `.ai-spec/history/<run-id>/bugfix.md / implementation-notes.md / checklist.md`
 
 ## 预期输出
 
 - 验证评审意见
 - 验收风险点
 - 需要补充的验证项
+
+## 双模式说明
+
+### OpenSpec 模式
+
+- 读取 `proposal/tasks/checklist`
+- 对照需求与任务口径补验证缺口
+
+### Quick-fix 模式
+
+- 读取 `.ai-spec/history/<run-id>/bugfix.md / implementation-notes.md / checklist.md`
+- 目标是补强轻流程的验收证据，不重写问题定义
 
 ## 启用条件
 

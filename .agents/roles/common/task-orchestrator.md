@@ -141,6 +141,22 @@ handoff_to:
 - 若同时存在多个 open change 且用户未说明目标，不允许猜测，必须先进入轻确认让用户选 change
 - 动态选专家的详细规则见 `task-orchestrator-routing.md`
 
+### bugfix-to-verification 触发表
+
+| 场景 | 路由结果 | 说明 |
+| --- | --- | --- |
+| bug 修复、样式微调、文案调整、小交互修正 | `quick-fix` | 允许走 `bugfix-to-verification`，直接保留到 `.ai-spec/history/<run-id>/` |
+| 当前 active/open change 内的小修正 | `patch` | 继续复用当前 change，不新开流程 |
+| 当前 active/open change 内影响范围、接口、验收口径 | `scope-delta` | 回到 `requirement-analyst` 做增量收敛 |
+| 归档前发现实现不对、先别归档、改成... | `archive-fix` | 回退到对应专家修正，不进入 archive fast-path |
+| 已归档内容补修 | `followup-patch` | 新开 follow-up patch change，保留父变更关系 |
+| 新增真实 API、路由、全局状态、需求边界变化、验收口径变化、中高风险领域 | `full-change` | 升级回 `prd-to-delivery`，不得继续伪装成快修 |
+
+补充约束：
+
+- 多个 open change 并存时，必须进入 `waiting-confirm`，禁止猜测目标 change
+- quick-fix 只代表“轻量交付”，不代表可以跳过规则、验证或证据留痕
+
 ## 输出标准
 
 至少要给出以下信息：

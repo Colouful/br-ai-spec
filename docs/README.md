@@ -10,6 +10,7 @@
 - [开发最佳实践指南](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/four/开发最佳实践指南.md)
 - [需求示例：从发起到归档](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/four/需求示例-从发起到归档.md)
 - [架构设计与治理说明](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/four/架构设计与治理说明.md)
+- [Hub 资产同步脚本说明](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/four/Hub资产同步脚本说明.md)
 
 ## 入门
 
@@ -20,6 +21,7 @@
 
 - [OpenSpec / 协议流说明](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/openspec-guide.md)
 - [小需求与补丁修正指南](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/four/小需求与补丁修正指南.md)
+- [Hub 资产同步脚本说明](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/four/Hub资产同步脚本说明.md)
 - [协议与专家增强记录](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/paser_three/协议与专家增强记录.md)
 - [主流程专家优化记录](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/paser_three/主流程专家优化记录.md)
 
@@ -61,6 +63,9 @@
 - `docs/four/README.md`
   - 第四阶段主入口
   - 按受众分层的阅读路径
+- `docs/four/Hub资产同步脚本说明.md`
+  - 本地脚本如何同步 skill / rule / role / scenario 到 Hub
+  - 认证、分类、domain 映射与场景覆盖策略
 - `docs/four/开发最佳实践指南.md`
   - 面向普通开发者的上手与实践说明
 - `docs/four/需求示例-从发起到归档.md`

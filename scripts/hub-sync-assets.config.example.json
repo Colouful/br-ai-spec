@@ -1,0 +1,87 @@
+{
+  "hub": {
+    "baseUrl": "http://localhost:3000",
+    "projectDir": "/Users/lizhenwei/workspace/vueworkspace/bairong/skill-q-platform",
+    "adminEmail": "",
+    "adminPassword": "",
+    "adminSessionCookie": "",
+    "adminSecret": "",
+    "agentApiKey": ""
+  },
+  "defaults": {
+    "author": "Hub Admin",
+    "downloadPolicy": "login",
+    "skillCategorySlug": "",
+    "ruleCategorySlug": "",
+    "rolePublishStatus": "draft",
+    "scenarioPublishStatus": "draft",
+    "scenarioRecommendedIdes": ["cursor"],
+    "scenarioSupportedProfiles": ["vue", "react"],
+    "scenarioFeatured": false
+  },
+  "categoryMap": {
+    "skill": {
+      "domain:engineering": "",
+      "domain:testing": ""
+    },
+    "rule": {
+      "domain:governance": "",
+      "domain:documentation": ""
+    }
+  },
+  "domainIdMap": {
+    "engineering": "",
+    "testing": "",
+    "governance": "",
+    "documentation": "",
+    "demand-design": "",
+    "delivery": "",
+    "orchestration": "",
+    "observability": ""
+  },
+  "resources": {
+    "skills": {
+      "create-api": {
+        "categorySlug": "",
+        "name": "",
+        "description": "",
+        "longDescription": "",
+        "tags": [],
+        "supportedProfiles": ["vue", "react"],
+        "downloadPolicy": "login"
+      }
+    },
+    "rules": {
+      "coding-standard": {
+        "categorySlug": "",
+        "name": "",
+        "description": "",
+        "longDescription": "",
+        "tags": []
+      }
+    },
+    "roles": {
+      "task-orchestrator": {
+        "author": "Hub Admin",
+        "publishStatus": "draft",
+        "longDescription": "",
+        "tags": [],
+        "supportedProfiles": ["vue", "react"]
+      }
+    },
+    "scenarios": {
+      "frontend-basic": {
+        "name": "frontend-basic",
+        "description": "前端基础交付场景",
+        "longDescription": "",
+        "publishStatus": "draft",
+        "recommendedIdes": ["cursor"],
+        "optionalRoles": [],
+        "entryRoleSlug": "task-orchestrator",
+        "tags": [],
+        "supportedProfiles": ["vue", "react"],
+        "isFeatured": false
+      }
+    }
+  }
+}

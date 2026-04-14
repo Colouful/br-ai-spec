@@ -244,7 +244,23 @@
       "name": "单元测试专家",
       "status": "active",
       "domains": ["testing"],
-      "source": ".agents/roles/domains/testing/unit-test-specialist.md"
+      "source": ".agents/roles/domains/testing/unit-test-specialist.md",
+      "rule_ids": ["coding-standard", "test-standard", "audit-report-standard"],
+      "skill_priority": ["create-test"],
+      "micro_skill_allowlist": ["create-test"],
+      "rule_contract_profiles": {
+        "default": {
+          "must_follow": [
+            "先判断当前改动是否真的需要补测，再给出最小但有效的测试策略。",
+            "quick-fix 下优先读取 bugfix 与实现说明，不把轻量修复默认升级成完整测试改造。"
+          ],
+          "blocked_when": [
+            "若关键回归路径已经受损但仍拒绝补测或给出测试建议，不得给出“风险可忽略”的判断。"
+          ]
+        }
+      },
+      "required_inputs": ["proposal", "specs", "design", "tasks"],
+      "required_outputs": []
     },
     "e2e-test-specialist": {
       "name": "E2E 测试专家",
@@ -262,7 +278,23 @@
       "name": "验证评审专家",
       "status": "active",
       "domains": ["testing"],
-      "source": ".agents/roles/domains/testing/verification-reviewer.md"
+      "source": ".agents/roles/domains/testing/verification-reviewer.md",
+      "rule_ids": ["style-standard", "test-standard", "audit-report-standard"],
+      "skill_priority": ["ui-verification", "web-design-guidelines"],
+      "micro_skill_allowlist": ["ui-verification", "web-design-guidelines"],
+      "rule_contract_profiles": {
+        "default": {
+          "must_follow": [
+            "验证评审只补强验收证据与验证口径，不重新定义需求边界。",
+            "quick-fix 下优先读取 .ai-spec/history/<run-id>/bugfix.md、implementation-notes.md 与 checklist.md（若已存在）。"
+          ],
+          "blocked_when": [
+            "若关键验收链路没有证据支撑，却仍想给出放行结论，必须维持阻断。"
+          ]
+        }
+      },
+      "required_inputs": ["proposal", "specs", "design", "tasks"],
+      "required_outputs": []
     },
     "pipeline-specialist": {
       "name": "流水线专家",
@@ -304,7 +336,23 @@
       "name": "性能审计专家",
       "status": "active",
       "domains": ["performance"],
-      "source": ".agents/roles/domains/performance/performance-auditor.md"
+      "source": ".agents/roles/domains/performance/performance-auditor.md",
+      "rule_ids": ["coding-standard", "style-standard", "audit-report-standard"],
+      "skill_priority": [],
+      "micro_skill_allowlist": [],
+      "rule_contract_profiles": {
+        "default": {
+          "must_follow": [
+            "先区分首屏、运行时、资源层问题，再给优先级建议，不做泛化性能点评。",
+            "quick-fix 下只给轻量性能判断和升级建议，不替代完整性能改造。"
+          ],
+          "blocked_when": [
+            "若性能问题已明显超出小修正边界，应建议升级主流程，而不是继续当作 quick-fix 放行。"
+          ]
+        }
+      },
+      "required_inputs": ["proposal", "specs", "design", "tasks"],
+      "required_outputs": []
     },
     "vitals-analyst": {
       "name": "性能指标专家",

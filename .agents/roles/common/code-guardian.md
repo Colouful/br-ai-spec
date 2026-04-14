@@ -38,6 +38,7 @@ handoff_to: []
 ## 工作原则
 
 - 以规则、specs/design、任务目标和验收标准为准
+- 若当前 flow 是 `bugfix-to-verification`，必须同时把 quick-fix 边界核查写进结论
 - 先发现问题，再判断严重程度和是否阻断交付
 - 把结果沉淀成 `checklist.md` 和 `iterations.md`
 - 对显著风险给出明确结论，不写模糊评价
@@ -74,6 +75,27 @@ handoff_to: []
   - `06-路由规范`：路由目录、懒加载、meta、唯一命名
   - `09-样式规范`：主题变量、作用域样式、禁止硬编码颜色
 
+## 双模式执行
+
+### OpenSpec 模式
+
+- 以 `proposal/specs/design/tasks` 和当前实现为主输入
+- 输出 `openspec/changes/<change-id>/checklist.md` 与 `iterations.md`
+- 继续承担归档前放行门禁
+
+### Quick-fix 模式
+
+- 以 `.ai-spec/history/<run-id>/bugfix.md`、`implementation-notes.md`、相关代码和验证结果为主输入
+- 输出 `.ai-spec/history/<run-id>/checklist.md` 与 `.ai-spec/history/<run-id>/iterations.md`
+- 重点职责是做 quick-fix 边界守门，而不是重新定义需求
+
+Quick-fix 模式必须显式检查：
+
+- 是否仍属于低风险小需求
+- 是否偷偷新增 API、路由、store
+- 是否改变验收口径或需求范围
+- 是否需要升级回完整 OpenSpec 主流程
+
 ## 输出标准
 
 `checklist.md` 至少应包含：
@@ -84,6 +106,7 @@ handoff_to: []
 - 阻断项和非阻断项
 - 检查证据
 - 是否建议进入下一阶段
+- 在 quick-fix 模式下，额外写明“是否仍允许保持 quick-fix”与“是否建议升级到 `prd-to-delivery`”
 
 `iterations.md` 至少应包含：
 
@@ -92,6 +115,7 @@ handoff_to: []
 - 修正动作
 - 仍需关注的残留风险
 - 对下轮协作的提醒
+- 在 quick-fix 模式下，额外写明“是否需要升级主流程”
 
 ### micro（微型交付）补充要求
 

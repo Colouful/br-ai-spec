@@ -50,7 +50,15 @@ function writeOpenChange(targetDir, changeId) {
   writeProjectFile(targetDir, `openspec/changes/${changeId}/specs/ui/spec.md`, `# ${changeId} spec`);
 }
 
-function bootstrapQuickFixRun(targetDir, runId, rawInput) {
+function bootstrapQuickFixRun(targetDir, runId, rawInput, options = {}) {
+  const firstHandoff = options.first_handoff || 'frontend-implementer';
+  const activatedOptionalRoles = Array.isArray(options.activated_optional_roles)
+    ? options.activated_optional_roles
+    : [];
+  const skippedOptionalRoles = Array.isArray(options.skipped_optional_roles)
+    ? options.skipped_optional_roles
+    : ['unit-test-specialist', 'verification-reviewer', 'performance-auditor']
+      .filter((roleId) => !activatedOptionalRoles.includes(roleId));
   writeProjectFile(targetDir, '.ai-spec/internal/tmp/task-orchestrator-turn.json', JSON.stringify({
     kind: 'run-plan',
     schema_version: 1,
@@ -75,10 +83,10 @@ function bootstrapQuickFixRun(targetDir, runId, rawInput) {
     },
     plan: {
       required_roles: ['frontend-implementer', 'code-guardian'],
-      activated_optional_roles: [],
-      skipped_optional_roles: ['unit-test-specialist', 'verification-reviewer', 'performance-auditor'],
+      activated_optional_roles: activatedOptionalRoles,
+      skipped_optional_roles: skippedOptionalRoles,
       approval_gates: [],
-      first_handoff: 'frontend-implementer',
+      first_handoff: firstHandoff,
       delivery_profile: 'micro',
       artifact_profile: 'compact',
     },
@@ -110,6 +118,9 @@ function main() {
   assert.strictEqual(result.turn.guidance.route_decision.selected_flow, 'bugfix-to-verification');
   assert.strictEqual(result.turn.guidance.route_decision.enter_openspec, false);
   assert.strictEqual(result.turn.guidance.route_decision.next_expert, 'frontend-implementer');
+  assert.ok(Array.isArray(result.turn.guidance.bugfix_route_contract.allowed_as_quick_fix));
+  assert.ok(result.turn.guidance.quick_fix_boundary.some((item) => item.includes('单页面')));
+  assert.ok(result.turn.guidance.upgrade_to_full_change_when.some((item) => item.includes('真实 API')));
 
   const fullChangeTarget = createWorkspace('br-ai-spec-full-change-');
   result = protocolWorkflow.advanceProtocolStep({
@@ -176,6 +187,9 @@ function main() {
     `.ai-spec/history/${runId}/implementation-notes.md`,
   ]);
   assert.strictEqual(workflow.turn.guidance.openspec_rules.enabled, false);
+  assert.ok(workflow.turn.guidance.quick_fix_boundary.some((item) => item.includes('单页面')));
+  assert.ok(workflow.turn.guidance.upgrade_to_full_change_when.some((item) => item.includes('全局状态')));
+  assert.ok(workflow.turn.guidance.optional_role_triggers.some((item) => item.role_id === 'unit-test-specialist'));
 
   writeProjectFile(runtimeTarget, `.ai-spec/history/${runId}/bugfix.md`, '# Bugfix');
   writeProjectFile(runtimeTarget, `.ai-spec/history/${runId}/implementation-notes.md`, '# Notes');
@@ -210,6 +224,9 @@ function main() {
     `.ai-spec/history/${runId}/iterations.md`,
   ]);
   assert.strictEqual(workflow.turn.guidance.route_decision.route_decision, 'quick-fix');
+  assert.ok(workflow.turn.guidance.bugfix_blocking_checks.some((item) => item.includes('低风险小需求')));
+  assert.ok(workflow.turn.guidance.quick_fix_boundary.some((item) => item.includes('低风险小需求')));
+  assert.ok(workflow.turn.guidance.optional_role_triggers.some((item) => item.role_id === 'verification-reviewer'));
 
   writeProjectFile(runtimeTarget, `.ai-spec/history/${runId}/checklist.md`, '# Checklist');
   writeProjectFile(runtimeTarget, `.ai-spec/history/${runId}/iterations.md`, '# Iterations');
@@ -241,6 +258,63 @@ function main() {
   assert.strictEqual(currentRun.task.route_decision, 'quick-fix');
   assert.strictEqual(currentRun.artifacts.bugfix, `.ai-spec/history/${runId}/bugfix.md`);
   assert.strictEqual(currentRun.artifacts.checklist, `.ai-spec/history/${runId}/checklist.md`);
+
+  const quickFixOptionalCases = [
+    {
+      roleId: 'unit-test-specialist',
+      rawInput: '这个 store 的边界逻辑修一下，顺便看看回归风险',
+      activatedOptionalRoles: ['unit-test-specialist'],
+      expectedReadPaths: [` .ai-spec/history/__RUN__/bugfix.md`, ` .ai-spec/history/__RUN__/implementation-notes.md`],
+      assertGuidance(workflowTurn) {
+        assert.ok(workflowTurn.guidance.quick_fix_boundary.some((item) => item.includes('store')));
+        assert.ok(workflowTurn.guidance.skill_selection_policy.use_when.some((item) => item.skills.includes('create-test')));
+      },
+    },
+    {
+      roleId: 'verification-reviewer',
+      rawInput: '这个小修正我需要再复核一下验收证据',
+      activatedOptionalRoles: ['verification-reviewer'],
+      expectedReadPaths: [
+        ` .ai-spec/history/__RUN__/bugfix.md`,
+        ` .ai-spec/history/__RUN__/implementation-notes.md`,
+        ` .ai-spec/history/__RUN__/checklist.md`,
+      ],
+      assertGuidance(workflowTurn) {
+        assert.ok(workflowTurn.guidance.quick_fix_boundary.some((item) => item.includes('bugfix.md')));
+        assert.ok(workflowTurn.guidance.skill_selection_policy.use_when.some((item) => item.skills.includes('ui-verification')));
+      },
+    },
+    {
+      roleId: 'performance-auditor',
+      rawInput: '这个列表滚动有点掉帧，先做个轻量性能判断',
+      activatedOptionalRoles: ['performance-auditor'],
+      expectedReadPaths: [` .ai-spec/history/__RUN__/bugfix.md`, ` .ai-spec/history/__RUN__/implementation-notes.md`],
+      assertGuidance(workflowTurn) {
+        assert.ok(workflowTurn.guidance.quick_fix_boundary.some((item) => item.includes('性能症状')));
+        assert.ok(workflowTurn.guidance.upgrade_to_full_change_when.some((item) => item.includes('跨模块重构')));
+      },
+    },
+  ];
+
+  for (const item of quickFixOptionalCases) {
+    const optionalTarget = createWorkspace(`br-ai-spec-${item.roleId}-`);
+    const optionalRunId = `run_20260414_${item.roleId.replace(/[^a-z]/g, '').slice(0, 8)}_quickfix`;
+    report = bootstrapQuickFixRun(optionalTarget, optionalRunId, item.rawInput, {
+      first_handoff: item.roleId,
+      activated_optional_roles: item.activatedOptionalRoles,
+    });
+    assert.strictEqual(report.applied.adapter_action, 'bootstrap');
+    workflow = protocolWorkflow.advanceProtocolStep({ target: optionalTarget });
+    assert.strictEqual(workflow.turn.mode, 'execute');
+    assert.strictEqual(workflow.turn.actor.id, item.roleId);
+    assert.strictEqual(workflow.turn.guidance.openspec_rules.enabled, false);
+    const readPaths = workflow.turn.reads.map((target) => target.rel_path).filter(Boolean);
+    for (const rawPath of item.expectedReadPaths) {
+      const expectedPath = rawPath.trim().replace('__RUN__', optionalRunId);
+      assert.ok(readPaths.includes(expectedPath), `${item.roleId} should read ${expectedPath}`);
+    }
+    item.assertGuidance(workflow.turn);
+  }
 
   console.log('small request routing test passed: quick-fix, patch, scope-delta, waiting-confirm, and lightweight runtime flow all work');
 }

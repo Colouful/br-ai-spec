@@ -42,6 +42,7 @@ handoff_to:
 ## 工作原则
 
 - 先读 `proposal.md`、`specs/`、`design.md` 和 `tasks.md`，再动代码
+- 若当前 flow 是 `bugfix-to-verification`，优先读 `bugfix.md`、用户原始输入和仓库规则，再做最小修复
 - 先按 `rules` 和 `repo_conventions` 判断目录、路由、API、状态、样式落点，再选 skill
 - 项目规则高于 skill 示例；如果 skill 样例与当前项目约定冲突，以规则为准
 - 优先复用现有规则、组件、目录结构和技能
@@ -72,6 +73,27 @@ handoff_to:
 - `role_rule_contract` 中的 source rules 属于硬约束；若实现与规则冲突，应回写 residual risk 或上抛，而不是直接绕过
 - 若进入 `implementation_contract.auto_fix` 模式，优先依据 `latest_verification` 与失败步骤修补，不把运行时报错扩写成新需求或新的 OpenSpec 任务
 
+## 双模式执行
+
+### OpenSpec 模式
+
+- 输入以 `proposal.md / specs/ / design.md / tasks.md` 为准
+- 输出以 `code + implementation-notes` 为准
+- 不得跳过需求收敛产物直接写实现
+
+### Quick-fix 模式
+
+- 输入优先读 `.ai-spec/history/<run-id>/bugfix.md`、用户原始输入、仓库规则和相关代码
+- 输出固定为 `code + bugfix.md + implementation-notes.md`
+- 不要求 `proposal/specs/design/tasks`
+- 只允许做单页面、单组件、单模块的小修复，不得把轻量修正静默扩成新需求
+
+Quick-fix 模式硬边界：
+
+- 禁止新增真实 API、路由、全局状态、权限、支付、风控、合规逻辑
+- 禁止顺手扩 scope、补新需求、重写方案边界
+- 一旦识别出范围变化、接口边界变化或验收口径变化，必须回抛 `task-orchestrator`
+
 ## 技能选择原则
 
 - 页面任务：`create-view -> create-route -> theme-variables`
@@ -80,6 +102,7 @@ handoff_to:
 - 状态任务：`create-store`
 - 混合任务：先完成主 skill，再按需使用 `execute-task`
 - 若只是因为 skill 示例“更完整”而想扩 scope，必须停止并回到规则和任务边界
+- 在 quick-fix 模式下，先按规则判断是否仍属于小修正，再按最小 skill 路径实现，不为“技能完整性”扩大改动面
 
 ## 输出标准
 
@@ -97,6 +120,7 @@ handoff_to:
 - 优先做最小必要改动
 - 优先复用既有目录、变量、组件和 mock 约定
 - 实现说明保持短版，只保留变更点、验证结果和残留风险
+- 若 flow 为 `bugfix-to-verification`，实现说明必须同步到 `.ai-spec/history/<run-id>/implementation-notes.md`
 
 ## 可选专家触发
 
