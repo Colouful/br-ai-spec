@@ -70,6 +70,13 @@ function readJsonFile(filePath, label) {
   }
 }
 
+function readOptionalJsonFile(filePath, label) {
+  if (!fs.existsSync(filePath)) {
+    return null;
+  }
+  return readJsonFile(filePath, label);
+}
+
 function buildSupportedProfileSet(profilesRegistry) {
   return new Set(getProfileIds(profilesRegistry));
 }
@@ -472,6 +479,9 @@ function validateRoleAndFlowReferences(rolesRegistry, flowsRegistry, report, ids
 }
 
 function validateScenarioPackagesRegistry(scenariosRegistry, report, ids, supportedProfiles) {
+  if (!scenariosRegistry) {
+    return;
+  }
   if (typeof scenariosRegistry.version !== 'number') {
     report.errors.push('scenario-packages.json version must be a number');
   }
@@ -543,16 +553,18 @@ function validateRegistry(sourceDir) {
   const skillsRegistry = readJsonFile(skillsPath, 'skills.json');
   const rolesRegistry = readJsonFile(rolesPath, 'roles.json');
   const flowsRegistry = readJsonFile(flowsPath, 'flows.json');
-  const scenariosRegistry = readJsonFile(scenariosPath, 'scenario-packages.json');
+  const scenariosRegistry = readOptionalJsonFile(scenariosPath, 'scenario-packages.json');
 
   report.checked_files.push(
     '.agents/registry/profiles.json',
     '.agents/registry/rules.json',
     '.agents/registry/skills.json',
     '.agents/registry/roles.json',
-    '.agents/registry/flows.json',
-    '.agents/registry/scenario-packages.json'
+    '.agents/registry/flows.json'
   );
+  if (scenariosRegistry) {
+    report.checked_files.push('.agents/registry/scenario-packages.json');
+  }
 
   const profileIds = validateProfilesRegistry(sourceDir, profilesRegistry, report);
   const supportedProfiles = buildSupportedProfileSet(profilesRegistry);
@@ -580,7 +592,7 @@ function validateRegistry(sourceDir) {
     skill_count: skillIds.size,
     role_count: roleIds.size,
     flow_count: flowIds.size,
-    scenario_package_count: Object.keys(scenariosRegistry.scenario_packages || {}).length,
+    scenario_package_count: scenariosRegistry ? Object.keys(scenariosRegistry.scenario_packages || {}).length : 0,
   };
 
   return report;

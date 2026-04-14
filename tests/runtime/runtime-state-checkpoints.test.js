@@ -124,117 +124,158 @@ function readCheckpoint(targetDir, checkpointRelPath) {
   return JSON.parse(fs.readFileSync(path.join(targetDir, checkpointRelPath), 'utf8'));
 }
 
+function withCheckpointPersistence(fn) {
+  const previousPersist = process.env.AI_SPEC_PERSIST_CHECKPOINTS;
+  const previousDebug = process.env.BR_AI_SPEC_DEBUG_CHECKPOINTS;
+  process.env.AI_SPEC_PERSIST_CHECKPOINTS = '1';
+  delete process.env.BR_AI_SPEC_DEBUG_CHECKPOINTS;
+
+  try {
+    fn();
+  } finally {
+    if (previousPersist === undefined) {
+      delete process.env.AI_SPEC_PERSIST_CHECKPOINTS;
+    } else {
+      process.env.AI_SPEC_PERSIST_CHECKPOINTS = previousPersist;
+    }
+
+    if (previousDebug === undefined) {
+      delete process.env.BR_AI_SPEC_DEBUG_CHECKPOINTS;
+    } else {
+      process.env.BR_AI_SPEC_DEBUG_CHECKPOINTS = previousDebug;
+    }
+  }
+}
+
 function main() {
-  const targetDir = createWorkspace();
-  const changeId = 'runtime-checkpoint-demo';
-  const runId = 'run_20260409_100000_checkpoint';
+  const lightweightTargetDir = createWorkspace();
+  const lightweightChangeId = 'runtime-events-default-demo';
+  const lightweightRunId = 'run_20260409_095000_events';
 
   let result = runtimeState.bootstrapRunState({
-    target: targetDir,
-    payloadData: buildBootstrapPayload(runId, changeId),
+    target: lightweightTargetDir,
+    payloadData: buildBootstrapPayload(lightweightRunId, lightweightChangeId),
   });
-  let currentRun = readCurrentRun(targetDir);
-  assert.strictEqual(result.state.run_id, runId);
-  assert.strictEqual(currentRun.checkpoint_count, 1);
-  assert.strictEqual(currentRun.last_checkpoint.event, 'bootstrap');
-  assert.ok(fs.existsSync(path.join(targetDir, '.ai-spec/repo-map.json')));
+  let currentRun = readCurrentRun(lightweightTargetDir);
+  assert.strictEqual(result.state.run_id, lightweightRunId);
+  assert.strictEqual(currentRun.checkpoint_count, 0);
+  assert.strictEqual(currentRun.last_checkpoint, null);
+  assert.ok(!fs.existsSync(path.join(lightweightTargetDir, '.ai-spec', 'checkpoints')));
+  assert.ok(Array.isArray(currentRun.events));
+  assert.strictEqual(currentRun.events[0].type, 'run-created');
 
-  const repoMap = JSON.parse(fs.readFileSync(path.join(targetDir, '.ai-spec/repo-map.json'), 'utf8'));
+  const repoMap = JSON.parse(fs.readFileSync(path.join(lightweightTargetDir, '.ai-spec/repo-map.json'), 'utf8'));
   assert.strictEqual(repoMap.paths.views_dir, 'src/views');
   assert.strictEqual(repoMap.paths.route_modules_dir, 'src/router/modules');
   assert.strictEqual(repoMap.paths.mock_dir, 'src/mock');
 
-  writeOpenSpecArtifacts(targetDir, changeId);
+  withCheckpointPersistence(() => {
+    const targetDir = createWorkspace();
+    const changeId = 'runtime-checkpoint-demo';
+    const runId = 'run_20260409_100000_checkpoint';
 
-  result = runtimeState.handoffRunState({
-    target: targetDir,
-    runId,
-    fromRole: 'requirement-analyst',
-    toRole: 'frontend-implementer',
-    nextRole: 'code-guardian',
+    result = runtimeState.bootstrapRunState({
+      target: targetDir,
+      payloadData: buildBootstrapPayload(runId, changeId),
+    });
+    currentRun = readCurrentRun(targetDir);
+    assert.strictEqual(result.state.run_id, runId);
+    assert.strictEqual(currentRun.checkpoint_count, 1);
+    assert.strictEqual(currentRun.last_checkpoint.event, 'bootstrap');
+    assert.ok(fs.existsSync(path.join(targetDir, '.ai-spec/repo-map.json')));
+
+    writeOpenSpecArtifacts(targetDir, changeId);
+
+    result = runtimeState.handoffRunState({
+      target: targetDir,
+      runId,
+      fromRole: 'requirement-analyst',
+      toRole: 'frontend-implementer',
+      nextRole: 'code-guardian',
+    });
+    currentRun = readCurrentRun(targetDir);
+    assert.strictEqual(currentRun.current_role, 'frontend-implementer');
+    assert.strictEqual(currentRun.checkpoint_count, 2);
+    assert.strictEqual(currentRun.last_checkpoint.event, 'handoff');
+
+    result = runtimeState.gateBlockedRunState({
+      target: targetDir,
+      runId,
+      gate: 'before-archive',
+      toRole: 'code-guardian',
+      nextRole: 'archive-change',
+      blockedByRole: 'code-guardian',
+      resumeToRole: 'archive-change',
+      requiredUserAction: '明确是否执行归档',
+      blockedReason: '归档前需要人工确认',
+    });
+    currentRun = readCurrentRun(targetDir);
+    assert.strictEqual(currentRun.status, 'waiting-approval');
+    assert.strictEqual(currentRun.pending_gate, 'before-archive');
+    assert.strictEqual(currentRun.gate_context.gate_id, 'before-archive');
+    assert.strictEqual(currentRun.gate_context.blocked_by_role, 'code-guardian');
+    assert.strictEqual(currentRun.gate_context.resume_to_role, 'archive-change');
+    assert.strictEqual(currentRun.checkpoint_count, 3);
+    assert.strictEqual(currentRun.last_checkpoint.event, 'gate-blocked');
+    const blockedCheckpointRelPath = currentRun.last_checkpoint.file;
+    const blockedCheckpoint = readCheckpoint(targetDir, blockedCheckpointRelPath);
+    assert.strictEqual(blockedCheckpoint.event, 'gate-blocked');
+    assert.strictEqual(blockedCheckpoint.state.pending_gate, 'before-archive');
+
+    result = runtimeState.approveRunState({
+      target: targetDir,
+      runId,
+      gate: 'before-archive',
+      toRole: 'archive-change',
+    });
+    currentRun = readCurrentRun(targetDir);
+    assert.strictEqual(currentRun.current_role, 'archive-change');
+    assert.strictEqual(currentRun.pending_gate, null);
+    assert.strictEqual(currentRun.checkpoint_count, 4);
+    assert.strictEqual(currentRun.last_checkpoint.event, 'approve');
+
+    result = runtimeState.completeRunState({
+      target: targetDir,
+      runId,
+      toRole: 'archive-change',
+      status: 'success',
+    });
+    currentRun = readCurrentRun(targetDir);
+    assert.strictEqual(currentRun.status, 'success');
+    assert.strictEqual(currentRun.checkpoint_count, 5);
+    assert.strictEqual(currentRun.last_checkpoint.event, 'complete');
+
+    const status = runtimeState.statusRunState({
+      target: targetDir,
+      runId,
+    });
+    assert.strictEqual(status.summary.checkpoint_count, 5);
+    assert.strictEqual(status.summary.last_checkpoint.event, 'complete');
+
+    result = runtimeState.restoreRunState({
+      target: targetDir,
+      runId,
+      checkpoint: path.join(targetDir, blockedCheckpointRelPath),
+    });
+    currentRun = readCurrentRun(targetDir);
+    assert.strictEqual(currentRun.status, 'waiting-approval');
+    assert.strictEqual(currentRun.pending_gate, 'before-archive');
+    assert.strictEqual(currentRun.gate_context.resume_to_role, 'archive-change');
+    assert.strictEqual(currentRun.checkpoint_count, 3);
+    assert.strictEqual(currentRun.last_checkpoint.event, 'gate-blocked');
+    assert.strictEqual(result.state.events.at(-1).type, 'run-restored');
+
+    const checkpointFiles = fs.readdirSync(path.join(targetDir, '.ai-spec', 'checkpoints', runId));
+    assert.deepStrictEqual(checkpointFiles, [
+      '001-bootstrap.json',
+      '002-handoff.json',
+      '003-gate-blocked.json',
+      '004-approve.json',
+      '005-complete.json',
+    ]);
   });
-  currentRun = readCurrentRun(targetDir);
-  assert.strictEqual(currentRun.current_role, 'frontend-implementer');
-  assert.strictEqual(currentRun.checkpoint_count, 2);
-  assert.strictEqual(currentRun.last_checkpoint.event, 'handoff');
 
-  result = runtimeState.gateBlockedRunState({
-    target: targetDir,
-    runId,
-    gate: 'before-archive',
-    toRole: 'code-guardian',
-    nextRole: 'archive-change',
-    blockedByRole: 'code-guardian',
-    resumeToRole: 'archive-change',
-    requiredUserAction: '明确是否执行归档',
-    blockedReason: '归档前需要人工确认',
-  });
-  currentRun = readCurrentRun(targetDir);
-  assert.strictEqual(currentRun.status, 'waiting-approval');
-  assert.strictEqual(currentRun.pending_gate, 'before-archive');
-  assert.strictEqual(currentRun.gate_context.gate_id, 'before-archive');
-  assert.strictEqual(currentRun.gate_context.blocked_by_role, 'code-guardian');
-  assert.strictEqual(currentRun.gate_context.resume_to_role, 'archive-change');
-  assert.strictEqual(currentRun.checkpoint_count, 3);
-  assert.strictEqual(currentRun.last_checkpoint.event, 'gate-blocked');
-  const blockedCheckpointRelPath = currentRun.last_checkpoint.file;
-  const blockedCheckpoint = readCheckpoint(targetDir, blockedCheckpointRelPath);
-  assert.strictEqual(blockedCheckpoint.event, 'gate-blocked');
-  assert.strictEqual(blockedCheckpoint.state.pending_gate, 'before-archive');
-
-  result = runtimeState.approveRunState({
-    target: targetDir,
-    runId,
-    gate: 'before-archive',
-    toRole: 'archive-change',
-  });
-  currentRun = readCurrentRun(targetDir);
-  assert.strictEqual(currentRun.current_role, 'archive-change');
-  assert.strictEqual(currentRun.pending_gate, null);
-  assert.strictEqual(currentRun.checkpoint_count, 4);
-  assert.strictEqual(currentRun.last_checkpoint.event, 'approve');
-
-  result = runtimeState.completeRunState({
-    target: targetDir,
-    runId,
-    toRole: 'archive-change',
-    status: 'success',
-  });
-  currentRun = readCurrentRun(targetDir);
-  assert.strictEqual(currentRun.status, 'success');
-  assert.strictEqual(currentRun.checkpoint_count, 5);
-  assert.strictEqual(currentRun.last_checkpoint.event, 'complete');
-
-  const status = runtimeState.statusRunState({
-    target: targetDir,
-    runId,
-  });
-  assert.strictEqual(status.summary.checkpoint_count, 5);
-  assert.strictEqual(status.summary.last_checkpoint.event, 'complete');
-
-  result = runtimeState.restoreRunState({
-    target: targetDir,
-    runId,
-    checkpoint: path.join(targetDir, blockedCheckpointRelPath),
-  });
-  currentRun = readCurrentRun(targetDir);
-  assert.strictEqual(currentRun.status, 'waiting-approval');
-  assert.strictEqual(currentRun.pending_gate, 'before-archive');
-  assert.strictEqual(currentRun.gate_context.resume_to_role, 'archive-change');
-  assert.strictEqual(currentRun.checkpoint_count, 3);
-  assert.strictEqual(currentRun.last_checkpoint.event, 'gate-blocked');
-  assert.strictEqual(result.state.events.at(-1).type, 'run-restored');
-
-  const checkpointFiles = fs.readdirSync(path.join(targetDir, '.ai-spec', 'checkpoints', runId));
-  assert.deepStrictEqual(checkpointFiles, [
-    '001-bootstrap.json',
-    '002-handoff.json',
-    '003-gate-blocked.json',
-    '004-approve.json',
-    '005-complete.json',
-  ]);
-
-  console.log('runtime-state checkpoints test passed: checkpoint, restore, gate payload, and repo-map work together');
+  console.log('runtime-state checkpoints test passed: default mode stays lightweight, checkpoint mode still supports restore');
 }
 
 main();

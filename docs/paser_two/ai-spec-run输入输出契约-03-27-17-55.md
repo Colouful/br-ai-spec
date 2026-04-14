@@ -218,7 +218,7 @@ ai-spec-auto run . \
 
 当前统一规范见：
 
-- [task-anchor-spec.md](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/.agents/roles/common/task-anchor-spec.md)
+- [task-anchor-spec.md](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/.agents/orchestration/task-anchor-spec.md)
 
 ### 6.6 首轮桥接写盘阶段
 
@@ -232,7 +232,7 @@ ai-spec-auto run . \
 
 对应规范见：
 
-- [task-orchestrator-bootstrap-payload.md](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/.agents/roles/common/task-orchestrator-bootstrap-payload.md)
+- [task-orchestrator-bootstrap-payload.md](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/.agents/orchestration/task-orchestrator-bootstrap-payload.md)
 
 ### 6.7 执行阶段
 
@@ -306,7 +306,7 @@ ai-spec-auto run . \
 
 当前阶段建议主代理的首轮输出统一遵循：
 
-- [task-orchestrator-run-plan-template.md](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/.agents/roles/common/task-orchestrator-run-plan-template.md)
+- [task-orchestrator-run-plan-template.md](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/.agents/orchestration/task-orchestrator-run-plan-template.md)
 
 ```json
 {

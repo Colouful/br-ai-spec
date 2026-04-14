@@ -114,6 +114,11 @@ npx @ex/ai-spec-auto@latest update . --skip-skills --skip-configs --skip-openspe
 
 ## 文档入口
 
+如果只从一个入口开始阅读，优先看第四阶段文档入口。
+
+- [第四阶段文档入口](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/four/README.md)
+- [开发最佳实践指南](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/four/开发最佳实践指南.md)
+- [架构设计与治理说明](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/four/架构设计与治理说明.md)
 - [5 分钟快速上手](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/quick-start.md)
 - [安装指南](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/install-guide.md)
 - [文档索引](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/README.md)

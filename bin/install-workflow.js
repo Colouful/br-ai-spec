@@ -3,7 +3,8 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
-const readline = require('readline/promises');
+const readline = require('readline');
+const readlinePromises = require('readline/promises');
 const {
   readProfilesRegistry,
   resolveProfileId,
@@ -33,12 +34,30 @@ const PROFILE_SUMMARIES = {
   vue: 'Vue 3 + TypeScript + Pinia + Vue Router',
   react: 'React + TypeScript + Antd + Zustand',
 };
+const DEFAULT_CUSTOM_RULE_SELECTION = CUSTOMIZABLE_RULES.map(([name]) => name);
+const INSTALL_STATE_FILE = '.ai-spec/install-state.json';
+const SHARED_CONFIG_FILES = [
+  '.prettierrc.json',
+  '.prettierignore',
+  '.stylelintrc.json',
+  '.stylelintignore',
+  '.eslintrc.js',
+  '.eslintrc.cjs',
+  '.eslintignore',
+  '.lintstagedrc',
+  'commitlint.config.js',
+  '.editorconfig',
+];
+const LINT_DEP_SPECS = ['eslint', 'prettier', 'stylelint', 'stylelint-config-standard'];
+const VUE_LINT_DEP_SPECS = ['stylelint-config-html', 'stylelint-config-recommended-vue', 'postcss-html'];
+const HUSKY_DEP_SPECS = ['husky@8', 'lint-staged@15', '@commitlint/cli@19', '@commitlint/config-conventional@19'];
 
 const C = {
   red: '\x1b[31m',
   green: '\x1b[32m',
   yellow: '\x1b[33m',
   blue: '\x1b[34m',
+  cyan: '\x1b[36m',
   bold: '\x1b[1m',
   reset: '\x1b[0m',
 };
@@ -101,11 +120,17 @@ function normalizeList(value) {
   return [...new Set(String(value).split(',').map((item) => item.trim()).filter(Boolean))];
 }
 
+function normalizeCustomRulesSelection(value) {
+  const allowed = new Set(DEFAULT_CUSTOM_RULE_SELECTION);
+  return normalizeList(value).filter((item) => allowed.has(item));
+}
+
 function parseArgs(argv) {
   const args = [...argv];
   const options = {
     command: '',
     target: '.',
+    manifest: '',
     profile: DEFAULT_PROFILE,
     level: DEFAULT_LEVEL,
     ideFilter: DEFAULT_IDE_FILTER,
@@ -125,7 +150,10 @@ function parseArgs(argv) {
     workspacePackageSubpath: '',
     workspaceRoot: false,
     profileExplicit: false,
+    ideExplicit: false,
     levelExplicit: false,
+    hubOrigin: '',
+    hubFetch: true,
   };
 
   while (args.length > 0) {
@@ -154,6 +182,16 @@ function parseArgs(argv) {
         break;
       case '--ide':
         options.ideFilter = requireArg(arg, args);
+        options.ideExplicit = true;
+        break;
+      case '--manifest':
+        options.manifest = requireArg(arg, args);
+        break;
+      case '--hub-origin':
+        options.hubOrigin = requireArg(arg, args);
+        break;
+      case '--no-hub-fetch':
+        options.hubFetch = false;
         break;
       case '--standard-rules':
         options.rulesStrategy = 'standard';
@@ -337,9 +375,10 @@ function walkFiles(rootDir) {
 
 function copyDirIncremental(sourceDir, destDir, options = {}) {
   if (!fs.existsSync(sourceDir)) {
-    return false;
+    return { copiedAny: false, createdPaths: [] };
   }
   let copiedAny = false;
+  const createdPaths = [];
   for (const filePath of walkFiles(sourceDir)) {
     const rel = path.relative(sourceDir, filePath);
     const firstSegment = rel.split(path.sep)[0];
@@ -349,14 +388,18 @@ function copyDirIncremental(sourceDir, destDir, options = {}) {
     }
     const destPath = path.join(destDir, rel);
     ensureDir(path.dirname(destPath));
+    const existedBefore = fs.existsSync(destPath);
     if (options.skipExisting && fs.existsSync(destPath)) {
       info(`  跳过已存在: ${rel.split(path.sep).join('/')}`);
       continue;
     }
     fs.copyFileSync(filePath, destPath);
     copiedAny = true;
+    if (!existedBefore) {
+      createdPaths.push(rel.split(path.sep).join('/'));
+    }
   }
-  return copiedAny;
+  return { copiedAny, createdPaths };
 }
 
 function createDirLink(targetAbsolute, linkPath) {
@@ -382,9 +425,246 @@ function normalizeIdeFilter(value) {
   return list;
 }
 
+function sameStringList(left, right) {
+  if (left.length !== right.length) return false;
+  return left.every((item, index) => item === right[index]);
+}
+
 function readPackageJson(filePath) {
   if (!fs.existsSync(filePath)) return null;
   return readJson(filePath, 'package.json');
+}
+
+function normalizeInstallState(state) {
+  const base = state && typeof state === 'object' ? state : {};
+  return {
+    schema_version: 1,
+    managed_paths: normalizeList(base.managed_paths),
+    created_config_files: normalizeList(base.created_config_files),
+    added_dev_dependencies: normalizeList(base.added_dev_dependencies),
+    package_json: base.package_json && typeof base.package_json === 'object'
+      ? {
+          prepare_script: typeof base.package_json.prepare_script === 'string' ? base.package_json.prepare_script : '',
+        }
+      : {
+          prepare_script: '',
+        },
+  };
+}
+
+function getInstallStatePath(targetDir) {
+  return path.join(targetDir, INSTALL_STATE_FILE);
+}
+
+function readInstallState(targetDir) {
+  const filePath = getInstallStatePath(targetDir);
+  if (!fs.existsSync(filePath)) {
+    return normalizeInstallState(null);
+  }
+  return normalizeInstallState(readJson(filePath, 'install-state'));
+}
+
+function readPackageSnapshot(targetDir) {
+  const pkgPath = path.join(targetDir, 'package.json');
+  const pkg = readPackageJson(pkgPath);
+  return {
+    exists: Boolean(pkg),
+    dependencies: new Set(Object.keys(pkg?.dependencies || {})),
+    devDependencies: new Set(Object.keys(pkg?.devDependencies || {})),
+    prepareScript: typeof pkg?.scripts?.prepare === 'string' ? pkg.scripts.prepare : '',
+  };
+}
+
+function extractPackageName(spec) {
+  const value = String(spec || '').trim();
+  if (!value) return '';
+  if (value.startsWith('@')) {
+    const secondAt = value.indexOf('@', 1);
+    return secondAt === -1 ? value : value.slice(0, secondAt);
+  }
+  const firstAt = value.indexOf('@');
+  return firstAt === -1 ? value : value.slice(0, firstAt);
+}
+
+function collectNewPackageNames(beforeSnapshot, afterSnapshot, packageSpecs) {
+  const afterNames = new Set([
+    ...afterSnapshot.dependencies,
+    ...afterSnapshot.devDependencies,
+  ]);
+  return normalizeList(packageSpecs.map((spec) => extractPackageName(spec))).filter((name) => (
+    name &&
+    afterNames.has(name) &&
+    !beforeSnapshot.dependencies.has(name) &&
+    !beforeSnapshot.devDependencies.has(name)
+  ));
+}
+
+function detectExistingIdeDirs(targetDir) {
+  return ALL_IDES.filter((ide) => fs.existsSync(path.join(targetDir, `.${ide}`)));
+}
+
+function detectInstalledManifestIdes(targetDir) {
+  const manifestPath = path.join(targetDir, '.ai-spec', 'manifest.json');
+  if (!fs.existsSync(manifestPath)) {
+    return [];
+  }
+  const manifest = readJson(manifestPath, 'existing manifest');
+  return normalizeIdeFilter(manifest.ides || DEFAULT_IDE_FILTER);
+}
+
+function resolveTargetIdes(targetDir, options) {
+  if (options.ideExplicit) {
+    return normalizeIdeFilter(options.ideFilter);
+  }
+  const manifestIdes = detectInstalledManifestIdes(targetDir);
+  if (manifestIdes.length > 0) {
+    return manifestIdes;
+  }
+  const existingIdes = detectExistingIdeDirs(targetDir);
+  if (existingIdes.length > 0) {
+    return existingIdes;
+  }
+  return normalizeIdeFilter(options.ideFilter || DEFAULT_IDE_FILTER);
+}
+
+function listTemplateCommandFiles(sourceDir, ideName) {
+  const commandFiles = new Set();
+  for (const relDir of [
+    path.join(sourceDir, '.agents', 'commands', 'common'),
+    path.join(sourceDir, '.agents', 'commands', ideName),
+  ]) {
+    if (!fs.existsSync(relDir)) continue;
+    for (const entry of fs.readdirSync(relDir)) {
+      if (entry.endsWith('.md')) {
+        commandFiles.add(`.${ideName}/commands/${entry}`);
+      }
+    }
+  }
+  return [...commandFiles].sort();
+}
+
+function isLinkToTarget(linkPath, expectedTargetPath) {
+  try {
+    if (!fs.lstatSync(linkPath).isSymbolicLink()) {
+      return false;
+    }
+    const actualTarget = fs.readlinkSync(linkPath);
+    const resolvedTarget = path.resolve(path.dirname(linkPath), actualTarget);
+    return resolvedTarget === expectedTargetPath;
+  } catch (error) {
+    return false;
+  }
+}
+
+function collectManagedIdePaths(targetDir, sourceDir) {
+  const managed = [];
+  for (const ide of ALL_IDES) {
+    const ideDir = path.join(targetDir, `.${ide}`);
+    if (!fs.existsSync(ideDir)) {
+      continue;
+    }
+    const rulesPath = path.join(ideDir, 'rules');
+    if (isLinkToTarget(rulesPath, path.join(targetDir, '.agents', 'rules'))) {
+      managed.push(`.${ide}/rules`);
+    }
+    const skillsDir = path.join(ideDir, 'skills');
+    if (fs.existsSync(skillsDir)) {
+      for (const entry of fs.readdirSync(skillsDir, { withFileTypes: true })) {
+        const fullPath = path.join(skillsDir, entry.name);
+        if (!isLinkToTarget(fullPath, path.join(targetDir, '.agents', 'skills', entry.name))) continue;
+        managed.push(`.${ide}/skills/${entry.name}`);
+      }
+    }
+    for (const relPath of listTemplateCommandFiles(sourceDir, ide)) {
+      if (fs.existsSync(path.join(targetDir, relPath))) {
+        managed.push(relPath);
+      }
+    }
+  }
+  return managed;
+}
+
+function writeInstallState(targetDir, sourceDir, previousState, additions = {}) {
+  const nextState = normalizeInstallState(previousState);
+  nextState.generated_at = new Date().toISOString();
+  nextState.managed_paths = normalizeList([
+    ...(fs.existsSync(path.join(targetDir, '.agents')) ? ['.agents'] : []),
+    ...collectManagedIdePaths(targetDir, sourceDir),
+  ]);
+  nextState.created_config_files = normalizeList([
+    ...nextState.created_config_files.filter((filePath) => fs.existsSync(path.join(targetDir, filePath))),
+    ...(additions.createdConfigFiles || []),
+  ]);
+  nextState.added_dev_dependencies = normalizeList([
+    ...nextState.added_dev_dependencies,
+    ...(additions.addedDevDependencies || []),
+  ]);
+  nextState.package_json = {
+    prepare_script: additions.prepareScript || nextState.package_json.prepare_script || '',
+  };
+  writeJson(getInstallStatePath(targetDir), nextState);
+}
+
+function sortPathsForRemoval(paths) {
+  return [...new Set(paths)].sort((left, right) => {
+    const leftDepth = left.split('/').length;
+    const rightDepth = right.split('/').length;
+    if (leftDepth !== rightDepth) {
+      return rightDepth - leftDepth;
+    }
+    return right.localeCompare(left);
+  });
+}
+
+function removeManagedPaths(targetDir, relPaths) {
+  for (const relPath of sortPathsForRemoval(relPaths)) {
+    removePath(path.join(targetDir, relPath));
+  }
+}
+
+function listLegacyManagedPaths(targetDir, sourceDir) {
+  const managed = [];
+  if (fs.existsSync(path.join(targetDir, '.agents'))) {
+    managed.push('.agents');
+  }
+  for (const ide of ALL_IDES) {
+    const ideDir = path.join(targetDir, `.${ide}`);
+    if (!fs.existsSync(ideDir)) {
+      continue;
+    }
+    if (isLinkToTarget(path.join(ideDir, 'rules'), path.join(targetDir, '.agents', 'rules'))) {
+      managed.push(`.${ide}/rules`);
+    }
+    const skillsDir = path.join(ideDir, 'skills');
+    if (fs.existsSync(skillsDir)) {
+      for (const entry of fs.readdirSync(skillsDir, { withFileTypes: true })) {
+        const fullPath = path.join(skillsDir, entry.name);
+        if (!isLinkToTarget(fullPath, path.join(targetDir, '.agents', 'skills', entry.name))) continue;
+        managed.push(`.${ide}/skills/${entry.name}`);
+      }
+    }
+    managed.push(...listTemplateCommandFiles(sourceDir, ide).filter((relPath) => fs.existsSync(path.join(targetDir, relPath))));
+  }
+  return managed;
+}
+
+function cleanupEmptyIdeDirs(targetDir) {
+  for (const ide of ALL_IDES) {
+    const ideDir = path.join(targetDir, `.${ide}`);
+    if (!fs.existsSync(ideDir)) {
+      continue;
+    }
+    for (const child of ['commands', 'skills']) {
+      const childDir = path.join(ideDir, child);
+      if (fs.existsSync(childDir) && fs.readdirSync(childDir).filter((entry) => entry !== '.DS_Store').length === 0) {
+        removePath(childDir);
+      }
+    }
+    const remaining = fs.readdirSync(ideDir).filter((entry) => entry !== '.DS_Store');
+    if (remaining.length === 0) {
+      removePath(ideDir);
+    }
+  }
 }
 
 function pkgJsonHasWorkspaces(dir) {
@@ -428,8 +708,15 @@ function detectInstalledLevel(targetDir) {
   return 'L1';
 }
 
+function isSyncManagedProject(targetDir) {
+  return (
+    fs.existsSync(path.join(targetDir, '.ai-spec', 'manifest.json')) ||
+    fs.existsSync(path.join(targetDir, '.ai-spec', 'lock.json'))
+  );
+}
+
 async function ask(question, defaultValue = '') {
-  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  const rl = readlinePromises.createInterface({ input: process.stdin, output: process.stdout });
   try {
     const prompt = defaultValue ? `${question} [默认 ${defaultValue}]: ` : `${question}: `;
     const answer = await rl.question(prompt);
@@ -463,15 +750,178 @@ async function selectFromList(title, items, defaultIndex = 0) {
   return items[defaultIndex].value;
 }
 
-async function selectRulesStrategy(options) {
-  if (!isInteractive() || options.rulesStrategy !== 'ask') {
-    options.rulesStrategy = options.rulesStrategy === 'ask' ? 'standard' : options.rulesStrategy;
+function formatMultiSelectLine(item, selectedValues, cursorIndex, index) {
+  const marker = selectedValues.has(item.value) ? '[x]' : '[ ]';
+  const prefix = index === cursorIndex ? color('❯', 'cyan') : ' ';
+  return `  ${prefix} ${marker} ${item.label}${item.desc ? ` — ${item.desc}` : ''}`;
+}
+
+async function selectMultipleFromList(title, items, config = {}) {
+  if (!isInteractive()) {
+    const defaultValues = new Set(normalizeList(config.defaultValues));
+    return items.filter((item) => defaultValues.has(item.value)).map((item) => item.value);
+  }
+
+  console.log('');
+  info(title);
+  if (config.description) {
+    console.log(`  ${config.description}`);
+  }
+  if (config.hint) {
+    console.log(`  ${config.hint}`);
+  }
+  console.log(`  ${config.instructions || '↑/↓ 移动，空格选中/取消，Enter 确认'}`);
+  console.log('');
+
+  const stdin = process.stdin;
+  const selectedValues = new Set(normalizeList(config.defaultValues));
+
+  if (typeof stdin.setRawMode !== 'function') {
+    return items.filter((item) => selectedValues.has(item.value)).map((item) => item.value);
+  }
+
+  let cursorIndex = 0;
+  let renderedLines = 0;
+
+  return await new Promise((resolve, reject) => {
+    let finished = false;
+
+    const cleanup = () => {
+      stdin.removeListener('keypress', onKeypress);
+      if (typeof stdin.setRawMode === 'function') {
+        stdin.setRawMode(false);
+      }
+      stdin.pause();
+      process.stdout.write('\x1b[?25h');
+    };
+
+    const finish = (result) => {
+      if (finished) return;
+      finished = true;
+      cleanup();
+      resolve(result);
+    };
+
+    const fail = (error) => {
+      if (finished) return;
+      finished = true;
+      cleanup();
+      reject(error);
+    };
+
+    const render = () => {
+      if (renderedLines > 0) {
+        process.stdout.write(`\x1b[${renderedLines}A`);
+      }
+      items.forEach((item, index) => {
+        process.stdout.write(`\x1b[2K\r${formatMultiSelectLine(item, selectedValues, cursorIndex, index)}\n`);
+      });
+      renderedLines = items.length;
+    };
+
+    const onKeypress = (_str, key = {}) => {
+      if (key.ctrl && key.name === 'c') {
+        process.stdout.write('\n');
+        fail(new Error('已取消选择'));
+        return;
+      }
+
+      if (key.name === 'up') {
+        cursorIndex = cursorIndex > 0 ? cursorIndex - 1 : cursorIndex;
+        render();
+        return;
+      }
+
+      if (key.name === 'down') {
+        cursorIndex = cursorIndex < items.length - 1 ? cursorIndex + 1 : cursorIndex;
+        render();
+        return;
+      }
+
+      if (key.name === 'space') {
+        const current = items[cursorIndex];
+        if (current) {
+          if (selectedValues.has(current.value)) {
+            selectedValues.delete(current.value);
+          } else {
+            selectedValues.add(current.value);
+          }
+          render();
+        }
+        return;
+      }
+
+      if (key.name === 'return' || key.name === 'enter') {
+        finish(items.filter((item) => selectedValues.has(item.value)).map((item) => item.value));
+      }
+    };
+
+    readline.emitKeypressEvents(stdin);
+    stdin.setRawMode(true);
+    stdin.resume();
+    process.stdout.write('\x1b[?25l');
+    stdin.on('keypress', onKeypress);
+    render();
+  });
+}
+
+async function selectCustomRuleList(options, config = {}) {
+  const defaultRules = normalizeCustomRulesSelection(config.defaultRules || DEFAULT_CUSTOM_RULE_SELECTION);
+  if (!isInteractive()) {
+    options.customRules = options.rulesStrategy === 'custom'
+      ? normalizeCustomRulesSelection(options.customRules.length > 0 ? options.customRules : defaultRules)
+      : [];
     return;
   }
 
-  const strategy = await selectFromList('规则安装策略：', [
-    { value: 'standard', label: '使用标准规范', desc: '直接使用规范库中的规则，适合快速接入' },
-    { value: 'custom', label: '根据项目自定义', desc: '跳过部分规则，后续由 /project-init 按项目生成' },
+  options.customRules = await selectMultipleFromList(
+    config.title || '选择需要根据项目自定义的规则（空格选中/取消，Enter 确认）：',
+    CUSTOMIZABLE_RULES.map(([fileName, desc]) => ({
+      value: fileName,
+      label: fileName.replace('.md', ''),
+      desc,
+    })),
+    {
+      defaultValues: defaultRules,
+      description: config.description,
+      hint: config.hint || '默认已勾选全部规则，可按空格取消',
+    },
+  );
+
+  if (options.customRules.length === 0) {
+    options.rulesStrategy = 'standard';
+    warn(config.emptySelectionLabel || '未选择任何自定义规则，将使用标准规范。');
+    return;
+  }
+
+  ok(`${config.resultLabel || '以下规则将根据项目自定义：'}${options.customRules.map((name) => `\n  • ${name}`).join('')}`);
+}
+
+async function selectRulesStrategy(options, config = {}) {
+  const mode = config.mode || 'default';
+  if (!isInteractive() || options.rulesStrategy !== 'ask') {
+    options.rulesStrategy = options.rulesStrategy === 'ask' ? 'standard' : options.rulesStrategy;
+    if (options.rulesStrategy === 'custom') {
+      options.customRules = normalizeCustomRulesSelection(options.customRules.length > 0 ? options.customRules : DEFAULT_CUSTOM_RULE_SELECTION);
+    } else {
+      options.customRules = [];
+    }
+    return;
+  }
+
+  const strategy = await selectFromList(mode === 'manifest' ? '规则内容偏好：' : '规则安装策略：', [
+    {
+      value: 'standard',
+      label: mode === 'manifest' ? '沿用安装模板' : '使用标准规范',
+      desc: mode === 'manifest' ? '保持 manifest 安装下来的规则模板内容，后续 /project-init 只刷新 01/03' : '直接使用规范库中的规则，适合快速接入',
+    },
+    {
+      value: 'custom',
+      label: '根据项目自定义',
+      desc: mode === 'manifest'
+        ? '规则模板照常安装，后续由 /project-init 按项目实际情况生成或刷新所选规则'
+        : '跳过部分规则，后续由 /project-init 按项目生成',
+    },
   ], 0);
   options.rulesStrategy = strategy;
   if (strategy !== 'custom') {
@@ -479,52 +929,30 @@ async function selectRulesStrategy(options) {
     return;
   }
 
-  console.log('');
-  info('选择需要根据项目自定义的规则（输入编号切换，回车确认）：');
-  CUSTOMIZABLE_RULES.forEach(([fileName, desc], index) => {
-    const defaultSelected = PROJECT_SPECIFIC_RULES.has(fileName);
-    console.log(`  ${index + 1}) [${defaultSelected ? 'x' : ' '}] ${fileName.replace('.md', '')} — ${desc}`);
+  await selectCustomRuleList(options, {
+    defaultRules: DEFAULT_CUSTOM_RULE_SELECTION,
+    title: mode === 'manifest'
+      ? '选择需要在 /project-init 中根据项目自定义的规则（空格选中/取消，Enter 确认）：'
+      : '选择需要根据项目自定义的规则（空格选中/取消，Enter 确认）：',
+    hint: mode === 'manifest'
+      ? '规则模板照常安装，后续由 /project-init 按项目实际情况生成或刷新所选规则'
+      : '选中的规则将不从规范库复制，而是由 AI 根据项目实际情况生成',
+    resultLabel: mode === 'manifest'
+      ? '以下规则将在 /project-init 时根据项目自定义生成或刷新：'
+      : '以下规则将根据项目自定义：',
+    emptySelectionLabel: mode === 'manifest'
+      ? '未选择任何需要在 /project-init 中自定义的规则，将沿用安装模板。'
+      : '未选择任何自定义规则，将使用标准规范。',
   });
-  const answer = await ask('输入编号（逗号分隔，留空表示保留默认 01/03）', '');
-  const selected = new Set(['01-项目概述.md', '03-项目结构.md']);
-  if (answer) {
-    for (const token of answer.split(',')) {
-      const idx = Number(token.trim()) - 1;
-      if (!Number.isInteger(idx) || idx < 0 || idx >= CUSTOMIZABLE_RULES.length) {
-        continue;
-      }
-      const name = CUSTOMIZABLE_RULES[idx][0];
-      if (selected.has(name)) {
-        selected.delete(name);
-      } else {
-        selected.add(name);
-      }
-    }
-  }
-  options.customRules = CUSTOMIZABLE_RULES.map(([name]) => name).filter((name) => selected.has(name));
-  ok(`以下规则将根据项目自定义：${options.customRules.map((name) => `\n  • ${name}`).join('')}`);
 }
 
-async function selectInitChoices(options, profilesRegistry) {
+async function selectBootstrapChoices(options) {
   if (!isInteractive()) {
     if (options.installLint === 'ask') options.installLint = 'yes';
     if (options.installHusky === 'ask') options.installHusky = 'no';
     if (options.uipro === 'ask') options.uipro = 'no';
-    if (options.rulesStrategy === 'ask') options.rulesStrategy = 'standard';
     return;
   }
-
-  if (!options.profileExplicit) {
-    const profileItems = Object.entries(getProfileEntries(profilesRegistry)).map(([id, entry]) => ({
-      value: id,
-      label: id,
-      desc: PROFILE_SUMMARIES[id] || entry.label || id,
-    }));
-    options.profile = await selectFromList('选择技术栈 Profile：', profileItems, Math.max(0, profileItems.findIndex((item) => item.value === DEFAULT_PROFILE)));
-    ok(`已选择 Profile: ${options.profile}`);
-  }
-
-  await selectRulesStrategy(options);
 
   if (options.uipro === 'ask') {
     console.log('');
@@ -547,6 +975,27 @@ async function selectInitChoices(options, profilesRegistry) {
     options.installHusky = (await confirm('安装提交校验?', false)) ? 'yes' : 'no';
     ok(options.installHusky === 'yes' ? '将安装提交校验' : '跳过提交校验');
   }
+}
+
+async function selectInitChoices(options, profilesRegistry) {
+  if (!isInteractive()) {
+    if (options.rulesStrategy === 'ask') options.rulesStrategy = 'standard';
+    await selectBootstrapChoices(options);
+    return;
+  }
+
+  if (!options.profileExplicit) {
+    const profileItems = Object.entries(getProfileEntries(profilesRegistry)).map(([id, entry]) => ({
+      value: id,
+      label: id,
+      desc: PROFILE_SUMMARIES[id] || entry.label || id,
+    }));
+    options.profile = await selectFromList('选择技术栈 Profile：', profileItems, Math.max(0, profileItems.findIndex((item) => item.value === DEFAULT_PROFILE)));
+    ok(`已选择 Profile: ${options.profile}`);
+  }
+
+  await selectRulesStrategy(options);
+  await selectBootstrapChoices(options);
 }
 
 async function resolveMonorepoTarget(targetDir, options) {
@@ -759,6 +1208,7 @@ function copyConfigs(targetDir, sourceDir, profilesRegistry, options, skipExisti
   const commonDir = path.join(sourceDir, 'configs', 'common');
   const { configsDir } = getProfileDirs(sourceDir, options.profile, profilesRegistry);
   let copied = false;
+  const createdPaths = [];
   const skipHuskyArtifacts = options.installHusky !== 'yes' && !fs.existsSync(path.join(targetDir, '.husky'));
 
   if (skipHuskyArtifacts) {
@@ -767,28 +1217,34 @@ function copyConfigs(targetDir, sourceDir, profilesRegistry, options, skipExisti
 
   if (fs.existsSync(commonDir)) {
     info('同步 lint/format 配置 (common) ...');
-    copied = copyDirIncremental(commonDir, targetDir, { skipExisting, skipHuskyArtifacts }) || copied;
+    const result = copyDirIncremental(commonDir, targetDir, { skipExisting, skipHuskyArtifacts });
+    copied = result.copiedAny || copied;
+    createdPaths.push(...result.createdPaths);
   }
   if (fs.existsSync(configsDir)) {
     info(`同步 lint/format 配置 (${path.relative(sourceDir, configsDir).split(path.sep).join('/')}) ...`);
-    copied = copyDirIncremental(configsDir, targetDir, { skipExisting, skipHuskyArtifacts }) || copied;
+    const result = copyDirIncremental(configsDir, targetDir, { skipExisting, skipHuskyArtifacts });
+    copied = result.copiedAny || copied;
+    createdPaths.push(...result.createdPaths);
   }
 
   if (copied) ok('lint/format 配置部署完成');
   else info('未找到 lint/format 配置模板，跳过');
+  return normalizeList(createdPaths);
 }
 
 function installLocalCli(targetDir, sourceDir, pkgManager, pending) {
   const targetPkg = path.join(targetDir, 'package.json');
   if (!fs.existsSync(targetPkg)) {
     warn('未找到 package.json，跳过本地 ai-spec-auto CLI 安装');
-    return;
+    return [];
   }
   if (!pkgManager) {
     warn('无可用的包管理器，跳过本地 ai-spec-auto CLI 安装');
-    return;
+    return [];
   }
 
+  const beforeSnapshot = readPackageSnapshot(targetDir);
   const forcedLocal = Boolean(process.env.BR_AI_SPEC_FORCE_LOCAL_CLI);
   const installSpec = forcedLocal
     ? sourceDir
@@ -808,58 +1264,72 @@ function installLocalCli(targetDir, sourceDir, pkgManager, pending) {
   const result = runCommand(pkgManager, args, { cwd: targetDir, stdio: 'inherit' });
   if (result.status !== 0) {
     pending.failures.push(`本地 ai-spec-auto CLI 安装失败：请在 ${targetDir} 手动执行 ${pkgManager} ${args.join(' ')}`);
-    return;
+    return [];
   }
   ok('项目内 ai-spec-auto CLI 已就绪 (./node_modules/.bin/ai-spec-auto)');
+  const afterSnapshot = readPackageSnapshot(targetDir);
+  return collectNewPackageNames(beforeSnapshot, afterSnapshot, [packageName || installSpec]);
 }
 
 function installLintDeps(targetDir, pkgManager, options, pending) {
   if (!fs.existsSync(path.join(targetDir, 'package.json'))) {
     pending.failures.push('lint/format：未找到 package.json，已跳过依赖安装。');
-    return;
+    return { addedPackages: [], prepareScript: '' };
   }
   if (!pkgManager) {
     pending.failures.push('lint/format：无可用的包管理器，无法安装 ESLint 等依赖。');
-    return;
+    return { addedPackages: [], prepareScript: '' };
   }
-  const deps = ['eslint', 'prettier', 'stylelint', 'stylelint-config-standard'];
+  const deps = [...LINT_DEP_SPECS];
   if (options.profile === 'vue') {
-    deps.push('stylelint-config-html', 'stylelint-config-recommended-vue', 'postcss-html');
+    deps.push(...VUE_LINT_DEP_SPECS);
   }
+  const beforeSnapshot = readPackageSnapshot(targetDir);
   info(`正在使用 ${pkgManager} 安装 lint/format 依赖，请稍候 ...`);
   info(`  ${deps.join(' ')}`);
   const result = installDevDependencies(targetDir, pkgManager, deps);
   if (result.status !== 0) {
     pending.failures.push(`lint/format 依赖安装失败：请在 ${targetDir} 手动安装 ${deps.join(' ')}`);
-    return;
+    return { addedPackages: [], prepareScript: '' };
   }
   ok('lint/format 依赖安装完成');
+  const afterSnapshot = readPackageSnapshot(targetDir);
+  return {
+    addedPackages: collectNewPackageNames(beforeSnapshot, afterSnapshot, deps),
+    prepareScript: !beforeSnapshot.prepareScript && afterSnapshot.prepareScript ? afterSnapshot.prepareScript : '',
+  };
 }
 
 function installCommitHooks(targetDir, pkgManager, pending) {
   if (!fs.existsSync(path.join(targetDir, 'package.json'))) {
     pending.failures.push('提交校验：未找到 package.json，已跳过依赖安装。');
-    return;
+    return { addedPackages: [], prepareScript: '' };
   }
   if (!pkgManager) {
     pending.failures.push('提交校验：无可用的包管理器，无法安装 husky 等依赖。');
-    return;
+    return { addedPackages: [], prepareScript: '' };
   }
-  const deps = ['husky@8', 'lint-staged@15', '@commitlint/cli@19', '@commitlint/config-conventional@19'];
+  const deps = [...HUSKY_DEP_SPECS];
+  const beforeSnapshot = readPackageSnapshot(targetDir);
   info(`正在使用 ${pkgManager} 安装提交校验依赖，请稍候 ...`);
   info(`  ${deps.join(' ')}`);
   const result = installDevDependencies(targetDir, pkgManager, deps);
   if (result.status !== 0) {
     pending.failures.push(`提交校验依赖安装失败：请在 ${targetDir} 手动安装 ${deps.join(' ')}`);
-    return;
+    return { addedPackages: [], prepareScript: '' };
   }
   info('初始化 husky ...');
   const huskyResult = runCommand('npx', ['husky', 'install'], { cwd: targetDir, stdio: 'inherit' });
   if (huskyResult.status !== 0) {
     pending.failures.push(`husky install 失败：请在 ${targetDir} 手动执行 npx husky install`);
-    return;
+    return { addedPackages: [], prepareScript: '' };
   }
   ok('提交校验工具链安装完成 (husky@8 + lint-staged + commitlint)');
+  const afterSnapshot = readPackageSnapshot(targetDir);
+  return {
+    addedPackages: collectNewPackageNames(beforeSnapshot, afterSnapshot, deps),
+    prepareScript: !beforeSnapshot.prepareScript && afterSnapshot.prepareScript ? afterSnapshot.prepareScript : '',
+  };
 }
 
 function createIdeLinks(targetDir, sourceDir, options) {
@@ -1047,6 +1517,19 @@ function getSelectedAiInitRules(options) {
   return [...selected];
 }
 
+function buildManifestLocalPreferences(options, existingPreferences = null) {
+  const base = existingPreferences && typeof existingPreferences === 'object'
+    ? JSON.parse(JSON.stringify(existingPreferences))
+    : {};
+  if (options.rulesStrategy === 'custom') {
+    const customRules = normalizeCustomRulesSelection(options.customRules.length > 0 ? options.customRules : DEFAULT_CUSTOM_RULE_SELECTION);
+    base.project_init = { custom_rules: customRules };
+  } else if (base.project_init) {
+    delete base.project_init;
+  }
+  return Object.keys(base).length > 0 ? base : null;
+}
+
 function printTools(level, uiproSelected) {
   info('工具环境：');
   if (commandExists('git')) {
@@ -1083,11 +1566,15 @@ function printTools(level, uiproSelected) {
 }
 
 function printInstallReport(targetDir, options, pending) {
+  const installMode = options.installMode || 'default-init';
+  const resolvedIdes = normalizeIdeFilter(options.ideFilter);
+  const ideSummary = resolvedIdes.length > 0 ? resolvedIdes.map((ide) => `.${ide}`).join(', ') : '(none)';
+  const selectedAiInitRules = getSelectedAiInitRules(options);
   console.log('');
   console.log(color('════════════════════════════════════════', 'bold'));
-  if (pending.failures.length > 0 || pending.configs.length > 0) {
+  if (pending.failures.length > 0 || pending.configs.length > 0 || (pending.warnings || []).length > 0) {
     info('规范与配置文件已同步到项目。');
-    warn(`存在 ${pending.failures.length + pending.configs.length} 项待处理（见文末汇总）。`);
+    warn(`存在 ${pending.failures.length + pending.configs.length + (pending.warnings || []).length} 项待处理（见文末汇总）。`);
   } else {
     ok('安装完成！');
   }
@@ -1095,43 +1582,58 @@ function printInstallReport(targetDir, options, pending) {
   console.log('');
   info('安装配置：');
   console.log(`  Profile:  ${color(options.profile, 'bold')}`);
+  console.log(`  安装模式: ${color(installMode, 'bold')}`);
   console.log(`  安装模型: ${color(options.level === DEFAULT_LEVEL ? 'default (full)' : 'compatibility override', 'bold')}`);
   if (options.level !== DEFAULT_LEVEL) {
     console.log(`  兼容层级: ${color(options.level, 'bold')}`);
   }
   console.log(`  IDE:      ${color(options.ideFilter, 'bold')}`);
+  if (installMode === 'init-with-manifest') {
+    console.log(`  Profile来源: ${color(options.profileSource || 'manifest', 'bold')}`);
+    console.log(`  规则来源: ${color(options.rulesSource || 'manifest 安装 + 安装模板沿用', 'bold')}`);
+    console.log(`  规则内容偏好: ${color(options.rulesStrategy === 'custom' ? '根据项目自定义' : '沿用安装模板', 'bold')}`);
+  }
   console.log(`  UIPro:    ${color(options.uipro, 'bold')}`);
   console.log(`  AIInit:   ${color('no', 'bold')}`);
+  if (options.manifestSource) {
+    console.log(`  Manifest: ${color(options.manifestSource, 'bold')}`);
+  }
+  if (options.syncSummary) {
+    console.log(`  首轮同步: roles ${options.syncSummary.roles}, skills ${options.syncSummary.skills}, rules ${options.syncSummary.rules}, flows ${options.syncSummary.flows}`);
+  }
   console.log('');
   info('已部署内容：');
   console.log(`  ${color('✔', 'green')} .agents/rules + skills (profile: ${options.profile})`);
   console.log(`  ${options.installLint === 'yes' ? color('✔', 'green') : color('—', 'yellow')} lint/format 配置${options.installLint === 'yes' ? ' (.prettierrc, .eslintrc, .stylelintrc)' : '（已跳过）'}`);
   console.log(`  ${options.installHusky === 'yes' ? color('✔', 'green') : color('—', 'yellow')} 提交校验${options.installHusky === 'yes' ? ' (.husky, .lintstagedrc, commitlint.config.js)' : '（已跳过）'}`);
   if (fs.existsSync(path.join(targetDir, '.agents', 'skills', 'ui-ux-pro-max', 'SKILL.md'))) {
-    console.log(`  ${color('✔', 'green')} UI UX Pro Max 设计智能技能`);
+    console.log(`  ${color('✔', 'green')} UI UX Pro Max 设计智能技能 (67 styles, 161 palettes)`);
   }
   if (options.level !== 'L1') {
-    console.log(`  ${color('✔', 'green')} IDE 适配 (.cursor, .claude)`);
+    console.log(`  ${color('✔', 'green')} IDE 适配 (${ideSummary})`);
   }
   console.log('');
   info('提醒事项：');
   console.log('  1. 当前包通过内网 npm registry 分发；首次接入前，请在 ~/.npmrc 中配置 @ex:registry=http://nodejs.100credit.cn/');
-  if (options.level !== 'L1') {
+  if (options.level !== 'L1' && resolvedIdes.includes('cursor')) {
     console.log('  2. 配置 .cursor/mcp.json（按需启用 MCP）');
+    console.log(`     ${color('→', 'yellow')} Cursor 里各 MCP 默认关闭/未启用是预期行为，并非安装失败`);
     console.log(`     ${color('→', 'yellow')} 先在 Cursor 设置 → MCP 中按需启用目标服务，再补齐凭证`);
+    console.log(`     ${color('→', 'yellow')} 将 project-id、access-token 等占位符替换成真实值，不需要的服务保持关闭即可`);
     console.log('  3. 首次运行 /spec-start / /spec-continue / /spec-update 时，如 Cursor 提示执行 ai-spec-auto 命令');
     console.log(`     ${color('→', 'yellow')} 请选择 Always allow for this workspace，避免宿主桥命令被权限弹窗打断`);
   }
   console.log('');
   console.log(color('────────────────────────────────────────────────────────────', 'bold'));
-  console.log(`  ${color('★ 项目初始化不会在安装后自动执行，请在 AI IDE 中手动触发：', 'bold')}`);
-  console.log(`    推荐触发方式：${color('/project-init', 'bold')}（或输入“初始化项目规范” / “project-init”）`);
-  console.log('    触发后 AI 将生成：');
-  for (const rule of getSelectedAiInitRules(options)) {
+  console.log(`  ${color('★ 项目初始化不会在安装后自动执行，请在 AI IDE 中按下面顺序继续：', 'bold')}`);
+  console.log(`    1. 先执行 ${color('/project-init', 'bold')}（或输入“初始化项目规范” / “project-init”）`);
+  console.log(`    2. 再执行 ${color('/spec-start', 'bold')} 开始第一个需求`);
+  console.log('    /project-init 将生成或刷新：');
+  for (const rule of selectedAiInitRules) {
     console.log(`    • ${rule}`);
   }
   console.log(color('────────────────────────────────────────────────────────────', 'bold'));
-  if (pending.failures.length > 0 || pending.configs.length > 0) {
+  if (pending.failures.length > 0 || pending.configs.length > 0 || (pending.warnings || []).length > 0) {
     console.log('');
     if (pending.failures.length > 0) {
       console.log(color('════════════════════════════════════════', 'red'));
@@ -1139,6 +1641,14 @@ function printInstallReport(targetDir, options, pending) {
       console.log(color('════════════════════════════════════════', 'red'));
       for (const item of pending.failures) {
         console.log(`  ${color('•', 'red')} ${item}`);
+      }
+    }
+    if ((pending.warnings || []).length > 0) {
+      console.log(color('════════════════════════════════════════', 'yellow'));
+      console.log(color('  安装提示（非阻断）', 'yellow'));
+      console.log(color('════════════════════════════════════════', 'yellow'));
+      for (const item of pending.warnings) {
+        console.log(`  ${color('•', 'yellow')} ${item}`);
       }
     }
     if (pending.configs.length > 0) {
@@ -1152,9 +1662,120 @@ function printInstallReport(targetDir, options, pending) {
   }
 }
 
+async function handleInitWithManifest(options, sourceDir, profilesRegistry, targetDir, pkgManager) {
+  const sync = require('./sync');
+  const pending = { failures: [], configs: [], warnings: [] };
+  const previousInstallState = readInstallState(targetDir);
+  const installStateAdditions = {
+    createdConfigFiles: [],
+    addedDevDependencies: [],
+    prepareScript: '',
+  };
+  const syncOptions = {
+    target: targetDir,
+    manifest: options.manifest,
+    dryRun: false,
+    force: false,
+    hubFetch: options.hubFetch,
+    ...(options.profileExplicit ? { profile: options.profile } : {}),
+    ...(options.ideExplicit ? { ide: options.ideFilter } : {}),
+    ...(options.hubOrigin ? { hubOrigin: options.hubOrigin } : {}),
+  };
+  info('预解析 manifest 与 registry ...');
+  const prepared = await sync.prepareSync(syncOptions);
+  ok('Manifest / registry 预校验通过');
+  await selectRulesStrategy(options, { mode: 'manifest' });
+
+  const manifestProfile = resolveProfileId(profilesRegistry, prepared.rawManifest?.profile || null);
+  if (options.profileExplicit && manifestProfile && manifestProfile !== prepared.manifest.profile) {
+    pending.warnings.push(`Manifest profile "${manifestProfile}" 已被显式参数 --profile ${options.profile} 覆盖，当前按 "${prepared.manifest.profile}" 安装。`);
+  }
+
+  if (options.ideExplicit && prepared.rawManifest?.ides !== undefined) {
+    const requestedIdes = normalizeIdeFilter(options.ideFilter);
+    const manifestIdes = normalizeIdes(prepared.rawManifest.ides);
+    if (!sameStringList(requestedIdes, manifestIdes)) {
+      pending.warnings.push(`Manifest ides "${manifestIdes.join(',') || 'default'}" 已被显式参数 --ide ${requestedIdes.join(',')} 覆盖。`);
+    }
+  }
+
+  if (options.levelExplicit) {
+    pending.warnings.push('init --manifest 固定按默认完整安装执行，--level 仅作兼容参数，当前不会影响场景资产同步。');
+  }
+  options.level = DEFAULT_LEVEL;
+  options.profile = prepared.manifest.profile;
+  options.ideFilter = prepared.manifest.ides.join(',');
+  options.installMode = 'init-with-manifest';
+  options.manifestSource = prepared.manifestSource;
+  options.profileSource = options.profileExplicit && manifestProfile
+    ? `manifest（已由 --profile 覆盖，原值 ${manifestProfile}）`
+    : 'manifest';
+  options.rulesSource = options.rulesStrategy === 'custom'
+    ? 'manifest 安装 + 本地 project-init 偏好'
+    : 'manifest 安装 + 安装模板沿用';
+  options.syncSummary = {
+    roles: prepared.resolvedResult.resolved.roles.length,
+    skills: prepared.resolvedResult.resolved.skills.length,
+    rules: prepared.resolvedResult.resolved.rules.length,
+    flows: prepared.resolvedResult.resolved.installed_flows.length,
+  };
+  const localPreferences = buildManifestLocalPreferences(options, prepared.manifest.local_preferences);
+  if (localPreferences) {
+    prepared.manifest.local_preferences = localPreferences;
+  } else {
+    delete prepared.manifest.local_preferences;
+  }
+
+  await selectBootstrapChoices(options);
+
+  const syncResult = await sync.runSync(syncOptions, prepared);
+  options.profile = syncResult.target.profile;
+  options.ideFilter = syncResult.target.ides.join(',');
+  options.syncSummary = {
+    roles: syncResult.resolved.roles.length,
+    skills: syncResult.resolved.skills.length,
+    rules: syncResult.resolved.rules.length,
+    flows: syncResult.resolved.installed_flows.length,
+  };
+  for (const warning of syncResult.warnings) {
+    if (!pending.warnings.includes(warning)) {
+      pending.warnings.push(warning);
+    }
+  }
+
+  installStateAdditions.addedDevDependencies.push(...installLocalCli(targetDir, sourceDir, pkgManager, pending));
+  if (options.installLint === 'yes') {
+    installStateAdditions.createdConfigFiles.push(...copyConfigs(targetDir, sourceDir, profilesRegistry, options, true));
+    const lintInstall = installLintDeps(targetDir, pkgManager, options, pending);
+    installStateAdditions.addedDevDependencies.push(...lintInstall.addedPackages);
+    installStateAdditions.prepareScript = installStateAdditions.prepareScript || lintInstall.prepareScript;
+  }
+  if (options.installHusky === 'yes') {
+    const commitInstall = installCommitHooks(targetDir, pkgManager, pending);
+    installStateAdditions.addedDevDependencies.push(...commitInstall.addedPackages);
+    installStateAdditions.prepareScript = installStateAdditions.prepareScript || commitInstall.prepareScript;
+  }
+  if (options.uipro === 'yes') {
+    setupUipro(targetDir, pkgManager, pending);
+  }
+  if (normalizeIdeFilter(options.ideFilter).includes('cursor')) {
+    pending.configs.push('.cursor/mcp.json：在 Cursor 设置 → MCP 中按需启用服务后，再补齐 project-id、access-token 等凭证。');
+  }
+  setupOpenSpec(targetDir, sourceDir, options, pkgManager, pending);
+  writeInstallState(targetDir, sourceDir, previousInstallState, installStateAdditions);
+  printTools(options.level, options.uipro);
+  printInstallReport(targetDir, options, pending);
+  return pending.failures.length > 0 ? 1 : 0;
+}
+
 async function handleInit(options) {
   const sourceDir = getSourceDir();
   const profilesRegistry = readProfilesRegistry(sourceDir);
+  const installStateAdditions = {
+    createdConfigFiles: [],
+    addedDevDependencies: [],
+    prepareScript: '',
+  };
   options.profile = resolveProfileId(profilesRegistry, options.profile) || DEFAULT_PROFILE;
 
   testNodeEnv();
@@ -1183,33 +1804,46 @@ async function handleInit(options) {
   } else {
     warn('未检测到 npm 或 pnpm，后续依赖安装会跳过');
   }
+  info(`使用 npm 包内规范库: ${sourceDir}`);
+
+  if (options.manifest) {
+    return handleInitWithManifest(options, sourceDir, profilesRegistry, targetDir, pkgManager);
+  }
 
   await selectInitChoices(options, profilesRegistry);
   if (!['L1', 'L2', 'L3'].includes(options.level)) {
     options.level = DEFAULT_LEVEL;
   }
 
-  const pending = { failures: [], configs: [] };
-  info(`使用 npm 包内规范库: ${sourceDir}`);
+  options.installMode = 'default-init';
+  const pending = { failures: [], configs: [], warnings: [] };
+  const previousInstallState = readInstallState(targetDir);
   copyAgents(targetDir, sourceDir, profilesRegistry, options);
-  installLocalCli(targetDir, sourceDir, pkgManager, pending);
+  installStateAdditions.addedDevDependencies.push(...installLocalCli(targetDir, sourceDir, pkgManager, pending));
   if (options.installLint === 'yes') {
-    copyConfigs(targetDir, sourceDir, profilesRegistry, options, true);
-    installLintDeps(targetDir, pkgManager, options, pending);
+    installStateAdditions.createdConfigFiles.push(...copyConfigs(targetDir, sourceDir, profilesRegistry, options, true));
+    const lintInstall = installLintDeps(targetDir, pkgManager, options, pending);
+    installStateAdditions.addedDevDependencies.push(...lintInstall.addedPackages);
+    installStateAdditions.prepareScript = installStateAdditions.prepareScript || lintInstall.prepareScript;
   }
   if (options.installHusky === 'yes') {
-    installCommitHooks(targetDir, pkgManager, pending);
+    const commitInstall = installCommitHooks(targetDir, pkgManager, pending);
+    installStateAdditions.addedDevDependencies.push(...commitInstall.addedPackages);
+    installStateAdditions.prepareScript = installStateAdditions.prepareScript || commitInstall.prepareScript;
   }
   if (options.uipro === 'yes') {
     setupUipro(targetDir, pkgManager, pending);
   }
   if (options.level !== 'L1') {
     createIdeLinks(targetDir, sourceDir, options);
-    pending.configs.push('.cursor/mcp.json：在 Cursor 设置 → MCP 中按需启用服务后，再补齐 project-id、access-token 等凭证。');
+    if (normalizeIdeFilter(options.ideFilter).includes('cursor')) {
+      pending.configs.push('.cursor/mcp.json：在 Cursor 设置 → MCP 中按需启用服务后，再补齐 project-id、access-token 等凭证。');
+    }
   }
   if (options.level === 'L3') {
     setupOpenSpec(targetDir, sourceDir, options, pkgManager, pending);
   }
+  writeInstallState(targetDir, sourceDir, previousInstallState, installStateAdditions);
   printTools(options.level, options.uipro);
   printInstallReport(targetDir, options, pending);
   return pending.failures.length > 0 ? 1 : 0;
@@ -1230,6 +1864,7 @@ async function handleUpdate(options) {
   if (!options.levelExplicit) {
     options.level = detectInstalledLevel(targetDir);
   }
+  options.ideFilter = resolveTargetIdes(targetDir, options).join(',');
   const pkgManager = detectPkgManager(targetDir);
   info(`更新规范: ${targetDir}`);
   if (options.rulesStrategy === 'ask') {
@@ -1279,22 +1914,29 @@ async function handleUpdate(options) {
   console.log('');
 
   const pending = { failures: [], configs: [] };
+  const previousInstallState = readInstallState(targetDir);
+  const installStateAdditions = {
+    createdConfigFiles: [],
+    addedDevDependencies: [],
+    prepareScript: '',
+  };
   if (options.updateSkills === 'yes' || options.updateRules === 'yes') {
     copyAgents(targetDir, sourceDir, profilesRegistry, options, {
       skipRules: options.updateRules !== 'yes',
       skipSkills: options.updateSkills !== 'yes',
     });
   }
-  installLocalCli(targetDir, sourceDir, pkgManager, pending);
+  installStateAdditions.addedDevDependencies.push(...installLocalCli(targetDir, sourceDir, pkgManager, pending));
   if (options.updateConfigs === 'yes') {
-    copyConfigs(targetDir, sourceDir, profilesRegistry, options, true);
+    installStateAdditions.createdConfigFiles.push(...copyConfigs(targetDir, sourceDir, profilesRegistry, options, true));
   }
   if (options.level !== 'L1') {
     if (options.updateIdeLinks === 'yes') {
       createIdeLinks(targetDir, sourceDir, options);
     }
-    syncCommands(targetDir, sourceDir, 'cursor', options.updateCommands === 'yes');
-    syncCommands(targetDir, sourceDir, 'claude', options.updateCommands === 'yes');
+    for (const ide of normalizeIdeFilter(options.ideFilter)) {
+      syncCommands(targetDir, sourceDir, ide, options.updateCommands === 'yes');
+    }
   }
   if (options.level === 'L3' && options.updateOpenSpec === 'yes') {
     setupOpenSpec(targetDir, sourceDir, options, pkgManager, pending);
@@ -1303,6 +1945,7 @@ async function handleUpdate(options) {
     removePath(path.join(targetDir, '.agents', 'skills', 'ui-ux-pro-max'));
     setupUipro(targetDir, pkgManager, pending);
   }
+  writeInstallState(targetDir, sourceDir, previousInstallState, installStateAdditions);
   ok(`更新完成 (profile: ${options.profile}, compatibility level: ${options.level})`);
   if (pending.failures.length > 0) {
     pending.failures.forEach((item) => warn(item));
@@ -1313,6 +1956,7 @@ async function handleUpdate(options) {
 function handleCheck(options) {
   const targetDir = path.resolve(options.target);
   let hasIssue = false;
+  const syncManaged = isSyncManagedProject(targetDir);
   console.log('');
   info(`═══ 安装状态检查: ${targetDir} ═══`);
   console.log('');
@@ -1329,7 +1973,12 @@ function handleCheck(options) {
   }
   const localCli = path.join(targetDir, 'node_modules', '.bin', isWindows() ? 'ai-spec-auto.cmd' : 'ai-spec-auto');
   if (fs.existsSync(localCli)) ok('./node_modules/.bin/ai-spec-auto 可用');
-  else { err('./node_modules/.bin/ai-spec-auto 缺失'); hasIssue = true; }
+  else if (syncManaged) {
+    warn('./node_modules/.bin/ai-spec-auto 缺失（当前项目已通过 sync --manifest 同步资源；仅在需要本地运行协议命令时再安装 CLI）');
+  } else {
+    err('./node_modules/.bin/ai-spec-auto 缺失');
+    hasIssue = true;
+  }
 
   for (const ide of ALL_IDES) {
     const ideDir = path.join(targetDir, `.${ide}`);
@@ -1371,8 +2020,12 @@ function uninstallPackageDeps(targetDir, packages) {
 
 async function handleUninstall(options) {
   const targetDir = path.resolve(options.target);
+  const sourceDir = getSourceDir();
+  const installStatePath = getInstallStatePath(targetDir);
+  const hasInstallState = fs.existsSync(installStatePath);
+  const installState = hasInstallState ? readInstallState(targetDir) : normalizeInstallState(null);
   warn(`将移除 ${targetDir} 下的规范库文件`);
-  console.log('  包括: .agents/、IDE 链接、lint/format 配置、husky hooks、相关依赖');
+  console.log('  包括: .agents/、IDE 链接、命令模板，以及可证明由本工具创建的共享配置/依赖');
   console.log('');
   if (!options.force && isInteractive()) {
     const goOn = await confirm('确认？', false);
@@ -1381,33 +2034,38 @@ async function handleUninstall(options) {
       return 0;
     }
   }
-  for (const ide of ALL_IDES) {
-    const ideDir = path.join(targetDir, `.${ide}`);
-    if (fs.existsSync(ideDir)) {
-      removePath(path.join(ideDir, 'rules'));
-      removePath(path.join(ideDir, 'skills'));
-      const remaining = fs.readdirSync(ideDir, { withFileTypes: true }).filter((entry) => entry.name !== '.' && entry.name !== '..');
-      if (remaining.length === 0) {
-        removePath(ideDir);
-      }
-    }
+  const managedPaths = hasInstallState ? installState.managed_paths : listLegacyManagedPaths(targetDir, sourceDir);
+  removeManagedPaths(targetDir, managedPaths);
+  removePath(path.join(targetDir, '.ai-spec', 'manifest.json'));
+  removePath(path.join(targetDir, '.ai-spec', 'lock.json'));
+  removePath(path.join(targetDir, '.ai-spec', 'sources.json'));
+  removePath(installStatePath);
+
+  if (hasInstallState) {
+    removeManagedPaths(targetDir, installState.created_config_files);
   }
-  removePath(path.join(targetDir, '.agents'));
-  for (const fileName of ['.prettierrc.json', '.prettierignore', '.stylelintrc.json', '.stylelintignore', '.eslintrc.js', '.eslintrc.cjs', '.eslintignore', '.lintstagedrc', 'commitlint.config.js', '.editorconfig']) {
-    removePath(path.join(targetDir, fileName));
-  }
-  removePath(path.join(targetDir, '.husky'));
+
   const pkgPath = path.join(targetDir, 'package.json');
   if (fs.existsSync(pkgPath)) {
     const pkg = readJson(pkgPath, 'package.json');
-    if (pkg.scripts?.prepare && String(pkg.scripts.prepare).includes('husky')) {
+    if (hasInstallState && installState.package_json.prepare_script && pkg.scripts?.prepare === installState.package_json.prepare_script) {
       delete pkg.scripts.prepare;
       if (Object.keys(pkg.scripts).length === 0) delete pkg.scripts;
       writeJson(pkgPath, pkg);
     }
   }
-  uninstallPackageDeps(targetDir, ['husky', 'lint-staged', '@commitlint/cli', '@commitlint/config-conventional']);
-  uninstallPackageDeps(targetDir, ['eslint', 'prettier', 'stylelint', 'stylelint-config-standard', 'stylelint-config-html', 'stylelint-config-recommended-vue', 'postcss-html']);
+  if (hasInstallState && installState.added_dev_dependencies.length > 0) {
+    uninstallPackageDeps(targetDir, installState.added_dev_dependencies);
+  }
+  const huskyDir = path.join(targetDir, '.husky');
+  if (fs.existsSync(huskyDir) && walkFiles(huskyDir).length === 0) {
+    removePath(huskyDir);
+  }
+  cleanupEmptyIdeDirs(targetDir);
+  const aiSpecDir = path.join(targetDir, '.ai-spec');
+  if (fs.existsSync(aiSpecDir) && fs.readdirSync(aiSpecDir).filter((entry) => entry !== '.DS_Store').length === 0) {
+    removePath(aiSpecDir);
+  }
   ok('卸载完成');
   return 0;
 }
@@ -1416,6 +2074,7 @@ function printUsage() {
   console.log(`${color('ai-spec-auto', 'bold')} 安装工具\n`);
   console.log('推荐入口：');
   console.log('  npx @ex/ai-spec-auto@latest init .');
+  console.log('  npx @ex/ai-spec-auto@latest init . --manifest <file-or-url>');
   console.log('  npx @ex/ai-spec-auto@latest update .');
   console.log('  npx @ex/ai-spec-auto@latest sync .');
   console.log('  npx @ex/ai-spec-auto@latest check .');
@@ -1426,7 +2085,7 @@ function printUsage() {
   console.log('  - 当前包通过内网 npm registry 分发，首次使用前请先配置 @ex:registry=http://nodejs.100credit.cn/');
   console.log('');
   console.log('命令：');
-  console.log('  init [dir]        首次安装到目标项目');
+  console.log('  init [dir]        首次安装到目标项目（支持 --manifest 首装即同步）');
   console.log('  update [dir]      更新规范，支持细粒度模块选择');
   console.log('  sync [dir]        按 manifest / profile 同步规范资产');
   console.log('  check [dir]       检查安装状态');
@@ -1435,20 +2094,22 @@ function printUsage() {
   console.log('常用选项：');
   console.log('  --profile <name>           技术栈（vue | react）');
   console.log('  --level <L1|L2|L3>         兼容参数，默认仍等价完整安装');
-  console.log('  --standard-rules           使用标准规则集');
-  console.log('  --custom-rules             启用自定义规则模式');
+  console.log('  --standard-rules           使用标准规则集（manifest 模式下表示沿用安装模板）');
+  console.log('  --custom-rules             启用自定义规则模式（manifest 模式下表示 /project-init 刷新偏好）');
   console.log('  --package <path>           Monorepo 下指定子包');
   console.log('  --workspace-root           Monorepo 下显式在根目录安装');
   console.log('  --uipro / --no-uipro       安装或跳过 UI UX Pro Max');
   console.log('  --lint / --no-lint         安装或跳过 lint/format');
   console.log('  --husky / --no-husky       安装或跳过提交校验');
+  console.log('  --manifest <path|url>      init/sync 时指定安装清单');
+  console.log('  --hub-origin <origin>      本地 manifest 缺失资产时指定 Hub 补充来源');
+  console.log('  --no-hub-fetch             禁止通过 Hub 补充下载缺失资产');
   console.log('  --skip-skills              update 时跳过 skills');
   console.log('  --skip-configs             update 时跳过 configs');
   console.log('  --skip-commands            update 时仅补新增命令模板');
   console.log('  --skip-ide-links           update 时跳过 IDE 链接');
   console.log('  --skip-openspec            update 时跳过 OpenSpec 更新');
   console.log('  --skip-uipro               update 时跳过 UI UX Pro Max 更新');
-  console.log('  --manifest <path|url>      sync 时指定安装清单');
   console.log('  --dry-run                  sync 时仅预览，不落盘');
   console.log('');
 }
@@ -1483,7 +2144,16 @@ async function main(argv) {
   }
 }
 
-module.exports = { main };
+module.exports = {
+  main,
+  __test__: {
+    CUSTOMIZABLE_RULES,
+    DEFAULT_CUSTOM_RULE_SELECTION,
+    normalizeCustomRulesSelection,
+    selectCustomRuleList,
+    selectMultipleFromList,
+  },
+};
 
 if (require.main === module) {
   main(process.argv.slice(2)).then((code) => process.exit(code));

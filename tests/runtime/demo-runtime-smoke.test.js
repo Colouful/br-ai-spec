@@ -44,8 +44,11 @@ function main() {
   assert.strictEqual(currentRun.run_id, 'run_20260408_100000_demo');
   assert.strictEqual(currentRun.task.change_id, 'runtime-smoke-demo');
   assert.strictEqual(currentRun.current_role, 'archive-change');
-  assert.ok(currentRun.checkpoint_count >= 1);
-  assert.ok(currentRun.last_checkpoint);
+  assert.strictEqual(currentRun.checkpoint_count, 0);
+  assert.strictEqual(currentRun.last_checkpoint, null);
+  assert.ok(Array.isArray(currentRun.events));
+  assert.ok(currentRun.events.length >= 5);
+  assert.ok(!fs.existsSync(path.join(targetDir, '.ai-spec', 'checkpoints')));
   assert.ok(currentRun.artifacts.proposal.includes('openspec/changes/archive/'));
 
   console.log('demo runtime smoke test passed: minimal expert-delivery example reaches success');

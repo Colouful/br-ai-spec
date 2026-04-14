@@ -142,7 +142,8 @@ function main() {
   assert.strictEqual(currentRun.auto_fix.max_attempts, 1);
   assert.strictEqual(currentRun.verification.overall_status, 'failed');
   assert.strictEqual(currentRun.auto_fix.last_failed_steps[0].name, 'build');
-  assert.ok(currentRun.checkpoint_count >= 3);
+  assert.strictEqual(currentRun.checkpoint_count, 0);
+  assert.strictEqual(currentRun.last_checkpoint, null);
 
   let workflow = step(successAfterFixTarget);
   assert.strictEqual(workflow.turn.actor.id, 'frontend-implementer');
@@ -187,7 +188,8 @@ function main() {
   assert.strictEqual(currentRun.auto_fix.attempts, 1);
   assert.strictEqual(currentRun.verification.overall_status, 'failed');
   assert.strictEqual(currentRun.auto_fix.last_failed_steps[0].name, 'build');
-  assert.ok(currentRun.checkpoint_count >= 4);
+  assert.strictEqual(currentRun.checkpoint_count, 0);
+  assert.strictEqual(currentRun.last_checkpoint, null);
 
   workflow = step(failureAfterFixTarget);
   assert.strictEqual(workflow.turn.actor.id, 'code-guardian');

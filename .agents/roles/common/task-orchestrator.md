@@ -19,9 +19,9 @@ reads:
   - .agents/flows/
   - openspec/changes/<change-id>/
   - .agents/roles/common/task-orchestrator-routing.md
-  - .agents/roles/common/task-orchestrator-run-plan-template.md
-  - .agents/roles/common/task-anchor-spec.md
-  - .agents/roles/common/runtime-state-handoff-spec.md
+  - .agents/orchestration/task-orchestrator-run-plan-template.md
+  - .agents/orchestration/task-anchor-spec.md
+  - .agents/orchestration/runtime-state-handoff-spec.md
 writes:
   - openspec/changes/<change-id>/proposal.md
   - .ai-spec/internal/tmp/task-orchestrator-turn.json

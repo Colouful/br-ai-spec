@@ -6,6 +6,7 @@ const {
   getExistingPath,
   getCandidatePaths,
   shouldPersistHistory,
+  shouldPersistCheckpoints,
 } = require('./runtime-paths');
 const { syncRepoMap } = require('./repo-map');
 
@@ -62,6 +63,10 @@ Options:
   --json                   Print JSON result
   --pretty                 Print readable summary (default)
   --help                   Show this help
+
+Environment:
+  AI_SPEC_PERSIST_CHECKPOINTS=1
+                           Persist .ai-spec/checkpoints/<run-id>/*.json for restore/debug
 `);
 }
 
@@ -1038,7 +1043,7 @@ function loadTaskAnchor(taskAnchorPath, taskAnchorData = null) {
 }
 
 function maybeAttachCheckpoint(targetDir, state, checkpointEvent) {
-  if (!checkpointEvent || !CHECKPOINT_EVENTS.has(checkpointEvent)) {
+  if (!shouldPersistCheckpoints() || !checkpointEvent || !CHECKPOINT_EVENTS.has(checkpointEvent)) {
     return state;
   }
 

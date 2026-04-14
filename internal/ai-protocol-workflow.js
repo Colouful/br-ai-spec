@@ -32,7 +32,7 @@ const {
 const PACKAGE_ROOT = path.resolve(__dirname, '..');
 
 const START_INSTRUCTION_FILES = [
-  '.agents/roles/common/task-orchestrator-run-plan-template.md',
+  '.agents/orchestration/task-orchestrator-run-plan-template.md',
 ];
 
 const CONTINUE_INSTRUCTION_FILES = [];

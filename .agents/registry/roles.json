@@ -4,14 +4,15 @@
     ".agents/roles/INDEX.md",
     ".agents/roles/common/README.md",
     ".agents/roles/domains/README.md",
-    ".agents/roles/common/runtime-state-handoff-spec.md",
-    ".agents/roles/common/task-anchor-spec.md",
-    ".agents/roles/common/task-orchestrator-adapter-payload.md",
-    ".agents/roles/common/task-orchestrator-bootstrap-payload.md",
-    ".agents/roles/common/task-orchestrator-output-extractor-spec.md",
+    ".agents/orchestration/README.md",
+    ".agents/orchestration/runtime-state-handoff-spec.md",
+    ".agents/orchestration/task-anchor-spec.md",
+    ".agents/orchestration/task-orchestrator-adapter-payload.md",
+    ".agents/orchestration/task-orchestrator-bootstrap-payload.md",
+    ".agents/orchestration/task-orchestrator-output-extractor-spec.md",
     ".agents/roles/common/task-orchestrator-routing.md",
-    ".agents/roles/common/task-orchestrator-run-plan-template.md",
-    ".agents/roles/common/task-orchestrator-runtime-hooks.md"
+    ".agents/orchestration/task-orchestrator-run-plan-template.md",
+    ".agents/orchestration/task-orchestrator-runtime-hooks.md"
   ],
   "roles": {
     "task-orchestrator": {

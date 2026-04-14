@@ -163,10 +163,15 @@ function shouldPersistHistory() {
   return process.env.AI_SPEC_PERSIST_HISTORY === '1' || process.env.BR_AI_SPEC_DEBUG_HISTORY === '1';
 }
 
+function shouldPersistCheckpoints() {
+  return process.env.AI_SPEC_PERSIST_CHECKPOINTS === '1' || process.env.BR_AI_SPEC_DEBUG_CHECKPOINTS === '1';
+}
+
 module.exports = {
   resolveRuntimePaths,
   getExistingPath,
   getExistingRelPath,
   getCandidatePaths,
   shouldPersistHistory,
+  shouldPersistCheckpoints,
 };

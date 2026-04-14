@@ -20,3 +20,4 @@
 - `new-page.md`：真实页面开发
 - `new-component.md`：独立组件开发
 - `bugfix.md`：单点缺陷修复
+- `create-expert-package.md`：创建专家包，连同 role、rule、skill、注册表片段一起生成

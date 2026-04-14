@@ -10,7 +10,8 @@ description: sync（同步）本地求解使用的最小注册表目录。用于
 当前阶段放 5 类数据：
 
 - `scenario-packages.json`
-  - 定义 `scenario_package（场景方案包）` 默认展开出的 `roles（专家角色） / skills（技能） / rules（规则） / domains（能力域）`
+  - 兼容保留的 `scenario_package（场景方案包） metadata`，用于导出追踪与展示分析
+  - 不再参与 `sync（同步）` 的安装求解；未知场景包不应阻断安装
 - `rules.json`
   - 定义 `rule（规则） id` 到实际文件的映射，以及它们的 `domains（能力域）`
   - `task-orchestrator` 优先通过它解析规则文件，不再在执行器中硬编码规则路径
@@ -27,7 +28,8 @@ description: sync（同步）本地求解使用的最小注册表目录。用于
 
 - 运行逻辑写在 `bin/sync.js`
 - 安装求解数据沉淀在 `.agents/registry/`
-- 后续新增或调整 `rules（规则） / scenario_packages（场景方案包） / skills（技能） / roles（专家角色） / flows（流程模板）` 时，优先改注册表，不优先改执行器
+- 后续新增或调整 `rules（规则） / skills（技能） / roles（专家角色） / flows（流程模板）` 时，优先改注册表，不优先改执行器
+- `scenario_packages（场景方案包）` 作为 metadata，允许存在于导出快照中，但不再作为本地安装求解的强依赖
 
 ## 校验方式
 
@@ -53,7 +55,8 @@ ai-spec-auto validate-registry --json
 - `version（版本号）` 是否合法
 - `source（源文件） / sourceByProfile（按技术栈源文件） / support_files（支持文件）` 是否真实存在
 - `domains（能力域）` 是否为字符串数组
-- `roles.json / flows.json / scenario-packages.json` 对 `rules / skills / roles` 的引用是否都能在注册表中找到
+- `roles.json / flows.json` 对 `rules / skills / roles` 的引用是否都能在注册表中找到
+- 若存在 `scenario-packages.json`，其引用关系会继续校验；若不存在，不影响主流程校验
 - `roles.json.rule_contract_profiles` 的 profile key 与数组字段是否合法
 - `scenario_package（场景方案包）` 引用的 `roles（专家角色） / skills（技能） / rules（规则）` 是否都能在注册表中找到
 

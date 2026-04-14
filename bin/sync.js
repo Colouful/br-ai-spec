@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 const crypto = require('crypto');
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
+const { spawnSync } = require('child_process');
 const {
   formatSupportedProfiles,
   getProfileEntries,
@@ -26,6 +28,8 @@ Options:
   --manifest <file|url>   Local manifest JSON file path or remote manifest URL
   --profile <profile>     Override profile from manifest (${profileHint})
   --ide <preset>          Override ides (default | all | cursor | claude | comma-separated)
+  --hub-origin <origin>   Hub origin for supplement fetch when manifest is local
+  --no-hub-fetch          Disable Hub supplement fetch for missing assets
   --json                  Print JSON output only
   --dry-run               Resolve only, do not write files
   --force                 Reserved for future conflict handling
@@ -41,6 +45,7 @@ function parseArgs(argv) {
     pretty: true,
     dryRun: false,
     force: false,
+    hubFetch: true,
   };
 
   while (args.length > 0) {
@@ -52,17 +57,23 @@ function parseArgs(argv) {
 
     switch (arg) {
       case '--manifest':
-        options.manifest = args.shift();
+        options.manifest = requireArg(arg, args);
         break;
       case '--profile':
-        options.profile = args.shift();
+        options.profile = requireArg(arg, args);
         break;
       case '--ide':
-        options.ide = args.shift();
+        options.ide = requireArg(arg, args);
         break;
       case '--json':
         options.json = true;
         options.pretty = false;
+        break;
+      case '--hub-origin':
+        options.hubOrigin = requireArg(arg, args);
+        break;
+      case '--no-hub-fetch':
+        options.hubFetch = false;
         break;
       case '--dry-run':
         options.dryRun = true;
@@ -84,6 +95,14 @@ function parseArgs(argv) {
   }
 
   return options;
+}
+
+function requireArg(flag, args) {
+  const next = args.shift();
+  if (!next || next.startsWith('--')) {
+    throw new Error(`选项 ${flag} 需要一个参数值`);
+  }
+  return next;
 }
 
 function isHttpUrl(value) {
@@ -162,6 +181,24 @@ function normalizeIdes(value) {
   return items;
 }
 
+function parseLocalPreferences(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return null;
+  }
+  if (!Object.prototype.hasOwnProperty.call(value, 'project_init')) {
+    return null;
+  }
+  const projectInit = value.project_init;
+  if (!projectInit || typeof projectInit !== 'object' || Array.isArray(projectInit)) {
+    return { project_init: { custom_rules: [] } };
+  }
+  return {
+    project_init: {
+      custom_rules: normalizeList(projectInit.custom_rules),
+    },
+  };
+}
+
 function walkFiles(rootDir, predicate) {
   const results = [];
   if (!fs.existsSync(rootDir)) {
@@ -188,7 +225,7 @@ function walkFiles(rootDir, predicate) {
   return results.sort();
 }
 
-function readSkillCatalog(sourceDir) {
+function readSkillCatalog(sourceDir, metadataMap = new Map()) {
   const skillRegistry = readRegistryJson(sourceDir, 'skills.json', 'skills');
   const profilesRegistry = readProfilesRegistry(sourceDir);
   const catalog = {
@@ -214,6 +251,12 @@ function readSkillCatalog(sourceDir) {
       sourceDirRel: dirRel,
       sourceFileRel: rel,
       domains: normalizeList(skillRegistry[id]?.domains),
+      sourceRoot: sourceDir,
+      sourceType: metadataMap.get(id)?.__sourceType || 'local',
+      sourceRef: metadataMap.get(id)?.__sourceRef || `local://${dirRel}`,
+      sourceOrigin: metadataMap.get(id)?.__sourceOrigin || null,
+      version: metadataMap.get(id)?.__version || 'workspace',
+      hubSlug: metadataMap.get(id)?.__hubSlug || null,
     };
 
     if (rel.startsWith('.agents/skills/common/')) {
@@ -232,11 +275,21 @@ function readSkillCatalog(sourceDir) {
 }
 
 function loadSyncRegistry(sourceDir) {
+  const roles = readJsonFile(path.join(sourceDir, '.agents/registry/roles.json'), 'Registry roles.json');
+  const flowsPath = path.join(sourceDir, '.agents/registry/flows.json');
+  const flows = fs.existsSync(flowsPath)
+    ? readJsonFile(flowsPath, 'Registry flows.json')
+    : { version: 1, support_files: [], flows: {} };
   return {
-    roles: readJsonFile(path.join(sourceDir, '.agents/registry/roles.json'), 'Registry roles.json'),
-    rules: readRegistryJson(sourceDir, 'rules.json', 'rules'),
-    scenarioPackages: readRegistryJson(sourceDir, 'scenario-packages.json', 'scenario_packages'),
-    flows: readJsonFile(path.join(sourceDir, '.agents/registry/flows.json'), 'Registry flows.json'),
+    roles: {
+      ...roles,
+      __sourceRoot: sourceDir,
+    },
+    rules: buildRuleRegistryForSource(readRegistryJson(sourceDir, 'rules.json', 'rules'), sourceDir, new Map()),
+    flows: {
+      ...flows,
+      __sourceRoot: sourceDir,
+    },
   };
 }
 
@@ -252,6 +305,37 @@ function readRoleCatalog(roleRegistry) {
       status: entry.status || 'unknown',
       domains: normalizeList(entry.domains),
       sourceRel: entry.source,
+      sourceRoot: roleRegistry.__sourceRoot,
+      sourceType: entry.__sourceType || 'local',
+      sourceRef: entry.__sourceRef || `local://${entry.source}`,
+      sourceOrigin: entry.__sourceOrigin || null,
+      version: entry.__version || 'workspace',
+      hubSlug: entry.__hubSlug || null,
+    });
+  }
+  return catalog;
+}
+
+function readRuleCatalog(ruleRegistry) {
+  const catalog = new Map();
+  for (const [id, entry] of Object.entries(ruleRegistry || {})) {
+    if (!entry || typeof entry !== 'object') {
+      continue;
+    }
+    if (!entry.source && !entry.sourceByProfile) {
+      continue;
+    }
+    catalog.set(id, {
+      id,
+      source: entry.source || null,
+      sourceByProfile: entry.sourceByProfile || null,
+      domains: normalizeList(entry.domains),
+      sourceRoot: entry.__sourceRoot,
+      sourceType: entry.__sourceType || 'local',
+      sourceRef: entry.__sourceRef || (entry.source ? `local://${entry.source}` : 'local://profiled-rule'),
+      sourceOrigin: entry.__sourceOrigin || null,
+      version: entry.__version || 'workspace',
+      hubSlug: entry.__hubSlug || null,
     });
   }
   return catalog;
@@ -268,6 +352,11 @@ function readFlowCatalog(flowRegistry) {
       name: entry.name || id,
       status: entry.status || 'unknown',
       sourceRel: entry.source,
+      sourceRoot: flowRegistry.__sourceRoot,
+      sourceType: entry.__sourceType || 'local',
+      sourceRef: entry.__sourceRef || `local://${entry.source}`,
+      sourceOrigin: entry.__sourceOrigin || null,
+      version: entry.__version || 'workspace',
     });
   }
   return catalog;
@@ -282,8 +371,80 @@ function resolveSkill(id, profile, catalog) {
   );
 }
 
+function normalizeLegacyProfileScopedSkillId(skillId, profile, catalog, warnings) {
+  const normalized = String(skillId || '').trim();
+  if (!normalized) {
+    return normalized;
+  }
+
+  const match = normalized.match(/^(.*?)-(react|vue)$/);
+  if (!match) {
+    return normalized;
+  }
+
+  const [, baseId, scopedProfile] = match;
+  if (!baseId) {
+    return normalized;
+  }
+
+  const resolvedBase = resolveSkill(baseId, profile, catalog);
+  if (!resolvedBase) {
+    return normalized;
+  }
+
+  if (scopedProfile !== profile) {
+    warnings.push(`Skill id "${normalized}" uses legacy profile suffix "${scopedProfile}" but target profile is "${profile}"; normalized to "${baseId}".`);
+  } else {
+    warnings.push(`Skill id "${normalized}" uses legacy profile suffix; normalized to "${baseId}".`);
+  }
+  return baseId;
+}
+
+const LEGACY_RULE_ID_ALIASES = {
+  'react-project-overview': 'project-overview',
+  'vue-project-overview': 'project-overview',
+  'react-project-structure': 'project-structure',
+  'vue-project-structure': 'project-structure',
+  'react-component-guidelines': 'component-standard',
+  'vue-component-guidelines': 'component-standard',
+  'react-routing-guidelines': 'route-standard',
+  'vue-routing-guidelines': 'route-standard',
+  'react-state-management': 'store-standard',
+  'vue-state-management': 'store-standard',
+  'react-style-guidelines': 'style-standard',
+  'vue-style-guidelines': 'style-standard',
+  'api-guidelines': 'api-standard',
+  'coding-guidelines': 'coding-standard',
+  'general-constraints': 'generic-constraints',
+  'documentation-guidelines': 'doc-standard',
+  'testing-guidelines': 'test-standard',
+  'superpowers-execution-guidelines': 'superpowers-standard',
+  'code-formatting-and-checks': 'format-check-standard',
+  'audit-reporting-guidelines': 'audit-report-standard',
+};
+
+function normalizeLegacyRuleId(ruleId, profile, ruleRegistry, warnings) {
+  const normalized = String(ruleId || '').trim();
+  if (!normalized) {
+    return normalized;
+  }
+
+  const canonicalId = LEGACY_RULE_ID_ALIASES[normalized];
+  if (!canonicalId) {
+    return normalized;
+  }
+
+  const resolvedCanonical = resolveRule(canonicalId, profile, ruleRegistry);
+  if (!resolvedCanonical) {
+    return normalized;
+  }
+
+  warnings.push(`Rule id "${normalized}" uses legacy manifest alias; normalized to "${canonicalId}".`);
+  return canonicalId;
+}
+
 function resolveRule(id, profile, ruleRegistry) {
-  const entry = ruleRegistry[id];
+  const entry = ruleRegistry.get(id);
   if (!entry) {
     return null;
   }
@@ -292,14 +453,16 @@ function resolveRule(id, profile, ruleRegistry) {
     if (!source) {
       return null;
     }
-    return { id, sourceRel: source, domains: entry.domains || [] };
+    return { ...entry, id, sourceRel: source, domains: entry.domains || [] };
   }
-  return { id, sourceRel: entry.source, domains: entry.domains || [] };
+  return { ...entry, id, sourceRel: entry.source, domains: entry.domains || [] };
 }
 
 function normalizeManifest(rawManifest, existingManifest, options, profilesRegistry) {
   const rawProfile = options.profile || rawManifest?.profile || existingManifest?.profile || null;
   const resolvedProfile = resolveProfileId(profilesRegistry, rawProfile);
+  const rawLocalPreferences = parseLocalPreferences(rawManifest?.local_preferences);
+  const existingLocalPreferences = parseLocalPreferences(existingManifest?.local_preferences);
   const manifest = {
     schema_version: Number(rawManifest?.schema_version || existingManifest?.schema_version || 1),
     manifest_type: rawManifest?.manifest_type || existingManifest?.manifest_type || 'hub-install',
@@ -318,6 +481,10 @@ function normalizeManifest(rawManifest, existingManifest, options, profilesRegis
     notes: normalizeList(rawManifest?.notes || existingManifest?.notes),
     sources: Array.isArray(rawManifest?.sources) ? rawManifest.sources : Array.isArray(existingManifest?.sources) ? existingManifest.sources : [],
   };
+  const localPreferences = rawLocalPreferences !== null ? rawLocalPreferences : existingLocalPreferences;
+  if (localPreferences) {
+    manifest.local_preferences = localPreferences;
+  }
 
   if (!manifest.profile) {
     if (!rawProfile) {
@@ -398,29 +565,27 @@ function unique(values) {
   return [...new Set(values.filter(Boolean))];
 }
 
-function resolveManifest(manifest, catalogs, registry) {
+function resolveManifest(manifest, catalogs, options = {}) {
+  const allowMissing = options.allowMissing === true;
   const warnings = [];
   const roleIds = new Set(manifest.roles);
   const skillIds = new Set(manifest.skills);
   const ruleIds = new Set(manifest.rules);
   const domains = new Set();
-
-  for (const scenarioId of manifest.scenario_packages) {
-    const scenario = registry.scenarioPackages[scenarioId];
-    if (!scenario) {
-      warnings.push(`Unknown scenario_package（场景方案包）: ${scenarioId}`);
-      continue;
-    }
-    for (const roleId of scenario.roles || []) roleIds.add(roleId);
-    for (const skillId of scenario.skills || []) skillIds.add(skillId);
-    for (const ruleId of scenario.rules || []) ruleIds.add(ruleId);
-    for (const domain of scenario.domains || []) domains.add(domain);
-  }
+  const missing = {
+    roles: [],
+    skills: [],
+    rules: [],
+  };
 
   const resolvedRoles = [];
   for (const roleId of roleIds) {
     const entry = catalogs.roles.get(roleId);
     if (!entry) {
+      if (allowMissing) {
+        missing.roles.push(roleId);
+        continue;
+      }
       throw new Error(`Unknown role（专家角色） id: ${roleId}`);
     }
     resolvedRoles.push(entry);
@@ -429,8 +594,13 @@ function resolveManifest(manifest, catalogs, registry) {
 
   const resolvedSkills = [];
   for (const skillId of skillIds) {
-    const entry = resolveSkill(skillId, manifest.profile, catalogs.skills);
+    const normalizedSkillId = normalizeLegacyProfileScopedSkillId(skillId, manifest.profile, catalogs.skills, warnings);
+    const entry = resolveSkill(normalizedSkillId, manifest.profile, catalogs.skills);
     if (!entry) {
+      if (allowMissing) {
+        missing.skills.push(skillId);
+        continue;
+      }
       throw new Error(`Unknown skill（技能） id for profile "${manifest.profile}": ${skillId}`);
     }
     resolvedSkills.push(entry);
@@ -439,8 +609,13 @@ function resolveManifest(manifest, catalogs, registry) {
 
   const resolvedRules = [];
   for (const ruleId of ruleIds) {
-    const entry = resolveRule(ruleId, manifest.profile, registry.rules);
+    const normalizedRuleId = normalizeLegacyRuleId(ruleId, manifest.profile, catalogs.rules, warnings);
+    const entry = resolveRule(normalizedRuleId, manifest.profile, catalogs.rules);
     if (!entry) {
+      if (allowMissing) {
+        missing.rules.push(ruleId);
+        continue;
+      }
       throw new Error(`Unknown rule（规则） id for profile "${manifest.profile}": ${ruleId}`);
     }
     resolvedRules.push(entry);
@@ -457,12 +632,13 @@ function resolveManifest(manifest, catalogs, registry) {
       : resolvedRoles[0]?.id || null;
   }
 
-  if (manifest.entry_role && !resolvedRoles.some((entry) => entry.id === manifest.entry_role)) {
+  if (!allowMissing && manifest.entry_role && !resolvedRoles.some((entry) => entry.id === manifest.entry_role)) {
     throw new Error(`entry_role（默认入口角色） is not included in resolved roles: ${manifest.entry_role}`);
   }
 
   return {
     warnings,
+    missing,
     resolved: {
       domains: unique([...domains]),
       installed_flows: installedFlows,
@@ -470,6 +646,277 @@ function resolveManifest(manifest, catalogs, registry) {
       skills: resolvedSkills,
       rules: resolvedRules,
     },
+  };
+}
+
+function hasMissingAssets(resolvedResult) {
+  return resolvedResult.missing.roles.length > 0 ||
+    resolvedResult.missing.skills.length > 0 ||
+    resolvedResult.missing.rules.length > 0;
+}
+
+function normalizeOrigin(value) {
+  if (!value) return null;
+  try {
+    return new URL(String(value)).origin;
+  } catch (error) {
+    throw new Error(`Invalid hub origin: ${value}`);
+  }
+}
+
+function resolveHubOrigin(options, manifestSource) {
+  if (options.hubFetch === false) {
+    return null;
+  }
+  if (options.hubOrigin) {
+    return normalizeOrigin(options.hubOrigin);
+  }
+  if (isHttpUrl(manifestSource)) {
+    return new URL(manifestSource).origin;
+  }
+  return null;
+}
+
+function mergeRegistryEntries(localEntries, remoteEntries) {
+  return {
+    ...(remoteEntries || {}),
+    ...(localEntries || {}),
+  };
+}
+
+function mergeSupportFiles(localFiles, remoteFiles) {
+  return unique([...(remoteFiles || []), ...(localFiles || [])]);
+}
+
+function buildRoleRegistryForSource(rawRegistry, sourceRoot, metadataMap) {
+  return {
+    version: rawRegistry.version || 1,
+    support_files: [...(rawRegistry.support_files || [])],
+    __sourceRoot: sourceRoot,
+    roles: Object.fromEntries(
+      Object.entries(rawRegistry.roles || {}).map(([id, entry]) => {
+        const meta = metadataMap.get(id);
+        return [id, {
+          ...entry,
+          ...(meta || {}),
+        }];
+      }),
+    ),
+  };
+}
+
+function buildRuleRegistryForSource(rawRegistry, sourceRoot, metadataMap) {
+  return Object.fromEntries(
+    Object.entries(rawRegistry || {}).map(([id, entry]) => {
+      const meta = metadataMap.get(id);
+      return [id, {
+        ...entry,
+        __sourceRoot: sourceRoot,
+        ...(meta || {}),
+      }];
+    }),
+  );
+}
+
+function buildFlowRegistryForSource(rawRegistry, sourceRoot) {
+  return {
+    version: rawRegistry.version || 1,
+    support_files: [...(rawRegistry.support_files || [])],
+    __sourceRoot: sourceRoot,
+    flows: Object.fromEntries(
+      Object.entries(rawRegistry.flows || {}).map(([id, entry]) => [id, {
+        ...entry,
+      }]),
+    ),
+  };
+}
+
+function createAssetMetadataMap(items, kind, requestUrl, origin) {
+  const map = new Map();
+  for (const item of items || []) {
+    const id = String(item.registryId || '').trim();
+    if (!id) continue;
+    map.set(id, {
+      __sourceType: 'hub',
+      __sourceRef: `${requestUrl}#${kind}:${id}`,
+      __sourceOrigin: origin,
+      __version: String(item.version || 'published'),
+      __hubSlug: item.hubSlug || null,
+    });
+  }
+  return map;
+}
+
+function mergeMapCatalog(localMap, remoteMap) {
+  return new Map([
+    ...remoteMap.entries(),
+    ...localMap.entries(),
+  ]);
+}
+
+function mergeSkillCatalog(localCatalog, remoteCatalog) {
+  const profiles = {};
+  const profileIds = unique([
+    ...Object.keys(localCatalog.profiles || {}),
+    ...Object.keys(remoteCatalog.profiles || {}),
+  ]);
+  for (const profileId of profileIds) {
+    profiles[profileId] = mergeMapCatalog(
+      localCatalog.profiles?.[profileId] || new Map(),
+      remoteCatalog.profiles?.[profileId] || new Map(),
+    );
+  }
+
+  return {
+    common: mergeMapCatalog(localCatalog.common, remoteCatalog.common),
+    profiles,
+    domains: mergeMapCatalog(localCatalog.domains, remoteCatalog.domains),
+  };
+}
+
+function extractZipArchive(zipPath, destDir) {
+  let result;
+  if (process.platform === 'win32') {
+    result = spawnSync('powershell', [
+      '-NoProfile',
+      '-Command',
+      `Expand-Archive -LiteralPath '${zipPath.replace(/'/g, "''")}' -DestinationPath '${destDir.replace(/'/g, "''")}' -Force`,
+    ], {
+      encoding: 'utf8',
+    });
+  } else {
+    result = spawnSync('unzip', ['-qq', zipPath, '-d', destDir], {
+      encoding: 'utf8',
+    });
+  }
+
+  if (result.error) {
+    throw new Error(`Failed to extract Hub supplement zip: ${result.error.message}`);
+  }
+  if (result.status !== 0) {
+    throw new Error(`Failed to extract Hub supplement zip: ${(result.stderr || result.stdout || '').trim() || 'unknown unzip error'}`);
+  }
+}
+
+function readOptionalJson(filePath, label) {
+  if (!fs.existsSync(filePath)) {
+    return null;
+  }
+  return readJsonFile(filePath, label);
+}
+
+async function fetchHubSupplement(origin, manifest, missing, timeoutMs) {
+  const requestUrl = `${origin.replace(/\/$/, '')}/api/install/supplement-export`;
+  const payload = {
+    profile: manifest.profile,
+    ides: manifest.ides,
+    roles: missing.roles,
+    skills: missing.skills,
+    rules: missing.rules,
+  };
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(requestUrl, {
+      method: 'POST',
+      signal: controller.signal,
+      headers: {
+        accept: 'application/zip',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      const text = await response.text().catch(() => '');
+      throw new Error(`Hub supplement request failed with status ${response.status} ${response.statusText}${text ? `: ${text}` : ''}`);
+    }
+
+    const bytes = Buffer.from(await response.arrayBuffer());
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-spec-hub-supplement-'));
+    const zipPath = path.join(tempDir, 'supplement.zip');
+    const extractDir = path.join(tempDir, 'bundle');
+    ensureDir(extractDir);
+    fs.writeFileSync(zipPath, bytes);
+    extractZipArchive(zipPath, extractDir);
+
+    const report = readOptionalJson(path.join(extractDir, 'export-report.json'), 'Hub supplement report') || {
+      warnings: [],
+      assets: { roles: [], skills: [], rules: [] },
+    };
+    return {
+      origin,
+      requestUrl,
+      tempDir,
+      extractDir,
+      report,
+    };
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      throw new Error(`Hub supplement request timed out after ${timeoutMs}ms: ${requestUrl}`);
+    }
+    if (error.message && error.message.startsWith('Hub supplement')) {
+      throw error;
+    }
+    throw new Error(`Failed to fetch Hub supplement: ${requestUrl} (${error.message})`);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function buildSupplementState(supplement) {
+  const supplementRoot = supplement.extractDir;
+  const supplementRegistry = loadSyncRegistry(supplementRoot);
+  const roleMetadata = createAssetMetadataMap(supplement.report.assets?.roles, 'role', supplement.requestUrl, supplement.origin);
+  const skillMetadata = createAssetMetadataMap(supplement.report.assets?.skills, 'skill', supplement.requestUrl, supplement.origin);
+  const ruleMetadata = createAssetMetadataMap(supplement.report.assets?.rules, 'rule', supplement.requestUrl, supplement.origin);
+
+  const roleRegistry = buildRoleRegistryForSource(supplementRegistry.roles, supplementRoot, roleMetadata);
+  const flowRegistry = buildFlowRegistryForSource(supplementRegistry.flows, supplementRoot);
+  const ruleRegistry = buildRuleRegistryForSource(supplementRegistry.rules, supplementRoot, ruleMetadata);
+
+  return {
+    registry: {
+      roles: roleRegistry,
+      rules: ruleRegistry,
+      flows: flowRegistry,
+    },
+    catalogs: {
+      roles: readRoleCatalog(roleRegistry),
+      skills: readSkillCatalog(supplementRoot, skillMetadata),
+      rules: readRuleCatalog(ruleRegistry),
+      flows: readFlowCatalog(flowRegistry),
+    },
+    warnings: normalizeList(supplement.report.warnings),
+  };
+}
+
+function mergePreparedState(prepared, supplement, supplementState) {
+  const mergedRoleRegistry = {
+    ...prepared.registry.roles,
+    support_files: mergeSupportFiles(prepared.registry.roles.support_files, supplementState.registry.roles.support_files),
+    roles: mergeRegistryEntries(prepared.registry.roles.roles, supplementState.registry.roles.roles),
+  };
+  const mergedRuleRegistry = mergeRegistryEntries(prepared.registry.rules, supplementState.registry.rules);
+  const mergedFlowRegistry = {
+    ...prepared.registry.flows,
+    support_files: mergeSupportFiles(prepared.registry.flows.support_files, supplementState.registry.flows.support_files),
+    flows: mergeRegistryEntries(prepared.registry.flows.flows, supplementState.registry.flows.flows),
+  };
+
+  return {
+    ...prepared,
+    registry: {
+      roles: mergedRoleRegistry,
+      rules: mergedRuleRegistry,
+      flows: mergedFlowRegistry,
+    },
+    catalogs: {
+      roles: mergeMapCatalog(prepared.catalogs.roles, supplementState.catalogs.roles),
+      skills: mergeSkillCatalog(prepared.catalogs.skills, supplementState.catalogs.skills),
+      rules: mergeMapCatalog(prepared.catalogs.rules, supplementState.catalogs.rules),
+      flows: prepared.catalogs.flows,
+    },
+    supplements: [...(prepared.supplements || []), supplement],
   };
 }
 
@@ -530,6 +977,22 @@ function copyFileTracked(sourceDir, targetDir, sourceRel, destRel, changes) {
   changes.updated.push(rel);
 }
 
+function copyFileIfMissingTracked(sourceDir, targetDir, sourceRel, destRel, changes) {
+  const sourcePath = path.join(sourceDir, sourceRel);
+  const destPath = path.join(targetDir, destRel);
+  const rel = targetRel(targetDir, destPath);
+  if (fs.existsSync(destPath)) {
+    if (!changes.skipped.includes(rel)) {
+      changes.skipped.push(rel);
+    }
+    return;
+  }
+  const content = fs.readFileSync(sourcePath);
+  ensureDir(path.dirname(destPath));
+  fs.writeFileSync(destPath, content);
+  changes.created.push(rel);
+}
+
 function copyDirectoryTracked(sourceDir, targetDir, sourceDirRel, destDirRel, changes) {
   const sourcePath = path.join(sourceDir, sourceDirRel);
   const destPath = path.join(targetDir, destDirRel);
@@ -545,15 +1008,9 @@ function copyDirectoryTracked(sourceDir, targetDir, sourceDirRel, destDirRel, ch
     return;
   }
 
-  ensureDir(destPath);
-  const files = walkFiles(sourcePath, () => true);
-  for (const filePath of files) {
-    const relInsideDir = path.relative(sourcePath, filePath);
-    const destFile = path.join(destPath, relInsideDir);
-    const sourceBuffer = fs.readFileSync(filePath);
-    ensureDir(path.dirname(destFile));
-    fs.writeFileSync(destFile, sourceBuffer);
-  }
+  fs.rmSync(destPath, { recursive: true, force: true });
+  ensureDir(path.dirname(destPath));
+  fs.cpSync(sourcePath, destPath, { recursive: true });
   if (existsBefore) {
     if (!changes.updated.includes(rel)) {
       changes.updated.push(rel);
@@ -563,6 +1020,84 @@ function copyDirectoryTracked(sourceDir, targetDir, sourceDirRel, destDirRel, ch
       changes.created.push(rel);
     }
   }
+}
+
+function isManagedPruneAsset(asset) {
+  if (!asset || typeof asset !== 'object') return false;
+  const rel = String(asset.local_path || '').trim();
+  if (!rel) return false;
+  if (rel === '.agents' || rel.startsWith('.agents/roles/') || rel.startsWith('.agents/skills/') || rel.startsWith('.agents/rules/')) {
+    return true;
+  }
+  if (/^\.(claude|cursor|opencode|trae)\/rules$/.test(rel)) {
+    return true;
+  }
+  if (/^\.(claude|cursor|opencode|trae)\/skills\/[^/]+$/.test(rel)) {
+    return true;
+  }
+  if (/^\.(claude|cursor|opencode|trae)\/commands\/[^/]+\.md$/.test(rel)) {
+    return true;
+  }
+  return false;
+}
+
+function readPreviousSources(targetDir) {
+  const sourcesPath = path.join(targetDir, '.ai-spec', 'sources.json');
+  if (!fs.existsSync(sourcesPath)) {
+    return null;
+  }
+  return readJsonFile(sourcesPath, 'Existing sources');
+}
+
+function collectManagedPathsFromSources(sources) {
+  const managed = new Set();
+  for (const asset of Array.isArray(sources?.assets) ? sources.assets : []) {
+    if (!isManagedPruneAsset(asset)) {
+      continue;
+    }
+    managed.add(asset.local_path);
+  }
+  return managed;
+}
+
+function sortPathsForRemoval(paths) {
+  return [...paths].sort((left, right) => {
+    const leftDepth = left.split('/').length;
+    const rightDepth = right.split('/').length;
+    if (leftDepth !== rightDepth) {
+      return rightDepth - leftDepth;
+    }
+    return right.localeCompare(left);
+  });
+}
+
+function cleanupEmptyIdeDirs(targetDir, changes) {
+  for (const ide of ALL_IDES) {
+    const ideDir = path.join(targetDir, `.${ide}`);
+    if (!fs.existsSync(ideDir)) {
+      continue;
+    }
+    for (const child of ['commands', 'skills']) {
+      const childDir = path.join(ideDir, child);
+      if (fs.existsSync(childDir) && fs.readdirSync(childDir).filter((entry) => entry !== '.DS_Store').length === 0) {
+        removePathTracked(targetDir, childDir, changes);
+      }
+    }
+    const remaining = fs.readdirSync(ideDir).filter((entry) => entry !== '.DS_Store');
+    if (remaining.length === 0) {
+      removePathTracked(targetDir, ideDir, changes);
+    }
+  }
+}
+
+function pruneManagedAssets(targetDir, previousSources, currentSources, changes) {
+  const previousPaths = collectManagedPathsFromSources(previousSources);
+  const currentPaths = collectManagedPathsFromSources(currentSources);
+  const stalePaths = [...previousPaths].filter((item) => !currentPaths.has(item));
+  for (const rel of sortPathsForRemoval(stalePaths)) {
+    removePathTracked(targetDir, path.join(targetDir, rel), changes);
+  }
+  cleanupEmptyIdeDirs(targetDir, changes);
 }
 
 function ensureSymlinkTracked(targetDir, linkPath, linkTarget, changes) {
@@ -618,46 +1153,62 @@ function removePathTracked(targetDir, targetPath, changes) {
   }
 }
 
-function installRoles(sourceDir, targetDir, resolvedRoles, roleRegistry, changes) {
+function installRoles(targetDir, resolvedRoles, roleRegistry, changes) {
   for (const supportFile of roleRegistry.support_files || []) {
-    copyFileTracked(sourceDir, targetDir, supportFile, supportFile, changes);
+    copyFileTracked(roleRegistry.__sourceRoot, targetDir, supportFile, supportFile, changes);
   }
 
   const copiedDomainReadmes = new Set();
   for (const role of resolvedRoles) {
-    copyFileTracked(sourceDir, targetDir, role.sourceRel, role.sourceRel, changes);
+    copyFileTracked(role.sourceRoot, targetDir, role.sourceRel, role.sourceRel, changes);
     const domainReadme = role.sourceRel.match(/^\.agents\/roles\/domains\/([^/]+)\//);
-    if (domainReadme) {
+    if (domainReadme && role.sourceType === 'local') {
       const domainReadmeRel = `.agents/roles/domains/${domainReadme[1]}/README.md`;
-      if (!copiedDomainReadmes.has(domainReadmeRel) && fs.existsSync(path.join(sourceDir, domainReadmeRel))) {
-        copyFileTracked(sourceDir, targetDir, domainReadmeRel, domainReadmeRel, changes);
+      if (!copiedDomainReadmes.has(domainReadmeRel) && fs.existsSync(path.join(role.sourceRoot, domainReadmeRel))) {
+        copyFileTracked(role.sourceRoot, targetDir, domainReadmeRel, domainReadmeRel, changes);
         copiedDomainReadmes.add(domainReadmeRel);
       }
     }
   }
 }
 
-function installSkills(sourceDir, targetDir, resolvedSkills, changes) {
-  copyFileTracked(sourceDir, targetDir, '.agents/skills/README.md', '.agents/skills/README.md', changes);
+function installSkills(targetDir, resolvedSkills, changes) {
+  if (resolvedSkills.some((item) => item.sourceType === 'local')) {
+    const localRoot = resolvedSkills.find((item) => item.sourceType === 'local')?.sourceRoot;
+    if (localRoot && fs.existsSync(path.join(localRoot, '.agents/skills/README.md'))) {
+      copyFileTracked(localRoot, targetDir, '.agents/skills/README.md', '.agents/skills/README.md', changes);
+    }
+  }
   for (const skill of resolvedSkills) {
-    copyDirectoryTracked(sourceDir, targetDir, skill.sourceDirRel, `.agents/skills/${skill.id}`, changes);
+    copyDirectoryTracked(skill.sourceRoot, targetDir, skill.sourceDirRel, `.agents/skills/${skill.id}`, changes);
   }
 }
 
-function installRules(sourceDir, targetDir, resolvedRules, changes) {
-  copyFileTracked(sourceDir, targetDir, '.agents/rules/README.md', '.agents/rules/README.md', changes);
+function installRules(targetDir, resolvedRules, changes) {
+  const localRoot = resolvedRules.find((item) => item.sourceType === 'local')?.sourceRoot;
+  if (localRoot && fs.existsSync(path.join(localRoot, '.agents/rules/README.md'))) {
+    copyFileTracked(localRoot, targetDir, '.agents/rules/README.md', '.agents/rules/README.md', changes);
+  }
   for (const rule of resolvedRules) {
-    const destRel = `.agents/rules/${path.basename(rule.sourceRel)}`;
-    copyFileTracked(sourceDir, targetDir, rule.sourceRel, destRel, changes);
+    const destRel = getInstalledRulePath(rule);
+    copyFileTracked(rule.sourceRoot, targetDir, rule.sourceRel, destRel, changes);
   }
 }
 
-function installFlows(sourceDir, targetDir, catalogs, flowRegistry, changes) {
+function getInstalledRulePath(rule) {
+  const baseName = path.basename(rule.sourceRel || '');
+  if (baseName && baseName !== 'RULE.md') {
+    return `.agents/rules/${baseName}`;
+  }
+  return `.agents/rules/${rule.id}.md`;
+}
+
+function installFlows(targetDir, catalogs, flowRegistry, changes) {
   for (const supportFile of flowRegistry.support_files || []) {
-    copyFileTracked(sourceDir, targetDir, supportFile, supportFile, changes);
+    copyFileTracked(flowRegistry.__sourceRoot, targetDir, supportFile, supportFile, changes);
   }
   for (const flow of catalogs.flows.values()) {
-    copyFileTracked(sourceDir, targetDir, flow.sourceRel, flow.sourceRel, changes);
+    copyFileTracked(flow.sourceRoot, targetDir, flow.sourceRel, flow.sourceRel, changes);
   }
 }
 
@@ -699,7 +1250,7 @@ function installIdeAssets(sourceDir, targetDir, ides, resolvedSkills, changes) {
     if (ide === 'cursor') {
       const sourceMcp = path.join(sourceDir, '.cursor/mcp.json');
       if (fs.existsSync(sourceMcp)) {
-        copyFileTracked(sourceDir, targetDir, '.cursor/mcp.json', '.cursor/mcp.json', changes);
+        copyFileIfMissingTracked(sourceDir, targetDir, '.cursor/mcp.json', '.cursor/mcp.json', changes);
       }
     }
   }
@@ -733,9 +1284,24 @@ function buildLock(manifest, targetDir, manifestSource, resolved, cliVersion) {
       rules: resolved.rules.map((item) => item.id),
     },
     assets: {
-      roles: resolved.roles.map((item) => ({ id: item.id, version: 'workspace' })),
-      skills: resolved.skills.map((item) => ({ id: item.id, version: 'workspace' })),
-      rules: resolved.rules.map((item) => ({ id: item.id, version: 'workspace' })),
+      roles: resolved.roles.map((item) => ({
+        id: item.id,
+        version: item.version || 'workspace',
+        source_type: item.sourceType || 'local',
+        ...(item.hubSlug ? { hub_slug: item.hubSlug } : {}),
+      })),
+      skills: resolved.skills.map((item) => ({
+        id: item.id,
+        version: item.version || 'workspace',
+        source_type: item.sourceType || 'local',
+        ...(item.hubSlug ? { hub_slug: item.hubSlug } : {}),
+      })),
+      rules: resolved.rules.map((item) => ({
+        id: item.id,
+        version: item.version || 'workspace',
+        source_type: item.sourceType || 'local',
+        ...(item.hubSlug ? { hub_slug: item.hubSlug } : {}),
+      })),
       flows: resolved.installed_flows.map((id) => ({ id, version: 'workspace' })),
     },
     installer: {
@@ -764,9 +1330,11 @@ function buildSources(manifest, manifestSource, resolved, sourceDir) {
     assets.push({
       kind: 'role',
       id: role.id,
-      source_type: 'local',
-      source_ref: `local://${role.sourceRel}`,
+      source_type: role.sourceType || 'local',
+      source_ref: role.sourceRef || `local://${role.sourceRel}`,
       local_path: role.sourceRel,
+      ...(role.hubSlug ? { hub_slug: role.hubSlug } : {}),
+      ...(role.version ? { version: role.version } : {}),
     });
   }
 
@@ -774,9 +1342,11 @@ function buildSources(manifest, manifestSource, resolved, sourceDir) {
     assets.push({
       kind: 'skill',
       id: skill.id,
-      source_type: 'local',
-      source_ref: `local://${skill.sourceDirRel}`,
+      source_type: skill.sourceType || 'local',
+      source_ref: skill.sourceRef || `local://${skill.sourceDirRel}`,
       local_path: `.agents/skills/${skill.id}`,
+      ...(skill.hubSlug ? { hub_slug: skill.hubSlug } : {}),
+      ...(skill.version ? { version: skill.version } : {}),
     });
   }
 
@@ -784,9 +1354,11 @@ function buildSources(manifest, manifestSource, resolved, sourceDir) {
     assets.push({
       kind: 'rule',
       id: rule.id,
-      source_type: 'local',
-      source_ref: `local://${rule.sourceRel}`,
-      local_path: `.agents/rules/${path.basename(rule.sourceRel)}`,
+      source_type: rule.sourceType || 'local',
+      source_ref: rule.sourceRef || `local://${rule.sourceRel}`,
+      local_path: getInstalledRulePath(rule),
+      ...(rule.hubSlug ? { hub_slug: rule.hubSlug } : {}),
+      ...(rule.version ? { version: rule.version } : {}),
     });
   }
 
@@ -798,6 +1370,49 @@ function buildSources(manifest, manifestSource, resolved, sourceDir) {
       source_ref: `local://.agents/flows/common/${flowId}.md`,
       local_path: `.agents/flows/common/${flowId}.md`,
     });
+  }
+
+  for (const ide of manifest.ides || []) {
+    assets.push({
+      kind: 'ide-rule-link',
+      id: `${ide}:rules`,
+      source_type: 'local',
+      source_ref: `local://.${ide}/rules`,
+      local_path: `.${ide}/rules`,
+    });
+  }
+
+  for (const ide of manifest.ides || []) {
+    for (const skill of resolved.skills) {
+      if (!shouldExposeSkillToIde(skill.id)) {
+        continue;
+      }
+      assets.push({
+        kind: 'ide-skill-link',
+        id: `${ide}:${skill.id}`,
+        source_type: 'local',
+        source_ref: `local://.${ide}/skills/${skill.id}`,
+        local_path: `.${ide}/skills/${skill.id}`,
+      });
+    }
+  }
+
+  for (const ide of manifest.ides || []) {
+    const commonCommandsDir = path.join(sourceDir, '.agents', 'commands', 'common');
+    const ideCommandsDir = path.join(sourceDir, '.agents', 'commands', ide);
+    const commandFiles = unique([
+      ...walkFiles(commonCommandsDir, (filePath) => filePath.endsWith('.md')).map((filePath) => path.basename(filePath)),
+      ...walkFiles(ideCommandsDir, (filePath) => filePath.endsWith('.md')).map((filePath) => path.basename(filePath)),
+    ]);
+    for (const fileName of commandFiles) {
+      assets.push({
+        kind: 'ide-command-template',
+        id: `${ide}:${fileName}`,
+        source_type: 'local',
+        source_ref: `local://.${ide}/commands/${fileName}`,
+        local_path: `.${ide}/commands/${fileName}`,
+      });
+    }
   }
 
   return {
@@ -814,6 +1429,15 @@ function buildSources(manifest, manifestSource, resolved, sourceDir) {
         name: 'br-ai-spec-local',
         path: sourceDir,
       },
+      ...unique(
+        [...resolved.roles, ...resolved.skills, ...resolved.rules]
+          .map((item) => item.sourceOrigin || '')
+          .filter(Boolean),
+      ).map((origin) => ({
+        type: 'hub-supplement',
+        name: 'hub-supplement',
+        source: origin,
+      })),
     ],
     assets,
   };
@@ -893,13 +1517,179 @@ function dedupeChanges(changes) {
   };
 }
 
+function buildResult(prepared, changes = null) {
+  return {
+    schema_version: 1,
+    kind: changes ? 'sync-result' : 'sync-plan',
+    status: changes ? 'success' : 'planned',
+    target: {
+      path: prepared.targetDir,
+      profile: prepared.manifest.profile,
+      ides: prepared.manifest.ides,
+    },
+    source: {
+      manifest: prepared.manifestSource,
+      manifest_type: prepared.manifest.manifest_type,
+    },
+    request: {
+      scenario_packages: prepared.manifest.scenario_packages,
+      roles: prepared.manifest.roles,
+      skills: prepared.manifest.skills,
+      rules: prepared.manifest.rules,
+    },
+    resolved: {
+      domains: prepared.resolvedResult.resolved.domains,
+      installed_flows: prepared.resolvedResult.resolved.installed_flows,
+      roles: prepared.resolvedResult.resolved.roles.map((item) => item.id),
+      skills: prepared.resolvedResult.resolved.skills.map((item) => item.id),
+      rules: prepared.resolvedResult.resolved.rules.map((item) => item.id),
+    },
+    ...(changes
+      ? {
+          changes,
+          artifacts: {
+            manifest: '.ai-spec/manifest.json',
+            lock: '.ai-spec/lock.json',
+            sources: '.ai-spec/sources.json',
+          },
+        }
+      : {}),
+    warnings: prepared.resolvedResult.warnings,
+    errors: [],
+  };
+}
+
+async function prepareSync(options) {
+  const sourceDir = getSourceDir();
+  const profilesRegistry = readProfilesRegistry(sourceDir);
+  const registryValidation = require('./validate-registry').validateRegistry(sourceDir);
+  if (registryValidation.status !== 'success') {
+    throw new Error(`Registry validation failed with ${registryValidation.errors.length} error(s). Run "ai-spec-auto validate-registry" for details.`);
+  }
+
+  const targetDir = path.resolve(options.target || '.');
+  const cliVersion = require(path.join(sourceDir, 'package.json')).version || '0.0.0';
+  const manifestInput = options.manifest
+    ? options.manifest
+    : path.join(targetDir, '.ai-spec/manifest.json');
+
+  if (!manifestInput) {
+    throw new Error('sync（同步） requires --manifest（安装清单） or an existing .ai-spec/manifest.json');
+  }
+
+  const requestedTimeout = Number(process.env.AI_SPEC_REMOTE_MANIFEST_TIMEOUT_MS || DEFAULT_REMOTE_MANIFEST_TIMEOUT_MS);
+  const timeoutMs = Number.isFinite(requestedTimeout) && requestedTimeout > 0
+    ? requestedTimeout
+    : DEFAULT_REMOTE_MANIFEST_TIMEOUT_MS;
+  const { manifestSource, rawManifest } = await loadManifestInput(manifestInput, timeoutMs);
+  const existingManifest = readExistingManifest(targetDir);
+  const manifest = normalizeManifest(rawManifest, existingManifest, options, profilesRegistry);
+  const registry = loadSyncRegistry(sourceDir);
+  const catalogs = {
+    roles: readRoleCatalog(registry.roles),
+    skills: readSkillCatalog(sourceDir),
+    rules: readRuleCatalog(registry.rules),
+    flows: readFlowCatalog(registry.flows),
+  };
+  let prepared = {
+    options,
+    sourceDir,
+    profilesRegistry,
+    targetDir,
+    cliVersion,
+    manifestInput,
+    manifestSource,
+    rawManifest,
+    existingManifest,
+    manifest,
+    registry,
+    catalogs,
+    supplements: [],
+  };
+  const preResolved = resolveManifest(manifest, catalogs, { allowMissing: true });
+  const hubOrigin = resolveHubOrigin(options, manifestSource);
+
+  if (hasMissingAssets(preResolved) && hubOrigin) {
+    const supplement = await fetchHubSupplement(
+      hubOrigin,
+      manifest,
+      preResolved.missing,
+      timeoutMs,
+    );
+    const supplementState = buildSupplementState(supplement);
+    prepared = mergePreparedState(prepared, supplement, supplementState);
+  }
+
+  const resolvedResult = resolveManifest(prepared.manifest, prepared.catalogs);
+
+  return {
+    ...prepared,
+    resolvedResult: {
+      ...resolvedResult,
+      warnings: unique([
+        ...resolvedResult.warnings,
+        ...preResolved.warnings,
+        ...prepared.supplements.flatMap((item) => normalizeList(item.report?.warnings)),
+      ]),
+    },
+  };
+}
+
+async function runSync(options, preparedState = null) {
+  const prepared = preparedState || await prepareSync(options);
+  try {
+    if (options.dryRun) {
+      return buildResult(prepared, null);
+    }
+
+    const changes = {
+      created: [],
+      updated: [],
+      skipped: [],
+      conflicts: [],
+    };
+
+    installRoles(prepared.targetDir, prepared.resolvedResult.resolved.roles, prepared.registry.roles, changes);
+    installSkills(prepared.targetDir, prepared.resolvedResult.resolved.skills, changes);
+    installRules(prepared.targetDir, prepared.resolvedResult.resolved.rules, changes);
+    installFlows(prepared.targetDir, prepared.catalogs, prepared.registry.flows, changes);
+    installIdeAssets(prepared.sourceDir, prepared.targetDir, prepared.manifest.ides, prepared.resolvedResult.resolved.skills, changes);
+
+    const aiSpecDir = path.join(prepared.targetDir, '.ai-spec');
+    ensureDir(aiSpecDir);
+
+    const manifestOutPath = path.join(aiSpecDir, 'manifest.json');
+    const lockOutPath = path.join(aiSpecDir, 'lock.json');
+    const sourcesOutPath = path.join(aiSpecDir, 'sources.json');
+    const previousSources = readPreviousSources(prepared.targetDir);
+
+    writeJsonTracked(prepared.targetDir, manifestOutPath, prepared.manifest, changes);
+    const lock = buildLock(prepared.manifest, prepared.targetDir, prepared.manifestSource, prepared.resolvedResult.resolved, prepared.cliVersion);
+    writeJsonTracked(prepared.targetDir, lockOutPath, lock, changes);
+    const sources = buildSources(prepared.manifest, prepared.manifestSource, prepared.resolvedResult.resolved, prepared.sourceDir);
+    if (previousSources) {
+      pruneManagedAssets(prepared.targetDir, previousSources, sources, changes);
+    }
+    writeJsonTracked(prepared.targetDir, sourcesOutPath, sources, changes);
+
+    return buildResult(prepared, dedupeChanges(changes));
+  } finally {
+    for (const supplement of prepared.supplements || []) {
+      try {
+        fs.rmSync(supplement.tempDir, { recursive: true, force: true });
+      } catch (error) {
+        // Cleanup failure should not change sync result.
+      }
+    }
+  }
+}
+
 async function main(argv) {
   try {
     const options = parseArgs(argv);
-    const sourceDir = getSourceDir();
     let profilesRegistry = null;
     try {
-      profilesRegistry = readProfilesRegistry(sourceDir);
+      profilesRegistry = readProfilesRegistry(getSourceDir());
     } catch (error) {
       if (!options.help) {
         throw error;
@@ -910,115 +1700,12 @@ async function main(argv) {
       return 0;
     }
 
-    const registryValidation = require('./validate-registry').validateRegistry(sourceDir);
-    if (registryValidation.status !== 'success') {
-      throw new Error(`Registry validation failed with ${registryValidation.errors.length} error(s). Run "ai-spec-auto validate-registry" for details.`);
-    }
-    const targetDir = path.resolve(options.target || '.');
-    const cliVersion = require(path.join(sourceDir, 'package.json')).version || '0.0.0';
-
-    const manifestInput = options.manifest
-      ? options.manifest
-      : path.join(targetDir, '.ai-spec/manifest.json');
-
-    if (!manifestInput) {
-      throw new Error('sync（同步） requires --manifest（安装清单） or an existing .ai-spec/manifest.json');
-    }
-
-    const requestedTimeout = Number(process.env.AI_SPEC_REMOTE_MANIFEST_TIMEOUT_MS || DEFAULT_REMOTE_MANIFEST_TIMEOUT_MS);
-    const timeoutMs = Number.isFinite(requestedTimeout) && requestedTimeout > 0
-      ? requestedTimeout
-      : DEFAULT_REMOTE_MANIFEST_TIMEOUT_MS;
-    const { manifestSource, rawManifest } = await loadManifestInput(manifestInput, timeoutMs);
-    const existingManifest = readExistingManifest(targetDir);
-    const manifest = normalizeManifest(rawManifest, existingManifest, options, profilesRegistry);
-    const registry = loadSyncRegistry(sourceDir);
-    const catalogs = {
-      roles: readRoleCatalog(registry.roles),
-      skills: readSkillCatalog(sourceDir),
-      flows: readFlowCatalog(registry.flows),
-    };
-    const resolvedResult = resolveManifest(manifest, catalogs, registry);
-
-    const plan = buildPlan(targetDir, manifestSource, manifest, resolvedResult);
-    if (options.dryRun) {
-      if (options.json) {
-        process.stdout.write(`${JSON.stringify(plan, null, 2)}\n`);
-      } else {
-        printPretty(plan, true);
-      }
-      return 0;
-    }
-
-    const changes = {
-      created: [],
-      updated: [],
-      skipped: [],
-      conflicts: [],
-    };
-
-    installRoles(sourceDir, targetDir, resolvedResult.resolved.roles, registry.roles, changes);
-    installSkills(sourceDir, targetDir, resolvedResult.resolved.skills, changes);
-    installRules(sourceDir, targetDir, resolvedResult.resolved.rules, changes);
-    installFlows(sourceDir, targetDir, catalogs, registry.flows, changes);
-    installIdeAssets(sourceDir, targetDir, manifest.ides, resolvedResult.resolved.skills, changes);
-
-    const aiSpecDir = path.join(targetDir, '.ai-spec');
-    ensureDir(aiSpecDir);
-
-    const manifestOutPath = path.join(aiSpecDir, 'manifest.json');
-    const lockOutPath = path.join(aiSpecDir, 'lock.json');
-    const sourcesOutPath = path.join(aiSpecDir, 'sources.json');
-
-    writeJsonTracked(targetDir, manifestOutPath, manifest, changes);
-    const lock = buildLock(manifest, targetDir, manifestSource, resolvedResult.resolved, cliVersion);
-    writeJsonTracked(targetDir, lockOutPath, lock, changes);
-    const sources = buildSources(manifest, manifestSource, resolvedResult.resolved, sourceDir);
-    writeJsonTracked(targetDir, sourcesOutPath, sources, changes);
-    const normalizedChanges = dedupeChanges(changes);
-
-    const result = {
-      schema_version: 1,
-      kind: 'sync-result',
-      status: 'success',
-      target: {
-        path: targetDir,
-        profile: manifest.profile,
-        ides: manifest.ides,
-      },
-      source: {
-        manifest: manifestSource,
-        manifest_type: manifest.manifest_type,
-      },
-      request: {
-        scenario_packages: manifest.scenario_packages,
-        roles: manifest.roles,
-        skills: manifest.skills,
-        rules: manifest.rules,
-      },
-      resolved: {
-        domains: resolvedResult.resolved.domains,
-        installed_flows: resolvedResult.resolved.installed_flows,
-        roles: resolvedResult.resolved.roles.map((item) => item.id),
-        skills: resolvedResult.resolved.skills.map((item) => item.id),
-        rules: resolvedResult.resolved.rules.map((item) => item.id),
-      },
-      changes: normalizedChanges,
-      artifacts: {
-        manifest: '.ai-spec/manifest.json',
-        lock: '.ai-spec/lock.json',
-        sources: '.ai-spec/sources.json',
-      },
-      warnings: resolvedResult.warnings,
-      errors: [],
-    };
-
+    const result = await runSync(options);
     if (options.json) {
       process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
     } else {
-      printPretty(result, false);
+      printPretty(result, options.dryRun);
     }
-
     return 0;
   } catch (error) {
     console.error(`sync（同步） failed: ${error.message}`);
@@ -1026,7 +1713,7 @@ async function main(argv) {
   }
 }
 
-module.exports = { main };
+module.exports = { parseArgs, prepareSync, runSync, main };
 
 if (require.main === module) {
   process.exit(main(process.argv.slice(2)));
