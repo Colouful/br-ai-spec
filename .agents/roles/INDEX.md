@@ -11,8 +11,8 @@ description: 供插件页面读取的角色展示索引。优先解析下方的 
 
 当前统计：
 
-- `active` 角色：4 个
-- `planned` 候选角色：27 个
+- `active` 角色：10 个
+- `planned` 候选角色：22 个
 
 插件页面建议优先解析下面的 `yaml` 数据块。
 
@@ -95,9 +95,17 @@ roles:
     domains: [governance, testing]
     source: .agents/roles/common/code-guardian.md
 
+  - id: archive-change
+    name: 归档专家
+    status: active
+    bucket: common
+    visibility: public
+    domains: [delivery, documentation]
+    source: .agents/roles/common/archive-change.md
+
   - id: design-collaborator
     name: 设计协作专家
-    status: planned
+    status: active
     bucket: domains
     visibility: public
     domains: [demand-design]
@@ -105,7 +113,7 @@ roles:
 
   - id: api-contract-specialist
     name: API 契约专家
-    status: planned
+    status: active
     bucket: domains
     visibility: public
     domains: [demand-design]
@@ -161,7 +169,7 @@ roles:
 
   - id: unit-test-specialist
     name: 单元测试专家
-    status: planned
+    status: active
     bucket: domains
     visibility: public
     domains: [testing]
@@ -185,7 +193,7 @@ roles:
 
   - id: verification-reviewer
     name: 验证评审专家
-    status: planned
+    status: active
     bucket: domains
     visibility: public
     domains: [testing]
@@ -241,7 +249,7 @@ roles:
 
   - id: performance-auditor
     name: 性能审计专家
-    status: planned
+    status: active
     bucket: domains
     visibility: public
     domains: [performance]
@@ -316,7 +324,7 @@ roles:
 
 - `domains` 视为展示层的一级能力域
 - `roles` 视为展示层的二级专家项
-- `status=active` 表示当前已进入 MVP
+- `status=active` 表示当前可安装、可展示、可被运行时路由；是否必经仍由 flow 的 `required_roles` 决定
 - `status=planned` 表示当前仅为候选模板
 - `visibility=internal` 可在插件页面隐藏或放到内部调试区
 - `source` 指向角色源文件路径

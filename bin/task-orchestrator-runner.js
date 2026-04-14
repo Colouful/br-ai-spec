@@ -732,7 +732,7 @@ function buildAutoDispatch(targetDir, currentRun) {
         }
         const microAllowlist = {
           'requirement-analyst': new Set(['create-proposal', 'design-analysis']),
-          'frontend-implementer': new Set(['create-view', 'create-component', 'create-route', 'theme-variables']),
+          'frontend-implementer': new Set(['create-view', 'create-route', 'create-api', 'theme-variables', 'create-component', 'create-store']),
           'code-guardian': new Set(['ui-verification', 'web-design-guidelines']),
         };
         return microAllowlist[roleId]?.has(id) ?? true;

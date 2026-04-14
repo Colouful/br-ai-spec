@@ -145,6 +145,13 @@ function main() {
     workflow.turn.guidance.role_skill_contract.primary_skills,
     ['design-analysis', 'create-proposal'],
   );
+  assert.strictEqual(workflow.turn.guidance.artifact_contract[0].artifact, 'proposal.md');
+  assert.deepStrictEqual(
+    workflow.turn.guidance.skill_selection_policy.primary_order,
+    ['design-analysis', 'create-proposal'],
+  );
+  assert.ok(workflow.turn.guidance.handoff_checklist.some((item) => item.includes('默认假设')));
+  assert.ok(workflow.turn.guidance.optional_role_triggers.some((item) => item.role_id === 'design-collaborator'));
   assert.deepStrictEqual(
     workflow.turn.guidance.role_rule_contract.must_follow,
     ['先按本地项目约束收敛需求。', '页面任务优先对齐 src/views/<page>/index.vue 与 src/router/modules/<module>.ts 的落点约定。', '若为 mock 或占位页，明确写清 src/mock 或本地 mock 方案，以及“不接真实 API”的边界。', '样式和视觉约束需对齐主题 CSS 变量，不要把硬编码颜色或自由样式当默认方案。'],

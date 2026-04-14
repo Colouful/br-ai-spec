@@ -8,6 +8,7 @@
 
 - [第四阶段文档入口](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/four/README.md)
 - [开发最佳实践指南](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/four/开发最佳实践指南.md)
+- [需求示例：从发起到归档](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/four/需求示例-从发起到归档.md)
 - [架构设计与治理说明](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/four/架构设计与治理说明.md)
 
 ## 入门
@@ -18,7 +19,9 @@
 ## 协议与流程
 
 - [OpenSpec / 协议流说明](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/openspec-guide.md)
+- [小需求与补丁修正指南](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/four/小需求与补丁修正指南.md)
 - [协议与专家增强记录](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/paser_three/协议与专家增强记录.md)
+- [主流程专家优化记录](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/paser_three/主流程专家优化记录.md)
 
 ## 推广与培训
 
@@ -53,11 +56,15 @@
   - 参数、兼容、Monorepo、自定义规则、排错
 - `docs/openspec-guide.md`
   - OpenSpec 与协议流
+- `docs/four/小需求与补丁修正指南.md`
+  - 小需求如何在 quick-fix / patch / archive-fix / followup-patch / full-change 之间分流
 - `docs/four/README.md`
   - 第四阶段主入口
   - 按受众分层的阅读路径
 - `docs/four/开发最佳实践指南.md`
   - 面向普通开发者的上手与实践说明
+- `docs/four/需求示例-从发起到归档.md`
+  - 一条真实需求从发起、迭代到归档的完整示例
 - `docs/four/架构设计与治理说明.md`
   - 面向维护者与评审的架构、治理和排障说明
 - `docs/five/README.md`

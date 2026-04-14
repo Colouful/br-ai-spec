@@ -31,8 +31,8 @@ const CUSTOMIZABLE_RULES = [
   ['09-样式规范.md', 'CSS Modules/Scoped、主题变量、全局样式'],
 ];
 const PROFILE_SUMMARIES = {
-  vue: 'Vue 3 + TypeScript + Pinia + Vue Router',
-  react: 'React + TypeScript + Antd + Zustand',
+  vue: 'Vue',
+  react: 'React',
 };
 const DEFAULT_CUSTOM_RULE_SELECTION = CUSTOMIZABLE_RULES.map(([name]) => name);
 const INSTALL_STATE_FILE = '.ai-spec/install-state.json';
@@ -736,6 +736,10 @@ async function confirm(question, defaultYes = false) {
 }
 
 async function selectFromList(title, items, defaultIndex = 0) {
+  if (isInteractive()) {
+    return selectSingleFromList(title, items, defaultIndex);
+  }
+
   console.log('');
   info(title);
   items.forEach((item, index) => {
@@ -748,6 +752,102 @@ async function selectFromList(title, items, defaultIndex = 0) {
     return items[index].value;
   }
   return items[defaultIndex].value;
+}
+
+function formatSingleSelectLine(item, selectedIndex, cursorIndex, index) {
+  const marker = index === selectedIndex ? '(*)' : '( )';
+  const prefix = index === cursorIndex ? color('❯', 'cyan') : ' ';
+  return `  ${prefix} ${marker} ${item.label}${item.desc ? ` — ${item.desc}` : ''}`;
+}
+
+async function selectSingleFromList(title, items, defaultIndex = 0) {
+  console.log('');
+  info(title);
+  console.log('  ↑/↓ 移动，空格选择，Enter 确认');
+  console.log('');
+
+  const stdin = process.stdin;
+  if (typeof stdin.setRawMode !== 'function') {
+    return items[defaultIndex]?.value;
+  }
+
+  let cursorIndex = Math.max(0, Math.min(defaultIndex, items.length - 1));
+  let selectedIndex = cursorIndex;
+  let renderedLines = 0;
+
+  return await new Promise((resolve, reject) => {
+    let finished = false;
+
+    const cleanup = () => {
+      stdin.removeListener('keypress', onKeypress);
+      if (typeof stdin.setRawMode === 'function') {
+        stdin.setRawMode(false);
+      }
+      stdin.pause();
+      process.stdout.write('\x1b[?25h');
+    };
+
+    const finish = (result) => {
+      if (finished) return;
+      finished = true;
+      cleanup();
+      resolve(result);
+    };
+
+    const fail = (error) => {
+      if (finished) return;
+      finished = true;
+      cleanup();
+      reject(error);
+    };
+
+    const render = () => {
+      if (renderedLines > 0) {
+        process.stdout.write(`\x1b[${renderedLines}A`);
+      }
+      items.forEach((item, index) => {
+        process.stdout.write(`\x1b[2K\r${formatSingleSelectLine(item, selectedIndex, cursorIndex, index)}\n`);
+      });
+      renderedLines = items.length;
+    };
+
+    const onKeypress = (_str, key = {}) => {
+      if (key.ctrl && key.name === 'c') {
+        process.stdout.write('\n');
+        fail(new Error('已取消选择'));
+        return;
+      }
+
+      if (key.name === 'up') {
+        cursorIndex = cursorIndex > 0 ? cursorIndex - 1 : cursorIndex;
+        render();
+        return;
+      }
+
+      if (key.name === 'down') {
+        cursorIndex = cursorIndex < items.length - 1 ? cursorIndex + 1 : cursorIndex;
+        render();
+        return;
+      }
+
+      if (key.name === 'space') {
+        selectedIndex = cursorIndex;
+        render();
+        return;
+      }
+
+      if (key.name === 'return' || key.name === 'enter') {
+        finish(items[selectedIndex]?.value);
+      }
+    };
+
+    readline.emitKeypressEvents(stdin);
+    stdin.setRawMode(true);
+    stdin.resume();
+    process.stdout.write('\x1b[?25l');
+    stdin.on('keypress', onKeypress);
+    render();
+  });
 }
 
 function formatMultiSelectLine(item, selectedValues, cursorIndex, index) {
@@ -2150,6 +2250,7 @@ module.exports = {
     CUSTOMIZABLE_RULES,
     DEFAULT_CUSTOM_RULE_SELECTION,
     normalizeCustomRulesSelection,
+    selectFromList,
     selectCustomRuleList,
     selectMultipleFromList,
   },

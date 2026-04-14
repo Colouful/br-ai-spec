@@ -87,7 +87,7 @@
       "source": ".agents/roles/common/frontend-implementer.md",
       "rule_ids": ["project-structure", "component-standard", "route-standard", "api-standard", "store-standard", "style-standard"],
       "skill_priority": ["create-view", "create-route", "create-api", "theme-variables", "create-component", "create-store", "execute-task"],
-      "micro_skill_allowlist": ["create-view", "create-component", "create-route", "theme-variables"],
+      "micro_skill_allowlist": ["create-view", "create-route", "create-api", "theme-variables", "create-component", "create-store"],
       "rule_contract_profiles": {
         "default": {
           "must_follow": [
@@ -167,6 +167,7 @@
       "status": "active",
       "domains": ["delivery", "documentation"],
       "source": ".agents/roles/common/archive-change.md",
+      "rule_ids": ["audit-report-standard"],
       "skill_priority": ["archive-change"],
       "micro_skill_allowlist": ["archive-change"],
       "rule_contract_profiles": {
@@ -193,13 +194,13 @@
     },
     "design-collaborator": {
       "name": "设计协作专家",
-      "status": "planned",
+      "status": "active",
       "domains": ["demand-design"],
       "source": ".agents/roles/domains/demand-design/design-collaborator.md"
     },
     "api-contract-specialist": {
       "name": "API 契约专家",
-      "status": "planned",
+      "status": "active",
       "domains": ["demand-design"],
       "source": ".agents/roles/domains/demand-design/api-contract-specialist.md"
     },
@@ -241,7 +242,7 @@
     },
     "unit-test-specialist": {
       "name": "单元测试专家",
-      "status": "planned",
+      "status": "active",
       "domains": ["testing"],
       "source": ".agents/roles/domains/testing/unit-test-specialist.md"
     },
@@ -259,7 +260,7 @@
     },
     "verification-reviewer": {
       "name": "验证评审专家",
-      "status": "planned",
+      "status": "active",
       "domains": ["testing"],
       "source": ".agents/roles/domains/testing/verification-reviewer.md"
     },
@@ -301,7 +302,7 @@
     },
     "performance-auditor": {
       "name": "性能审计专家",
-      "status": "planned",
+      "status": "active",
       "domains": ["performance"],
       "source": ".agents/roles/domains/performance/performance-auditor.md"
     },

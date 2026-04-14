@@ -1,7 +1,7 @@
 ---
 id: unit-test-specialist
 name: 单元测试专家
-status: planned
+status: active
 domains:
   - testing
 description: 负责为关键模块设计和补充单元测试策略，提升回归稳定性。

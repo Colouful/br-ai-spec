@@ -70,12 +70,39 @@ description: 为任务主代理提供“先选模板、再动态加减专家”�
 - 是新功能开发
 - 是有明确范围的增量改造
 
+### 规则 A-1：全新低风险小修正
+
+满足任一条件时，可优先选择 `bugfix-to-verification`：
+
+- 单页面、单组件、单模块 bug 修复
+- 样式微调、文案调整、小交互修正
+- 不新增真实 API、路由、全局状态
+- 不改变需求边界和验收口径
+- 风险等级低
+
+说明：
+
+- 不进入 `requirement-analyst`
+- 不进入 `archive-change`
+- 留痕写到 `.ai-spec/history/<run-id>/`
+
 ### 规则 B：已有设计与任务清单
 
 若已存在完整 `proposal.md` 和 `tasks.md`，且需求边界清晰：
 
 - 仍归属 `prd-to-delivery`
 - 但可从 `frontend-implementer` 开始，而不是强制重新走需求解析
+
+### 规则 B-1：已有 open / archived change 的小修正
+
+若 `openspec/changes/` 中已存在可复用的变更上下文：
+
+- 当前 open change 内的小修正 -> `patch`
+- 当前 open change 内影响范围/接口/验收边界 -> `scope-delta`
+- 归档前修正 -> `archive-fix`
+- 已归档内容补修 -> `followup-patch`
+
+若同时存在多个 open change 且输入没有明确说明目标 change，则必须先进入轻确认，不允许自动猜测。
 
 ### 规则 C：上下文严重不足
 

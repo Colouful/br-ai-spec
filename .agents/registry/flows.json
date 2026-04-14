@@ -13,6 +13,7 @@
       "default_schema": "expert-delivery",
       "artifact_profile": "full",
       "required_roles": ["requirement-analyst", "frontend-implementer", "code-guardian"],
+      "optional_roles": ["design-collaborator", "api-contract-specialist", "unit-test-specialist", "verification-reviewer", "performance-auditor"],
       "first_handoff": "requirement-analyst",
       "approval_gates": ["before-implementation", "before-archive"],
       "handoff_gate_policy": {
@@ -24,6 +25,56 @@
       "required_artifacts": ["proposal.md", "specs", "design.md", "tasks.md", "checklist.md", "iterations.md"],
       "handoff_policy": "task-orchestrator -> requirement-analyst -> frontend-implementer -> code-guardian -> before-archive -> archive-change(可选) -> terminal",
       "completion_policy": "proposal.md、specs/、design.md、tasks.md、checklist.md、iterations.md 缺一不可；若用户同意归档，再执行 archive-change"
+    },
+    "bugfix-to-verification": {
+      "name": "缺陷修复到验证",
+      "status": "active",
+      "source": ".agents/flows/common/bugfix-to-verification.md",
+      "default_schema": "expert-delivery",
+      "artifact_profile": "compact",
+      "required_roles": ["frontend-implementer", "code-guardian"],
+      "optional_roles": ["unit-test-specialist", "verification-reviewer", "performance-auditor"],
+      "first_handoff": "frontend-implementer",
+      "approval_gates": [],
+      "handoff_gate_policy": {
+        "frontend-implementer->code-guardian": "silent"
+      },
+      "runtime_transitions": {
+        "frontend-implementer": {
+          "action": "handoff",
+          "to_role": "code-guardian",
+          "next_role": null,
+          "message": "handoff to code-guardian after lightweight bugfix delivery"
+        },
+        "unit-test-specialist": {
+          "action": "handoff",
+          "to_role": "code-guardian",
+          "next_role": null,
+          "message": "handoff to code-guardian after lightweight test supplementation"
+        },
+        "verification-reviewer": {
+          "action": "handoff",
+          "to_role": "code-guardian",
+          "next_role": null,
+          "message": "handoff to code-guardian after lightweight verification review"
+        },
+        "performance-auditor": {
+          "action": "handoff",
+          "to_role": "code-guardian",
+          "next_role": null,
+          "message": "handoff to code-guardian after lightweight performance review"
+        },
+        "code-guardian": {
+          "action": "complete",
+          "to_role": "code-guardian",
+          "next_role": null,
+          "message": "run completed after lightweight verification closeout"
+        }
+      },
+      "core_artifacts": ["bugfix", "implementation-notes", "checklist", "iterations"],
+      "required_artifacts": ["bugfix.md", "implementation-notes.md", "checklist.md", "iterations.md"],
+      "handoff_policy": "task-orchestrator -> frontend-implementer -> code-guardian -> terminal",
+      "completion_policy": "bugfix.md、implementation-notes.md、checklist.md、iterations.md 缺一不可；若守护阶段发现范围升级，则转回 prd-to-delivery"
     }
   }
 }

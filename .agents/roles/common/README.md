@@ -6,12 +6,13 @@
 
 - `../INDEX.md`
 
-当前只保留 4 个核心角色：
+当前保留 5 个已启用的主流程角色：
 
 - `task-orchestrator.md`
 - `requirement-analyst.md`
 - `frontend-implementer.md`
 - `code-guardian.md`
+- `archive-change.md`
 
 另外保留 1 份与主代理配套的路由策略草案：
 
@@ -21,7 +22,7 @@
 
 - `../../orchestration/`
 
-这 4 个角色足够支撑最小闭环：
+其中 4 个是默认执行主链，`archive-change` 负责归档收尾：
 
 ```text
 任务输入
@@ -29,6 +30,8 @@
   -> requirement-analyst
   -> frontend-implementer
   -> code-guardian
+  -> before-archive
+  -> archive-change（批准后）
 ```
 
 ## 角色文件编写原则
@@ -61,6 +64,7 @@ handoff_to:
 
 - 当前启用角色继续放在 `common/`
 - 规划中的能力域目录放在 `../domains/`
+- `domains/` 中也允许保留 `active` 的 optional 专家；是否必经由 flow 决定
 - 当某个规划专家真正进入 MVP，再从能力域目录迁入或补充到 `common/`
 - 主代理配套协议文档统一放到 `../../orchestration/`
 

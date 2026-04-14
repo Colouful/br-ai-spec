@@ -30,8 +30,22 @@ OpenSpec 是一个**规范驱动开发（Spec-Driven Development）**框架，�
 | 新功能开发（如"新增用户管理模块"） | 推荐使用 |
 | 跨模块变更（如"重构权限体系"） | 推荐使用 |
 | 需要团队评审的变更提案 | 推荐使用 |
-| Bug 修复、小调整 | 不需要，直接开发即可 |
-| 样式微调、文案修改 | 不需要 |
+| 已在 open change 内的小修正 | 继续复用当前 change，按 `patch / scope-delta` 增量处理 |
+| 已归档内容的补丁修正 | 不直接改 archive，改走 `followup-patch` 新开补丁 change |
+| 全新、低风险、单点小修正 | 可不进入 OpenSpec change，默认走 `bugfix-to-verification` 轻量留痕 |
+| 样式微调、文案修改但明确要求归档 / 评审 / spec | 仍建议进入 OpenSpec 主流程 |
+
+### 小需求分层策略
+
+ai-spec-auto 不再把“小需求”简单等同于“直接开发即可”，而是先判断它属于哪一层：
+
+| 当前上下文 | 默认路由 | 留痕位置 |
+| --- | --- | --- |
+| 当前有 active run | `patch / scope-delta / archive-fix` | 原 run + 原 change |
+| 当前有未归档 change | `patch / scope-delta` | 原 `openspec/changes/<change-id>/` |
+| 当前是已归档内容补修 | `followup-patch` | 新 patch change + `parent_change_id` |
+| 当前没有可复用 change，且是低风险小修正 | `bugfix-to-verification` | `.ai-spec/history/<run-id>/` |
+| 当前没有可复用 change，但需要长期追溯或风险更高 | `prd-to-delivery` | `openspec/changes/<change-id>/` |
 
 ---
 
@@ -713,7 +727,14 @@ npx openspec init --tools cursor,claude
 
 **Q：不是所有需求都需要走 OpenSpec 吧？**
 
-对。OpenSpec 适合**需要规划和评审的中大型变更**。小修改（bug fix、文案调整、样式微调）直接在 AI IDE 中对话开发即可，不需要走提案流程。
+对。OpenSpec 适合**需要规划和评审的中大型变更**，但小修改也不再是“完全无流程”。
+
+当前推荐按分层留痕处理：
+
+- 如果它已经在当前 open change 里，就继续走 `patch / scope-delta / archive-fix`
+- 如果它是在已归档内容上补修，就走 `followup-patch`
+- 如果它是全新、低风险、单点的小修正，就走 `bugfix-to-verification`，记录在 `.ai-spec/history/<run-id>/`
+- 如果它虽然小，但你明确需要 `留痕 / 归档 / 评审 / spec`，仍建议走完整 OpenSpec 主流程
 
 **Q：openspec/ 下的文件需要提交到 Git 吗？**
 

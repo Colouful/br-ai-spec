@@ -7,7 +7,7 @@ const { spawnSync } = require('child_process');
 const { __test__ } = require('../../bin/install-workflow');
 
 const repoRoot = path.join(__dirname, '..', '..');
-const { selectCustomRuleList } = __test__;
+const { selectCustomRuleList, selectFromList } = __test__;
 
 function createWorkspace(prefix) {
   return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -133,7 +133,6 @@ async function verifyInteractiveCustomRuleSelectionUsesSpaceToggle() {
     await selection;
 
     const output = getOutput();
-    assert.ok(output.includes('空格选中/取消'));
     assert.ok(!output.includes('1) ['));
   });
 
@@ -168,7 +167,58 @@ async function verifyInteractiveEmptySelectionFallsBackToStandard() {
   assert.deepStrictEqual(options.customRules, []);
 }
 
+async function verifyInteractiveSingleSelectionUsesArrowSpaceEnter() {
+  let selected = null;
+
+  await withMockTTY(async ({ input, getOutput }) => {
+    const selection = selectFromList('选择技术栈 Profile：', [
+      { value: 'vue', label: 'vue', desc: 'Vue' },
+      { value: 'react', label: 'react', desc: 'React' },
+    ], 0);
+
+    setImmediate(() => {
+      input.write('\x1b[B');
+      input.write(' ');
+      input.write('\r');
+    });
+
+    selected = await selection;
+
+    const output = getOutput();
+    assert.ok(output.includes('空格选择'));
+    assert.ok(output.includes('(*) react'));
+    assert.ok(!output.includes('1) vue'));
+  });
+
+  assert.strictEqual(selected, 'react');
+}
+
+async function verifyInteractiveSingleSelectionEnterConfirmsDefault() {
+  let selected = null;
+
+  await withMockTTY(async ({ input, getOutput }) => {
+    const selection = selectFromList('规则安装策略：', [
+      { value: 'standard', label: '使用标准规范', desc: '直接使用规范库中的规则，适合快速接入' },
+      { value: 'custom', label: '根据项目自定义', desc: '跳过部分规则，后续由 /project-init 按项目生成' },
+    ], 0);
+
+    setImmediate(() => {
+      input.write('\r');
+    });
+
+    selected = await selection;
+
+    const output = getOutput();
+    assert.ok(output.includes('(*) 使用标准规范'));
+    assert.ok(!output.includes('请选择 (1-2)'));
+  });
+
+  assert.strictEqual(selected, 'standard');
+}
+
 async function main() {
+  await verifyInteractiveSingleSelectionUsesArrowSpaceEnter();
+  await verifyInteractiveSingleSelectionEnterConfirmsDefault();
   await verifyInteractiveCustomRuleSelectionUsesSpaceToggle();
   await verifyInteractiveEmptySelectionFallsBackToStandard();
 

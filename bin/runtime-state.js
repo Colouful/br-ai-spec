@@ -340,6 +340,9 @@ function buildIncrementalUpdateState(state, options = {}, defaults = {}) {
     ? state.incremental_update
     : {};
   const next = {
+    change_context: options.changeContext || defaults.changeContext || previous.change_context || null,
+    route_decision: options.routeDecision || defaults.routeDecision || previous.route_decision || null,
+    trace_mode: options.traceMode || defaults.traceMode || previous.trace_mode || null,
     change_impact: options.changeImpact || defaults.changeImpact || previous.change_impact || null,
     reconcile_strategy: options.reconcileStrategy || defaults.reconcileStrategy || previous.reconcile_strategy || null,
     artifacts_to_update: Array.isArray(options.artifactsToUpdate)
@@ -357,6 +360,9 @@ function buildIncrementalUpdateState(state, options = {}, defaults = {}) {
   };
 
   if (
+    !next.change_context &&
+    !next.route_decision &&
+    !next.trace_mode &&
     !next.change_impact &&
     !next.reconcile_strategy &&
     next.artifacts_to_update.length === 0 &&
@@ -642,13 +648,34 @@ function normalizeSpecsArtifactPath(relPath) {
   return match ? match[1] : normalized;
 }
 
-function buildDefaultArtifacts(changeId) {
+function buildDefaultArtifacts(changeId, options = {}) {
+  const flowId = String(options.flowId || '').trim();
+  const runId = String(options.runId || '').trim();
+  const traceMode = String(options.traceMode || '').trim();
+
+  if ((flowId === 'bugfix-to-verification' || traceMode === 'direct-fix') && runId) {
+    const historyDir = `.ai-spec/history/${runId}`;
+    return {
+      proposal: null,
+      specs: null,
+      design: null,
+      tasks: null,
+      bugfix: `${historyDir}/bugfix.md`,
+      implementation_notes: `${historyDir}/implementation-notes.md`,
+      checklist: `${historyDir}/checklist.md`,
+      iterations: `${historyDir}/iterations.md`,
+      additional: [],
+    };
+  }
+
   if (!changeId) {
     return {
       proposal: null,
       specs: null,
       design: null,
       tasks: null,
+      bugfix: null,
+      implementation_notes: null,
       checklist: null,
       iterations: null,
       additional: [],
@@ -661,6 +688,8 @@ function buildDefaultArtifacts(changeId) {
     specs: `${baseDir}/specs`,
     design: `${baseDir}/design.md`,
     tasks: `${baseDir}/tasks.md`,
+    bugfix: null,
+    implementation_notes: null,
     checklist: `${baseDir}/checklist.md`,
     iterations: `${baseDir}/iterations.md`,
     additional: [],
@@ -672,10 +701,12 @@ function mergeArtifacts(baseArtifacts, inferredArtifacts) {
   const specs = normalizeSpecsArtifactPath(inferredArtifacts?.specs || baseArtifacts?.specs || null);
   const design = inferredArtifacts?.design || baseArtifacts?.design || null;
   const tasks = inferredArtifacts?.tasks || baseArtifacts?.tasks || null;
+  const bugfix = inferredArtifacts?.bugfix || baseArtifacts?.bugfix || null;
+  const implementationNotes = inferredArtifacts?.implementation_notes || baseArtifacts?.implementation_notes || null;
   const checklist = inferredArtifacts?.checklist || baseArtifacts?.checklist || null;
   const iterations = inferredArtifacts?.iterations || baseArtifacts?.iterations || null;
   const primaryArtifacts = new Set(
-    [proposal, specs, design, tasks, checklist, iterations]
+    [proposal, specs, design, tasks, bugfix, implementationNotes, checklist, iterations]
       .map((item) => (typeof item === 'string' ? item.trim().replace(/[\\/]+$/, '') : null))
       .filter(Boolean),
   );
@@ -693,6 +724,8 @@ function mergeArtifacts(baseArtifacts, inferredArtifacts) {
     specs,
     design,
     tasks,
+    bugfix,
+    implementation_notes: implementationNotes,
     checklist,
     iterations,
     additional: Array.from(new Set(additional.filter(Boolean))),
@@ -711,6 +744,8 @@ function inferArtifacts(artifacts) {
     specs: null,
     design: null,
     tasks: null,
+    bugfix: null,
+    implementation_notes: null,
     checklist: null,
     iterations: null,
     additional: [],
@@ -721,7 +756,7 @@ function inferArtifacts(artifacts) {
   }
 
   if (artifacts && typeof artifacts === 'object' && !Array.isArray(artifacts)) {
-    const directKeys = ['proposal', 'specs', 'design', 'tasks', 'checklist', 'iterations'];
+    const directKeys = ['proposal', 'specs', 'design', 'tasks', 'bugfix', 'implementation_notes', 'checklist', 'iterations'];
     for (const key of directKeys) {
       if (typeof artifacts[key] === 'string' && artifacts[key].trim()) {
         normalized[key] = key === 'specs'
@@ -766,6 +801,14 @@ function inferArtifacts(artifacts) {
     }
     if (item.endsWith('/tasks.md')) {
       normalized.tasks = item;
+      continue;
+    }
+    if (item.endsWith('/bugfix.md')) {
+      normalized.bugfix = item;
+      continue;
+    }
+    if (item.endsWith('/implementation-notes.md')) {
+      normalized.implementation_notes = item;
       continue;
     }
     if (item.endsWith('/checklist.md')) {
@@ -858,7 +901,14 @@ function buildRunState({ runPlan, taskAnchor, options, now, source }) {
     deliveryProfile,
     riskLevel,
   });
-  const artifacts = mergeArtifacts(buildDefaultArtifacts(changeId), inferArtifacts(runPlan.artifacts));
+  const changeContext = options.changeContext || runPlan.task?.change_context || null;
+  const routeDecision = options.routeDecision || runPlan.task?.route_decision || null;
+  const traceMode = options.traceMode || runPlan.task?.trace_mode || null;
+  const artifacts = mergeArtifacts(buildDefaultArtifacts(changeId, {
+    flowId: runPlan.flow?.id || null,
+    runId,
+    traceMode,
+  }), inferArtifacts(runPlan.artifacts));
   const currentRole = runPlan.plan?.first_handoff || null;
   const approvalGates = Array.isArray(runPlan.plan?.approval_gates)
     ? runPlan.plan.approval_gates
@@ -877,7 +927,11 @@ function buildRunState({ runPlan, taskAnchor, options, now, source }) {
           change_id: sanitizedAnchor.task?.change_id || changeId,
         },
         artifacts: mergeArtifacts(
-          buildDefaultArtifacts(changeId),
+          buildDefaultArtifacts(changeId, {
+            flowId: runPlan.flow?.id || null,
+            runId,
+            traceMode,
+          }),
           inferArtifacts(sanitizedAnchor.artifacts || artifacts),
         ),
       }
@@ -909,6 +963,9 @@ function buildRunState({ runPlan, taskAnchor, options, now, source }) {
       risk_level: riskLevel,
       type: runPlan.task?.type || null,
       complexity,
+      change_context: changeContext,
+      route_decision: routeDecision,
+      trace_mode: traceMode,
       change_impact: options.changeImpact || runPlan.task?.change_impact || null,
     },
     flow: {
@@ -932,6 +989,9 @@ function buildRunState({ runPlan, taskAnchor, options, now, source }) {
     pending_gate: pendingGate,
     gate_context: buildGateContext(null, options, pendingGate),
     incremental_update: buildIncrementalUpdateState(null, options, {
+      changeContext,
+      routeDecision,
+      traceMode,
       changeImpact: options.changeImpact || runPlan.task?.change_impact || null,
       reconcileStrategy: options.reconcileStrategy || runPlan.task?.reconcile_strategy || null,
       artifactsToUpdate: options.artifactsToUpdate || runPlan.task?.artifacts_to_update || [],
@@ -1116,6 +1176,9 @@ function recordRunInputUpdate(options) {
     at: now.toISOString(),
     text: userInput,
     source: options.source || 'protocol-update',
+    change_context: options.changeContext || null,
+    route_decision: options.routeDecision || null,
+    trace_mode: options.traceMode || null,
     change_impact: options.changeImpact || null,
     reconcile_strategy: options.reconcileStrategy || null,
     artifacts_to_update: Array.isArray(options.artifactsToUpdate) ? options.artifactsToUpdate : [],
@@ -1150,6 +1213,9 @@ function recordRunInputUpdate(options) {
       ...(state.trigger || {}),
       latest_user_input: userInput,
       latest_input_at: now.toISOString(),
+      latest_change_context: options.changeContext || null,
+      latest_route_decision: options.routeDecision || null,
+      latest_trace_mode: options.traceMode || null,
       latest_change_impact: options.changeImpact || null,
       latest_reconcile_strategy: options.reconcileStrategy || null,
     },

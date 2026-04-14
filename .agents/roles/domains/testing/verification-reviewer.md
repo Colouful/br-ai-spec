@@ -1,7 +1,7 @@
 ---
 id: verification-reviewer
 name: 验证评审专家
-status: planned
+status: active
 domains:
   - testing
 description: 负责对需求验收项、测试场景和交付验证口径做最终审视，保证验证链路完整。

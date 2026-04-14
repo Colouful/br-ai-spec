@@ -1,7 +1,7 @@
 ---
 id: performance-auditor
 name: 性能审计专家
-status: planned
+status: active
 domains:
   - performance
 description: 负责分析页面和构建层面的性能问题，识别主要瓶颈与优化优先级。

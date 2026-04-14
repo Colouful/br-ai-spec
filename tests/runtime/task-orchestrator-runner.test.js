@@ -53,8 +53,35 @@ function readCurrentRun(targetDir) {
   return JSON.parse(fs.readFileSync(path.join(targetDir, '.ai-spec', 'current-run.json'), 'utf8'));
 }
 
-function main() {
-  const targetDir = fs.mkdtempSync(path.join(os.tmpdir(), 'br-ai-spec-runner-test-'));
+function rewriteRunGoal(targetDir, rawGoal) {
+  const currentRunPath = path.join(targetDir, '.ai-spec', 'current-run.json');
+  const currentRun = JSON.parse(fs.readFileSync(currentRunPath, 'utf8'));
+  currentRun.trigger.raw_input = rawGoal;
+  currentRun.trigger.latest_user_input = rawGoal;
+  if (currentRun.anchor?.task) {
+    currentRun.anchor.task.raw_goal = rawGoal;
+  }
+  fs.writeFileSync(currentRunPath, JSON.stringify(currentRun, null, 2));
+}
+
+function rewriteCurrentDispatchGoal(targetDir, rawGoal) {
+  const dispatchPathCandidates = [
+    path.join(targetDir, '.ai-spec', 'internal', 'current-dispatch.json'),
+    path.join(targetDir, '.ai-spec', 'current-dispatch.json'),
+  ];
+  const dispatchPath = dispatchPathCandidates.find((filePath) => fs.existsSync(filePath));
+  if (!dispatchPath) {
+    throw new Error('current dispatch file not found');
+  }
+  const dispatch = JSON.parse(fs.readFileSync(dispatchPath, 'utf8'));
+  if (dispatch.task) {
+    dispatch.task.raw_goal = rawGoal;
+  }
+  fs.writeFileSync(dispatchPath, JSON.stringify(dispatch, null, 2));
+}
+
+function createWorkspace(prefix = 'br-ai-spec-runner-test-') {
+  const targetDir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
   writeProjectFile(targetDir, 'package.json', JSON.stringify({
     name: 'runner-smoke',
     scripts: {
@@ -82,6 +109,61 @@ function main() {
   writeProjectFile(targetDir, 'src/store/modules/demo/index.ts', 'export const useDemoStore = () => ({})');
   writeProjectFile(targetDir, 'src/styles/variables.scss', ':root {}');
   writeProjectFile(targetDir, 'context/PROJECT.md', '# PROJECT');
+  return targetDir;
+}
+
+function writeRequirementArtifacts(targetDir) {
+  writeProjectFile(targetDir, 'openspec/changes/runtime-smoke-demo/proposal.md', [
+    '# 变更提案：runtime-smoke-demo',
+    '',
+    '## 目标',
+    '- 新增一个商品组件演示页，验证协议链与页面落点约定。',
+    '',
+    '## 范围',
+    '- 页面放在 src/views，保留最小 mock 数据与组件结构。',
+    '',
+    '## 风险',
+    '- 当前仅演示协议流，不接真实 API。',
+  ].join('\n'));
+  writeProjectFile(targetDir, 'openspec/changes/runtime-smoke-demo/specs/ui/spec.md', [
+    '## 新增需求',
+    '',
+    '### 需求：商品演示页',
+    '',
+    '系统必须提供一个最小商品演示页，用于协议链验证。',
+    '',
+    '#### 场景：查看商品演示页',
+    '',
+    '- **已知** 当前仅提供 mock 数据',
+    '- **当** 用户进入商品演示页',
+    '- **则** 页面展示本地 mock 列表且不请求真实接口',
+  ].join('\n'));
+  writeProjectFile(targetDir, 'openspec/changes/runtime-smoke-demo/specs/api/spec.md', [
+    '## 新增需求',
+    '',
+    '### 需求：数据来源约束',
+    '',
+    '系统必须明确页面只读取本地 mock 数据，不请求真实接口。',
+  ].join('\n'));
+  writeProjectFile(targetDir, 'openspec/changes/runtime-smoke-demo/design.md', [
+    '# 技术设计',
+    '',
+    '## 实现落点',
+    '- 页面落在 src/views',
+    '- 路由落在 src/router/modules',
+    '- mock 数据落在 src/mock',
+  ].join('\n'));
+  writeProjectFile(targetDir, 'openspec/changes/runtime-smoke-demo/tasks.md', [
+    '# 实施任务',
+    '',
+    '- [ ] 创建页面与基础组件结构',
+    '- [ ] 补齐路由入口与懒加载配置',
+    '- [ ] 保持 mock 数据与样式变量约定',
+  ].join('\n'));
+}
+
+function main() {
+  const targetDir = createWorkspace();
 
   let workflow = step(targetDir, '创建一个商品组件');
   assert.strictEqual(workflow.advanced, null);
@@ -118,6 +200,12 @@ function main() {
   assert.ok(workflow.turn.guidance.role_rule_contract.source_rules.some((item) => item.path.includes('05-API规范.md')));
   assert.ok(Array.isArray(workflow.turn.guidance.role_skill_contract.primary_skills));
   assert.ok(workflow.turn.guidance.role_skill_contract.primary_skills.includes('create-proposal'));
+  assert.ok(Array.isArray(workflow.turn.guidance.artifact_contract));
+  assert.strictEqual(workflow.turn.guidance.artifact_contract[0].artifact, 'proposal.md');
+  assert.ok(workflow.turn.guidance.skill_selection_policy.primary_order.includes('create-proposal'));
+  assert.ok(workflow.turn.guidance.handoff_checklist.some((item) => item.includes('mock-first')));
+  assert.ok(workflow.turn.guidance.optional_role_triggers.some((item) => item.role_id === 'design-collaborator'));
+  assert.ok(workflow.turn.guidance.optional_role_triggers.some((item) => item.role_id === 'api-contract-specialist'));
   assert.ok(workflow.turn.guidance.analysis_contract);
   assert.deepStrictEqual(listTurnTargets(workflow.turn), [
     '.ai-spec/internal/tmp/current-execution.json',
@@ -189,6 +277,10 @@ function main() {
   assert.strictEqual(workflow.turn.actor.id, 'frontend-implementer');
   assert.strictEqual(workflow.turn.command, 'frontend-implementer');
   assert.ok(workflow.turn.guidance.implementation_contract);
+  assert.strictEqual(workflow.turn.guidance.artifact_contract[0].artifact, 'code');
+  assert.ok(workflow.turn.guidance.skill_selection_policy.primary_order.includes('create-component'));
+  assert.ok(workflow.turn.guidance.handoff_checklist.some((item) => item.includes('懒加载')));
+  assert.ok(workflow.turn.guidance.optional_role_triggers.some((item) => item.role_id === 'unit-test-specialist'));
   assert.ok(workflow.turn.guidance.role_skill_contract.primary_skills.includes('create-route'));
   assert.ok(
     workflow.turn.guidance.role_skill_contract.read_targets.some((item) => item.rel_path === '.agents/skills/profiles/vue/create-route/SKILL.md' && item.exists),
@@ -214,11 +306,16 @@ function main() {
   assert.strictEqual(workflow.turn.actor.id, 'code-guardian');
   assert.strictEqual(workflow.turn.command, 'code-guardian');
   assert.ok(workflow.turn.guidance.review_contract);
+  assert.strictEqual(workflow.turn.guidance.artifact_contract[0].artifact, 'checklist.md');
+  assert.ok(workflow.turn.guidance.skill_selection_policy.primary_order.includes('ui-verification'));
+  assert.ok(workflow.turn.guidance.handoff_checklist.some((item) => item.includes('阻断项')));
+  assert.ok(workflow.turn.guidance.optional_role_triggers.some((item) => item.role_id === 'verification-reviewer'));
   assert.ok(workflow.turn.guidance.role_rule_contract.source_rules.some((item) => item.path.includes('14-审计汇报规范.md')));
   assert.ok(workflow.turn.guidance.review_contract.evidence_targets.includes('src/router/index.ts'));
   assert.ok(workflow.turn.guidance.review_contract.evidence_targets.includes('src/api'));
   assert.ok(workflow.turn.guidance.review_contract.blocking_checks.some((item) => item.includes('src/api')));
   assert.ok(workflow.turn.guidance.review_contract.blocking_checks.some((item) => item.includes('无关的扩改')));
+  assert.ok(workflow.turn.guidance.review_contract.blocking_checks.some((item) => item.includes('11-测试规范')));
   assert.ok(workflow.turn.guidance.review_contract.scope_guard.some((item) => item.includes('proposal/specs/design/tasks')));
   assert.ok(workflow.turn.guidance.review_contract.verification_expectations.includes('pnpm run build'));
   assert.ok(workflow.turn.guidance.review_contract.latest_verification);
@@ -263,6 +360,10 @@ function main() {
   workflow = step(targetDir);
   assert.strictEqual(workflow.turn.mode, 'execute');
   assert.strictEqual(workflow.turn.actor.id, 'archive-change');
+  assert.strictEqual(workflow.turn.guidance.artifact_contract[0].artifact, 'openspec/specs/');
+  assert.ok(workflow.turn.guidance.skill_selection_policy.primary_order.includes('archive-change'));
+  assert.ok(workflow.turn.guidance.handoff_checklist.some((item) => item.includes('archive_preflight')));
+  assert.ok(workflow.turn.guidance.archive_preflight.ready);
   assert.ok(workflow.turn.guidance.role_skill_contract.primary_skills.includes('archive-change'));
   assert.strictEqual(workflow.turn.enforcement.execute_current_command_first, true);
   assert.strictEqual(workflow.turn.enforcement.current_command_finalizes_run, true);
@@ -298,6 +399,64 @@ function main() {
   assert.ok(currentRun.artifacts.proposal.includes('openspec/changes/archive/'));
   assert.ok(fs.existsSync(path.join(targetDir, 'openspec/specs/ui/spec.md')));
   assert.ok(fs.existsSync(path.join(targetDir, 'openspec/specs/api/spec.md')));
+
+  const apiOnlyTarget = createWorkspace('br-ai-spec-api-only-');
+  step(apiOnlyTarget, '创建一个商品组件');
+  copyFixture(apiOnlyTarget, 'task-orchestrator-bootstrap-reply.md', 'task-orchestrator-turn.json');
+  advance(apiOnlyTarget);
+  writeRequirementArtifacts(apiOnlyTarget);
+  copyFixture(apiOnlyTarget, 'current-execution-requirement-analyst.json', 'current-execution.json');
+  advance(apiOnlyTarget);
+  rewriteRunGoal(apiOnlyTarget, '为 mock 数据层补一个接口封装');
+  rewriteCurrentDispatchGoal(apiOnlyTarget, '为 mock 数据层补一个接口封装');
+  const apiOnlyWorkflow = step(apiOnlyTarget);
+  assert.strictEqual(apiOnlyWorkflow.turn.actor.id, 'frontend-implementer');
+  assert.strictEqual(apiOnlyWorkflow.turn.guidance.role_skill_contract.primary_skills[0], 'create-api');
+
+  const pageTarget = createWorkspace('br-ai-spec-page-order-');
+  step(pageTarget, '创建一个商品组件');
+  copyFixture(pageTarget, 'task-orchestrator-bootstrap-reply.md', 'task-orchestrator-turn.json');
+  advance(pageTarget);
+  writeRequirementArtifacts(pageTarget);
+  copyFixture(pageTarget, 'current-execution-requirement-analyst.json', 'current-execution.json');
+  advance(pageTarget);
+  rewriteRunGoal(pageTarget, '创建一个欢迎页面，使用本地 mock 并补齐路由和样式');
+  rewriteCurrentDispatchGoal(pageTarget, '创建一个欢迎页面，使用本地 mock 并补齐路由和样式');
+  const pageWorkflow = step(pageTarget);
+  assert.strictEqual(pageWorkflow.turn.actor.id, 'frontend-implementer');
+  assert.deepStrictEqual(
+    pageWorkflow.turn.guidance.role_skill_contract.primary_skills.slice(0, 3),
+    ['create-view', 'create-route', 'theme-variables'],
+  );
+
+  const archiveBlockedTarget = createWorkspace('br-ai-spec-archive-blocked-');
+  step(archiveBlockedTarget, '创建一个商品组件');
+  copyFixture(archiveBlockedTarget, 'task-orchestrator-bootstrap-reply.md', 'task-orchestrator-turn.json');
+  advance(archiveBlockedTarget);
+  writeRequirementArtifacts(archiveBlockedTarget);
+  copyFixture(archiveBlockedTarget, 'current-execution-requirement-analyst.json', 'current-execution.json');
+  advance(archiveBlockedTarget);
+  copyFixture(archiveBlockedTarget, 'current-execution-frontend-implementer.json', 'current-execution.json');
+  advance(archiveBlockedTarget);
+  writeProjectFile(archiveBlockedTarget, 'openspec/changes/runtime-smoke-demo/checklist.md', '# checklist');
+  writeProjectFile(archiveBlockedTarget, 'openspec/changes/runtime-smoke-demo/iterations.md', '# iterations');
+  copyFixture(archiveBlockedTarget, 'current-execution-code-guardian.json', 'current-execution.json');
+  advance(archiveBlockedTarget);
+  writeRuntimeActionInbox(archiveBlockedTarget, {
+    schema_version: 1,
+    kind: 'task-orchestrator-runtime-action',
+    action: 'approve',
+    gate: 'before-archive',
+    to_role: 'archive-change',
+    message: 'archive approved',
+  });
+  advance(archiveBlockedTarget);
+  fs.unlinkSync(path.join(archiveBlockedTarget, 'openspec/changes/runtime-smoke-demo/checklist.md'));
+  const blockedArchiveWorkflow = step(archiveBlockedTarget);
+  assert.strictEqual(blockedArchiveWorkflow.turn.actor.id, 'archive-change');
+  assert.strictEqual(blockedArchiveWorkflow.turn.status, 'blocked');
+  assert.ok(blockedArchiveWorkflow.turn.guidance.archive_preflight.missing_artifacts.includes('checklist.md'));
+  assert.strictEqual(blockedArchiveWorkflow.turn.enforcement.execute_current_command_first, false);
 
   const runnerStatus = status(targetDir);
   assert.strictEqual(runnerStatus.kind, 'task-orchestrator-runner-status');

@@ -1,7 +1,7 @@
 ---
 id: api-contract-specialist
 name: API 契约专家
-status: planned
+status: active
 domains:
   - demand-design
 description: 负责在需求设计阶段梳理接口契约、字段边界和前后端协作约定。

@@ -217,6 +217,9 @@ function main() {
   });
   assert.strictEqual(result.fast_path.executed, false);
   assert.strictEqual(result.turn.mode, 'update-review');
+  assert.strictEqual(result.turn.guidance.update_contract.change_context, 'active-change');
+  assert.strictEqual(result.turn.guidance.update_contract.route_decision, 'patch');
+  assert.strictEqual(result.turn.guidance.update_contract.trace_mode, 'same-change');
   assert.strictEqual(result.turn.guidance.update_contract.change_impact, 'patch');
   assert.strictEqual(result.turn.guidance.update_contract.reconcile_strategy, 'in-place');
   assert.ok(result.turn.guidance.update_contract.artifacts_to_update.includes('tasks.md'));
@@ -231,6 +234,9 @@ function main() {
   currentRun = readCurrentRun(archiveFixTarget);
   assert.strictEqual(result.fast_path.executed, false);
   assert.strictEqual(result.turn.mode, 'update-review');
+  assert.strictEqual(result.turn.guidance.update_contract.change_context, 'active-change');
+  assert.strictEqual(result.turn.guidance.update_contract.route_decision, 'archive-fix');
+  assert.strictEqual(result.turn.guidance.update_contract.trace_mode, 'same-change');
   assert.strictEqual(result.turn.guidance.update_contract.change_impact, 'archive-fix');
   assert.strictEqual(result.turn.guidance.update_contract.reconcile_strategy, 'rewind-to-frontend');
   assert.strictEqual(result.turn.guidance.update_contract.target_role, 'frontend-implementer');
@@ -253,9 +259,15 @@ function main() {
   currentRun = readCurrentRun(archiveFixTarget);
   assert.strictEqual(result.fast_path.executed, true);
   assert.strictEqual(result.fast_path.action, 'followup-patch-opened');
+  assert.strictEqual(currentRun.task.change_context, 'archived-change');
+  assert.strictEqual(currentRun.task.route_decision, 'followup-patch');
+  assert.strictEqual(currentRun.task.trace_mode, 'followup-change');
   assert.strictEqual(currentRun.task.type, 'followup-patch');
   assert.strictEqual(currentRun.task.parent_change_id, 'runtime-smoke-demo');
   assert.strictEqual(currentRun.task.change_impact, 'followup-patch');
+  assert.strictEqual(currentRun.incremental_update.change_context, 'archived-change');
+  assert.strictEqual(currentRun.incremental_update.route_decision, 'followup-patch');
+  assert.strictEqual(currentRun.incremental_update.trace_mode, 'followup-change');
   assert.strictEqual(currentRun.incremental_update.reconcile_strategy, 'followup-patch');
   assert.ok(currentRun.plan.activated_optional_roles.includes('unit-test-specialist'));
 
@@ -295,6 +307,14 @@ function main() {
   assert.ok(statusResult.turn.guidance.orchestration_contract.activated_optional_roles.includes('api-contract-specialist'));
   assert.ok(statusResult.turn.guidance.orchestration_contract.activated_optional_roles.includes('unit-test-specialist'));
   assert.ok(statusResult.turn.guidance.orchestration_contract.activated_optional_roles.includes('performance-auditor'));
+  copyFixture(optionalRoleTarget, 'task-orchestrator-bootstrap-reply.md', 'task-orchestrator-turn.json');
+  runner.advanceRunner({ target: optionalRoleTarget });
+  const requirementTurn = protocolWorkflow.advanceProtocolStep({
+    target: optionalRoleTarget,
+  });
+  assert.strictEqual(requirementTurn.turn.actor.id, 'requirement-analyst');
+  assert.ok(requirementTurn.turn.guidance.optional_role_triggers.some((item) => item.role_id === 'design-collaborator'));
+  assert.ok(requirementTurn.turn.guidance.optional_role_triggers.some((item) => item.role_id === 'api-contract-specialist'));
 
   console.log('protocol interaction enhancements test passed: pause/status, delta update review, archive-fix, followup patch, confirm gate, and optional experts all behave as expected');
 }

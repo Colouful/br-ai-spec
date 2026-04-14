@@ -80,6 +80,21 @@ npx @ex/ai-spec-auto@latest init .
 - `/spec-stop`：暂停当前 run
 - `/spec-status`：查看当前阶段、门禁和下一步
 
+### 小需求怎么走
+
+| 场景 | 推荐入口 | 默认结果 |
+| --- | --- | --- |
+| 新的大需求、新功能、跨模块改动 | `/spec-start` 或自然语言描述 | 进入 `prd-to-delivery` |
+| 当前 run / 未归档 change 里的小修正 | `/spec-update` 或自然语言补充 | 复用原 change，走 `patch` / `scope-delta` |
+| 归档前发现实现不对 | 自然语言：`先别归档，这里改成...` | 走 `archive-fix`，回退到对应专家 |
+| 已归档内容补一个修正 | 自然语言：`给上个归档变更补个修正...` | 走 `followup-patch`，新开补丁 change |
+| 全新、低风险、单点小修正 | 自然语言直接描述 | 进入 `bugfix-to-verification`，留痕写到 `.ai-spec/history/<run-id>/` |
+
+判断原则：
+
+- 只要涉及新增 API、路由、全局状态、权限/支付/合规、跨模块范围变化，就升级回 `prd-to-delivery`
+- 只要你明确要求“留痕 / 归档 / 评审 / spec”，即使需求很小，也优先走完整 OpenSpec
+
 如果你走 OpenSpec 提案流：
 
 - Cursor：`/opsx-propose`、`/opsx-apply`、`/opsx-archive`、`/opsx-explore`
@@ -118,13 +133,16 @@ npx @ex/ai-spec-auto@latest update . --skip-skills --skip-configs --skip-openspe
 
 - [第四阶段文档入口](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/four/README.md)
 - [开发最佳实践指南](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/four/开发最佳实践指南.md)
+- [需求示例：从发起到归档](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/four/需求示例-从发起到归档.md)
 - [架构设计与治理说明](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/four/架构设计与治理说明.md)
 - [5 分钟快速上手](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/quick-start.md)
 - [安装指南](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/install-guide.md)
 - [文档索引](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/README.md)
 - [OpenSpec / 协议流说明](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/openspec-guide.md)
+- [小需求与补丁修正指南](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/four/小需求与补丁修正指南.md)
 - [培训大纲](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/training-outline.md)
 - [协议与专家增强记录](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/paser_three/协议与专家增强记录.md)
+- [主流程专家优化记录](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/paser_three/主流程专家优化记录.md)
 - [项目介绍与运行机制说明](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/paser_three/项目介绍与运行机制说明.md)
 
 ## 兼容说明

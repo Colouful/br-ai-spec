@@ -10,12 +10,12 @@ triggers:
   - implementation-ready
   - tasks-available
 preferred_skills:
-  - create-component
   - create-view
   - create-route
   - create-api
-  - create-store
   - theme-variables
+  - create-component
+  - create-store
   - execute-task
 reads:
   - context/PROJECT.md
@@ -42,6 +42,8 @@ handoff_to:
 ## 工作原则
 
 - 先读 `proposal.md`、`specs/`、`design.md` 和 `tasks.md`，再动代码
+- 先按 `rules` 和 `repo_conventions` 判断目录、路由、API、状态、样式落点，再选 skill
+- 项目规则高于 skill 示例；如果 skill 样例与当前项目约定冲突，以规则为准
 - 优先复用现有规则、组件、目录结构和技能
 - 按技术栈选择对应 profile skill，不混用无关框架做法
 - 修改范围尽量贴近本次变更，不顺手大改无关代码
@@ -53,8 +55,8 @@ handoff_to:
 ## 必做步骤
 
 1. 读取规则入口、任务设计和任务清单
-2. 判断当前实现属于组件、页面、接口、状态还是样式改造
-3. 选择对应 skill 执行
+2. 先判断当前实现属于页面、组件、接口、状态还是样式改造
+3. 按任务类型选择对应主 skill，再补辅助 skill
 4. 严格按任务清单推进实现
 5. 对超出任务范围的发现，记录到实现说明或交回主代理，而不是自行扩 scope
 6. 实现完成后，准备交给 `code-guardian`
@@ -72,13 +74,12 @@ handoff_to:
 
 ## 技能选择原则
 
-- 先按主代理交接的当前实现阶段完成本轮范围；需要细化单项任务时再使用 `execute-task`
-- 组件相关优先用 `create-component`
-- Vue 页面用 `create-view`
-- React 路由页面用 `create-route`
-- 接口相关用 `create-api`
-- 全局状态相关用 `create-store`
-- 样式和主题相关用 `theme-variables`
+- 页面任务：`create-view -> create-route -> theme-variables`
+- 组件任务：`create-component -> theme-variables`
+- 接口任务：`create-api`
+- 状态任务：`create-store`
+- 混合任务：先完成主 skill，再按需使用 `execute-task`
+- 若只是因为 skill 示例“更完整”而想扩 scope，必须停止并回到规则和任务边界
 
 ## 输出标准
 
@@ -87,6 +88,7 @@ handoff_to:
 - 代码实现
 - 与当前变更相关的简要实现说明
 - 如果存在未完成项，要明确列出原因和影响
+- `implementation-notes` 中说明主技能选择、验证结果与残留风险
 
 ### micro（微型交付）补充要求
 
@@ -95,6 +97,19 @@ handoff_to:
 - 优先做最小必要改动
 - 优先复用既有目录、变量、组件和 mock 约定
 - 实现说明保持短版，只保留变更点、验证结果和残留风险
+
+## 可选专家触发
+
+- 改动涉及 store、复杂逻辑或高回归风险，且现有测试不足时，拉起 `unit-test-specialist`
+- 页面存在大列表、首屏卡顿或明确性能目标时，拉起 `performance-auditor`
+
+## 交接前检查
+
+- 目录落点是否符合项目结构
+- 路由是否懒加载并补齐 meta
+- 页面/组件是否未直接调 `request`
+- 样式是否使用主题变量和作用域样式
+- 是否出现超范围补功能或顺手重构
 
 ## 禁止事项
 

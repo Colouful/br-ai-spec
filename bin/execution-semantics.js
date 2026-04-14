@@ -68,6 +68,38 @@ const FLOW_RUNTIME_TRANSITIONS = {
       message: 'run completed after archive-change closeout',
     },
   },
+  'bugfix-to-verification': {
+    'frontend-implementer': {
+      action: 'handoff',
+      to_role: 'code-guardian',
+      next_role: null,
+      message: 'handoff to code-guardian after lightweight bugfix delivery',
+    },
+    'unit-test-specialist': {
+      action: 'handoff',
+      to_role: 'code-guardian',
+      next_role: null,
+      message: 'handoff to code-guardian after lightweight test supplementation',
+    },
+    'verification-reviewer': {
+      action: 'handoff',
+      to_role: 'code-guardian',
+      next_role: null,
+      message: 'handoff to code-guardian after lightweight verification review',
+    },
+    'performance-auditor': {
+      action: 'handoff',
+      to_role: 'code-guardian',
+      next_role: null,
+      message: 'handoff to code-guardian after lightweight performance review',
+    },
+    'code-guardian': {
+      action: 'complete',
+      to_role: 'code-guardian',
+      next_role: null,
+      message: 'run completed after lightweight verification closeout',
+    },
+  },
 };
 
 const ROLE_OPENSPEC_ACTIONS = {
@@ -86,6 +118,23 @@ const ROLE_REQUIRED_INPUTS = {
 const ROLE_REQUIRED_OUTPUTS = {
   'requirement-analyst': ['proposal', 'specs', 'design', 'tasks'],
   'code-guardian': ['checklist', 'iterations'],
+};
+
+const FLOW_ROLE_REQUIRED_INPUTS = {
+  'bugfix-to-verification': {
+    'frontend-implementer': [],
+    'code-guardian': ['bugfix', 'implementation_notes'],
+    'unit-test-specialist': ['bugfix', 'implementation_notes'],
+    'verification-reviewer': ['bugfix', 'implementation_notes'],
+    'performance-auditor': ['bugfix', 'implementation_notes'],
+  },
+};
+
+const FLOW_ROLE_REQUIRED_OUTPUTS = {
+  'bugfix-to-verification': {
+    'frontend-implementer': ['bugfix', 'implementation_notes'],
+    'code-guardian': ['checklist', 'iterations'],
+  },
 };
 
 function readJsonFile(filePath, label) {
@@ -225,7 +274,16 @@ function readMarkdownArtifactContent(artifactPath) {
   };
 }
 
-function getRoleArtifactRequirements(targetDir, roleId) {
+function getRoleArtifactRequirements(targetDir, roleId, flowId = null) {
+  const flowRequiredInputs = normalizeStringList(FLOW_ROLE_REQUIRED_INPUTS[flowId]?.[roleId]);
+  const flowRequiredOutputs = normalizeStringList(FLOW_ROLE_REQUIRED_OUTPUTS[flowId]?.[roleId]);
+  if (flowRequiredInputs.length > 0 || flowRequiredOutputs.length > 0) {
+    return {
+      required_inputs: flowRequiredInputs,
+      required_outputs: flowRequiredOutputs,
+    };
+  }
+
   const registryEntry = getRoleRuntimeConfig(targetDir, roleId);
   const requiredInputs = normalizeStringList(registryEntry?.required_inputs);
   const requiredOutputs = normalizeStringList(registryEntry?.required_outputs);
@@ -378,16 +436,16 @@ function validatePreImplementationGate(targetDir, currentRun, executionPayload) 
 }
 
 function getRuntimeTransition(targetDir, flowId, roleId) {
-  const roleConfig = getRoleRuntimeConfig(targetDir, roleId);
-  const roleTransition = roleConfig?.runtime_transition;
-  if (roleTransition && typeof roleTransition === 'object' && roleTransition.action) {
-    return roleTransition;
-  }
-
   const flowConfig = getFlowRuntimeConfig(targetDir, flowId);
   const flowTransition = flowConfig?.runtime_transitions?.[roleId];
   if (flowTransition && typeof flowTransition === 'object' && flowTransition.action) {
     return flowTransition;
+  }
+
+  const roleConfig = getRoleRuntimeConfig(targetDir, roleId);
+  const roleTransition = roleConfig?.runtime_transition;
+  if (roleTransition && typeof roleTransition === 'object' && roleTransition.action) {
+    return roleTransition;
   }
 
   return FLOW_RUNTIME_TRANSITIONS[flowId]?.[roleId] || null;

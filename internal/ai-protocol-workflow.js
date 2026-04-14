@@ -92,6 +92,7 @@ const FALLBACK_ROLE_RULE_IDS = {
   'requirement-analyst': ['project-overview', 'project-structure', 'api-standard', 'route-standard', 'style-standard'],
   'frontend-implementer': ['project-structure', 'component-standard', 'route-standard', 'api-standard', 'store-standard', 'style-standard'],
   'code-guardian': ['coding-standard', 'api-standard', 'route-standard', 'style-standard', 'test-standard', 'format-check-standard', 'audit-report-standard'],
+  'archive-change': ['audit-report-standard'],
   'design-collaborator': ['project-structure', 'component-standard', 'route-standard', 'style-standard'],
   'api-contract-specialist': ['project-overview', 'api-standard', 'route-standard'],
   'unit-test-specialist': ['coding-standard', 'test-standard', 'audit-report-standard'],
@@ -163,6 +164,7 @@ const FALLBACK_ROLE_OPENSPEC_RULE_SECTIONS = {
 };
 
 const DEFAULT_FLOW_ID = 'prd-to-delivery';
+const QUICK_FIX_FLOW_ID = 'bugfix-to-verification';
 const DEFAULT_FLOW_CONSTRAINTS = {
   required_roles: ['requirement-analyst', 'frontend-implementer', 'code-guardian'],
   approval_gates: ['before-implementation', 'before-archive'],
@@ -297,6 +299,18 @@ const ROLE_GUIDANCE = {
     must_not: [
       '不要在 checklist.md 和 iterations.md 未落盘前给 complete 结论',
       '不要把明显问题写成模糊建议',
+    ],
+  },
+  'archive-change': {
+    goal: '在归档批准后先完成 preflight，再通过 archive-change 命令做规范合并、目录归档和运行收尾。',
+    must_do: [
+      '先确认 proposal/specs/design/tasks/checklist/iterations 已齐备',
+      '归档摘要要说明合并的 spec、归档位置、残留风险和后续 patch 的回退阶段',
+      '优先执行 archive-change 内置命令，不手工搬运目录',
+    ],
+    must_not: [
+      '不要在 preflight 未通过时强行归档',
+      '不要在命令成功后重复补写 execution 或再次 advance',
     ],
   },
   'design-collaborator': {
@@ -475,7 +489,7 @@ const ROLE_RULE_REPO_SPECIFIC = {
 
 const MICRO_ROLE_SKILL_ALLOWLIST = {
   'requirement-analyst': ['create-proposal', 'design-analysis'],
-  'frontend-implementer': ['create-view', 'create-component', 'create-route', 'theme-variables'],
+  'frontend-implementer': ['create-view', 'create-route', 'create-api', 'theme-variables', 'create-component', 'create-store'],
   'code-guardian': ['ui-verification', 'web-design-guidelines'],
 };
 
@@ -819,12 +833,246 @@ function inferRiskDrivers(rawInput, repoConventions) {
   return [...new Set(drivers)];
 }
 
-function buildOrchestratorGuidance(targetDir, runState = null, userInput = null) {
-  const selectedFlowId = runState?.flow?.id || DEFAULT_FLOW_ID;
+function parseArchivedChangeId(entryName) {
+  const value = String(entryName || '').trim();
+  const match = value.match(/^\d{4}-\d{2}-\d{2}-(.+)$/);
+  return match ? match[1] : null;
+}
+
+function listOpenChangeCandidates(targetDir) {
+  const changesDir = path.join(targetDir, 'openspec', 'changes');
+  if (!fs.existsSync(changesDir)) {
+    return [];
+  }
+
+  return fs.readdirSync(changesDir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && entry.name !== 'archive')
+    .map((entry) => ({
+      id: entry.name,
+      rel_path: path.join('openspec', 'changes', entry.name),
+    }))
+    .sort((a, b) => a.id.localeCompare(b.id));
+}
+
+function listArchivedChangeCandidates(targetDir) {
+  const archiveDir = path.join(targetDir, 'openspec', 'changes', 'archive');
+  if (!fs.existsSync(archiveDir)) {
+    return [];
+  }
+
+  return fs.readdirSync(archiveDir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => ({
+      id: parseArchivedChangeId(entry.name),
+      archive_entry: entry.name,
+      rel_path: path.join('openspec', 'changes', 'archive', entry.name),
+    }))
+    .filter((item) => item.id)
+    .sort((a, b) => b.archive_entry.localeCompare(a.archive_entry));
+}
+
+function findReferencedChangeCandidates(input, candidates) {
+  const text = String(input || '').trim().toLowerCase();
+  if (!text) {
+    return [];
+  }
+
+  return candidates.filter((item) => {
+    const id = String(item.id || '').toLowerCase();
+    const archiveEntry = String(item.archive_entry || '').toLowerCase();
+    return Boolean(id && text.includes(id)) || Boolean(archiveEntry && text.includes(archiveEntry));
+  });
+}
+
+function looksLikeExplicitTraceInput(input) {
+  return /留痕|归档|评审|spec|规范|openspec/i.test(String(input || ''));
+}
+
+function looksLikeScopeDeltaInput(input) {
+  return /范围|方案|边界|验收口径|新增接口|字段调整|路由|流程|真实接口|跨模块|全局状态|store|联动/i.test(String(input || ''));
+}
+
+function looksLikeLowRiskQuickFixInput(input) {
+  const text = String(input || '');
+  if (!text.trim()) {
+    return false;
+  }
+  if (
+    looksLikeExplicitTraceInput(text) ||
+    looksLikeScopeDeltaInput(text) ||
+    /新增接口|新增路由|新增状态|全局状态|权限|支付|风控|合规|真实接口|多页面|重构|架构|需求边界/i.test(text)
+  ) {
+    return false;
+  }
+  return /bug|修复|样式|微调|文案|按钮|标题|颜色|间距|布局|对齐|hover|小交互|交互调整|卡片布局|显示异常|报错/i.test(text);
+}
+
+function summarizeChangeCandidates(candidates) {
+  return candidates.map((item) => ({
+    change_id: item.id,
+    rel_path: item.rel_path,
+    archive_entry: item.archive_entry || null,
+  }));
+}
+
+function inferStartRoutingDecision(targetDir, userInput) {
+  const text = String(userInput || '').trim();
+  const openCandidates = listOpenChangeCandidates(targetDir);
+  const archivedCandidates = listArchivedChangeCandidates(targetDir);
+  const referencedOpen = findReferencedChangeCandidates(text, openCandidates);
+  const referencedArchived = findReferencedChangeCandidates(text, archivedCandidates);
+  const archivedIntent = looksLikeFollowupPatchInput(text) || /上个归档|最近归档|已归档/.test(text);
+  const traceRequired = looksLikeExplicitTraceInput(text);
+  const quickFixEligible = looksLikeLowRiskQuickFixInput(text);
+  const needsScopeDelta = looksLikeScopeDeltaInput(text);
+
+  if (archivedIntent || referencedArchived.length > 0) {
+    let selectedArchived = referencedArchived[0] || null;
+    if (!selectedArchived && /上个归档|最近归档|已归档/.test(text)) {
+      selectedArchived = archivedCandidates[0] || null;
+    }
+    return {
+      change_context: 'archived-change',
+      route_decision: 'followup-patch',
+      trace_mode: 'followup-change',
+      selected_flow: DEFAULT_FLOW_ID,
+      reuse_change_id: null,
+      parent_change_id: selectedArchived?.id || null,
+      enter_openspec: true,
+      next_expert: needsScopeDelta ? 'requirement-analyst' : 'frontend-implementer',
+      reason: selectedArchived
+        ? `检测到已归档变更 ${selectedArchived.id}，应新开 follow-up patch 并保留 parent_change_id。`
+        : '输入明确指向已归档变更补丁，按 follow-up patch 新开修正链路。',
+      candidate_changes: summarizeChangeCandidates(selectedArchived ? [selectedArchived] : archivedCandidates.slice(0, 3)),
+      waiting_confirm_required: false,
+    };
+  }
+
+  if (openCandidates.length > 0) {
+    const selectedOpen = referencedOpen[0] || (openCandidates.length === 1 ? openCandidates[0] : null);
+    if (!selectedOpen && openCandidates.length > 1) {
+      return {
+        change_context: 'open-change',
+        route_decision: null,
+        trace_mode: 'same-change',
+        selected_flow: DEFAULT_FLOW_ID,
+        reuse_change_id: null,
+        parent_change_id: null,
+        enter_openspec: true,
+        next_expert: null,
+        reason: '检测到多个未归档 change，但当前输入没有明确指向哪一个，不能自动猜测。',
+        candidate_changes: summarizeChangeCandidates(openCandidates),
+        waiting_confirm_required: true,
+      };
+    }
+
+    if (selectedOpen) {
+      const routeDecision = needsScopeDelta ? 'scope-delta' : 'patch';
+      return {
+        change_context: 'open-change',
+        route_decision: routeDecision,
+        trace_mode: 'same-change',
+        selected_flow: DEFAULT_FLOW_ID,
+        reuse_change_id: selectedOpen.id,
+        parent_change_id: null,
+        enter_openspec: true,
+        next_expert: routeDecision === 'scope-delta' ? 'requirement-analyst' : 'frontend-implementer',
+        reason: routeDecision === 'scope-delta'
+          ? `检测到未归档 change ${selectedOpen.id}，且输入会影响范围/接口/验收边界，需回到 requirement-analyst 做增量修订。`
+          : `检测到未归档 change ${selectedOpen.id}，当前输入属于同一 change 内的小修正，按 patch 最小吸收。`,
+        candidate_changes: summarizeChangeCandidates([selectedOpen]),
+        waiting_confirm_required: false,
+      };
+    }
+  }
+
+  if (quickFixEligible && !traceRequired) {
+    return {
+      change_context: 'no-change',
+      route_decision: 'quick-fix',
+      trace_mode: 'direct-fix',
+      selected_flow: QUICK_FIX_FLOW_ID,
+      reuse_change_id: null,
+      parent_change_id: null,
+      enter_openspec: false,
+      next_expert: 'frontend-implementer',
+      reason: '当前输入属于全新且低风险的小修正，适合直接进入轻量 bugfix-to-verification 路径。',
+      candidate_changes: [],
+      waiting_confirm_required: false,
+    };
+  }
+
+  return {
+    change_context: 'no-change',
+    route_decision: 'full-change',
+    trace_mode: 'full-openspec',
+    selected_flow: DEFAULT_FLOW_ID,
+    reuse_change_id: null,
+    parent_change_id: null,
+    enter_openspec: true,
+    next_expert: null,
+    reason: traceRequired
+      ? '输入明确要求留痕/归档/spec，需进入完整 OpenSpec 主流程。'
+      : '当前输入超出低风险快修边界，需进入 prd-to-delivery 完整链路。',
+    candidate_changes: [],
+    waiting_confirm_required: false,
+  };
+}
+
+function buildRunRouteDecision(targetDir, runState, userInput, flowDefinition) {
+  const text = userInput || runState?.trigger?.latest_user_input || runState?.trigger?.raw_input || '';
+  const incremental = runState?.incremental_update || {};
+  const status = String(runState?.status || '').trim().toLowerCase();
+  const flowId = flowDefinition.id;
+  const routeDecision = incremental.route_decision
+    || runState?.task?.route_decision
+    || (flowId === QUICK_FIX_FLOW_ID ? 'quick-fix' : 'full-change');
+  const traceMode = incremental.trace_mode
+    || runState?.task?.trace_mode
+    || (flowId === QUICK_FIX_FLOW_ID ? 'direct-fix' : 'full-openspec');
+  const changeContext = incremental.change_context
+    || runState?.task?.change_context
+    || (status === 'success' ? 'archived-change' : 'active-change');
+  const parentChangeId = runState?.task?.parent_change_id || incremental.parent_change_id || null;
+  const reuseChangeId = traceMode === 'same-change' || (flowId !== QUICK_FIX_FLOW_ID && !parentChangeId)
+    ? runState?.task?.change_id || null
+    : null;
+  const nextExpert = incremental.target_role
+    || runState?.current_role
+    || runState?.plan?.first_handoff
+    || flowDefinition.first_handoff;
+
+  return {
+    change_context: changeContext,
+    route_decision: routeDecision,
+    trace_mode: traceMode,
+    selected_flow: flowId,
+    reuse_change_id: reuseChangeId,
+    parent_change_id: parentChangeId,
+    enter_openspec: flowId !== QUICK_FIX_FLOW_ID,
+    next_expert: nextExpert,
+    reason: changeContext === 'active-change'
+      ? '当前存在进行中的 run，补充输入按当前 run 的增量语义继续处理。'
+      : changeContext === 'archived-change'
+      ? '当前输入基于已结束或已归档结果继续补丁修正。'
+      : `当前运行沿用 ${flowId} 的默认链路继续推进。`,
+    candidate_changes: reuseChangeId
+      ? summarizeChangeCandidates([{ id: reuseChangeId, rel_path: runState?.artifacts?.proposal ? path.dirname(runState.artifacts.proposal) : null }])
+      : [],
+    waiting_confirm_required: false,
+    latest_input: text || null,
+  };
+}
+
+function buildOrchestratorGuidance(targetDir, runState = null, userInput = null, routeDecisionOverride = null) {
+  const selectedFlowId = routeDecisionOverride?.selected_flow || runState?.flow?.id || DEFAULT_FLOW_ID;
   const flowDefinition = loadFlowDefinition(targetDir, selectedFlowId);
   const projectProfile = detectProjectProfile(targetDir);
   const repoConventions = collectRepoConventions(targetDir, projectProfile);
   const rawInput = userInput || runState?.trigger?.latest_user_input || runState?.trigger?.raw_input || null;
+  const routeDecision = routeDecisionOverride || (runState?.run_id
+    ? buildRunRouteDecision(targetDir, runState, rawInput, flowDefinition)
+    : inferStartRoutingDecision(targetDir, rawInput));
   const riskLevel = runState?.task?.risk_level || inferRiskLevel({
     rawInput,
     taskType: null,
@@ -837,7 +1085,7 @@ function buildOrchestratorGuidance(targetDir, runState = null, userInput = null)
     riskLevel,
     flowId: selectedFlowId,
   });
-  const artifactProfile = runState?.artifact_profile || inferArtifactProfile({
+  const artifactProfile = runState?.artifact_profile || flowDefinition.artifact_profile || inferArtifactProfile({
     deliveryProfile,
   });
   const complexity = runState?.complexity || runState?.task?.complexity || inferComplexity({
@@ -857,7 +1105,8 @@ function buildOrchestratorGuidance(targetDir, runState = null, userInput = null)
     repoConventions,
   );
   const riskDrivers = inferRiskDrivers(rawInput, repoConventions);
-  const activatedOptionalRoles = inferOptionalRoles(rawInput);
+  const activatedOptionalRoles = inferOptionalRoles(rawInput)
+    .filter((roleId) => !Array.isArray(flowDefinition.optional_roles) || flowDefinition.optional_roles.includes(roleId));
   const skippedOptionalRoles = (flowDefinition.optional_roles || []).filter((roleId) => !activatedOptionalRoles.includes(roleId));
   const pendingGate = runState?.pending_gate || null;
   const hasBeforeImplementationGate = flowDefinition.approval_gates.includes('before-implementation');
@@ -877,7 +1126,7 @@ function buildOrchestratorGuidance(targetDir, runState = null, userInput = null)
       required_experts: flowDefinition.required_roles,
       activated_optional_roles: activatedOptionalRoles,
       skipped_optional_roles: skippedOptionalRoles,
-      first_handoff: runState?.plan?.first_handoff || flowDefinition.first_handoff,
+      first_handoff: runState?.plan?.first_handoff || routeDecision?.next_expert || flowDefinition.first_handoff,
       route_strategy: inferRoutingStrategy(repoConventions, rawInput),
       api_strategy: inferApiStrategy(repoConventions, rawInput),
       mock_strategy: inferMockStrategy(repoConventions, rawInput),
@@ -914,7 +1163,7 @@ function buildOrchestratorGuidance(targetDir, runState = null, userInput = null)
       selected_flow: flowDefinition.id,
       delivery_profile: deliveryProfile,
       artifact_profile: artifactProfile,
-      change_id: runState?.task?.change_id || null,
+      change_id: runState?.task?.change_id || routeDecision?.reuse_change_id || null,
       required_experts: flowDefinition.required_roles,
       required_artifacts: flowDefinition.required_artifacts,
       activated_optional_roles: activatedOptionalRoles,
@@ -936,6 +1185,20 @@ function buildOrchestratorGuidance(targetDir, runState = null, userInput = null)
         repoConventions.apiDir ? `API 模块优先对齐 ${repoConventions.apiDir}` : '真实接口任务需先明确 API 承载方式',
         repoConventions.styleEntry ? `样式入口优先对齐 ${repoConventions.styleEntry}` : '样式承载方式需先明确',
       ],
+    },
+    route_decision: {
+      identified_type: routeDecision?.change_context || null,
+      change_context: routeDecision?.change_context || null,
+      route_decision: routeDecision?.route_decision || null,
+      trace_mode: routeDecision?.trace_mode || null,
+      selected_flow: routeDecision?.selected_flow || flowDefinition.id,
+      reuse_change_id: routeDecision?.reuse_change_id || null,
+      parent_change_id: routeDecision?.parent_change_id || null,
+      enter_openspec: routeDecision?.enter_openspec ?? (flowDefinition.id !== QUICK_FIX_FLOW_ID),
+      next_expert: routeDecision?.next_expert || runState?.plan?.first_handoff || flowDefinition.first_handoff,
+      candidate_changes: routeDecision?.candidate_changes || [],
+      waiting_confirm_required: Boolean(routeDecision?.waiting_confirm_required),
+      reason: routeDecision?.reason || null,
     },
   };
 }
@@ -1422,6 +1685,9 @@ function buildSummary(status, runState = null) {
     complexity: runState?.complexity || runState?.task?.complexity || null,
     pending_input_update: Boolean(runState?.pending_input_update),
     input_update_count: Array.isArray(runState?.input_updates) ? runState.input_updates.length : 0,
+    change_context: runState?.incremental_update?.change_context || runState?.task?.change_context || null,
+    route_decision: runState?.incremental_update?.route_decision || runState?.task?.route_decision || null,
+    trace_mode: runState?.incremental_update?.trace_mode || runState?.task?.trace_mode || null,
     change_impact: runState?.incremental_update?.change_impact || runState?.task?.change_impact || null,
     reconcile_strategy: runState?.incremental_update?.reconcile_strategy || null,
     parent_change_id: runState?.task?.parent_change_id || runState?.incremental_update?.parent_change_id || null,
@@ -1552,6 +1818,9 @@ function buildProtocolCommands(userInput = null) {
 function buildRoleCurrentCommand(turn) {
   const actorId = turn.actor?.id || null;
   if (actorId !== 'archive-change') {
+    return null;
+  }
+  if (turn.guidance?.archive_preflight && turn.guidance.archive_preflight.ready === false) {
     return null;
   }
 
@@ -1867,31 +2136,123 @@ function resolveRoleMicroSkillAllowlist(targetDir, roleId) {
   return MICRO_ROLE_SKILL_ALLOWLIST[roleId] || [];
 }
 
-function choosePrimarySkillIds(targetDir, roleId, selectedSkills, repoConventions, userRequest = null) {
+function readTextIfExists(filePath) {
+  if (!filePath || !fs.existsSync(filePath)) {
+    return '';
+  }
+  try {
+    return fs.readFileSync(filePath, 'utf8');
+  } catch (_error) {
+    return '';
+  }
+}
+
+function detectTaskIntentSignals(rawText) {
+  const text = String(rawText || '');
+  return {
+    page: /页面|page|view|screen|路由|route|首页|欢迎页|登录页|报表页|详情页|列表页/i.test(text),
+    component: /组件|component|按钮|表单|卡片|弹窗|drawer|dialog|modal/i.test(text),
+    api: /接口封装|数据层|接口|api|请求|字段|联调|分页|筛选|搜索|契约|支付|订单/i.test(text),
+    store: /store|状态|pinia|zustand|redux|全局状态/i.test(text),
+    style: /样式|主题|颜色|视觉|还原|design|ui|scss|css/i.test(text),
+  };
+}
+
+function collectChangeArtifactIntentText(targetDir, changeId, currentRun) {
+  const candidates = [];
+  const artifactBase = changeId ? path.join(targetDir, 'openspec', 'changes', changeId) : null;
+
+  if (artifactBase) {
+    candidates.push(
+      path.join(artifactBase, 'proposal.md'),
+      path.join(artifactBase, 'design.md'),
+      path.join(artifactBase, 'tasks.md'),
+    );
+  }
+
+  if (currentRun?.artifacts && typeof currentRun.artifacts === 'object') {
+    for (const key of ['proposal', 'design', 'tasks']) {
+      if (typeof currentRun.artifacts[key] === 'string') {
+        candidates.push(path.join(targetDir, currentRun.artifacts[key]));
+      }
+    }
+  }
+
+  return [...new Set(candidates)]
+    .map((filePath) => readTextIfExists(filePath))
+    .filter(Boolean)
+    .join('\n');
+}
+
+function choosePrimarySkillIds(targetDir, roleId, selectedSkills, repoConventions, userRequest = null, currentRun = null, changeId = null) {
   const ordered = resolveRoleSkillPriority(targetDir, roleId, selectedSkills);
   const selected = new Set(normalizeSkillIds(selectedSkills));
-  const requestText = String(userRequest || '');
+  const requestSignals = detectTaskIntentSignals(userRequest);
+  const artifactSignals = roleId === 'frontend-implementer'
+    ? detectTaskIntentSignals(collectChangeArtifactIntentText(targetDir, changeId, currentRun))
+    : { page: false, component: false, api: false, store: false, style: false };
+  const explicitApiFocus = roleId === 'frontend-implementer'
+    && requestSignals.api
+    && !requestSignals.page
+    && !requestSignals.component
+    && !requestSignals.store
+    && !requestSignals.style;
+  const explicitStoreFocus = roleId === 'frontend-implementer'
+    && requestSignals.store
+    && !requestSignals.page
+    && !requestSignals.component
+    && !requestSignals.api
+    && !requestSignals.style;
+
+  if (explicitApiFocus) {
+    return ordered.filter((skillId) => selected.has(skillId) && skillId === 'create-api').slice(0, 1);
+  }
+
+  if (explicitStoreFocus) {
+    return ordered.filter((skillId) => selected.has(skillId) && skillId === 'create-store').slice(0, 1);
+  }
+
+  const pageIntent = requestSignals.page || (!requestSignals.api && artifactSignals.page);
+  const componentIntent = requestSignals.component || (!requestSignals.api && artifactSignals.component);
+  const apiIntent = requestSignals.api || (!requestSignals.page && !requestSignals.component && artifactSignals.api);
+  const storeIntent = requestSignals.store || (!requestSignals.api && artifactSignals.store);
+  const styleIntent = requestSignals.style || (!requestSignals.api && artifactSignals.style);
 
   return ordered.filter((skillId) => {
     if (!selected.has(skillId)) {
       return false;
     }
+    if (skillId === 'create-view') {
+      return pageIntent || Boolean(repoConventions.viewsDir && !apiIntent && !storeIntent && !componentIntent);
+    }
+    if (skillId === 'create-component') {
+      return componentIntent;
+    }
     if (skillId === 'create-route') {
-      return Boolean(repoConventions.routeEntry || repoConventions.routeModulesDir || /路由|route|页面|page/i.test(requestText));
+      return pageIntent;
     }
     if (skillId === 'create-api') {
-      return Boolean(repoConventions.apiDir || repoConventions.requestConfig || /接口|api|请求|支付|订单|列表/i.test(requestText));
+      return apiIntent || Boolean(
+        (repoConventions.apiDir || repoConventions.requestConfig)
+        && !pageIntent
+        && !componentIntent
+        && !storeIntent
+        && !styleIntent,
+      );
     }
     if (skillId === 'create-store') {
-      return Boolean(repoConventions.storeModulesDir || /store|状态|pinia/i.test(requestText));
+      return storeIntent;
+    }
+    if (skillId === 'theme-variables') {
+      return styleIntent || pageIntent || componentIntent;
     }
     return true;
   }).slice(0, roleId === 'frontend-implementer' ? 4 : 3);
 }
 
-function buildRoleSkillContract(targetDir, roleId, selectedSkills, deliveryProfile, projectProfile, repoConventions, userRequest = null) {
+function buildRoleSkillContract(targetDir, roleId, selectedSkills, deliveryProfile, projectProfile, repoConventions, userRequest = null, currentRun = null, changeId = null) {
   const normalized = normalizeSkillIds(selectedSkills);
-  const primaryIds = choosePrimarySkillIds(targetDir, roleId, selectedSkills, repoConventions, userRequest);
+  const primaryIds = choosePrimarySkillIds(targetDir, roleId, selectedSkills, repoConventions, userRequest, currentRun, changeId);
   const targetIds = primaryIds.length > 0 ? primaryIds : normalized.slice(0, roleId === 'frontend-implementer' ? 4 : 3);
   const readTargets = targetIds
     .map((id) => buildSkillTarget(targetDir, id, projectProfile))
@@ -1925,7 +2286,19 @@ function buildRuleHints(roleId, deliveryProfile, roleRuleContract = null) {
   return hints;
 }
 
-function buildOpenSpecGuidance(targetDir, roleId, deliveryProfile) {
+function buildOpenSpecGuidance(targetDir, roleId, deliveryProfile, flowId = DEFAULT_FLOW_ID) {
+  if (flowId === QUICK_FIX_FLOW_ID) {
+    return {
+      enabled: false,
+      source: null,
+      profile: inferArtifactProfile({
+        deliveryProfile,
+      }),
+      sections: [],
+      reason: '当前流程为 bugfix-to-verification，直接使用 .ai-spec/history/<run-id>/ 轻量留痕，不读取 OpenSpec 章节约束。',
+    };
+  }
+
   const config = loadOpenSpecRuleSections(targetDir);
   const sectionNames = resolveRoleOpenSpecSections(targetDir, roleId);
   const artifactProfile = inferArtifactProfile({
@@ -1965,21 +2338,378 @@ function buildRepoConventionGuidance(repoConventions) {
   };
 }
 
+function buildArtifactContract(roleId, roleRuleContract, roleSkillContract, flowId = DEFAULT_FLOW_ID) {
+  const ruleIds = Array.isArray(roleRuleContract?.source_rules)
+    ? roleRuleContract.source_rules.map((item) => item.id)
+    : [];
+  const primarySkills = Array.isArray(roleSkillContract?.primary_skills) ? roleSkillContract.primary_skills : [];
+
+  if (flowId === QUICK_FIX_FLOW_ID && roleId === 'frontend-implementer') {
+    return [
+      {
+        artifact: 'code',
+        required_rules: ruleIds.filter((id) => ['project-structure', 'component-standard', 'route-standard', 'api-standard', 'store-standard', 'style-standard'].includes(id)),
+        preferred_skills: primarySkills,
+        done_when: '只完成当前 bug/样式/文案/小交互修复，不新增真实 API、路由、全局状态或超范围功能。',
+      },
+      {
+        artifact: 'bugfix.md',
+        required_rules: ruleIds.filter((id) => ['project-overview', 'project-structure'].includes(id)),
+        preferred_skills: primarySkills,
+        done_when: '问题现象、期望结果、影响范围、复现线索和限制条件已写清，可支撑后续复查。',
+      },
+      {
+        artifact: 'implementation-notes.md',
+        required_rules: ruleIds.filter((id) => ['style-standard', 'audit-report-standard'].includes(id)),
+        preferred_skills: primarySkills.filter((id) => ['execute-task'].includes(id)),
+        done_when: '已记录修复动作、验证结果、残留风险和是否需要升级到完整 OpenSpec。'
+      },
+    ];
+  }
+
+  if (flowId === QUICK_FIX_FLOW_ID && roleId === 'code-guardian') {
+    return [
+      {
+        artifact: 'checklist.md',
+        required_rules: ruleIds.filter((id) => ['api-standard', 'route-standard', 'style-standard', 'test-standard', 'audit-report-standard'].includes(id)),
+        preferred_skills: primarySkills.filter((id) => ['ui-verification', 'web-design-guidelines', 'create-test'].includes(id)),
+        done_when: '已区分通过 / 未通过 / 阻断项 / 证据 / 是否放行，并明确是否仍可保持 quick-fix 范围。'
+      },
+      {
+        artifact: 'iterations.md',
+        required_rules: ruleIds.filter((id) => ['test-standard', 'audit-report-standard'].includes(id)),
+        preferred_skills: primarySkills.filter((id) => ['create-test', 'ui-verification'].includes(id)),
+        done_when: '已沉淀本轮问题、修正动作、残留风险和下轮提醒，可作为后续 patch 继续依据。'
+      },
+    ];
+  }
+
+  if (roleId === 'requirement-analyst') {
+    return [
+      {
+        artifact: 'proposal.md',
+        required_rules: ruleIds.filter((id) => ['project-overview', 'project-structure'].includes(id)),
+        preferred_skills: primarySkills.filter((id) => ['create-proposal'].includes(id)),
+        done_when: '目标、范围、非目标、默认假设和风险已写清，且与当前仓库定位一致。',
+      },
+      {
+        artifact: 'specs/',
+        required_rules: ruleIds.filter((id) => ['api-standard', 'route-standard', 'style-standard'].includes(id)),
+        preferred_skills: primarySkills.filter((id) => ['create-proposal', 'design-analysis'].includes(id)),
+        done_when: '每个增量 spec 都能回指接口、路由或样式约束，并至少包含一个可验证场景。',
+      },
+      {
+        artifact: 'design.md',
+        required_rules: ruleIds.filter((id) => ['project-structure', 'component-standard', 'route-standard', 'api-standard', 'style-standard'].includes(id)),
+        preferred_skills: primarySkills.filter((id) => ['create-proposal', 'design-analysis'].includes(id)),
+        done_when: '页面、组件、路由、API、mock、状态和样式落点都已对齐到当前仓库结构。',
+      },
+      {
+        artifact: 'tasks.md',
+        required_rules: ruleIds.filter((id) => ['project-structure', 'api-standard', 'route-standard', 'style-standard'].includes(id)),
+        preferred_skills: primarySkills.filter((id) => ['create-proposal'].includes(id)),
+        done_when: '关键规则约束已转成可执行任务项，且待确认项已区分阻断与默认假设。',
+      },
+    ];
+  }
+
+  if (roleId === 'frontend-implementer') {
+    return [
+      {
+        artifact: 'code',
+        required_rules: ruleIds.filter((id) => ['project-structure', 'component-standard', 'route-standard', 'api-standard', 'store-standard', 'style-standard'].includes(id)),
+        preferred_skills: primarySkills,
+        done_when: '代码落点符合项目目录与路由/API/状态/样式规范，且未超出 tasks 范围。',
+      },
+      {
+        artifact: 'implementation-notes',
+        required_rules: ruleIds.filter((id) => ['project-structure', 'style-standard', 'audit-report-standard'].includes(id)),
+        preferred_skills: primarySkills.filter((id) => ['execute-task'].includes(id)),
+        done_when: '说明已记录主技能选择、验证结果、残留风险和未完成项，不以笼统措辞代替。',
+      },
+    ];
+  }
+
+  if (roleId === 'code-guardian') {
+    return [
+      {
+        artifact: 'checklist.md',
+        required_rules: ruleIds.filter((id) => ['api-standard', 'route-standard', 'style-standard', 'test-standard', 'audit-report-standard'].includes(id)),
+        preferred_skills: primarySkills.filter((id) => ['ui-verification', 'web-design-guidelines', 'create-test'].includes(id)),
+        done_when: '通过项、未通过项、阻断项、证据和是否放行结论都已明确，不存在模糊建议。',
+      },
+      {
+        artifact: 'iterations.md',
+        required_rules: ruleIds.filter((id) => ['test-standard', 'audit-report-standard'].includes(id)),
+        preferred_skills: primarySkills.filter((id) => ['create-test', 'ui-verification'].includes(id)),
+        done_when: '本轮问题、修正动作、残留风险和下轮提醒已沉淀，可支撑 patch/follow-up 继续推进。',
+      },
+    ];
+  }
+
+  if (roleId === 'archive-change') {
+    return [
+      {
+        artifact: 'openspec/specs/',
+        required_rules: ruleIds,
+        preferred_skills: primarySkills.filter((id) => ['archive-change'].includes(id)),
+        done_when: '增量 spec 已合并到 openspec/specs/，且没有覆盖既有规范。',
+      },
+      {
+        artifact: 'openspec/changes/archive/',
+        required_rules: ruleIds,
+        preferred_skills: primarySkills.filter((id) => ['archive-change'].includes(id)),
+        done_when: '当前 change 已迁移到 YYYY-MM-DD-change-id 归档目录并保持产物可追溯。',
+      },
+      {
+        artifact: 'archive-summary',
+        required_rules: ruleIds.filter((id) => ['audit-report-standard'].includes(id)),
+        preferred_skills: primarySkills.filter((id) => ['archive-change'].includes(id)),
+        done_when: '摘要已写清合并的 spec、归档目录、残留风险和后续 patch 应回退的阶段。',
+      },
+    ];
+  }
+
+  return [];
+}
+
+function buildSkillSelectionPolicy(roleId, roleSkillContract) {
+  const primaryOrder = Array.isArray(roleSkillContract?.primary_skills) ? roleSkillContract.primary_skills : [];
+  const ruleFirst = '当项目规则、repo_conventions 与 skill 示例冲突时，以规则与仓库事实为准，skill 只负责给出执行方法。';
+
+  if (roleId === 'requirement-analyst') {
+    return {
+      primary_order: primaryOrder,
+      use_when: [
+        { when: '生成 proposal/specs/design/tasks', skills: ['create-proposal'] },
+        { when: '输入包含设计稿、视觉还原或复杂交互', skills: ['design-analysis'] },
+      ],
+      fallback_rule: ruleFirst,
+    };
+  }
+
+  if (roleId === 'frontend-implementer') {
+    return {
+      primary_order: primaryOrder,
+      use_when: [
+        { when: '页面任务', skills: ['create-view', 'create-route', 'theme-variables'] },
+        { when: '组件任务', skills: ['create-component', 'theme-variables'] },
+        { when: '接口任务', skills: ['create-api'] },
+        { when: '状态任务', skills: ['create-store'] },
+        { when: '混合任务或多步实现', skills: ['execute-task'] },
+      ],
+      fallback_rule: ruleFirst,
+    };
+  }
+
+  if (roleId === 'code-guardian') {
+    return {
+      primary_order: primaryOrder,
+      use_when: [
+        { when: '页面或 UI 验收任务', skills: ['ui-verification'] },
+        { when: '交互、体验或设计规范检查', skills: ['web-design-guidelines'] },
+        { when: '工具函数、store、复杂逻辑存在回归风险或需补测', skills: ['create-test'] },
+      ],
+      fallback_rule: '先依据 rules 生成检查项，再决定是否启用对应 skill 补证据或补测试建议。',
+    };
+  }
+
+  if (roleId === 'archive-change') {
+    return {
+      primary_order: primaryOrder,
+      use_when: [
+        { when: 'before-archive 已批准且 archive_preflight 全部通过', skills: ['archive-change'] },
+      ],
+      fallback_rule: '优先执行 archive-change 内置命令；除非命令不可用，不得以手工目录操作替代。',
+    };
+  }
+
+  return {
+    primary_order: primaryOrder,
+    use_when: [],
+    fallback_rule: ruleFirst,
+  };
+}
+
+function buildHandoffChecklist(roleId, repoConventions, flowId = DEFAULT_FLOW_ID) {
+  if (flowId === QUICK_FIX_FLOW_ID && roleId === 'frontend-implementer') {
+    return [
+      '修复范围仍限定在单页面、单组件或单模块的小改动，没有偷偷升级成新需求。',
+      '未新增真实 API、路由、全局状态、权限/支付/合规逻辑；若已越界，必须显式升级到 prd-to-delivery。',
+      'bugfix.md 与 implementation-notes.md 已同步，能够说明问题、修复动作与残留风险。',
+    ];
+  }
+
+  if (flowId === QUICK_FIX_FLOW_ID && roleId === 'code-guardian') {
+    return [
+      'checklist.md 已区分通过 / 未通过 / 阻断项 / 证据 / 是否放行。',
+      'iterations.md 已记录问题、修正动作、残留风险和下轮提醒。',
+      '若发现需求已越出 quick-fix 边界，已明确阻断并要求升级到完整 OpenSpec 主流程。',
+    ];
+  }
+
+  if (roleId === 'requirement-analyst') {
+    return [
+      '页面、路由、API、mock、状态和样式落点已写入 design.md 或 tasks.md。',
+      '真实接口与 mock-first 边界已写清，未把未确认契约伪装成已定事实。',
+      '待确认项已区分阻断问题还是默认假设，必要时保留 before-implementation 门禁。',
+    ];
+  }
+
+  if (roleId === 'frontend-implementer') {
+    return [
+      repoConventions.viewsDir ? `目录落点已对齐 ${repoConventions.viewsDir} 等项目结构。` : '目录落点已对齐当前项目结构约定。',
+      repoConventions.routeModulesDir ? `路由已落在 ${repoConventions.routeModulesDir} 并保持懒加载和 meta 约束。` : '若涉及路由，已按项目要求处理懒加载和 meta。',
+      repoConventions.apiDir ? `页面或组件未直接调 request，接口已经由 ${repoConventions.apiDir} 封装。` : '页面或组件未直接调 request，接口封装方式已保持一致。',
+      '样式已使用主题变量和作用域样式，不存在硬编码颜色或全局污染。',
+      '未新增超范围功能、顺手重构或与本任务无关的扩改。',
+    ];
+  }
+
+  if (roleId === 'code-guardian') {
+    return [
+      'checklist.md 已区分通过 / 未通过 / 阻断项 / 证据 / 是否放行。',
+      'iterations.md 已记录问题、修正动作、残留风险和下轮提醒。',
+      '若存在阻断项，已明确回退到 frontend-implementer 或保留门禁，不用模糊建议放行。',
+    ];
+  }
+
+  if (roleId === 'archive-change') {
+    return [
+      'archive_preflight 已全部通过，缺失项已补齐。',
+      '归档命令执行后将直接结束运行，不再补写 execution 或重复推进协议。',
+      '归档摘要需覆盖 spec 合并结果、归档路径、残留风险和后续 patch 回退阶段。',
+    ];
+  }
+
+  return [];
+}
+
+function buildOptionalRoleTriggers(roleId) {
+  if (roleId === 'requirement-analyst') {
+    return [
+      { role_id: 'design-collaborator', use_when: '输入包含设计稿、视觉还原、像素级交互或复杂 UI 约束，需要先把设计歧义收口。' },
+      { role_id: 'api-contract-specialist', use_when: '涉及接口字段、联调、mock/真实接口边界或契约不稳定，需要先补接口约束。' },
+    ];
+  }
+
+  if (roleId === 'frontend-implementer') {
+    return [
+      { role_id: 'unit-test-specialist', use_when: '改动涉及 store、复杂逻辑、关键回归路径，且现有测试不足以覆盖风险。' },
+      { role_id: 'performance-auditor', use_when: '页面存在大列表、首屏卡顿、性能指标退化或明确性能目标。' },
+    ];
+  }
+
+  if (roleId === 'code-guardian') {
+    return [
+      { role_id: 'verification-reviewer', use_when: '交付需要更强验收证据、多人协作确认或现有验证口径不完整。' },
+      { role_id: 'unit-test-specialist', use_when: '规则检查命中工具函数、store 或复杂逻辑未补测，需补充测试策略。' },
+      { role_id: 'performance-auditor', use_when: '守护阶段识别出明确性能风险，需要在归档前补性能审计结论。' },
+    ];
+  }
+
+  return [];
+}
+
+function buildArchivePreflight(targetDir, changeId, currentRun) {
+  if (!changeId) {
+    return {
+      ready: false,
+      summary: '缺少 change_id，无法执行归档 preflight。',
+      missing_artifacts: ['change_id'],
+      items: [],
+    };
+  }
+
+  const artifactBase = path.join('openspec', 'changes', changeId);
+  const hasFrontendDelivery = Boolean(currentRun?.verification)
+    || Boolean(currentRun?.current_role === 'archive-change' || currentRun?.current_role === 'code-guardian');
+  const items = [
+    { artifact: 'proposal.md', rel_path: path.join(artifactBase, 'proposal.md'), ready: fs.existsSync(path.join(targetDir, artifactBase, 'proposal.md')), source_stage: 'requirement-analyst' },
+    { artifact: 'specs/', rel_path: path.join(artifactBase, 'specs'), ready: fs.existsSync(path.join(targetDir, artifactBase, 'specs')), source_stage: 'requirement-analyst' },
+    { artifact: 'design.md', rel_path: path.join(artifactBase, 'design.md'), ready: fs.existsSync(path.join(targetDir, artifactBase, 'design.md')), source_stage: 'requirement-analyst' },
+    { artifact: 'tasks.md', rel_path: path.join(artifactBase, 'tasks.md'), ready: fs.existsSync(path.join(targetDir, artifactBase, 'tasks.md')), source_stage: 'requirement-analyst' },
+    { artifact: 'code', rel_path: null, ready: hasFrontendDelivery, source_stage: 'frontend-implementer' },
+    { artifact: 'implementation-notes', rel_path: null, ready: hasFrontendDelivery, source_stage: 'frontend-implementer' },
+    { artifact: 'checklist.md', rel_path: path.join(artifactBase, 'checklist.md'), ready: fs.existsSync(path.join(targetDir, artifactBase, 'checklist.md')), source_stage: 'code-guardian' },
+    { artifact: 'iterations.md', rel_path: path.join(artifactBase, 'iterations.md'), ready: fs.existsSync(path.join(targetDir, artifactBase, 'iterations.md')), source_stage: 'code-guardian' },
+  ];
+  const missingArtifacts = items.filter((item) => !item.ready).map((item) => item.artifact);
+
+  return {
+    ready: missingArtifacts.length === 0,
+    summary: missingArtifacts.length === 0
+      ? 'proposal/specs/design/tasks/code/implementation-notes/checklist/iterations 已齐备，可以执行归档命令。'
+      : `仍缺少 ${missingArtifacts.join('、')}，当前不允许执行归档命令。`,
+    missing_artifacts: missingArtifacts,
+    items,
+  };
+}
+
 function buildRoleSpecificContract(
   roleId,
   roleRuleContract,
   roleSkillContract,
   repoConventions,
   deliveryProfile,
+  flowId = DEFAULT_FLOW_ID,
   targetDir = null,
   projectContextGuidance = null,
+  currentRun = null,
+  changeId = null,
 ) {
   const base = {
     delivery_profile: deliveryProfile,
     primary_skills: roleSkillContract.primary_skills,
     required_rules: roleRuleContract.source_rules.map((item) => item.path),
     repo_alignment: roleRuleContract.repo_specific,
+    artifact_contract: buildArtifactContract(roleId, roleRuleContract, roleSkillContract, flowId),
+    skill_selection_policy: buildSkillSelectionPolicy(roleId, roleSkillContract),
+    handoff_checklist: buildHandoffChecklist(roleId, repoConventions, flowId),
+    optional_role_triggers: buildOptionalRoleTriggers(roleId),
   };
+
+  if (flowId === QUICK_FIX_FLOW_ID && roleId === 'frontend-implementer') {
+    return {
+      ...base,
+      summary: '按用户输入与 bugfix.md 完成最小修复，不创建新的 OpenSpec change，不擅自扩大需求边界。',
+      implementation_focus: [
+        '优先修复单页面、单组件或单模块中的 bug、样式、文案、小交互问题',
+        repoConventions.viewsDir ? `页面落点继续对齐 ${repoConventions.viewsDir}` : '页面落点继续对齐现有项目结构',
+        repoConventions.styleEntry ? `样式继续沿用 ${repoConventions.styleEntry} 与主题变量体系` : '样式继续沿用现有主题变量与作用域样式',
+      ],
+      implementation_constraints: [
+        '不得顺手新增真实 API、路由、全局状态、权限、支付、风控、合规逻辑。',
+        '若修复过程中发现需要改动范围/接口/验收口径，必须停止快修并升级到 prd-to-delivery。',
+        '必须把问题现象与修复动作写回 .ai-spec/history/<run-id>/bugfix.md 和 implementation-notes.md。',
+      ],
+    };
+  }
+
+  if (flowId === QUICK_FIX_FLOW_ID && roleId === 'code-guardian') {
+    const verificationExpectations = targetDir
+      ? buildVerificationExpectations(targetDir, projectContextGuidance)
+      : [];
+    return {
+      ...base,
+      summary: '基于 bugfix.md、implementation-notes.md、代码与验证结果做轻量放行判断；越界时阻断并要求升级主流程。',
+      review_focus: [
+        '修复是否仍限定在低风险小需求边界内',
+        '代码落点、样式变量、路由/API 约束是否仍符合仓库规范',
+        'bugfix.md 与 implementation-notes.md 是否能支撑后续复查',
+      ],
+      blocking_checks: [
+        '是否新增真实 API、路由、全局状态、权限/支付/风控/合规逻辑；若是，立即阻断 quick-fix。',
+        '是否出现跨模块范围扩张、验收口径变化或需要补 proposal/specs/design/tasks 的情况。',
+        'checklist.md 是否明确写出通过 / 未通过 / 阻断项 / 证据 / 是否放行。',
+      ],
+      verification_expectations: verificationExpectations,
+      output_requirements: [
+        'checklist.md 必须使用轻量结构，但仍要明确证据和放行结论。',
+        'iterations.md 必须记录问题、修正动作、残留风险与是否建议升级主流程。',
+      ],
+    };
+  }
 
   if (roleId === 'requirement-analyst') {
     return {
@@ -1990,6 +2720,7 @@ function buildRoleSpecificContract(
         '页面/路由/API/mock/样式落点需和仓库约定一致',
         '至少产出一个 specs/<domain>/spec.md，并在 design.md 说明实现落点',
         '能从项目规则与代码推断的信息优先转成 assumptions',
+        '在 tasks.md 中把关键规则约束转成可执行任务项，而不是保留成抽象建议',
       ],
     };
   }
@@ -2004,6 +2735,7 @@ function buildRoleSpecificContract(
         repoConventions.apiDir ? `接口封装优先对齐 ${repoConventions.apiDir}` : '若涉及真实接口，需先确认 API 封装入口',
       ],
       implementation_constraints: [
+        '项目规则和 repo_conventions 高于 skill 示例；若 skill 样例与项目规范冲突，以规则为准。',
         '遵守最小改动原则：只改当前需求直接相关的页面、路由、mock、API 或样式文件',
         '不要顺手重构无关模块，不要为了“更完整”扩大改动面',
       ],
@@ -2041,6 +2773,8 @@ function buildRoleSpecificContract(
         repoConventions.viewsDir ? `页面或组件是否落在 ${repoConventions.viewsDir} 约定范围` : '页面或组件落点是否符合仓库结构约定',
         repoConventions.routeModulesDir ? `路由是否落在 ${repoConventions.routeModulesDir} 并保持懒加载/meta 约定` : '新增路由是否先补齐路由骨架并符合模块组织方式',
         repoConventions.apiDir ? `接口是否经由 ${repoConventions.apiDir} 封装，页面/组件未直接调 request` : '涉及真实接口时是否先建立统一 API 封装入口',
+        '工具函数、store 或复杂业务逻辑新增时，是否已按 11-测试规范补齐测试并保证可独立运行',
+        '审计结论是否按 14-审计汇报规范给出读取记录、操作记录、规范对齐、技能状态与偏差披露',
         repoConventions.styleEntry ? `样式是否沿用 ${repoConventions.styleEntry} 及主题变量，不存在硬编码颜色或全局污染` : '样式是否继续使用主题变量和作用域样式',
         '是否出现与本次任务无关的扩改、顺手重构或越权补功能',
         '实现是否越过 proposal/specs/design/tasks 或审批约束，把演示页扩成生产能力',
@@ -2119,15 +2853,26 @@ function buildRoleSpecificContract(
   }
 
   if (roleId === 'archive-change') {
+    const archivePreflight = targetDir
+      ? buildArchivePreflight(targetDir, changeId, currentRun)
+      : {
+          ready: false,
+          summary: '缺少目标项目上下文，无法执行 archive preflight。',
+          missing_artifacts: ['target'],
+          items: [],
+        };
+
     return {
       ...base,
       summary: '在用户明确同意后合并增量规范并归档 change 目录，不跳过任何收尾步骤。',
       archive_command: './node_modules/.bin/ai-spec-auto archive-change --target . --change-id <change-id> --complete-run --json',
       must_use_internal_command: true,
+      archive_preflight: archivePreflight,
       archive_focus: [
         '优先执行 ai-spec-auto archive-change --complete-run 内置命令，不手工 mkdir/cp/mv',
         '先把 openspec/changes/<change-id>/specs/ 合并到 openspec/specs/',
         '再把 change 目录迁移到 openspec/changes/archive/YYYY-MM-DD-<change-id>/',
+        'preflight 未通过时先补齐缺失产物，不得放行到归档命令',
         '归档命令成功后直接结束本次运行，不再补写 runtime-state complete 或额外执行 protocol-advance',
       ],
     };
@@ -2269,9 +3014,13 @@ function classifyChangeImpact(runState, latestInput) {
   const pendingGate = runState?.pending_gate || null;
   const currentRole = runState?.current_role || null;
   const status = String(runState?.status || '').trim().toLowerCase();
+  const changeContext = status === 'success' ? 'archived-change' : 'active-change';
 
   if (!text) {
     return {
+      change_context: changeContext,
+      route_decision: runState?.flow?.id === QUICK_FIX_FLOW_ID ? 'quick-fix' : 'full-change',
+      trace_mode: runState?.flow?.id === QUICK_FIX_FLOW_ID ? 'direct-fix' : 'same-change',
       change_impact: null,
       reconcile_strategy: null,
       artifacts_to_update: [],
@@ -2284,6 +3033,9 @@ function classifyChangeImpact(runState, latestInput) {
   if (pendingGate === 'before-archive' && looksLikeArchiveFixInput(text) && !looksLikeArchiveSkipInput(text) && !looksLikeArchiveApproveInput(text)) {
     const targetRole = inferChangeImpactTargetRole(currentRole, 'archive-fix', text);
     return {
+      change_context: changeContext,
+      route_decision: 'archive-fix',
+      trace_mode: 'same-change',
       change_impact: 'archive-fix',
       reconcile_strategy: targetRole === 'requirement-analyst'
         ? 'rewind-to-requirement'
@@ -2299,6 +3051,9 @@ function classifyChangeImpact(runState, latestInput) {
 
   if (status === 'success' && looksLikeFollowupPatchInput(text)) {
     return {
+      change_context: 'archived-change',
+      route_decision: 'followup-patch',
+      trace_mode: 'followup-change',
       change_impact: 'followup-patch',
       reconcile_strategy: 'followup-patch',
       artifacts_to_update: inferArtifactsToUpdate('followup-patch'),
@@ -2310,6 +3065,9 @@ function classifyChangeImpact(runState, latestInput) {
 
   if (/顺便|另外再做|改成.*模块|真实支付|生产收银台|权限系统|风控规则/i.test(text)) {
     return {
+      change_context: changeContext,
+      route_decision: 'full-change',
+      trace_mode: 'full-openspec',
       change_impact: 're-scope',
       reconcile_strategy: 'suggest-new-change',
       artifacts_to_update: inferArtifactsToUpdate('re-scope'),
@@ -2321,6 +3079,9 @@ function classifyChangeImpact(runState, latestInput) {
 
   if (/范围|方案|边界|改成.*详情|详情联动|新增接口|字段调整|验收口径|路由|流程/i.test(text)) {
     return {
+      change_context: changeContext,
+      route_decision: 'scope-delta',
+      trace_mode: 'same-change',
       change_impact: 'scope-delta',
       reconcile_strategy: 'rewind-to-requirement',
       artifacts_to_update: inferArtifactsToUpdate('scope-delta'),
@@ -2331,6 +3092,9 @@ function classifyChangeImpact(runState, latestInput) {
   }
 
   return {
+    change_context: changeContext,
+    route_decision: 'patch',
+    trace_mode: 'same-change',
     change_impact: 'patch',
     reconcile_strategy: 'in-place',
     artifacts_to_update: inferArtifactsToUpdate('patch'),
@@ -2431,6 +3195,23 @@ function buildExecutionContract(targetDir, runtimePaths, dispatch, roleDefinitio
 
 function buildExpertExpectedOutput(dispatch, writes, runtimePaths, deliveryProfile = 'standard') {
   const outputs = [];
+  const flowId = dispatch.flow?.id || DEFAULT_FLOW_ID;
+
+  if (flowId === QUICK_FIX_FLOW_ID) {
+    if (dispatch.role?.id === 'frontend-implementer') {
+      outputs.push('完成当前范围内的代码修复');
+      outputs.push('完成 .ai-spec/history/<run-id>/bugfix.md');
+      outputs.push('完成 .ai-spec/history/<run-id>/implementation-notes.md');
+    } else if (dispatch.role?.id === 'code-guardian') {
+      outputs.push('完成 .ai-spec/history/<run-id>/checklist.md');
+      outputs.push('完成 .ai-spec/history/<run-id>/iterations.md');
+    }
+
+    outputs.push(`写入 ${runtimePaths.tmpCurrentExecution.relPath}`);
+    outputs.push('产出合法的 expert-execution JSON 回执');
+    outputs.push('完成后立即执行 protocol-advance 推进下一轮');
+    return [...new Set(outputs)];
+  }
 
   if (dispatch.role?.id === 'requirement-analyst') {
     outputs.push(deliveryProfile === 'micro' ? '完成短版 openspec proposal.md' : '完成 openspec proposal.md');
@@ -2453,6 +3234,36 @@ function buildExpertExpectedOutput(dispatch, writes, runtimePaths, deliveryProfi
   outputs.push('完成后立即执行 protocol-advance 推进下一轮');
 
   return [...new Set(outputs)];
+}
+
+function resolveFlowRoleTargets(flowId, roleId, currentRun) {
+  if (flowId !== QUICK_FIX_FLOW_ID) {
+    return null;
+  }
+
+  const artifacts = currentRun?.artifacts || {};
+  if (roleId === 'frontend-implementer') {
+    return {
+      reads: ['.agents/templates/common/bugfix.md'],
+      writes: ['code', artifacts.bugfix, artifacts.implementation_notes].filter(Boolean),
+    };
+  }
+
+  if (roleId === 'code-guardian') {
+    return {
+      reads: [artifacts.bugfix, artifacts.implementation_notes].filter(Boolean),
+      writes: [artifacts.checklist, artifacts.iterations].filter(Boolean),
+    };
+  }
+
+  if (['unit-test-specialist', 'verification-reviewer', 'performance-auditor'].includes(roleId)) {
+    return {
+      reads: [artifacts.bugfix, artifacts.implementation_notes].filter(Boolean),
+      writes: [],
+    };
+  }
+
+  return null;
 }
 
 function buildActorPresentation(actorId, mode) {
@@ -2523,13 +3334,73 @@ function attachActorPresentation(turn) {
   };
 }
 
+function buildStartConfirmTurn(targetDir, userInput, routeDecision) {
+  const runtimePaths = resolveRuntimePaths(targetDir);
+  const orchestratorGuidance = buildOrchestratorGuidance(targetDir, null, userInput, routeDecision);
+
+  return attachProtocolContracts(attachActorPresentation({
+    kind: 'ai-protocol-turn',
+    status: 'blocked',
+    mode: 'confirm-gate',
+    actor: {
+      id: 'task-orchestrator',
+      type: 'orchestrator',
+    },
+    command: null,
+    reason: 'multiple candidate open changes were detected; user confirmation is required before opening or reusing a change',
+    summary: {
+      run_id: null,
+      run_status: null,
+      current_role: null,
+      pending_gate: null,
+      next_expected_producer: 'task-orchestrator',
+      change_context: routeDecision?.change_context || null,
+      route_decision: routeDecision?.route_decision || null,
+      trace_mode: routeDecision?.trace_mode || null,
+    },
+    input: {
+      user_request: userInput || null,
+      candidate_changes: routeDecision?.candidate_changes || [],
+    },
+    reads: dedupeTargets([
+      ...buildCommandTargets(targetDir, START_INSTRUCTION_FILES),
+      buildFileTarget(targetDir, runtimePaths.repoMap.relPath, {
+        label: 'lightweight repo map',
+      }),
+    ]),
+    writes: [],
+    expected_output: [
+      '当前存在多个未归档 change，先请用户明确本次要复用哪个 change 或说明这是新的独立需求',
+      '只输出简洁的候选 change 摘要与下一步确认动作',
+    ],
+    guidance: {
+      ...orchestratorGuidance,
+      confirm_gate: {
+        gate: 'select-change',
+        status: 'waiting-confirm',
+        required_user_action: '请明确要复用的 change_id，或说明这是一个新的独立小需求。',
+        blocked_reason: routeDecision?.reason || '当前存在多个未归档 change，不能自动猜测目标变更。',
+        blocked_by_role: 'task-orchestrator',
+        resume_to_role: 'task-orchestrator',
+        candidate_changes: routeDecision?.candidate_changes || [],
+        resume_rule: '用户明确 change_id 或说明“这是新的需求”后，再重新进入 start 路由选择。',
+      },
+    },
+  }), { userInput });
+}
+
 function buildStartTurn(targetDir, userInput) {
   const runtimePaths = resolveRuntimePaths(targetDir);
-  const flowDefinition = loadFlowDefinition(targetDir, DEFAULT_FLOW_ID);
+  const routeDecision = inferStartRoutingDecision(targetDir, userInput);
+  if (routeDecision.waiting_confirm_required) {
+    return buildStartConfirmTurn(targetDir, userInput, routeDecision);
+  }
+  const flowDefinition = loadFlowDefinition(targetDir, routeDecision.selected_flow || DEFAULT_FLOW_ID);
   const riskLevel = inferRiskLevel({
     rawInput: userInput,
     taskType: null,
     deliveryProfile: null,
+    flowId: flowDefinition.id,
   });
   const deliveryProfile = inferDeliveryProfile({
     rawInput: userInput,
@@ -2537,7 +3408,7 @@ function buildStartTurn(targetDir, userInput) {
     riskLevel,
     flowId: flowDefinition.id,
   });
-  const artifactProfile = inferArtifactProfile({
+  const artifactProfile = flowDefinition.artifact_profile || inferArtifactProfile({
     deliveryProfile,
   });
   const complexity = inferComplexity({
@@ -2550,11 +3421,19 @@ function buildStartTurn(targetDir, userInput) {
     complexity,
     task: {
       risk_level: riskLevel,
+      change_context: routeDecision.change_context,
+      route_decision: routeDecision.route_decision,
+      trace_mode: routeDecision.trace_mode,
+      change_id: routeDecision.reuse_change_id || null,
+      parent_change_id: routeDecision.parent_change_id || null,
     },
     flow: {
       id: flowDefinition.id,
     },
-  }, userInput);
+    plan: {
+      first_handoff: routeDecision.next_expert || flowDefinition.first_handoff,
+    },
+  }, userInput, routeDecision);
 
   return attachProtocolContracts(attachActorPresentation({
     kind: 'ai-protocol-turn',
@@ -2578,6 +3457,9 @@ function buildStartTurn(targetDir, userInput) {
       artifact_profile: artifactProfile,
       complexity,
       risk_level: riskLevel,
+      change_context: routeDecision.change_context,
+      route_decision: routeDecision.route_decision,
+      trace_mode: routeDecision.trace_mode,
     },
     input: {
       user_request: userInput || null,
@@ -2597,6 +3479,7 @@ function buildStartTurn(targetDir, userInput) {
     expected_output: [
       '输出最小 run-plan JSON',
       `在 run-plan 中明确 delivery_profile=${deliveryProfile} 与 artifact_profile=${artifactProfile}`,
+      `在 run-plan 中明确 change_context=${routeDecision.change_context || 'no-change'}、route_decision=${routeDecision.route_decision || 'full-change'}、trace_mode=${routeDecision.trace_mode || 'full-openspec'}`,
       `写入 ${runtimePaths.tmpTaskOrchestratorTurn.relPath}`,
     ],
     guidance: {
@@ -2607,7 +3490,9 @@ function buildStartTurn(targetDir, userInput) {
         artifact_profile: artifactProfile,
         complexity,
         risk_level: riskLevel,
-        note: riskLevel === 'high'
+        note: routeDecision.route_decision === 'quick-fix'
+          ? '当前需求命中全新低风险小修正，默认走 bugfix-to-verification 轻链路，并在 .ai-spec/history/<run-id>/ 下留痕。'
+          : riskLevel === 'high'
           ? '当前需求涉及高风险领域：仍按三专家协同推进，但 requirement 阶段后将进入 before-implementation 审批门禁。'
           : deliveryProfile === 'micro'
             ? '当前需求更适合微型交付档位：保留三专家，但产物使用短版 compact 规格。'
@@ -2622,6 +3507,9 @@ function buildStartTurn(targetDir, userInput) {
           'plan.first_handoff',
           'delivery_profile',
           'artifact_profile',
+          'task.change_context',
+          'task.route_decision',
+          'task.trace_mode',
         ],
         allowed_kinds: ['run-plan', 'task-orchestrator-bootstrap'],
       },
@@ -2897,6 +3785,7 @@ function buildApprovalGateTurn(targetDir, status, currentArtifacts) {
         currentArtifacts.run,
         currentArtifacts.run?.trigger?.latest_user_input || currentArtifacts.run?.trigger?.raw_input || null,
       );
+
   const reads = [
     buildFileTarget(targetDir, path.join('.ai-spec', 'current-run.json'), {
       required: true,
@@ -3079,6 +3968,9 @@ function buildUpdateReviewTurn(targetDir, status, currentArtifacts) {
       input_updates: recentUpdates,
       current_role: currentArtifacts.run?.current_role || null,
       pending_gate: currentArtifacts.run?.pending_gate || null,
+      change_context: changeDecision?.change_context || null,
+      route_decision: changeDecision?.route_decision || null,
+      trace_mode: changeDecision?.trace_mode || null,
       change_impact: changeDecision?.change_impact || null,
       reconcile_strategy: changeDecision?.reconcile_strategy || null,
       delivery_profile: currentArtifacts.run?.delivery_profile || null,
@@ -3117,6 +4009,9 @@ function buildUpdateReviewTurn(targetDir, status, currentArtifacts) {
       ...orchestratorGuidance,
       update_contract: {
         latest_user_input: latestInput,
+        change_context: changeDecision?.change_context || null,
+        route_decision: changeDecision?.route_decision || null,
+        trace_mode: changeDecision?.trace_mode || null,
         change_impact: changeDecision?.change_impact || null,
         reconcile_strategy: changeDecision?.reconcile_strategy || null,
         artifacts_to_update: changeDecision?.artifacts_to_update || [],
@@ -3190,11 +4085,15 @@ function buildExpertTurn(targetDir, status, currentArtifacts) {
   });
   const projectProfile = detectProjectProfile(targetDir);
   const repoConventions = collectRepoConventions(targetDir, projectProfile);
+  const flowDefinition = loadFlowDefinition(targetDir, flowId);
   const projectContextGuidance = buildProjectContextGuidance(targetDir, projectProfile, currentArtifacts.run);
   const frontendAutoFixContract = dispatch.role?.id === 'frontend-implementer'
     ? buildFrontendAutoFixContract(targetDir, currentArtifacts.run)
     : null;
   const autoFixActive = Boolean(frontendAutoFixContract?.active);
+  const flowRoleTargets = resolveFlowRoleTargets(flowId, dispatch.role?.id, currentArtifacts.run);
+  const roleReadSpecs = flowRoleTargets?.reads || roleDefinition.reads;
+  const roleWriteSpecs = flowRoleTargets?.writes || roleDefinition.writes;
 
   const reads = [
     buildFileTarget(targetDir, path.join('.ai-spec', 'current-run.json'), {
@@ -3210,7 +4109,7 @@ function buildExpertTurn(targetDir, status, currentArtifacts) {
     }),
   ];
 
-  for (const item of roleDefinition.reads) {
+  for (const item of roleReadSpecs) {
     const resolvedValue = resolveTemplateVariables(item, context);
     if (autoFixActive && resolvedValue.startsWith('openspec/')) {
       continue;
@@ -3238,7 +4137,7 @@ function buildExpertTurn(targetDir, status, currentArtifacts) {
         }),
       ];
 
-  for (const item of roleDefinition.writes) {
+  for (const item of roleWriteSpecs) {
     writes.push(convertTargetSpec(targetDir, item, context));
   }
 
@@ -3275,6 +4174,8 @@ function buildExpertTurn(targetDir, status, currentArtifacts) {
     projectProfile,
     repoConventions,
     dispatch.task?.raw_goal || currentArtifacts.run?.trigger?.raw_input || null,
+    currentArtifacts.run,
+    context.changeId,
   );
   const roleSpecificContract = dispatch.role?.id
     ? buildRoleSpecificContract(
@@ -3283,10 +4184,16 @@ function buildExpertTurn(targetDir, status, currentArtifacts) {
         roleSkillContract,
         repoConventions,
         deliveryProfile,
+        flowId,
         targetDir,
         projectContextGuidance,
+        currentArtifacts.run,
+        context.changeId,
       )
     : null;
+  const archivePreflightBlocked = dispatch.role?.id === 'archive-change'
+    && roleSpecificContract?.archive_preflight
+    && roleSpecificContract.archive_preflight.ready === false;
   const implementationContract = dispatch.role?.id === 'frontend-implementer'
     ? {
         ...(roleSpecificContract || {}),
@@ -3317,7 +4224,7 @@ function buildExpertTurn(targetDir, status, currentArtifacts) {
 
   return attachProtocolContracts(attachActorPresentation({
     kind: 'ai-protocol-turn',
-    status: 'ready',
+    status: archivePreflightBlocked ? 'blocked' : 'ready',
     mode: 'execute',
     actor: {
       id: dispatch.role.id,
@@ -3325,8 +4232,10 @@ function buildExpertTurn(targetDir, status, currentArtifacts) {
       type: 'expert',
       source: roleDefinition.source || null,
     },
-    command: dispatch.role.id,
-    reason: status.next_expected.reason,
+    command: archivePreflightBlocked ? null : dispatch.role.id,
+    reason: archivePreflightBlocked
+      ? 'archive-preflight 检查未通过，需先补齐缺失产物后才能执行归档命令'
+      : status.next_expected.reason,
     summary: buildSummary(status, currentArtifacts.run),
     input: {
       user_request: dispatch.task?.raw_goal || currentArtifacts.run?.trigger?.raw_input || null,
@@ -3343,11 +4252,22 @@ function buildExpertTurn(targetDir, status, currentArtifacts) {
     expected_output: [...new Set(expectedOutput)],
     execution_contract: buildExecutionContract(targetDir, runtimePaths, dispatch, roleDefinition, writes, deliveryProfile),
     guidance: {
+      route_decision: buildRunRouteDecision(
+        targetDir,
+        currentArtifacts.run,
+        currentArtifacts.run?.trigger?.latest_user_input || currentArtifacts.run?.trigger?.raw_input || null,
+        flowDefinition,
+      ),
       project_context: projectContextGuidance,
       repo_conventions: buildRepoConventionGuidance(repoConventions),
       role: buildRoleGuidance(dispatch.role?.id, deliveryProfile),
       role_rule_contract: roleRuleContract,
       role_skill_contract: roleSkillContract,
+      artifact_contract: roleSpecificContract?.artifact_contract || [],
+      skill_selection_policy: roleSpecificContract?.skill_selection_policy || null,
+      handoff_checklist: roleSpecificContract?.handoff_checklist || [],
+      optional_role_triggers: roleSpecificContract?.optional_role_triggers || [],
+      archive_preflight: roleSpecificContract?.archive_preflight || null,
       analysis_contract: dispatch.role?.id === 'requirement-analyst'
         ? roleSpecificContract
         : null,
@@ -3364,7 +4284,7 @@ function buildExpertTurn(targetDir, status, currentArtifacts) {
       skills: buildSkillGuidance(
         selectedSkills.map((item) => (typeof item === 'string' ? { id: item } : item)),
       ),
-      openspec_rules: buildOpenSpecGuidance(targetDir, dispatch.role?.id, deliveryProfile),
+      openspec_rules: buildOpenSpecGuidance(targetDir, dispatch.role?.id, deliveryProfile, flowId),
     },
     handoff_to: nextRole ? [nextRole] : roleDefinition.handoff_to,
   }), {
@@ -3648,6 +4568,9 @@ function tryOpenFollowupPatchFastPath(targetDir, userInput) {
         parent_change_id: parentChangeId,
         raw_input: `针对已归档变更 ${parentChangeId || '(unknown)'} 的补丁修正：${userInput}`,
         risk_level: runState.task?.risk_level || 'low',
+        change_context: 'archived-change',
+        route_decision: 'followup-patch',
+        trace_mode: 'followup-change',
         change_impact: 'followup-patch',
         reconcile_strategy: 'followup-patch',
         artifacts_to_update: changeDecision.artifacts_to_update || [],
@@ -3674,6 +4597,9 @@ function tryOpenFollowupPatchFastPath(targetDir, userInput) {
       missing_inputs: [],
       artifacts: runState.artifacts || null,
     },
+    changeContext: 'archived-change',
+    routeDecision: 'followup-patch',
+    traceMode: 'followup-change',
     parentChangeId,
     changeImpact: 'followup-patch',
     reconcileStrategy: 'followup-patch',
@@ -3801,6 +4727,9 @@ function updateProtocolInput(options = {}) {
     target: targetDir,
     userInput,
     source: 'protocol-update',
+    changeContext: changeDecision.change_context,
+    routeDecision: changeDecision.route_decision,
+    traceMode: changeDecision.trace_mode,
     changeImpact: changeDecision.change_impact,
     reconcileStrategy: changeDecision.reconcile_strategy,
     artifactsToUpdate: changeDecision.artifacts_to_update,

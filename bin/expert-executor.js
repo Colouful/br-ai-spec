@@ -259,15 +259,36 @@ function shouldAdvanceRuntime(options = {}) {
   return options.advanceRuntime === true;
 }
 
-function buildOpenSpecArtifactMap(changeId, artifacts = {}) {
+function buildExecutionArtifactMap(changeId, artifacts = {}, options = {}) {
+  const flowId = String(options.flowId || '').trim();
+  const runId = String(options.runId || '').trim();
+  const traceMode = String(options.traceMode || '').trim();
+  const implementationNotes = artifacts.implementation_notes || artifacts.implementationNotes || null;
+
+  if ((flowId === 'bugfix-to-verification' || traceMode === 'direct-fix') && runId) {
+    const historyDir = `.ai-spec/history/${runId}`;
+    return {
+      proposal: null,
+      specs: null,
+      design: null,
+      tasks: null,
+      bugfix: artifacts.bugfix || `${historyDir}/bugfix.md`,
+      implementation_notes: implementationNotes || `${historyDir}/implementation-notes.md`,
+      checklist: artifacts.checklist || `${historyDir}/checklist.md`,
+      iterations: artifacts.iterations || `${historyDir}/iterations.md`,
+    };
+  }
+
   if (!changeId) {
     return {
       proposal: null,
       specs: null,
       design: null,
       tasks: null,
-      checklist: null,
-      iterations: null,
+      bugfix: artifacts.bugfix || null,
+      implementation_notes: implementationNotes,
+      checklist: artifacts.checklist || null,
+      iterations: artifacts.iterations || null,
     };
   }
 
@@ -277,6 +298,8 @@ function buildOpenSpecArtifactMap(changeId, artifacts = {}) {
     specs: runtimeState.normalizeSpecsArtifactPath(artifacts.specs || `${baseDir}/specs`),
     design: artifacts.design || `${baseDir}/design.md`,
     tasks: artifacts.tasks || `${baseDir}/tasks.md`,
+    bugfix: artifacts.bugfix || null,
+    implementation_notes: implementationNotes,
     checklist: artifacts.checklist || `${baseDir}/checklist.md`,
     iterations: artifacts.iterations || `${baseDir}/iterations.md`,
   };
@@ -301,10 +324,20 @@ function hydrateExecutionPayload(targetDir, payload) {
     currentRun?.task?.change_id ||
     currentRun?.anchor?.task?.change_id ||
     null;
+  hydrated.task.trace_mode =
+    hydrated.task.trace_mode ||
+    currentRun?.task?.trace_mode ||
+    currentRun?.incremental_update?.trace_mode ||
+    null;
 
-  const artifactMap = buildOpenSpecArtifactMap(
+  const artifactMap = buildExecutionArtifactMap(
     hydrated.task.change_id,
     currentRun?.artifacts || {},
+    {
+      flowId: hydrated.flow.id,
+      runId: hydrated.run_id,
+      traceMode: hydrated.task.trace_mode,
+    },
   );
   hydrated.artifacts = {
     ...artifactMap,
@@ -341,15 +374,20 @@ function collectMissingArtifacts(targetDir, artifactMap, keys) {
 }
 
 function validateExecutionArtifacts(targetDir, payload) {
+  const flowId = payload.flow?.id || null;
   const changeId = payload.task?.change_id || null;
-  if (!changeId) {
+  if (flowId === 'prd-to-delivery' && !changeId) {
     throw new Error(
       `Execution payload for ${payload.role.id} requires task.change_id or current-run.task.change_id to resolve OpenSpec artifacts`,
     );
   }
 
-  const artifactMap = buildOpenSpecArtifactMap(changeId, payload.artifacts || {});
-  const requirements = getRoleArtifactRequirements(targetDir, payload.role.id);
+  const artifactMap = buildExecutionArtifactMap(changeId, payload.artifacts || {}, {
+    flowId,
+    runId: payload.run_id,
+    traceMode: payload.task?.trace_mode || null,
+  });
+  const requirements = getRoleArtifactRequirements(targetDir, payload.role.id, flowId);
   const requiredInputs = requirements.required_inputs;
   const requiredOutputs = requirements.required_outputs;
   const missingInputs = collectMissingArtifacts(targetDir, artifactMap, requiredInputs);
@@ -357,12 +395,12 @@ function validateExecutionArtifacts(targetDir, payload) {
 
   if (missingInputs.length > 0) {
     throw new Error(
-      `Execution payload for ${payload.role.id} is missing required OpenSpec inputs: ${missingInputs.join(', ')}`,
+      `Execution payload for ${payload.role.id} is missing required inputs: ${missingInputs.join(', ')}`,
     );
   }
   if (missingOutputs.length > 0) {
     throw new Error(
-      `Execution payload for ${payload.role.id} is missing required OpenSpec artifacts: ${missingOutputs.join(', ')}`,
+      `Execution payload for ${payload.role.id} is missing required artifacts: ${missingOutputs.join(', ')}`,
     );
   }
 

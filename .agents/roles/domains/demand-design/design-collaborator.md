@@ -1,7 +1,7 @@
 ---
 id: design-collaborator
 name: 设计协作专家
-status: planned
+status: active
 domains:
   - demand-design
 description: 负责把设计稿、标注和交互说明整理成可执行的前端设计约束与问题清单。
