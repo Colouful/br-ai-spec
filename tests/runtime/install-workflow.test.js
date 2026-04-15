@@ -60,6 +60,33 @@ exit 0
   return fakeBinDir;
 }
 
+function createFakeUiproBin(targetDir) {
+  const fakeBinDir = path.join(targetDir, 'fake-uipro-bin');
+  writeExecutable(
+    path.join(fakeBinDir, 'uipro'),
+    `#!/bin/sh
+if [ "$1" = "--version" ]; then
+  echo "1.0.0"
+  exit 0
+fi
+if [ "$1" = "init" ]; then
+  mkdir -p "$PWD/.shared/ui-ux-pro-max"
+  mkdir -p "$PWD/.cursor/commands"
+  printf '{"palettes":161,"styles":67}\\n' > "$PWD/.shared/ui-ux-pro-max/catalog.json"
+  cat > "$PWD/.cursor/commands/ui-ux-pro-max.md" <<'EOF'
+# UI UX Pro Max
+
+优先读取 data/catalog.json
+EOF
+  exit 0
+fi
+echo "unexpected uipro invocation: $@" >&2
+exit 1
+`,
+  );
+  return fakeBinDir;
+}
+
 function runCli(args, extraEnv = {}) {
   return spawnSync('node', ['./bin/cli.js', ...args], {
     cwd: repoRoot,
@@ -249,9 +276,26 @@ async function main() {
   assert.ok(!fs.existsSync(path.join(target, '.agents', 'registry')));
   assert.ok(fs.existsSync(path.join(target, 'node_modules', '.bin', 'ai-spec-auto')) || fs.existsSync(path.join(target, 'node_modules', '.bin', 'ai-spec-auto.cmd')));
   assert.ok(!fs.existsSync(path.join(target, '.cursor')));
+  assert.ok(!fs.existsSync(path.join(target, '.agents', 'skills', 'domains', 'ui-ux-pro-max', 'data')));
 
   result = runCli(['check', target]);
   assert.strictEqual(result.status, 0, result.stderr);
+
+  const uiproTarget = createWorkspace('ai-spec-uipro-install-');
+  writeJson(path.join(uiproTarget, 'package.json'), {
+    name: 'uipro-install-smoke',
+    version: '1.0.0',
+  });
+  const fakeUiproBin = createFakeUiproBin(uiproTarget);
+  result = runCli(
+    ['init', uiproTarget, '--profile', 'vue', '--level', 'L1', '--no-lint', '--no-husky', '--uipro'],
+    { PATH: `${fakeUiproBin}:${process.env.PATH || ''}` },
+  );
+  assert.strictEqual(result.status, 0, result.stderr);
+  assert.ok(fs.existsSync(path.join(uiproTarget, '.agents', 'skills', 'domains', 'ui-ux-pro-max', 'SKILL.md')));
+  assert.ok(fs.existsSync(path.join(uiproTarget, '.agents', 'skills', 'domains', 'ui-ux-pro-max', 'data', 'catalog.json')));
+  assert.ok(!fs.existsSync(path.join(uiproTarget, '.agents', 'skills', 'ui-ux-pro-max')));
+  assert.ok(result.stdout.includes('UI UX Pro Max 设计智能技能'));
 
   const syncOnlyTarget = createWorkspace('ai-spec-sync-check-');
   writeJson(path.join(syncOnlyTarget, 'package.json'), {
@@ -408,6 +452,23 @@ exit 1
   result = runCli(['update', updateScopeTarget, '--ide', 'claude', '--skip-skills', '--skip-configs', '--skip-openspec', '--skip-uipro']);
   assert.strictEqual(result.status, 0, result.stderr);
   assert.ok(fs.existsSync(path.join(updateScopeTarget, '.claude', 'commands', 'spec-start.md')));
+
+  const legacyUiproUpdateTarget = createWorkspace('ai-spec-uipro-legacy-update-');
+  writeJson(path.join(legacyUiproUpdateTarget, 'package.json'), {
+    name: 'uipro-legacy-update-smoke',
+    version: '1.0.0',
+  });
+  writeText(path.join(legacyUiproUpdateTarget, '.agents', 'skills', 'ui-ux-pro-max', 'SKILL.md'), '# legacy\n');
+  writeText(path.join(legacyUiproUpdateTarget, '.agents', 'skills', 'ui-ux-pro-max', 'data', 'legacy.txt'), 'legacy\n');
+  const legacyFakeUiproBin = createFakeUiproBin(legacyUiproUpdateTarget);
+  result = runCli(
+    ['update', legacyUiproUpdateTarget, '--profile', 'vue', '--skip-skills', '--skip-configs', '--skip-openspec'],
+    { PATH: `${legacyFakeUiproBin}:${process.env.PATH || ''}` },
+  );
+  assert.strictEqual(result.status, 0, result.stderr);
+  assert.ok(!fs.existsSync(path.join(legacyUiproUpdateTarget, '.agents', 'skills', 'ui-ux-pro-max')));
+  assert.ok(fs.existsSync(path.join(legacyUiproUpdateTarget, '.agents', 'skills', 'domains', 'ui-ux-pro-max', 'SKILL.md')));
+  assert.ok(fs.existsSync(path.join(legacyUiproUpdateTarget, '.agents', 'skills', 'domains', 'ui-ux-pro-max', 'data', 'catalog.json')));
 
   const uninstallTarget = createWorkspace('ai-spec-uninstall-managed-');
   const uninstallFakeBin = createFakePackageManagerBin(uninstallTarget);

@@ -107,6 +107,9 @@ const FALLBACK_SKILL_SOURCE_CANDIDATES = {
   'design-analysis': {
     default: ['.agents/skills/common/design-analysis/SKILL.md'],
   },
+  'ui-ux-pro-max': {
+    default: ['.agents/skills/domains/ui-ux-pro-max/SKILL.md'],
+  },
   'create-view': {
     vue: ['.agents/skills/profiles/vue/create-view/SKILL.md'],
   },
@@ -149,7 +152,7 @@ const FALLBACK_ROLE_SKILL_PRIORITY = {
   'requirement-analyst': ['create-proposal', 'design-analysis'],
   'frontend-implementer': ['create-view', 'create-route', 'create-api', 'theme-variables', 'create-component', 'create-store', 'execute-task'],
   'code-guardian': ['ui-verification', 'web-design-guidelines', 'create-test'],
-  'design-collaborator': ['design-analysis'],
+  'design-collaborator': ['ui-ux-pro-max', 'design-analysis'],
   'api-contract-specialist': ['create-api', 'design-analysis'],
   'unit-test-specialist': ['create-test'],
   'verification-reviewer': ['ui-verification', 'web-design-guidelines'],
@@ -165,6 +168,10 @@ const FALLBACK_ROLE_OPENSPEC_RULE_SECTIONS = {
 
 const DEFAULT_FLOW_ID = 'prd-to-delivery';
 const QUICK_FIX_FLOW_ID = 'bugfix-to-verification';
+const DEFAULT_RUN_MODE = 'auto';
+const DEFAULT_REVIEW_POLICY = 'main-flow-blocking';
+const RUN_MODES = new Set(['auto', 'suggest', 'manual']);
+const REVIEW_POLICIES = new Set(['none', 'main-flow-blocking']);
 const DEFAULT_FLOW_CONSTRAINTS = {
   required_roles: ['requirement-analyst', 'frontend-implementer', 'code-guardian'],
   approval_gates: ['before-implementation', 'before-archive'],
@@ -176,6 +183,65 @@ const DEFAULT_HANDOFF_GATE_POLICY = {
   'frontend-implementer->code-guardian': 'silent',
   'code-guardian->archive-change': 'approval',
 };
+
+function normalizeRunMode(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  return RUN_MODES.has(normalized) ? normalized : DEFAULT_RUN_MODE;
+}
+
+function normalizeReviewPolicy(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  return REVIEW_POLICIES.has(normalized) ? normalized : DEFAULT_REVIEW_POLICY;
+}
+
+function buildEffectiveApprovalGates(flowId, gates, reviewPolicy) {
+  const normalizedPolicy = normalizeReviewPolicy(reviewPolicy);
+  const deduped = [...new Set(normalizeStringArray(gates))];
+  if (flowId !== DEFAULT_FLOW_ID || normalizedPolicy !== 'main-flow-blocking') {
+    return deduped;
+  }
+  const supportedMainFlowGates = new Set(['before-implementation', 'before-guardian', 'before-archive']);
+  const shouldInjectMainFlowGates = deduped.length === 0 || deduped.every((gate) => supportedMainFlowGates.has(gate));
+  if (!shouldInjectMainFlowGates) {
+    return deduped;
+  }
+
+  const ordered = [];
+  for (const gate of ['before-implementation', 'before-guardian', 'before-archive']) {
+    if (!ordered.includes(gate)) {
+      ordered.push(gate);
+    }
+  }
+  for (const gate of deduped) {
+    if (!ordered.includes(gate)) {
+      ordered.push(gate);
+    }
+  }
+  return ordered;
+}
+
+function buildEffectiveHandoffGatePolicy(flowId, handoffGatePolicy, reviewPolicy) {
+  const normalizedPolicy = normalizeReviewPolicy(reviewPolicy);
+  const nextPolicy = {
+    ...(handoffGatePolicy || {}),
+  };
+
+  const supportedPairs = new Set([
+    'requirement-analyst->frontend-implementer',
+    'frontend-implementer->code-guardian',
+    'code-guardian->archive-change',
+  ]);
+  const shouldInjectMainFlowPolicy = Object.keys(nextPolicy).length === 0
+    || Object.keys(nextPolicy).every((pair) => supportedPairs.has(pair));
+
+  if (flowId === DEFAULT_FLOW_ID && normalizedPolicy === 'main-flow-blocking' && shouldInjectMainFlowPolicy) {
+    nextPolicy['requirement-analyst->frontend-implementer'] = 'approval';
+    nextPolicy['frontend-implementer->code-guardian'] = 'approval';
+    nextPolicy['code-guardian->archive-change'] = 'approval';
+  }
+
+  return nextPolicy;
+}
 
 const MICRO_ROLE_EXTRAS = {
   'task-orchestrator': {
@@ -368,6 +434,7 @@ const ROLE_GUIDANCE = {
 const SKILL_GUIDANCE = {
   'create-proposal': '用于快速形成 proposal/specs/design/tasks 的结构和变更说明。',
   'design-analysis': '用于整理页面结构、信息层级和交互要点。',
+  'ui-ux-pro-max': '用于设计协作阶段的 Figma 解析、标注提取和 UI/UX 设计决策收口。',
   'create-view': '用于创建或调整 Vue 页面文件与页面目录结构。',
   'create-component': '用于拆分和实现 Vue 组件。',
   'create-route': '用于新增或调整页面路由。',
@@ -1129,7 +1196,11 @@ function buildOrchestratorGuidance(targetDir, runState = null, userInput = null,
     .filter((roleId) => !Array.isArray(flowDefinition.optional_roles) || flowDefinition.optional_roles.includes(roleId));
   const skippedOptionalRoles = (flowDefinition.optional_roles || []).filter((roleId) => !activatedOptionalRoles.includes(roleId));
   const pendingGate = runState?.pending_gate || null;
-  const hasBeforeImplementationGate = flowDefinition.approval_gates.includes('before-implementation');
+  const runMode = normalizeRunMode(runState?.mode || routeDecisionOverride?.mode || null);
+  const reviewPolicy = normalizeReviewPolicy(runState?.review_policy || routeDecisionOverride?.review_policy || null);
+  const approvalGates = buildEffectiveApprovalGates(flowDefinition.id, runState?.plan?.approval_gates || flowDefinition.approval_gates, reviewPolicy);
+  const handoffGatePolicy = buildEffectiveHandoffGatePolicy(flowDefinition.id, flowDefinition.handoff_gate_policy, reviewPolicy);
+  const hasBeforeImplementationGate = approvalGates.includes('before-implementation');
   const expectedGate = pendingGate || (riskLevel === 'high' && hasBeforeImplementationGate ? 'before-implementation' : null);
   const resumeRole = expectedGate === 'before-implementation'
     ? inferApprovalResumeRoleFromFlow(targetDir, runState, flowDefinition)
@@ -1146,6 +1217,8 @@ function buildOrchestratorGuidance(targetDir, runState = null, userInput = null,
     role_rule_contract: roleRuleContract,
     routing_constraints: {
       selected_flow: flowDefinition.id,
+      run_mode: runMode,
+      review_policy: reviewPolicy,
       required_experts: flowDefinition.required_roles,
       activated_optional_roles: activatedOptionalRoles,
       skipped_optional_roles: skippedOptionalRoles,
@@ -1163,17 +1236,22 @@ function buildOrchestratorGuidance(targetDir, runState = null, userInput = null,
       drivers: riskDrivers,
       before_implementation_gate: riskLevel === 'high' && hasBeforeImplementationGate ? 'before-implementation' : null,
       manual_confirmation_required: riskLevel === 'high' && hasBeforeImplementationGate,
+      review_policy: reviewPolicy,
       escalation_rule: riskLevel === 'high' && hasBeforeImplementationGate
         ? '需求收敛后必须进入 before-implementation 审批门禁，再决定是否放行实现'
+        : reviewPolicy === 'main-flow-blocking' && flowDefinition.id === DEFAULT_FLOW_ID
+        ? '当前启用 main-flow-blocking 审核策略，主流程三个核心专家完成后都会进入人工审核门禁'
         : '按三专家协同自动推进，必要时仅在异常或门禁场景下阻断',
     },
     approval_contract: {
-      gates: flowDefinition.approval_gates,
+      gates: approvalGates,
       pending_gate: pendingGate,
       expected_gate: expectedGate,
+      review_policy: reviewPolicy,
       required_when: [
         '支付、认证、权限、安全、风控、合规等高风险领域',
         '关键流程或约束仍未确认，继续实现会显著放大返工成本',
+        '内测期启用 main-flow-blocking 时，主流程 requirement / frontend / guardian 完成后都需要人工审核',
       ],
       approve_resume_to_role: resumeRole,
       approval_examples: [
@@ -1184,6 +1262,8 @@ function buildOrchestratorGuidance(targetDir, runState = null, userInput = null,
     },
     orchestration_contract: {
       selected_flow: flowDefinition.id,
+      run_mode: runMode,
+      review_policy: reviewPolicy,
       delivery_profile: deliveryProfile,
       artifact_profile: artifactProfile,
       change_id: runState?.task?.change_id || routeDecision?.reuse_change_id || null,
@@ -1200,7 +1280,7 @@ function buildOrchestratorGuidance(targetDir, runState = null, userInput = null,
         '高风险且无法可靠推断的边界必须显式升级为审批点',
       ],
       handoff_policy: flowDefinition.handoff_policy,
-      handoff_gate_policy: flowDefinition.handoff_gate_policy,
+      handoff_gate_policy: handoffGatePolicy,
       completion_policy: flowDefinition.completion_policy,
       repo_alignment: [
         repoConventions.viewsDir ? `页面目录优先对齐 ${repoConventions.viewsDir}` : '页面目录需先与仓库结构对齐',
@@ -1548,6 +1628,13 @@ function inferPendingGateResumeRole(targetDir, runState, flowDefinition, pending
     return inferApprovalResumeRoleFromFlow(targetDir, runState, flowDefinition);
   }
 
+  if (pendingGate === 'before-guardian') {
+    const currentRole = runState?.current_role || null;
+    if (currentRole) {
+      return resolveNextRole(targetDir, flowDefinition.id, currentRole, null) || runState?.anchor?.stage?.next_role || null;
+    }
+  }
+
   if (pendingGate === 'before-archive') {
     const currentRole = runState?.current_role || null;
     if (currentRole) {
@@ -1562,7 +1649,7 @@ function inferOptionalRoles(rawInput) {
   const text = String(rawInput || '');
   const roles = [];
 
-  if (/设计稿|还原|高保真|视觉|交互稿|像素级|ui/i.test(text)) {
+  if (/设计稿|还原|高保真|视觉|交互稿|像素级|好看|好看的|漂亮|美观|高级感|精致|视觉升级|更有设计感|更精致|更有质感|更现代|更高级|优化视觉|优化\s*ui|改漂亮点|ui/i.test(text)) {
     roles.push('design-collaborator');
   }
   if (/接口|api|字段|契约|mock|联调|分页|筛选|搜索|状态切换|重试/i.test(text)) {
@@ -1635,8 +1722,18 @@ function describeApprovalGate(pendingGate, resumeRole) {
     };
   }
 
+  if (pendingGate === 'before-guardian') {
+    return {
+      blockedReason: '当前实现已完成，但在进入守护审查前需要人工确认是否按当前实现结果继续。',
+      requiredUserAction: '明确批准当前实现结果进入 code-guardian（规范守护专家）审查，或说明需要回退修正的方向。',
+      blockedRule: '在人工确认前，禁止继续推进到 code-guardian 或归档阶段。',
+      resumeRule: `收到明确批准意见后，先执行 turn.commands.update 记录审批说明，再恢复到 ${resumeRole || 'code-guardian（规范守护专家）'}。`,
+      nextOutput: `收到明确批准意见后，再恢复到 ${resumeRole || 'code-guardian（规范守护专家）'} 继续审查`,
+    };
+  }
+
   return {
-    blockedReason: '支付/认证/安全/风控等关键约束未获人工确认，当前不能进入实现阶段。',
+    blockedReason: '当前需求收敛已完成，但在进入实现前仍需人工确认范围、限制条件或内测审核意见。',
     requiredUserAction: '明确批准或拒绝当前 proposal / tasks 的实现范围与限制条件',
     blockedRule: '在人工确认前，禁止继续实现或调用 protocol-advance 推进到下一专家',
     resumeRule: `收到明确批准意见后，先执行 turn.commands.update 记录审批说明，再由用户重新执行 /spec-continue 恢复到 ${resumeRole || '下一位专家'}`,
@@ -1705,6 +1802,8 @@ function buildSummary(status, runState = null) {
     run_status: status.current.run_status || null,
     current_role: status.current.current_role || null,
     pending_gate: status.current.pending_gate || null,
+    run_mode: runState?.mode || null,
+    review_policy: runState?.review_policy || null,
     next_expected_producer: status.next_expected.producer || null,
     delivery_profile: runState?.delivery_profile || null,
     artifact_profile: runState?.artifact_profile || null,
@@ -2718,7 +2817,7 @@ function buildHandoffChecklist(roleId, repoConventions, flowId = DEFAULT_FLOW_ID
 function buildOptionalRoleTriggers(roleId, flowId = DEFAULT_FLOW_ID) {
   if (roleId === 'requirement-analyst') {
     return [
-      { role_id: 'design-collaborator', use_when: '输入包含设计稿、视觉还原、像素级交互或复杂 UI 约束，需要先把设计歧义收口。' },
+      { role_id: 'design-collaborator', use_when: '输入包含设计稿、视觉还原、像素级交互、复杂 UI 约束，或明确要求页面更好看、漂亮、美观、有高级感、更有设计感、更有质感、更现代、更高级、优化视觉/优化 UI/改漂亮点时，需要先把设计歧义收口。' },
       { role_id: 'api-contract-specialist', use_when: '涉及接口字段、联调、mock/真实接口边界或契约不稳定，需要先补接口约束。' },
     ];
   }
@@ -3630,24 +3729,108 @@ function buildStartConfirmTurn(targetDir, userInput, routeDecision) {
   }), { userInput });
 }
 
-function buildStartTurn(targetDir, userInput) {
+function buildStartConfigGateTurn(targetDir, userInput, options = {}) {
   const runtimePaths = resolveRuntimePaths(targetDir);
+  const runMode = normalizeRunMode(options.mode);
+  const reviewPolicy = normalizeReviewPolicy(options.reviewPolicy);
+  const requiredAction = options.requiredUserAction || (runMode === 'manual'
+    ? '当前以 manual（手动）模式启动，请补充 --flow <flow-id> 后再继续。'
+    : '当前以 suggest（建议）模式启动，请先确认建议执行计划后再继续。');
+  const blockedReason = options.blockedReason || (runMode === 'manual'
+    ? 'manual（手动）模式要求显式指定 flow（流程模板），当前不能自动猜测。'
+    : 'suggest（建议）模式会先收敛 run-plan（运行计划），经人工确认后再启动第一位专家。');
+
+  return attachProtocolContracts(attachActorPresentation({
+    kind: 'ai-protocol-turn',
+    status: 'blocked',
+    mode: 'confirm-gate',
+    actor: {
+      id: 'task-orchestrator',
+      type: 'orchestrator',
+    },
+    command: null,
+    reason: blockedReason,
+    summary: {
+      run_id: null,
+      run_status: null,
+      current_role: null,
+      pending_gate: null,
+      run_mode: runMode,
+      review_policy: reviewPolicy,
+      next_expected_producer: 'task-orchestrator',
+    },
+    input: {
+      user_request: userInput || null,
+      requested_mode: runMode,
+      review_policy: reviewPolicy,
+      requested_flow: options.flowId || null,
+    },
+    reads: dedupeTargets([
+      ...buildCommandTargets(targetDir, START_INSTRUCTION_FILES),
+      buildFileTarget(targetDir, runtimePaths.repoMap.relPath, {
+        label: 'lightweight repo map',
+      }),
+    ]),
+    writes: [],
+    expected_output: runMode === 'manual'
+      ? ['提示用户补充 --flow <flow-id>，不要自动猜测流程模板']
+      : ['提示用户先确认建议执行计划，再恢复到第一位专家继续'],
+    guidance: {
+      confirm_gate: {
+        gate: runMode === 'manual' ? 'manual-flow-required' : 'start-review',
+        status: 'waiting-confirm',
+        required_user_action: requiredAction,
+        blocked_reason: blockedReason,
+        blocked_by_role: 'task-orchestrator',
+        resume_to_role: 'task-orchestrator',
+        resume_rule: runMode === 'manual'
+          ? '补充 --flow 后重新执行 /spec-start。'
+          : '确认建议计划后，再恢复到第一位专家继续。',
+      },
+    },
+  }), { userInput });
+}
+
+function buildStartTurn(targetDir, userInput, options = {}) {
+  const runtimePaths = resolveRuntimePaths(targetDir);
+  const runMode = normalizeRunMode(options.mode);
+  const reviewPolicy = normalizeReviewPolicy(options.reviewPolicy);
+  const requestedFlowId = options.flowId ? String(options.flowId).trim() : null;
+  if (runMode === 'manual' && !requestedFlowId) {
+    return buildStartConfigGateTurn(targetDir, userInput, {
+      mode: runMode,
+      reviewPolicy,
+      flowId: null,
+    });
+  }
+  if (runMode === 'manual' && requestedFlowId && !getFlowRuntimeConfig(targetDir, requestedFlowId)) {
+    return buildStartConfigGateTurn(targetDir, userInput, {
+      mode: runMode,
+      reviewPolicy,
+      flowId: requestedFlowId,
+      requiredUserAction: `指定的 flow（流程模板） "${requestedFlowId}" 未注册，请改用有效的 flow-id 后重试。`,
+      blockedReason: `manual（手动）模式指定的 flow（流程模板） "${requestedFlowId}" 未在当前项目注册，不能继续。`,
+    });
+  }
+
   const routeDecision = inferStartRoutingDecision(targetDir, userInput);
   if (routeDecision.waiting_confirm_required) {
     return buildStartConfirmTurn(targetDir, userInput, routeDecision);
   }
-  const flowDefinition = loadFlowDefinition(targetDir, routeDecision.selected_flow || DEFAULT_FLOW_ID);
+  const selectedFlowId = requestedFlowId || routeDecision.selected_flow || DEFAULT_FLOW_ID;
+  const flowDefinition = loadFlowDefinition(targetDir, selectedFlowId);
+  const effectiveApprovalGates = buildEffectiveApprovalGates(flowDefinition.id, flowDefinition.approval_gates, reviewPolicy);
   const riskLevel = inferRiskLevel({
     rawInput: userInput,
     taskType: null,
     deliveryProfile: null,
-    flowId: flowDefinition.id,
+    flowId: selectedFlowId,
   });
   const deliveryProfile = inferDeliveryProfile({
     rawInput: userInput,
     taskType: null,
     riskLevel,
-    flowId: flowDefinition.id,
+    flowId: selectedFlowId,
   });
   const artifactProfile = flowDefinition.artifact_profile || inferArtifactProfile({
     deliveryProfile,
@@ -3669,12 +3852,20 @@ function buildStartTurn(targetDir, userInput) {
       parent_change_id: routeDecision.parent_change_id || null,
     },
     flow: {
-      id: flowDefinition.id,
+      id: selectedFlowId,
     },
     plan: {
       first_handoff: routeDecision.next_expert || flowDefinition.first_handoff,
+      approval_gates: effectiveApprovalGates,
     },
-  }, userInput, routeDecision);
+    mode: runMode,
+    review_policy: reviewPolicy,
+  }, userInput, {
+    ...routeDecision,
+    selected_flow: selectedFlowId,
+    mode: runMode,
+    review_policy: reviewPolicy,
+  });
 
   return attachProtocolContracts(attachActorPresentation({
     kind: 'ai-protocol-turn',
@@ -3693,6 +3884,8 @@ function buildStartTurn(targetDir, userInput) {
       run_status: null,
       current_role: null,
       pending_gate: null,
+      run_mode: runMode,
+      review_policy: reviewPolicy,
       next_expected_producer: 'task-orchestrator',
       delivery_profile: deliveryProfile,
       artifact_profile: artifactProfile,
@@ -3704,6 +3897,9 @@ function buildStartTurn(targetDir, userInput) {
     },
     input: {
       user_request: userInput || null,
+      requested_mode: runMode,
+      review_policy: reviewPolicy,
+      requested_flow: requestedFlowId,
     },
     reads: dedupeTargets([
       ...buildCommandTargets(targetDir, START_INSTRUCTION_FILES),
@@ -3719,22 +3915,32 @@ function buildStartTurn(targetDir, userInput) {
     ],
     expected_output: [
       '输出最小 run-plan JSON',
+      `在 run-plan 中明确 mode=${runMode} 与 review_policy=${reviewPolicy}`,
       `在 run-plan 中明确 delivery_profile=${deliveryProfile} 与 artifact_profile=${artifactProfile}`,
       `在 run-plan 中明确 change_context=${routeDecision.change_context || 'no-change'}、route_decision=${routeDecision.route_decision || 'full-change'}、trace_mode=${routeDecision.trace_mode || 'full-openspec'}`,
+      requestedFlowId ? `在 run-plan 中显式使用 flow.id=${requestedFlowId}` : 'flow.id 需按当前路由结果或用户指定值显式写明',
       `写入 ${runtimePaths.tmpTaskOrchestratorTurn.relPath}`,
     ],
     guidance: {
       ...orchestratorGuidance,
       routing: {
-        selected_flow: flowDefinition.id,
+        selected_flow: selectedFlowId,
+        requested_mode: runMode,
+        review_policy: reviewPolicy,
         delivery_profile: deliveryProfile,
         artifact_profile: artifactProfile,
         complexity,
         risk_level: riskLevel,
-        note: routeDecision.route_decision === 'quick-fix'
+        note: runMode === 'suggest'
+          ? '当前以 suggest（建议）模式启动：先生成建议执行计划，经人工确认后再启动第一位专家。'
+          : runMode === 'manual'
+          ? `当前以 manual（手动）模式启动：flow 已锁定为 ${requestedFlowId}，主代理只做校验与编排。`
+          : routeDecision.route_decision === 'quick-fix'
           ? '当前需求命中全新低风险小修正，默认走 bugfix-to-verification 轻链路，并在 .ai-spec/history/<run-id>/ 下留痕。'
           : riskLevel === 'high'
           ? '当前需求涉及高风险领域：仍按三专家协同推进，但 requirement 阶段后将进入 before-implementation 审批门禁。'
+          : reviewPolicy === 'main-flow-blocking' && selectedFlowId === DEFAULT_FLOW_ID
+          ? '当前启用 main-flow-blocking 审核策略：主流程 requirement / frontend / guardian 完成后都需人工审核。'
           : deliveryProfile === 'micro'
             ? '当前需求更适合微型交付档位：保留三专家，但产物使用短版 compact 规格。'
             : '当前需求更适合标准交付档位：保留完整门禁与完整 OpenSpec 产物。',
@@ -3744,6 +3950,8 @@ function buildStartTurn(targetDir, userInput) {
         write_to: runtimePaths.tmpTaskOrchestratorTurn.relPath,
         required_fields: [
           'kind',
+          'mode',
+          'review_policy',
           'flow.id',
           'plan.first_handoff',
           'delivery_profile',
@@ -3999,13 +4207,15 @@ function buildApprovalGateTurn(targetDir, status, currentArtifacts) {
   const pendingGate = currentArtifacts.run?.pending_gate || null;
   const gateContext = currentArtifacts.run?.gate_context || null;
   const flowDefinition = loadFlowDefinition(targetDir, currentArtifacts.run?.flow?.id || DEFAULT_FLOW_ID);
+  const reviewPolicy = normalizeReviewPolicy(currentArtifacts.run?.review_policy || currentArtifacts.run?.plan?.review_policy || null);
+  const approvalGates = buildEffectiveApprovalGates(flowDefinition.id, currentArtifacts.run?.plan?.approval_gates || flowDefinition.approval_gates, reviewPolicy);
   const resumeRole = gateContext?.resume_to_role || inferPendingGateResumeRole(targetDir, currentArtifacts.run, flowDefinition, pendingGate);
   const gateDescription = describeApprovalGate(pendingGate, resumeRole);
   const useCompactArchiveGate = pendingGate === 'before-archive';
   const orchestratorGuidance = useCompactArchiveGate
     ? {
         approval_contract: {
-          gates: flowDefinition.approval_gates,
+          gates: approvalGates,
           pending_gate: pendingGate,
           expected_gate: pendingGate,
           approve_resume_to_role: resumeRole,
@@ -4105,6 +4315,7 @@ function buildApprovalGateTurn(targetDir, status, currentArtifacts) {
         blocked_by_role: gateContext?.blocked_by_role || currentArtifacts.run?.current_role || null,
         resume_to_role: resumeRole,
         resume_rule: gateDescription.resumeRule,
+        review_policy: reviewPolicy,
         user_report_contract: {
           style: 'approval-compact',
           max_lines: 4,
@@ -4133,6 +4344,8 @@ function buildApprovalGateTurn(targetDir, status, currentArtifacts) {
 function buildUpdateReviewTurn(targetDir, status, currentArtifacts) {
   const runtimePaths = resolveRuntimePaths(targetDir);
   const flowDefinition = loadFlowDefinition(targetDir, currentArtifacts.run?.flow?.id || DEFAULT_FLOW_ID);
+  const reviewPolicy = normalizeReviewPolicy(currentArtifacts.run?.review_policy || currentArtifacts.run?.plan?.review_policy || null);
+  const approvalGates = buildEffectiveApprovalGates(flowDefinition.id, currentArtifacts.run?.plan?.approval_gates || flowDefinition.approval_gates, reviewPolicy);
   const recentUpdates = Array.isArray(currentArtifacts.run?.input_updates)
     ? currentArtifacts.run.input_updates.slice(-3)
     : [];
@@ -4149,7 +4362,7 @@ function buildUpdateReviewTurn(targetDir, status, currentArtifacts) {
   const orchestratorGuidance = useCompactArchiveGate
     ? {
         approval_contract: {
-          gates: flowDefinition.approval_gates,
+          gates: approvalGates,
           pending_gate: pendingGate,
           expected_gate: pendingGate,
           approve_resume_to_role: resumeRole,
@@ -4277,6 +4490,7 @@ function buildUpdateReviewTurn(targetDir, status, currentArtifacts) {
             archive_fix_intent_detected: pendingGate === 'before-archive' && changeDecision?.change_impact === 'archive-fix',
             latest_user_input: latestInput,
             resume_to_role: resumeRole,
+            review_policy: reviewPolicy,
             next_step: approvalIntent
               ? `生成 action=approve 的 runtime-action，清除 pending_gate，并恢复到 ${resumeRole || '下一位专家'}`
               : archiveSkipIntent
@@ -4565,12 +4779,12 @@ function buildProtocolTurn(options = {}) {
   }
 
   if (!status.current.run_id) {
-    return buildStartTurn(targetDir, userInput);
+    return buildStartTurn(targetDir, userInput, options);
   }
 
   if (status.next_expected.producer === null) {
     if (userInput) {
-      return buildStartTurn(targetDir, userInput);
+      return buildStartTurn(targetDir, userInput, options);
     }
 
     return attachProtocolContracts({
@@ -4652,6 +4866,9 @@ function advanceProtocolStep(options = {}) {
     turn: buildProtocolTurn({
       target: targetDir,
       userInput: options.userInput || null,
+      mode: options.mode || null,
+      reviewPolicy: options.reviewPolicy || null,
+      flowId: options.flowId || null,
     }),
   };
 }
@@ -4798,12 +5015,14 @@ function tryOpenFollowupPatchFastPath(targetDir, userInput) {
     ? 'requirement-analyst'
     : 'frontend-implementer';
   const flowDefinition = loadFlowDefinition(targetDir, runState.flow?.id || DEFAULT_FLOW_ID);
+  const reviewPolicy = normalizeReviewPolicy(runState.review_policy || runState.plan?.review_policy || null);
   const bootstrap = bootstrapRunState({
     target: targetDir,
     payloadData: {
       kind: 'run-plan',
       schema_version: 1,
-      mode: 'auto',
+      mode: DEFAULT_RUN_MODE,
+      review_policy: reviewPolicy,
       status: 'planned',
       delivery_profile: runState.delivery_profile || 'standard',
       artifact_profile: runState.artifact_profile || 'full',
@@ -4831,10 +5050,11 @@ function tryOpenFollowupPatchFastPath(targetDir, userInput) {
         required_roles: flowDefinition.required_roles,
         activated_optional_roles: /测试|回归/.test(String(userInput || '')) ? ['unit-test-specialist'] : [],
         skipped_optional_roles: [],
-        approval_gates: ['before-archive'],
+        approval_gates: buildEffectiveApprovalGates(flowDefinition.id, ['before-archive'], reviewPolicy),
         first_handoff: firstHandoff,
         delivery_profile: runState.delivery_profile || 'standard',
         artifact_profile: runState.artifact_profile || 'full',
+        review_policy: reviewPolicy,
       },
       assumptions: [
         `这是针对已归档变更 ${parentChangeId || '(unknown)'} 的 follow-up patch`,

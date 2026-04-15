@@ -37,6 +37,10 @@
       "source": ".agents/skills/common/project-init/SKILL.md",
       "domains": ["documentation"]
     },
+    "ui-ux-pro-max": {
+      "source": ".agents/skills/domains/ui-ux-pro-max/SKILL.md",
+      "domains": ["demand-design"]
+    },
     "route-permission-map": {
       "source": ".agents/skills/common/route-permission-map/SKILL.md",
       "domains": ["governance"]

@@ -106,6 +106,7 @@
   "kind": "run-plan",
   "run_id": "run_20260326_001",
   "mode": "auto",
+  "review_policy": "main-flow-blocking",
   "status": "planned",
   "task": {
     "change_id": "add-user-center",
@@ -121,8 +122,9 @@
     "required_roles": ["requirement-analyst", "frontend-implementer", "code-guardian"],
     "activated_optional_roles": ["design-collaborator", "api-contract-specialist"],
     "skipped_optional_roles": ["unit-test-specialist", "verification-reviewer", "performance-auditor"],
-    "approval_gates": ["before-implementation"],
-    "first_handoff": "requirement-analyst"
+    "approval_gates": ["before-implementation", "before-guardian", "before-archive"],
+    "first_handoff": "requirement-analyst",
+    "review_policy": "main-flow-blocking"
   },
   "artifacts": [
     "openspec/changes/add-user-center/proposal.md",
@@ -150,7 +152,8 @@
 | `kind` | `flow-descriptor` 或 `run-plan` |
 | `run_id` | 仅 `run-plan` 需要，表示一次运行实例 ID |
 | `mode` | 主代理运行模式：`auto / suggest / manual` |
-| `status` | 当前运行状态，如 `planned / waiting-approval / running / blocked` |
+| `review_policy` | 当前审核策略：`none / main-flow-blocking` |
+| `status` | 当前运行状态，如 `planned / waiting-confirm / waiting-approval / running / blocked` |
 
 ### 4.2 `task`
 
@@ -173,6 +176,7 @@
 | `skipped_optional_roles` | 本次未激活的可选专家 |
 | `approval_gates` | 本次实际保留的审批点 |
 | `first_handoff` | 第一位要被启动的专家 |
+| `review_policy` | 本次计划对应的审核策略，便于运行时恢复默认门禁 |
 
 ## 5. 最小实现建议
 
@@ -195,6 +199,7 @@
 - 主代理根据输入生成 `run-plan`
 - 输出 `first_handoff`
 - 输出 `approval_gates`
+- 输出 `review_policy`
 - 输出 `missing_inputs`
 
 ## 6. 错误处理约定
@@ -250,3 +255,9 @@
 3. 明确第一跳交接给谁
 
 只要这三件事稳定了，后面接 OpenClaw、审批、恢复、审计都会顺很多。
+
+补充当前默认语义：
+
+- `suggest（建议）` 模式下，`run-plan（运行计划）` 落盘后通常会进入 `waiting-confirm（等待确认）`
+- `manual（手动）` 模式下，必须显式指定 `flow（流程模板）`
+- `prd-to-delivery（需求到交付流程）` 在 `review_policy = main-flow-blocking（主流程阻塞审核）` 下，会把 `before-guardian（守护前门禁）` 注入到实际 `approval_gates（审批点）` 中

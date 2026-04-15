@@ -84,7 +84,11 @@ python3 .agents/skills/common/skill-creator/scripts/quick_validate.py <skill-dir
 
 ## domains/ — 按能力域沉淀的可复用技能（可选）
 
-这里的 `domains（能力域）` 是一种**分类和复用标签**，不是安装求解时必须依赖的目录结构。
+这里的 `domains（能力域）` 是一种**分类和复用标签**，也是 `sync（同步）` 与 `Hub（平台）` 识别能力域 skill 的正式目录结构。
+
+| 技能 | 用途 | 配合规范 |
+|------|------|----------|
+| `ui-ux-pro-max` | 设计协作专家专用的 UI/UX 设计决策能力，可选安装完整版资源 | - |
 
 只有在某个 skill 同时满足下面两个条件时，才建议放到 `domains/`：
 
@@ -93,6 +97,7 @@ python3 .agents/skills/common/skill-creator/scripts/quick_validate.py <skill-dir
 
 例如未来可能出现：
 
+- `domains/demand-design/ui-ux-pro-max`
 - `domains/performance/lighthouse-audit`
 - `domains/observability/sentry-triage`
 - `domains/security-a11y/security-review`
@@ -134,6 +139,7 @@ python3 .agents/skills/common/skill-creator/scripts/quick_validate.py <skill-dir
 | 编写样式/主题适配 | `.agents/skills/profiles/<stack>/theme-variables/SKILL.md` |
 | 开始执行 tasks.md | `.agents/skills/common/execute-task/SKILL.md` |
 | 分析设计稿 | `.agents/skills/common/design-analysis/SKILL.md` |
+| 做 Figma 解析、标注提取和 UI 设计决策 | `.agents/skills/domains/ui-ux-pro-max/SKILL.md`（设计协作专家专用，可选安装完整版资源） |
 | UI 还原验收 | `.agents/skills/common/ui-verification/SKILL.md` |
 | 扫描敏感信息 / 统一配置规范 | `.agents/skills/common/config-and-secret-scan/SKILL.md` |
 | 核对路由、菜单和权限 | `.agents/skills/common/route-permission-map/SKILL.md` |
@@ -150,14 +156,14 @@ python3 .agents/skills/common/skill-creator/scripts/quick_validate.py <skill-dir
 
 - 与技术栈无关的 skill 放 `common/`
 - 与 React / Vue 强绑定的 skill 放 `profiles/react/`、`profiles/vue/`
-- 与性能、安全、可观测等能力域强绑定，且会被多个专家复用的 skill，后续再放 `domains/`
+- 与设计、安全、性能、可观测等能力域强绑定，且需要被专家链按能力域识别的 skill，放 `domains/`
 
 当前阶段先保持：
 
 ```text
 .agents/skills/
 ├── common/
+├── domains/
 ├── profiles/react/
-├── profiles/vue/
-└── domains/        # 预留，未来按需启用
+└── profiles/vue/
 ```

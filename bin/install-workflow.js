@@ -1625,11 +1625,35 @@ function setupOpenSpec(targetDir, sourceDir, options, pkgManager, pending) {
   ok('OpenSpec 配置完成');
 }
 
+function getUiproSkillPaths(targetDir) {
+  const legacySkillDir = path.join(targetDir, '.agents', 'skills', 'ui-ux-pro-max');
+  const skillDir = path.join(targetDir, '.agents', 'skills', 'domains', 'ui-ux-pro-max');
+  return {
+    legacySkillDir,
+    skillDir,
+    legacyDataDir: path.join(legacySkillDir, 'data'),
+    skillDataDir: path.join(skillDir, 'data'),
+  };
+}
+
+function hasInstalledUiproData(targetDir) {
+  const { legacyDataDir, skillDataDir } = getUiproSkillPaths(targetDir);
+  return fs.existsSync(skillDataDir) || fs.existsSync(legacyDataDir);
+}
+
+function hasAnyUiproAssets(targetDir) {
+  const { legacySkillDir, skillDir } = getUiproSkillPaths(targetDir);
+  return fs.existsSync(skillDir) || fs.existsSync(legacySkillDir);
+}
+
 function setupUipro(targetDir, pkgManager, pending) {
-  const skillDir = path.join(targetDir, '.agents', 'skills', 'ui-ux-pro-max');
-  if (fs.existsSync(path.join(skillDir, 'SKILL.md'))) {
+  const { legacySkillDir, skillDir, skillDataDir } = getUiproSkillPaths(targetDir);
+  if (fs.existsSync(skillDataDir)) {
     ok('UI UX Pro Max 已安装，跳过');
     return;
+  }
+  if (fs.existsSync(legacySkillDir)) {
+    removePath(legacySkillDir);
   }
   if (!pkgManager) {
     pending.failures.push('UI UX Pro Max：无可用的包管理器，无法全局安装 uipro-cli。');
@@ -1663,8 +1687,8 @@ function setupUipro(targetDir, pkgManager, pending) {
     removePath(tmpDir);
     return;
   }
-  ensureDir(path.join(skillDir, 'data'));
-  fs.cpSync(sourceDir, path.join(skillDir, 'data'), { recursive: true });
+  ensureDir(skillDataDir);
+  fs.cpSync(sourceDir, skillDataDir, { recursive: true });
   const promptFile = path.join(tmpDir, '.cursor', 'commands', 'ui-ux-pro-max.md');
   if (fs.existsSync(promptFile)) {
     const prompt = fs.readFileSync(promptFile, 'utf8').replace(/\.shared\/ui-ux-pro-max\//g, 'data/');
@@ -1775,7 +1799,7 @@ function printInstallReport(targetDir, options, pending) {
   console.log(`  ${color('✔', 'green')} .agents/rules + skills + roles + flows + orchestration (profile: ${options.profile})`);
   console.log(`  ${options.installLint === 'yes' ? color('✔', 'green') : color('—', 'yellow')} lint/format 配置${options.installLint === 'yes' ? ' (.prettierrc, .eslintrc, .stylelintrc)' : '（已跳过）'}`);
   console.log(`  ${options.installHusky === 'yes' ? color('✔', 'green') : color('—', 'yellow')} 提交校验${options.installHusky === 'yes' ? ' (.husky, .lintstagedrc, commitlint.config.js)' : '（已跳过）'}`);
-  if (fs.existsSync(path.join(targetDir, '.agents', 'skills', 'ui-ux-pro-max', 'SKILL.md'))) {
+  if (hasInstalledUiproData(targetDir)) {
     console.log(`  ${color('✔', 'green')} UI UX Pro Max 设计智能技能 (67 styles, 161 palettes)`);
   }
   if (options.level !== 'L1') {
@@ -2041,7 +2065,7 @@ async function handleUpdate(options) {
     await selectRulesStrategy(options);
   }
   if (options.rulesStrategy === 'ask') options.rulesStrategy = 'standard';
-  if (fs.existsSync(path.join(targetDir, '.agents', 'skills', 'ui-ux-pro-max')) && options.updateUipro !== 'yes') {
+  if (hasAnyUiproAssets(targetDir) && options.updateUipro !== 'yes') {
     options.updateUipro = 'yes';
   }
   if (options.uipro === 'yes') {
@@ -2113,7 +2137,9 @@ async function handleUpdate(options) {
     setupOpenSpec(targetDir, sourceDir, options, pkgManager, pending);
   }
   if (options.updateUipro === 'yes') {
-    removePath(path.join(targetDir, '.agents', 'skills', 'ui-ux-pro-max'));
+    const { legacySkillDir, skillDir } = getUiproSkillPaths(targetDir);
+    removePath(legacySkillDir);
+    removePath(skillDir);
     setupUipro(targetDir, pkgManager, pending);
   }
   writeInstallState(targetDir, sourceDir, previousInstallState, installStateAdditions);
@@ -2189,7 +2215,7 @@ function handleCheck(options) {
       warn(`检测到 OpenSpec 或协议命令入口，但缺少 ${missingProtocolAssets.join('、')}；建议运行: npx @ex/ai-spec-auto@latest update .`);
     }
   }
-  printTools(detectInstalledLevel(targetDir), fs.existsSync(path.join(targetDir, '.agents', 'skills', 'ui-ux-pro-max')) ? 'yes' : 'no');
+  printTools(detectInstalledLevel(targetDir), hasInstalledUiproData(targetDir) ? 'yes' : 'no');
   console.log('');
   if (hasIssue) {
     err('存在问题，建议运行: npx @ex/ai-spec-auto@latest init .');

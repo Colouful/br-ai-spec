@@ -23,6 +23,10 @@ function writeJsonFile(targetDir, relPath, value) {
   writeProjectFile(targetDir, relPath, JSON.stringify(value, null, 2));
 }
 
+function readJsonFile(targetDir, relPath) {
+  return JSON.parse(fs.readFileSync(path.join(targetDir, relPath), 'utf8'));
+}
+
 function createWorkspace() {
   const targetDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-spec-auto-protocol-registry-test-'));
   writeProjectFile(targetDir, 'package.json', JSON.stringify({
@@ -122,6 +126,9 @@ function main() {
         },
         openspec_rule_sections: ['proposal'],
       },
+      'design-collaborator': {
+        skill_priority: ['ui-ux-pro-max', 'design-analysis'],
+      },
     },
   });
   copyFixture(roleOverrideTarget, 'task-orchestrator-bootstrap-reply.md', 'task-orchestrator-turn.json');
@@ -168,6 +175,79 @@ function main() {
   assert.deepStrictEqual(
     workflow.turn.guidance.openspec_rules.sections.map((item) => item.name),
     ['proposal'],
+  );
+
+  const currentRun = readJsonFile(roleOverrideTarget, '.ai-spec/current-run.json');
+  currentRun.current_role = 'design-collaborator';
+  if (currentRun.anchor?.stage) {
+    currentRun.anchor.stage.current_role = 'design-collaborator';
+    currentRun.anchor.stage.next_role = 'requirement-analyst';
+  }
+  writeJsonFile(roleOverrideTarget, '.ai-spec/current-run.json', currentRun);
+  writeJsonFile(roleOverrideTarget, '.ai-spec/internal/current-dispatch.json', {
+    schema_version: 1,
+    kind: 'expert-dispatch',
+    run_id: currentRun.run_id,
+    status: 'running',
+    role: {
+      id: 'design-collaborator',
+      name: '设计协作专家',
+      source: '.agents/roles/domains/demand-design/design-collaborator.md',
+      preferred_skills: [],
+    },
+    task: {
+      raw_goal: '分析一个 Figma 设计稿并收口样式约束',
+      change_id: currentRun.anchor?.task?.change_id || 'runtime-smoke-demo',
+    },
+    flow: {
+      id: 'prd-to-delivery',
+    },
+    execution: {
+      profile: 'vue',
+      current_role: 'design-collaborator',
+      next_role: 'requirement-analyst',
+      pending_gate: null,
+      expected_output: ['补充 UI 分析清单', '列出设计待确认项'],
+      skills: [],
+    },
+    anchor: currentRun.anchor,
+    instructions: {
+      source: '.agents/roles/domains/demand-design/design-collaborator.md',
+      markdown: '# design-collaborator',
+    },
+  });
+
+  workflow = protocolWorkflow.advanceProtocolStep({
+    target: roleOverrideTarget,
+  });
+
+  assert.strictEqual(workflow.turn.actor.id, 'design-collaborator');
+  assert.deepStrictEqual(
+    workflow.turn.guidance.role_skill_contract.primary_skills,
+    ['ui-ux-pro-max', 'design-analysis'],
+  );
+  assert.ok(
+    workflow.turn.guidance.role_skill_contract.read_targets.some(
+      (item) => item.rel_path === '.agents/skills/domains/ui-ux-pro-max/SKILL.md' && item.exists,
+    ),
+  );
+
+  writeProjectFile(
+    roleOverrideTarget,
+    '.agents/skills/domains/ui-ux-pro-max/SKILL.md',
+    '# local ui-ux-pro-max',
+  );
+
+  workflow = protocolWorkflow.advanceProtocolStep({
+    target: roleOverrideTarget,
+  });
+
+  assert.ok(
+    workflow.turn.guidance.role_skill_contract.read_targets.some(
+      (item) =>
+        item.rel_path === '.agents/skills/domains/ui-ux-pro-max/SKILL.md'
+        && item.path === path.join(roleOverrideTarget, '.agents/skills/domains/ui-ux-pro-max/SKILL.md'),
+    ),
   );
 
   const futureProfileTarget = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-spec-auto-protocol-future-profile-'));

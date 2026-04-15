@@ -9,7 +9,19 @@
 先执行：
 
 ```bash
-./node_modules/.bin/ai-spec-auto protocol-step --target . --user-input "<本次 /spec-start 的用户原始需求>" --json
+./node_modules/.bin/ai-spec-auto protocol-step --target . --user-input "<本次 /spec-start 的用户原始需求>" --mode auto --review-policy main-flow-blocking --json
+```
+
+若用户明确要求先看建议计划，再改用：
+
+```bash
+./node_modules/.bin/ai-spec-auto protocol-step --target . --user-input "<本次 /spec-start 的用户原始需求>" --mode suggest --review-policy main-flow-blocking --json
+```
+
+若用户明确要求手动锁定流程模板，再改用：
+
+```bash
+./node_modules/.bin/ai-spec-auto protocol-step --target . --user-input "<本次 /spec-start 的用户原始需求>" --mode manual --flow <flow-id> --review-policy main-flow-blocking --json
 ```
 
 然后只按返回的 `turn` 执行：
@@ -38,6 +50,12 @@
   只保留“当前状态 / 关键原因 / 下一步”，不要写长篇阶段说明，不要罗列 proposal/specs/design/tasks 或仓库文件路径，不要输出任何“对内说明”
 - 不要继续执行 `advance`
 - 若用户随后给出明确批准意见，或在归档确认门禁下给出“归档 / 不归档”决定，先执行 `turn.commands.update` 记录说明；若 `protocol-update` 返回 `fast_path.executed = true`，直接结束当前轮次，否则再让用户重新执行 `/spec-continue`
+
+若 `turn.status = blocked` 且存在 `turn.guidance.confirm_gate`：
+- 先判断是否是 `start-review（启动确认门禁）` 或 `manual-flow-required（手动流程必填门禁）`
+- `start-review（启动确认门禁）`：提示用户当前是 `suggest（建议）` 模式，先确认建议计划，再恢复到第一位专家
+- `manual-flow-required（手动流程必填门禁）`：提示用户必须补充 `--flow <flow-id>`
+- 不要把 `manual（手动）` 理解成“每一步都审核”
 
 对用户只输出阶段语义和最终摘要，不回显 scratch JSON。
 若存在 `turn.finalize_contract.user_report_contract`，最终摘要严格服从它：

@@ -7,6 +7,9 @@ function parseArgs(argv) {
   const options = {
     target: '.',
     userInput: null,
+    mode: null,
+    reviewPolicy: null,
+    flowId: null,
     json: false,
     pretty: true,
   };
@@ -25,6 +28,15 @@ function parseArgs(argv) {
         break;
       case '--user-input':
         options.userInput = args.shift();
+        break;
+      case '--mode':
+        options.mode = args.shift();
+        break;
+      case '--review-policy':
+        options.reviewPolicy = args.shift();
+        break;
+      case '--flow':
+        options.flowId = args.shift();
         break;
       case '--json':
         options.json = true;
@@ -62,6 +74,9 @@ function printUsage(mode) {
 Options:
   --target <dir>         Target project directory (default: .)
   --user-input <text>    User requirement or follow-up text
+  --mode <mode>          Start mode: auto | suggest | manual (protocol-step only)
+  --review-policy <id>   Review policy: none | main-flow-blocking (protocol-step only)
+  --flow <flow-id>       Explicit flow id for manual mode (protocol-step only)
   --json                 Print JSON only
   --pretty               Print readable summary (default)
   --help                 Show this help
@@ -351,6 +366,9 @@ function buildStepPreview(options) {
     turn: workflow.buildProtocolTurn({
       target: options.target,
       userInput: options.userInput || null,
+      mode: options.mode || null,
+      reviewPolicy: options.reviewPolicy || null,
+      flowId: options.flowId || null,
     }),
   };
 }
@@ -366,6 +384,9 @@ function main(mode, argv) {
     ? workflow.advanceProtocolStep({
       target: options.target,
       userInput: options.userInput || null,
+      mode: options.mode || null,
+      reviewPolicy: options.reviewPolicy || null,
+      flowId: options.flowId || null,
     })
     : mode === 'update'
     ? workflow.updateProtocolInput({

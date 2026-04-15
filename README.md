@@ -60,10 +60,12 @@ npx @ex/ai-spec-auto@latest init .
 - `.agents/skills/`：技能与操作流程
 - `.cursor/`、`.claude/`：IDE 适配与命令模板
 - `openspec/`：OpenSpec 流程目录
-- 可选的 lint / husky / UI UX Pro Max
+- 可选的 lint / husky / UI UX Pro Max（设计协作专家专用，可通过 `--uipro` 显式安装完整版资源）
 
 `L1 / L2 / L3` 仍然保留为**兼容参数**，但不再是主路径概念。  
 如果你没有特别原因，直接用默认安装即可。
+
+其中 `UI UX Pro Max`(设计智能技能) 归属 `design-collaborator`(设计协作专家) 链路，主要用于 Figma 解析、标注提取和 UI/UX 设计决策，不属于 `frontend-implementer`(前端实现专家) 的默认技能集。
 
 ## 安装后怎么开始
 

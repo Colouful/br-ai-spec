@@ -22,20 +22,21 @@ description: 定义 task-orchestrator 在首次识别任务时必须输出的最
 
 ## 2. 必填字段
 
-首轮输出至少必须覆盖下面 12 类信息：
+首轮输出至少必须覆盖下面 13 类信息：
 
 1. `task_identification（任务识别）`
 2. `change_identification（稳定变更 ID）`
 3. `artifact_targets（关键产物路径）`
 4. `mode（运行模式）`
-5. `selected_flow（选中的流程模板）`
-6. `delivery_profile（交付档位）`
-7. `artifact_profile（产物规格）`
-8. `complexity（复杂度）`
-9. `selected_roles（本次激活专家）`
-10. `assumptions（默认假设）`
-11. `missing_inputs（缺失输入）`
-12. `next_action（下一步动作）`
+5. `review_policy（审核策略）`
+6. `selected_flow（选中的流程模板）`
+7. `delivery_profile（交付档位）`
+8. `artifact_profile（产物规格）`
+9. `complexity（复杂度）`
+10. `selected_roles（本次激活专家）`
+11. `assumptions（默认假设）`
+12. `missing_inputs（缺失输入）`
+13. `next_action（下一步动作）`
 
 ## 3. 推荐 Markdown（标记语言）模板
 
@@ -51,6 +52,9 @@ description: 定义 task-orchestrator 在首次识别任务时必须输出的最
 
 ## 运行模式
 - `mode（运行模式）`：auto / suggest / manual
+
+## 审核策略
+- `review_policy（审核策略）`：none / main-flow-blocking
 
 ## 交付档位
 - `delivery_profile（交付档位）`：micro / standard
@@ -85,6 +89,7 @@ description: 定义 task-orchestrator 在首次识别任务时必须输出的最
   "schema_version": 1,
   "kind": "run-plan",
   "mode": "auto",
+  "review_policy": "main-flow-blocking",
   "delivery_profile": "micro",
   "artifact_profile": "compact",
   "complexity": "low",
@@ -106,9 +111,10 @@ description: 定义 task-orchestrator 在首次识别任务时必须输出的最
     "required_roles": ["frontend-implementer", "code-guardian"],
     "activated_optional_roles": ["requirement-analyst"],
     "first_handoff": "requirement-analyst",
-    "approval_gates": [],
+    "approval_gates": ["before-implementation", "before-guardian", "before-archive"],
     "delivery_profile": "micro",
-    "artifact_profile": "compact"
+    "artifact_profile": "compact",
+    "review_policy": "main-flow-blocking"
   },
   "assumptions": [
     "默认沿用项目现有组件目录与命名规范",
@@ -140,6 +146,14 @@ description: 定义 task-orchestrator 在首次识别任务时必须输出的最
 - 先推断可补齐的信息
 - 把推断结果写入 `assumptions（默认假设）`
 - 在不引入明显高风险的前提下继续交给下一跳专家
+
+默认内测配置下，`auto（自动）` 通常会搭配 `review_policy = main-flow-blocking（主流程阻塞审核）`。
+
+此时 `prd-to-delivery（需求到交付流程）` 需要保留：
+
+- `before-implementation（实现前门禁）`
+- `before-guardian（守护前门禁）`
+- `before-archive（归档前门禁）`
 
 ### 5.2 可以直接进入实现前置阶段
 
@@ -173,6 +187,11 @@ description: 定义 task-orchestrator 在首次识别任务时必须输出的最
 - 关键默认假设与仓库现有实现冲突
 - 继续执行会显著放大返工成本
 - 需要明确业务口径才能决定实现方向
+
+补充规则：
+
+- `suggest（建议）` 适合“先看计划再决定是否继续”的场景，首轮 `run-plan（运行计划）` 生成后应进入 `start-review（启动确认门禁）`
+- `manual（手动）` 当前只允许手动指定 `flow（流程模板）`，必须显式提供 `--flow <flow-id>`
 
 ### 5.5 delivery_profile 的选择规则
 

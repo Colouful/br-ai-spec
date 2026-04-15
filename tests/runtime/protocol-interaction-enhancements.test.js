@@ -68,6 +68,18 @@ function readCurrentRun(targetDir) {
   return JSON.parse(fs.readFileSync(path.join(targetDir, '.ai-spec', 'current-run.json'), 'utf8'));
 }
 
+function approveGate(targetDir, gate, toRole, message) {
+  writeProjectFile(targetDir, '.ai-spec/internal/tmp/current-runtime-action.json', JSON.stringify({
+    schema_version: 1,
+    kind: 'task-orchestrator-runtime-action',
+    action: 'approve',
+    gate,
+    to_role: toRole,
+    message,
+  }, null, 2));
+  return runner.advanceRunner({ target: targetDir });
+}
+
 function setupFrontendRun(targetDir) {
   bootstrapRun(targetDir, '创建一个订单列表页面，接真实接口，支持分页和状态筛选');
   writeProjectFile(targetDir, 'openspec/changes/runtime-smoke-demo/proposal.md', [
@@ -118,7 +130,9 @@ function setupFrontendRun(targetDir) {
     '- [ ] 保持 mock 数据与样式变量约定',
   ].join('\n'));
   copyFixture(targetDir, 'current-execution-requirement-analyst.json', 'current-execution.json');
-  const report = runner.advanceRunner({ target: targetDir });
+  let report = runner.advanceRunner({ target: targetDir });
+  assert.strictEqual(report.applied.pending_gate, 'before-implementation');
+  report = approveGate(targetDir, 'before-implementation', 'frontend-implementer', 'implementation approved');
   assert.strictEqual(report.applied.current_role, 'frontend-implementer');
 }
 
@@ -170,10 +184,14 @@ function setupRunToArchiveGate(targetDir) {
 
   copyFixture(targetDir, 'current-execution-requirement-analyst.json', 'current-execution.json');
   let report = runner.advanceRunner({ target: targetDir });
+  assert.strictEqual(report.applied.pending_gate, 'before-implementation');
+  report = approveGate(targetDir, 'before-implementation', 'frontend-implementer', 'implementation approved');
   assert.strictEqual(report.applied.current_role, 'frontend-implementer');
 
   copyFixture(targetDir, 'current-execution-frontend-implementer.json', 'current-execution.json');
   report = runner.advanceRunner({ target: targetDir });
+  assert.strictEqual(report.applied.pending_gate, 'before-guardian');
+  report = approveGate(targetDir, 'before-guardian', 'code-guardian', 'guardian review approved');
   assert.strictEqual(report.applied.current_role, 'code-guardian');
 
   writeProjectFile(targetDir, 'openspec/changes/runtime-smoke-demo/checklist.md', '# Checklist');

@@ -196,10 +196,30 @@ function main() {
     'openspec/changes/runtime-smoke-demo/design.md',
     'openspec/changes/runtime-smoke-demo/tasks.md',
   ]);
-  assert.strictEqual(result.runtime_transition.payload.action, 'handoff');
-  assert.strictEqual(result.runtime_transition.applied.current_role, 'frontend-implementer');
-  assert.strictEqual(readCurrentRun(targetDir).current_role, 'frontend-implementer');
+  assert.strictEqual(result.runtime_transition.payload.action, 'gate-blocked');
+  assert.strictEqual(result.runtime_transition.payload.pending_gate, 'before-implementation');
+  assert.strictEqual(result.runtime_transition.applied.current_role, 'requirement-analyst');
+  let currentRun = readCurrentRun(targetDir);
+  assert.strictEqual(currentRun.pending_gate, 'before-implementation');
   assertMissingCurrentArtifacts(targetDir);
+
+  result = expertExecutor.applyRuntimeActionData({
+    target: targetDir,
+    advanceRuntime: true,
+    payloadData: {
+      schema_version: 1,
+      kind: 'task-orchestrator-runtime-action',
+      action: 'approve',
+      gate: 'before-implementation',
+      to_role: 'frontend-implementer',
+      next_role: 'code-guardian',
+      message: 'implementation approved',
+    },
+  });
+  currentRun = readCurrentRun(targetDir);
+  assert.strictEqual(currentRun.status, 'running');
+  assert.strictEqual(currentRun.current_role, 'frontend-implementer');
+  assert.strictEqual(currentRun.pending_gate, null);
 
   expertDispatch.applyDispatch({
     target: targetDir,
@@ -217,16 +237,35 @@ function main() {
     'openspec/changes/runtime-smoke-demo/design.md',
     'openspec/changes/runtime-smoke-demo/tasks.md',
   ]);
-  assert.strictEqual(result.runtime_transition.payload.action, 'handoff');
-  assert.strictEqual(result.runtime_transition.applied.current_role, 'code-guardian');
-  let currentRun = readCurrentRun(targetDir);
-  assert.strictEqual(currentRun.current_role, 'code-guardian');
+  assert.strictEqual(result.runtime_transition.payload.action, 'gate-blocked');
+  assert.strictEqual(result.runtime_transition.payload.pending_gate, 'before-guardian');
+  currentRun = readCurrentRun(targetDir);
+  assert.strictEqual(currentRun.current_role, 'frontend-implementer');
+  assert.strictEqual(currentRun.pending_gate, 'before-guardian');
   assert.ok(result.payload.verification, 'expected auto-generated verification on frontend delivery');
   assert.strictEqual(result.payload.verification.kind, 'verification');
   assert.strictEqual(result.payload.verification.steps.length, 3);
   assert.ok(currentRun.verification, 'expected verification to be persisted into current-run');
   assert.strictEqual(currentRun.verification.kind, 'verification');
   assertMissingCurrentArtifacts(targetDir);
+
+  result = expertExecutor.applyRuntimeActionData({
+    target: targetDir,
+    advanceRuntime: true,
+    payloadData: {
+      schema_version: 1,
+      kind: 'task-orchestrator-runtime-action',
+      action: 'approve',
+      gate: 'before-guardian',
+      to_role: 'code-guardian',
+      next_role: null,
+      message: 'guardian review approved',
+    },
+  });
+  currentRun = readCurrentRun(targetDir);
+  assert.strictEqual(currentRun.status, 'running');
+  assert.strictEqual(currentRun.current_role, 'code-guardian');
+  assert.strictEqual(currentRun.pending_gate, null);
 
   expertDispatch.applyDispatch({
     target: targetDir,
@@ -338,6 +377,12 @@ function main() {
 
   const registryOverrideTarget = createWorkspace();
   bootstrapRun(registryOverrideTarget);
+  const registryOverrideRun = readCurrentRun(registryOverrideTarget);
+  registryOverrideRun.review_policy = 'none';
+  if (registryOverrideRun.plan && typeof registryOverrideRun.plan === 'object') {
+    registryOverrideRun.plan.review_policy = 'none';
+  }
+  writeJsonFile(registryOverrideTarget, '.ai-spec/current-run.json', registryOverrideRun);
   writeJsonFile(registryOverrideTarget, '.agents/registry/roles.json', {
     version: 1,
     roles: {

@@ -99,7 +99,7 @@ domains:
 
 ## 审批点
 
-本模板默认存在两个审批点：
+本模板的基础审批点定义为两个：
 
 1. `before-implementation`
 说明：
@@ -108,6 +108,14 @@ domains:
 2. `before-archive`
 说明：
 存在阻断项、验证结论不清晰或残留风险较高时，不能直接判定交付完成。
+
+运行时如果启用了 `review_policy = main-flow-blocking（主流程阻塞审核）`，还会在 `frontend-implementer（前端实现专家）` 完成后，额外注入：
+
+3. `before-guardian`
+说明：
+实现结果需要先经过人工确认，再进入 `code-guardian（规范守护专家）` 守护审查。
+
+这也是为什么当前内测默认链路看起来是“三段门禁”，而不是只保留模板 frontmatter（前置信息）里的两段门禁。
 
 ## 主要产物
 

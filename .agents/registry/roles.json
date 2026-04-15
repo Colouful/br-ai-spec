@@ -196,6 +196,7 @@
       "name": "设计协作专家",
       "status": "active",
       "domains": ["demand-design"],
+      "skill_priority": ["ui-ux-pro-max", "design-analysis"],
       "source": ".agents/roles/domains/demand-design/design-collaborator.md"
     },
     "api-contract-specialist": {

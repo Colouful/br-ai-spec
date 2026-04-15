@@ -97,6 +97,53 @@ function bootstrapQuickFixRun(targetDir, runId, rawInput, options = {}) {
   return runner.advanceRunner({ target: targetDir });
 }
 
+function bootstrapMainFlowRun(targetDir, runId, rawInput, options = {}) {
+  const mode = options.mode || 'auto';
+  const reviewPolicy = options.review_policy || 'main-flow-blocking';
+  const flowId = options.flow_id || 'prd-to-delivery';
+  const approvalGates = Array.isArray(options.approval_gates)
+    ? options.approval_gates
+    : ['before-implementation', 'before-guardian', 'before-archive'];
+  writeProjectFile(targetDir, '.ai-spec/internal/tmp/task-orchestrator-turn.json', JSON.stringify({
+    kind: 'run-plan',
+    schema_version: 1,
+    run_id: runId,
+    mode,
+    review_policy: reviewPolicy,
+    status: 'planned',
+    delivery_profile: 'standard',
+    artifact_profile: 'full',
+    complexity: 'medium',
+    task: {
+      type: 'page-development',
+      raw_input: rawInput,
+      risk_level: 'medium',
+      change_context: 'no-change',
+      route_decision: 'full-change',
+      trace_mode: 'full-openspec',
+    },
+    flow: {
+      id: flowId,
+      name: '需求到交付',
+      source: '.agents/flows/common/prd-to-delivery.md',
+    },
+    plan: {
+      required_roles: ['requirement-analyst', 'frontend-implementer', 'code-guardian'],
+      activated_optional_roles: [],
+      skipped_optional_roles: ['design-collaborator', 'api-contract-specialist', 'unit-test-specialist', 'verification-reviewer', 'performance-auditor'],
+      approval_gates: approvalGates,
+      first_handoff: 'requirement-analyst',
+      delivery_profile: 'standard',
+      artifact_profile: 'full',
+      review_policy: reviewPolicy,
+    },
+    assumptions: ['默认沿用当前项目的页面目录、路由和主题变量约定。'],
+    missing_inputs: [],
+  }, null, 2));
+
+  return runner.advanceRunner({ target: targetDir });
+}
+
 function writeExecutionInbox(targetDir, value) {
   writeProjectFile(targetDir, '.ai-spec/internal/tmp/current-execution.json', JSON.stringify(value, null, 2));
 }
@@ -171,13 +218,81 @@ function main() {
   assert.strictEqual(result.turn.guidance.route_decision.waiting_confirm_required, true);
   assert.strictEqual(result.turn.guidance.route_decision.candidate_changes.length, 2);
 
+  const manualTarget = createWorkspace('ai-spec-auto-manual-start-');
+  result = protocolWorkflow.advanceProtocolStep({
+    target: manualTarget,
+    userInput: '新增一个订单详情路由，接真实接口并补一个全局状态 store',
+    mode: 'manual',
+  });
+  assert.strictEqual(result.turn.mode, 'confirm-gate');
+  assert.strictEqual(result.turn.guidance.confirm_gate.gate, 'manual-flow-required');
+  assert.strictEqual(result.turn.input.requested_mode, 'manual');
+  assert.strictEqual(result.turn.summary.review_policy, 'main-flow-blocking');
+
+  const manualFlowTarget = createWorkspace('ai-spec-auto-manual-flow-');
+  result = protocolWorkflow.advanceProtocolStep({
+    target: manualFlowTarget,
+    userInput: '新增一个订单详情路由，接真实接口并补一个全局状态 store',
+    mode: 'manual',
+    flowId: 'prd-to-delivery',
+  });
+  assert.strictEqual(result.turn.mode, 'start');
+  assert.strictEqual(result.turn.input.requested_mode, 'manual');
+  assert.strictEqual(result.turn.input.requested_flow, 'prd-to-delivery');
+  assert.strictEqual(result.turn.guidance.routing.selected_flow, 'prd-to-delivery');
+  assert.strictEqual(result.turn.guidance.routing.review_policy, 'main-flow-blocking');
+
+  const suggestTarget = createWorkspace('ai-spec-auto-suggest-start-');
+  result = protocolWorkflow.advanceProtocolStep({
+    target: suggestTarget,
+    userInput: '新增一个订单详情路由，接真实接口并补一个全局状态 store',
+    mode: 'suggest',
+  });
+  assert.strictEqual(result.turn.mode, 'start');
+  assert.strictEqual(result.turn.input.requested_mode, 'suggest');
+  assert.strictEqual(result.turn.guidance.routing.review_policy, 'main-flow-blocking');
+
+  let report = bootstrapMainFlowRun(
+    suggestTarget,
+    'run_20260415_100000_suggest',
+    '新增一个订单详情路由，接真实接口并补一个全局状态 store',
+    { mode: 'suggest' },
+  );
+  assert.strictEqual(report.applied.adapter_action, 'bootstrap');
+  let currentRun = readCurrentRun(suggestTarget);
+  assert.strictEqual(currentRun.mode, 'suggest');
+  assert.strictEqual(currentRun.status, 'waiting-confirm');
+  assert.strictEqual(currentRun.review_policy, 'main-flow-blocking');
+  assert.deepStrictEqual(currentRun.plan.approval_gates, ['before-implementation', 'before-guardian', 'before-archive']);
+
+  let workflow = protocolWorkflow.advanceProtocolStep({ target: suggestTarget });
+  assert.strictEqual(workflow.turn.mode, 'confirm-gate');
+  assert.strictEqual(workflow.turn.guidance.confirm_gate.gate, 'start-review');
+  assert.strictEqual(workflow.turn.guidance.confirm_gate.resume_to_role, 'requirement-analyst');
+  assert.strictEqual(workflow.turn.summary.run_status, 'waiting-confirm');
+
+  const noReviewPolicyTarget = createWorkspace('ai-spec-auto-none-review-');
+  report = bootstrapMainFlowRun(
+    noReviewPolicyTarget,
+    'run_20260415_100001_noreview',
+    '新增一个订单详情路由，接真实接口并补一个全局状态 store',
+    {
+      review_policy: 'none',
+      approval_gates: ['before-implementation', 'before-archive'],
+    },
+  );
+  assert.strictEqual(report.applied.adapter_action, 'bootstrap');
+  currentRun = readCurrentRun(noReviewPolicyTarget);
+  assert.strictEqual(currentRun.review_policy, 'none');
+  assert.deepStrictEqual(currentRun.plan.approval_gates, ['before-implementation', 'before-archive']);
+
   const runtimeTarget = createWorkspace('ai-spec-auto-quick-fix-runtime-');
   const runId = 'run_20260414_100000_bugfix';
-  let report = bootstrapQuickFixRun(runtimeTarget, runId, '把列表标题文案改一下，按钮也更简洁一点');
+  report = bootstrapQuickFixRun(runtimeTarget, runId, '把列表标题文案改一下，按钮也更简洁一点');
   assert.strictEqual(report.applied.adapter_action, 'bootstrap');
   assert.strictEqual(report.recorded.dispatch.role, 'frontend-implementer');
 
-  let workflow = protocolWorkflow.advanceProtocolStep({ target: runtimeTarget });
+  workflow = protocolWorkflow.advanceProtocolStep({ target: runtimeTarget });
   assert.strictEqual(workflow.turn.mode, 'execute');
   assert.strictEqual(workflow.turn.actor.id, 'frontend-implementer');
   assert.deepStrictEqual(listTurnTargets(workflow.turn), [
@@ -250,7 +365,7 @@ function main() {
     },
   });
   report = runner.advanceRunner({ target: runtimeTarget });
-  const currentRun = readCurrentRun(runtimeTarget);
+  currentRun = readCurrentRun(runtimeTarget);
   assert.strictEqual(report.applied.status, 'success');
   assert.strictEqual(currentRun.status, 'success');
   assert.strictEqual(currentRun.pending_gate, null);
@@ -316,7 +431,7 @@ function main() {
     item.assertGuidance(workflow.turn);
   }
 
-  console.log('small request routing test passed: quick-fix, patch, scope-delta, waiting-confirm, and lightweight runtime flow all work');
+  console.log('small request routing test passed: quick-fix, manual/suggest mode, review-policy, waiting-confirm, and lightweight runtime flow all work');
 }
 
 main();

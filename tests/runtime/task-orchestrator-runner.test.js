@@ -45,6 +45,18 @@ function writeRuntimeActionInbox(targetDir, value) {
   writeProjectFile(targetDir, '.ai-spec/internal/tmp/current-runtime-action.json', JSON.stringify(value, null, 2));
 }
 
+function approveGate(targetDir, gate, toRole, message) {
+  writeRuntimeActionInbox(targetDir, {
+    schema_version: 1,
+    kind: 'task-orchestrator-runtime-action',
+    action: 'approve',
+    gate,
+    to_role: toRole,
+    message,
+  });
+  return advance(targetDir);
+}
+
 function writeExecutionInbox(targetDir, value) {
   writeProjectFile(targetDir, '.ai-spec/internal/tmp/current-execution.json', JSON.stringify(value, null, 2));
 }
@@ -266,8 +278,28 @@ function main() {
   report = advance(targetDir);
   assert.strictEqual(report.consumed.kind, 'expert-execution');
   assert.strictEqual(report.recorded.execution.role, 'requirement-analyst');
-  assert.strictEqual(report.recorded.runtime_action.action, 'handoff');
-  assert.strictEqual(report.applied.adapter_action, 'handoff');
+  assert.strictEqual(report.recorded.runtime_action.action, 'gate-blocked');
+  assert.strictEqual(report.applied.adapter_action, 'gate-blocked');
+  assert.strictEqual(report.applied.pending_gate, 'before-implementation');
+  assert.strictEqual(report.applied.status, 'waiting-approval');
+
+  workflow = step(targetDir);
+  assert.strictEqual(workflow.turn.status, 'blocked');
+  assert.strictEqual(workflow.turn.mode, 'approval-gate');
+  assert.strictEqual(workflow.turn.guidance.approval_gate.gate, 'before-implementation');
+  assert.strictEqual(workflow.turn.guidance.approval_gate.resume_to_role, 'frontend-implementer');
+
+  writeRuntimeActionInbox(targetDir, {
+    schema_version: 1,
+    kind: 'task-orchestrator-runtime-action',
+    action: 'approve',
+    gate: 'before-implementation',
+    to_role: 'frontend-implementer',
+    message: 'implementation approved',
+  });
+  report = advance(targetDir);
+  assert.strictEqual(report.recorded.runtime_action.action, 'approve');
+  assert.strictEqual(report.applied.adapter_action, 'approve');
   assert.strictEqual(report.applied.current_role, 'frontend-implementer');
   assert.strictEqual(report.recorded.dispatch.role, 'frontend-implementer');
   assert.deepStrictEqual(report.next_expected.files, ['.ai-spec/internal/tmp/current-execution.json']);
@@ -294,11 +326,32 @@ function main() {
   copyFixture(targetDir, 'current-execution-frontend-implementer.json', 'current-execution.json');
   report = advance(targetDir);
   assert.strictEqual(report.recorded.execution.role, 'frontend-implementer');
-  assert.strictEqual(report.recorded.runtime_action.action, 'handoff');
-  assert.strictEqual(report.applied.adapter_action, 'handoff');
+  assert.strictEqual(report.recorded.runtime_action.action, 'gate-blocked');
+  assert.strictEqual(report.applied.adapter_action, 'gate-blocked');
+  assert.strictEqual(report.applied.current_role, 'frontend-implementer');
+  assert.strictEqual(report.applied.pending_gate, 'before-guardian');
+  assert.ok(readCurrentRun(targetDir).verification, 'expected frontend verification to be persisted for guardian');
+  assert.strictEqual(report.next_expected.producer, 'task-orchestrator');
+
+  workflow = step(targetDir);
+  assert.strictEqual(workflow.turn.status, 'blocked');
+  assert.strictEqual(workflow.turn.mode, 'approval-gate');
+  assert.strictEqual(workflow.turn.guidance.approval_gate.gate, 'before-guardian');
+  assert.strictEqual(workflow.turn.guidance.approval_gate.resume_to_role, 'code-guardian');
+
+  writeRuntimeActionInbox(targetDir, {
+    schema_version: 1,
+    kind: 'task-orchestrator-runtime-action',
+    action: 'approve',
+    gate: 'before-guardian',
+    to_role: 'code-guardian',
+    message: 'guardian review approved',
+  });
+  report = advance(targetDir);
+  assert.strictEqual(report.recorded.runtime_action.action, 'approve');
+  assert.strictEqual(report.applied.adapter_action, 'approve');
   assert.strictEqual(report.applied.current_role, 'code-guardian');
   assert.strictEqual(report.recorded.dispatch.role, 'code-guardian');
-  assert.ok(readCurrentRun(targetDir).verification, 'expected frontend verification to be persisted for guardian');
   assert.deepStrictEqual(report.next_expected.files, ['.ai-spec/internal/tmp/current-execution.json']);
 
   workflow = step(targetDir);
@@ -395,7 +448,7 @@ function main() {
   assert.strictEqual(currentRun.run_id, 'run_20260331_160700_smoke');
   assert.strictEqual(currentRun.status, 'success');
   assert.strictEqual(currentRun.current_role, 'archive-change');
-  assert.strictEqual(currentRun.events.length, 6);
+  assert.strictEqual(currentRun.events.length, 8);
   assert.ok(currentRun.artifacts.proposal.includes('openspec/changes/archive/'));
   assert.ok(fs.existsSync(path.join(targetDir, 'openspec/specs/ui/spec.md')));
   assert.ok(fs.existsSync(path.join(targetDir, 'openspec/specs/api/spec.md')));
@@ -407,6 +460,7 @@ function main() {
   writeRequirementArtifacts(apiOnlyTarget);
   copyFixture(apiOnlyTarget, 'current-execution-requirement-analyst.json', 'current-execution.json');
   advance(apiOnlyTarget);
+  approveGate(apiOnlyTarget, 'before-implementation', 'frontend-implementer', 'implementation approved');
   rewriteRunGoal(apiOnlyTarget, '为 mock 数据层补一个接口封装');
   rewriteCurrentDispatchGoal(apiOnlyTarget, '为 mock 数据层补一个接口封装');
   const apiOnlyWorkflow = step(apiOnlyTarget);
@@ -420,6 +474,7 @@ function main() {
   writeRequirementArtifacts(pageTarget);
   copyFixture(pageTarget, 'current-execution-requirement-analyst.json', 'current-execution.json');
   advance(pageTarget);
+  approveGate(pageTarget, 'before-implementation', 'frontend-implementer', 'implementation approved');
   rewriteRunGoal(pageTarget, '创建一个欢迎页面，使用本地 mock 并补齐路由和样式');
   rewriteCurrentDispatchGoal(pageTarget, '创建一个欢迎页面，使用本地 mock 并补齐路由和样式');
   const pageWorkflow = step(pageTarget);
@@ -436,8 +491,10 @@ function main() {
   writeRequirementArtifacts(archiveBlockedTarget);
   copyFixture(archiveBlockedTarget, 'current-execution-requirement-analyst.json', 'current-execution.json');
   advance(archiveBlockedTarget);
+  approveGate(archiveBlockedTarget, 'before-implementation', 'frontend-implementer', 'implementation approved');
   copyFixture(archiveBlockedTarget, 'current-execution-frontend-implementer.json', 'current-execution.json');
   advance(archiveBlockedTarget);
+  approveGate(archiveBlockedTarget, 'before-guardian', 'code-guardian', 'guardian review approved');
   writeProjectFile(archiveBlockedTarget, 'openspec/changes/runtime-smoke-demo/checklist.md', '# checklist');
   writeProjectFile(archiveBlockedTarget, 'openspec/changes/runtime-smoke-demo/iterations.md', '# iterations');
   copyFixture(archiveBlockedTarget, 'current-execution-code-guardian.json', 'current-execution.json');

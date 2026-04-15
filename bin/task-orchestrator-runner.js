@@ -410,6 +410,14 @@ function buildNextExpected(targetDir) {
     };
   }
 
+  if (String(current.run.status || '').trim().toLowerCase() === 'waiting-confirm') {
+    return {
+      producer: 'task-orchestrator',
+      files: [],
+      reason: 'run is waiting at confirm gate before continuing',
+    };
+  }
+
   if (current.execution) {
     return {
       producer: 'task-orchestrator',
@@ -464,6 +472,8 @@ function buildStatus(targetDir) {
     current: {
       run_id: current.run?.run_id || null,
       run_status: current.run?.status || null,
+      mode: current.run?.mode || null,
+      review_policy: current.run?.review_policy || null,
       current_role: current.run?.current_role || null,
       pending_gate: current.run?.pending_gate || null,
       dispatch_role: current.dispatch?.role?.id || null,
@@ -776,7 +786,13 @@ function maybeAutoDispatchCurrentRole(targetDir, applied) {
   }
 
   const currentRun = readCurrentRun(targetDir);
-  if (!currentRun || !currentRun.current_role || currentRun.pending_gate || TERMINAL_STATUSES.has(currentRun.status)) {
+  if (
+    !currentRun ||
+    !currentRun.current_role ||
+    currentRun.pending_gate ||
+    String(currentRun.status || '').trim().toLowerCase() === 'waiting-confirm' ||
+    TERMINAL_STATUSES.has(currentRun.status)
+  ) {
     return null;
   }
 

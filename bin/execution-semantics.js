@@ -8,6 +8,7 @@ const {
 } = require('./runtime-registry');
 
 const AUTO_ADVANCE_EXECUTION_STATUSES = new Set(['done', 'success', 'completed']);
+const DEFAULT_REVIEW_POLICY = 'main-flow-blocking';
 
 const FLOW_RUNTIME_TRANSITIONS = {
   'prd-to-delivery': {
@@ -119,6 +120,17 @@ const ROLE_REQUIRED_OUTPUTS = {
   'requirement-analyst': ['proposal', 'specs', 'design', 'tasks'],
   'code-guardian': ['checklist', 'iterations'],
 };
+
+function normalizeReviewPolicy(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  return normalized === 'none' || normalized === 'main-flow-blocking'
+    ? normalized
+    : DEFAULT_REVIEW_POLICY;
+}
+
+function isMainFlowBlocking(currentRun, flowId) {
+  return flowId === 'prd-to-delivery' && normalizeReviewPolicy(currentRun?.review_policy || currentRun?.plan?.review_policy || null) === 'main-flow-blocking';
+}
 
 const FLOW_ROLE_REQUIRED_INPUTS = {
   'bugfix-to-verification': {
@@ -470,6 +482,7 @@ function buildAutoRuntimeAction(targetDir, executionPayload) {
   if (!flowId || !roleId) {
     return null;
   }
+  const mainFlowBlocking = isMainFlowBlocking(currentRun, flowId);
 
   const transition = getRuntimeTransition(targetDir, flowId, roleId);
   if (!transition) {
@@ -531,7 +544,10 @@ function buildAutoRuntimeAction(targetDir, executionPayload) {
 
   if (transition.action === 'handoff' && roleId === 'requirement-analyst') {
     const gateCheck = validatePreImplementationGate(targetDir, currentRun, executionPayload);
-    if (!gateCheck.ok) {
+    if (mainFlowBlocking || !gateCheck.ok) {
+      const blockedReason = gateCheck.ok
+        ? '内测阶段启用 main-flow-blocking 审核策略，需求收敛完成后需要先人工审核再进入实现。'
+        : gateCheck.reasons.join('；');
       return {
         schema_version: 1,
         kind: 'task-orchestrator-runtime-action',
@@ -544,13 +560,35 @@ function buildAutoRuntimeAction(targetDir, executionPayload) {
         blocked_by_role: roleId,
         resume_to_role: transition.to_role || null,
         required_user_action: '明确批准或拒绝当前 proposal / specs / design / tasks 的实现范围与限制条件。',
-        blocked_reason: gateCheck.reasons.join('；'),
+        blocked_reason: blockedReason,
         status: 'waiting-approval',
         clear_pending_gate: false,
-        message: `requirement gate blocked: ${gateCheck.reasons.join('；')}`,
+        message: `requirement gate blocked: ${blockedReason}`,
         source: 'expert-executor-auto-transition',
       };
     }
+  }
+
+  if (transition.action === 'handoff' && roleId === 'frontend-implementer' && mainFlowBlocking) {
+    return {
+      schema_version: 1,
+      kind: 'task-orchestrator-runtime-action',
+      action: 'gate-blocked',
+      run_id: executionPayload.run_id,
+      from_role: roleId,
+      to_role: roleId,
+      next_role: transition.to_role || 'code-guardian',
+      pending_gate: 'before-guardian',
+      blocked_by_role: roleId,
+      resume_to_role: transition.to_role || 'code-guardian',
+      required_user_action: '明确批准当前实现结果进入 code-guardian 守护审查，或说明需要回退修正的方向。',
+      blocked_reason: '内测阶段启用 main-flow-blocking 审核策略，前端实现完成后需要先人工审核再进入守护阶段。',
+      status: 'waiting-approval',
+      clear_pending_gate: false,
+      message: 'frontend delivery is waiting for manual review before code-guardian',
+      source: 'expert-executor-auto-transition',
+      verification: executionPayload.verification || null,
+    };
   }
 
   if (transition.action === 'gate-blocked') {

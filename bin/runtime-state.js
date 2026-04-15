@@ -198,6 +198,49 @@ function parseArgs(argv) {
   return { command, options };
 }
 
+const DEFAULT_RUN_MODE = 'auto';
+const DEFAULT_REVIEW_POLICY = 'main-flow-blocking';
+const RUN_MODES = new Set(['auto', 'suggest', 'manual']);
+const REVIEW_POLICIES = new Set(['none', 'main-flow-blocking']);
+
+function normalizeRunMode(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  return RUN_MODES.has(normalized) ? normalized : DEFAULT_RUN_MODE;
+}
+
+function normalizeReviewPolicy(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  return REVIEW_POLICIES.has(normalized) ? normalized : DEFAULT_REVIEW_POLICY;
+}
+
+function buildEffectiveApprovalGates(flowId, gates, reviewPolicy) {
+  const normalizedPolicy = normalizeReviewPolicy(reviewPolicy);
+  const deduped = Array.isArray(gates)
+    ? [...new Set(gates.map((item) => String(item || '').trim()).filter(Boolean))]
+    : [];
+  if (flowId !== 'prd-to-delivery' || normalizedPolicy !== 'main-flow-blocking') {
+    return deduped;
+  }
+  const supportedMainFlowGates = new Set(['before-implementation', 'before-guardian', 'before-archive']);
+  const shouldInjectMainFlowGates = deduped.length === 0 || deduped.every((gate) => supportedMainFlowGates.has(gate));
+  if (!shouldInjectMainFlowGates) {
+    return deduped;
+  }
+
+  const ordered = [];
+  for (const gate of ['before-implementation', 'before-guardian', 'before-archive']) {
+    if (!ordered.includes(gate)) {
+      ordered.push(gate);
+    }
+  }
+  for (const gate of deduped) {
+    if (!ordered.includes(gate)) {
+      ordered.push(gate);
+    }
+  }
+  return ordered;
+}
+
 function readJsonFile(filePath, label) {
   const raw = fs.readFileSync(filePath, 'utf8');
   try {
@@ -868,6 +911,8 @@ function normalizeBootstrapPayload(payload, sourceLabel) {
 function buildRunState({ runPlan, taskAnchor, options, now, source }) {
   const runId = options.runId || runPlan.run_id || createRunId(now);
   const createdAt = now.toISOString();
+  const runMode = normalizeRunMode(runPlan.mode);
+  const reviewPolicy = normalizeReviewPolicy(runPlan.review_policy || runPlan.plan?.review_policy || null);
   const rawInput =
     options.rawInput ||
     runPlan.task?.raw_input ||
@@ -910,9 +955,16 @@ function buildRunState({ runPlan, taskAnchor, options, now, source }) {
     traceMode,
   }), inferArtifacts(runPlan.artifacts));
   const currentRole = runPlan.plan?.first_handoff || null;
-  const approvalGates = Array.isArray(runPlan.plan?.approval_gates)
-    ? runPlan.plan.approval_gates
-    : [];
+  const approvalGates = buildEffectiveApprovalGates(
+    runPlan.flow?.id || null,
+    Array.isArray(runPlan.plan?.approval_gates) ? runPlan.plan.approval_gates : [],
+    reviewPolicy,
+  );
+  const normalizedRunPlanStatus = String(runPlan.status || '').trim().toLowerCase();
+  const initialStatus = options.status
+    || (runMode === 'suggest'
+      ? (normalizedRunPlanStatus && normalizedRunPlanStatus !== 'planned' ? runPlan.status : 'waiting-confirm')
+      : runPlan.status || 'planned');
   const pendingGate =
     options.pendingGate ||
     runPlan.pending_gate ||
@@ -939,16 +991,35 @@ function buildRunState({ runPlan, taskAnchor, options, now, source }) {
   const initMessage = source?.bootstrapPayload
     ? 'runtime-state initialized from task-orchestrator bootstrap payload'
     : 'runtime-state initialized from run-plan';
+  const initialGateContext = runPlan.gate_context && typeof runPlan.gate_context === 'object'
+    ? {
+        gate_id: runPlan.gate_context.gate_id || null,
+        blocked_by_role: runPlan.gate_context.blocked_by_role || null,
+        resume_to_role: runPlan.gate_context.resume_to_role || currentRole,
+        required_user_action: runPlan.gate_context.required_user_action || null,
+        blocked_reason: runPlan.gate_context.blocked_reason || null,
+      }
+    : null;
+  const suggestGateContext = runMode === 'suggest' && initialStatus === 'waiting-confirm' && !pendingGate
+    ? {
+        gate_id: 'start-review',
+        blocked_by_role: 'task-orchestrator',
+        resume_to_role: currentRole,
+        required_user_action: '请先确认建议执行计划，再启动第一位专家。',
+        blocked_reason: '当前以 suggest（建议）模式启动，首轮 run-plan 需要先经过人工确认。',
+      }
+    : null;
 
   return {
     schema_version: 1,
     kind: 'run-state',
     run_id: runId,
-    mode: runPlan.mode || 'auto',
+    mode: runMode,
+    review_policy: reviewPolicy,
     delivery_profile: deliveryProfile,
     artifact_profile: artifactProfile,
     complexity,
-    status: options.status || runPlan.status || 'planned',
+    status: initialStatus,
     trigger: {
       source: options.triggerSource,
       entry: options.entry,
@@ -983,11 +1054,14 @@ function buildRunState({ runPlan, taskAnchor, options, now, source }) {
       first_handoff: currentRole,
       delivery_profile: deliveryProfile,
       artifact_profile: artifactProfile,
+      review_policy: reviewPolicy,
     },
     current_role: currentRole,
     pending_input_update: false,
     pending_gate: pendingGate,
-    gate_context: buildGateContext(null, options, pendingGate),
+    gate_context: pendingGate
+      ? buildGateContext(null, options, pendingGate)
+      : initialGateContext || suggestGateContext,
     incremental_update: buildIncrementalUpdateState(null, options, {
       changeContext,
       routeDecision,
@@ -1827,6 +1901,7 @@ function gateBlockedRunState(options) {
     incremental_update: buildIncrementalUpdateState(state, options, {
       updatedAt: now.toISOString(),
     }),
+    verification: options.verificationData || state.verification || null,
     auto_fix: buildNextAutoFixState(state, options),
     anchor,
     events: [...(Array.isArray(state.events) ? state.events : []), event],
@@ -2175,6 +2250,7 @@ function printPretty(result, action = 'init') {
     console.log(`  history: ${result.artifacts.run_history}`);
   }
   console.log(`  mode: ${result.state.mode || 'n/a'}`);
+  console.log(`  review_policy: ${result.state.review_policy || 'n/a'}`);
   console.log(`  delivery_profile: ${result.state.delivery_profile || 'n/a'}`);
   console.log(`  artifact_profile: ${result.state.artifact_profile || 'n/a'}`);
   console.log(`  complexity: ${result.state.complexity || result.state.task?.complexity || 'n/a'}`);
