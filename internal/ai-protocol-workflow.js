@@ -754,7 +754,38 @@ function findExistingRelPath(targetDir, candidates) {
   return null;
 }
 
+function normalizeOptionalRelPath(value) {
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+function buildRepoConventionsFromRepoMap(projectProfile, repoMap) {
+  const paths = repoMap?.paths && typeof repoMap.paths === 'object'
+    ? repoMap.paths
+    : {};
+
+  return {
+    project_profile: projectProfile,
+    projectContextPath: normalizeOptionalRelPath(paths.project_context),
+    routeEntry: normalizeOptionalRelPath(paths.route_entry),
+    routeModulesDir: normalizeOptionalRelPath(paths.route_modules_dir),
+    viewsDir: normalizeOptionalRelPath(paths.views_dir),
+    apiDir: normalizeOptionalRelPath(paths.api_dir),
+    apiTypesDir: normalizeOptionalRelPath(paths.api_types_dir),
+    mockDir: normalizeOptionalRelPath(paths.mock_dir),
+    storeModulesDir: normalizeOptionalRelPath(paths.store_modules_dir),
+    styleEntry: normalizeOptionalRelPath(paths.style_entry),
+    requestConfig: normalizeOptionalRelPath(paths.request_config),
+    appEntry: normalizeOptionalRelPath(paths.app_entry),
+    mainEntry: normalizeOptionalRelPath(paths.main_entry),
+  };
+}
+
 function collectRepoConventions(targetDir, projectProfile) {
+  const repoMap = readJsonIfExists(path.join(targetDir, '.ai-spec', 'repo-map.json'));
+  if (repoMap?.kind === 'repo-map' && repoMap.paths && typeof repoMap.paths === 'object') {
+    return buildRepoConventionsFromRepoMap(projectProfile, repoMap);
+  }
+
   const routeEntry = findExistingRelPath(targetDir, ['src/router/index.ts', 'src/router/index.js']);
   const routeModulesDir = findExistingRelPath(targetDir, ['src/router/modules']);
   const viewsDir = findExistingRelPath(targetDir, ['src/views']);
@@ -791,9 +822,9 @@ function collectRepoConventions(targetDir, projectProfile) {
   };
 }
 
-function buildProjectContextGuidance(targetDir, projectProfile, runState = null) {
+function buildProjectContextGuidance(targetDir, projectProfile, runState = null, repoConventionsOverride = null) {
   const pkg = loadPackageManifest(targetDir);
-  const facts = collectRepoConventions(targetDir, projectProfile);
+  const facts = repoConventionsOverride || collectRepoConventions(targetDir, projectProfile);
   const routing = facts.routeEntry
     ? `${projectProfile === 'vue' ? 'vue-router' : 'router'} @ ${facts.routeEntry}${facts.routeModulesDir ? ` + ${facts.routeModulesDir}` : ''}`
     : '仓库未检测到显式路由入口';
@@ -1309,20 +1340,52 @@ function buildOrchestratorGuidance(targetDir, runState = null, userInput = null,
   };
 }
 
-function buildCodeGuardianEvidenceTargets(targetDir, repoConventions) {
-  const relPaths = [
-    repoConventions.projectContextPath,
-    repoConventions.appEntry,
-    repoConventions.mainEntry,
+function isParentRelPath(parentPath, childPath) {
+  const normalizedParent = String(parentPath || '').replace(/\/+$/, '');
+  const normalizedChild = String(childPath || '').replace(/\/+$/, '');
+  if (!normalizedParent || !normalizedChild || normalizedParent === normalizedChild) {
+    return false;
+  }
+  return normalizedChild.startsWith(`${normalizedParent}/`);
+}
+
+function buildCodeGuardianEvidenceRelPaths(repoConventions) {
+  const prioritized = [
     repoConventions.routeEntry,
     repoConventions.routeModulesDir,
-    repoConventions.apiDir,
-    repoConventions.apiTypesDir,
-    repoConventions.requestConfig,
+    repoConventions.apiDir || repoConventions.requestConfig,
+    repoConventions.styleEntry,
     repoConventions.mockDir,
     repoConventions.storeModulesDir,
-    repoConventions.styleEntry,
+    repoConventions.viewsDir,
+    repoConventions.mainEntry,
+    repoConventions.appEntry,
   ].filter(Boolean);
+  const deduped = [];
+
+  for (const relPath of prioritized) {
+    if (deduped.includes(relPath)) {
+      continue;
+    }
+    const parentIndex = deduped.findIndex((existing) => isParentRelPath(relPath, existing));
+    if (parentIndex >= 0) {
+      deduped[parentIndex] = relPath;
+      continue;
+    }
+    if (deduped.some((existing) => isParentRelPath(existing, relPath))) {
+      continue;
+    }
+    deduped.push(relPath);
+    if (deduped.length >= 4) {
+      break;
+    }
+  }
+
+  return deduped;
+}
+
+function buildCodeGuardianEvidenceTargets(targetDir, repoConventions) {
+  const relPaths = buildCodeGuardianEvidenceRelPaths(repoConventions);
 
   return relPaths.map((relPath) => buildReadableTarget(targetDir, relPath, {
     label: `review evidence: ${relPath}`,
@@ -1787,13 +1850,42 @@ function buildCommandTargets(targetDir, relPaths) {
   return relPaths.map((relPath) => buildReadableTarget(targetDir, relPath, { required: true }));
 }
 
-function loadCurrentArtifacts(targetDir) {
-  const runtimePaths = resolveRuntimePaths(targetDir);
+function loadCurrentArtifacts(targetDir, runtimePaths = resolveRuntimePaths(targetDir)) {
   return {
     run: readJsonIfExists(runtimePaths.currentRun.path),
     dispatch: readJsonIfExists(getExistingPath(runtimePaths.currentDispatch)),
     execution: readJsonIfExists(getExistingPath(runtimePaths.currentExecutionJson)),
   };
+}
+
+function createWorkflowSnapshot(targetDir, options = {}) {
+  const runtimePaths = options.runtimePaths || resolveRuntimePaths(targetDir);
+  const currentArtifacts = options.currentArtifacts || loadCurrentArtifacts(targetDir, runtimePaths);
+  const status = options.status || runner.buildStatus(targetDir);
+  const projectProfile = options.projectProfile || detectProjectProfile(targetDir);
+  const repoConventions = options.repoConventions || collectRepoConventions(targetDir, projectProfile);
+  const flowDefinitions = new Map();
+
+  return {
+    targetDir,
+    runtimePaths,
+    currentArtifacts,
+    status,
+    projectProfile,
+    repoConventions,
+    flowDefinitions,
+  };
+}
+
+function getSnapshotFlowDefinition(snapshot, flowId) {
+  const resolvedFlowId = flowId || DEFAULT_FLOW_ID;
+  if (!snapshot.flowDefinitions.has(resolvedFlowId)) {
+    snapshot.flowDefinitions.set(
+      resolvedFlowId,
+      loadFlowDefinition(snapshot.targetDir, resolvedFlowId),
+    );
+  }
+  return snapshot.flowDefinitions.get(resolvedFlowId);
 }
 
 function buildSummary(status, runState = null) {
@@ -3080,19 +3172,7 @@ function buildRoleSpecificContract(
     const verificationExpectations = targetDir
       ? buildVerificationExpectations(targetDir, projectContextGuidance)
       : [];
-    const evidenceTargets = [
-      repoConventions.projectContextPath,
-      repoConventions.appEntry,
-      repoConventions.mainEntry,
-      repoConventions.routeEntry,
-      repoConventions.routeModulesDir,
-      repoConventions.apiDir,
-      repoConventions.apiTypesDir,
-      repoConventions.requestConfig,
-      repoConventions.mockDir,
-      repoConventions.storeModulesDir,
-      repoConventions.styleEntry,
-    ].filter(Boolean);
+    const evidenceTargets = buildCodeGuardianEvidenceRelPaths(repoConventions);
 
     return {
       ...base,
@@ -3479,13 +3559,137 @@ function buildRoleGuidance(roleId, deliveryProfile) {
   };
 }
 
+function buildArtifactSummary(currentRun, writes) {
+  const currentArtifacts = currentRun?.artifacts && typeof currentRun.artifacts === 'object'
+    ? Object.fromEntries(Object.entries(currentRun.artifacts).filter(([, value]) => Boolean(value)))
+    : {};
+  const plannedOutputs = writes
+    .filter((item) => item.kind === 'symbolic' || item.rel_path)
+    .map((item) => (item.kind === 'symbolic' ? item.value : item.rel_path));
+
+  return {
+    change_id: currentRun?.task?.change_id || currentRun?.anchor?.task?.change_id || null,
+    current_artifacts: currentArtifacts,
+    planned_outputs: plannedOutputs,
+    latest_verification: currentRun?.verification ? 'available' : null,
+    auto_fix_active: Boolean(currentRun?.auto_fix?.active),
+  };
+}
+
+function buildCompactContext(roleRuleContract, roleSkillContract, repoConventions, currentRun, writes) {
+  return {
+    rule_summary: {
+      source_rule_ids: Array.isArray(roleRuleContract?.source_rules)
+        ? roleRuleContract.source_rules.map((item) => item.id)
+        : [],
+      must_follow: Array.isArray(roleRuleContract?.must_follow) ? roleRuleContract.must_follow.slice(0, 4) : [],
+      blocked_when: Array.isArray(roleRuleContract?.blocked_when) ? roleRuleContract.blocked_when.slice(0, 3) : [],
+      repo_specific: Array.isArray(roleRuleContract?.repo_specific) ? roleRuleContract.repo_specific.slice(0, 3) : [],
+    },
+    skill_summary: {
+      primary_skills: Array.isArray(roleSkillContract?.primary_skills) ? roleSkillContract.primary_skills : [],
+      execution_order: Array.isArray(roleSkillContract?.execution_order) ? roleSkillContract.execution_order : [],
+      selected_purposes: Array.isArray(roleSkillContract?.selected)
+        ? roleSkillContract.selected
+          .filter((item) => item.mode === 'primary' && item.purpose)
+          .map((item) => ({ id: item.id, purpose: item.purpose }))
+        : [],
+    },
+    repo_summary: buildRepoConventionGuidance(repoConventions),
+    artifact_summary: buildArtifactSummary(currentRun, writes),
+    do_not_search_package_source: true,
+  };
+}
+
+function buildSearchPolicy() {
+  return {
+    prefer_repo_map_first: true,
+    avoid_package_source_search: true,
+    max_optional_repo_searches: 3,
+  };
+}
+
+function buildExecutionArtifactHints(writes, runtimePaths) {
+  return writes
+    .filter((item) => item.kind === 'symbolic' || item.rel_path !== runtimePaths.tmpCurrentExecution.relPath)
+    .map((item) => ({
+      artifact: item.kind === 'symbolic' ? item.value : item.rel_path,
+      kind: item.kind,
+      note: item.kind === 'directory'
+        ? '目录型产物也要在 artifacts 中显式列出路径。'
+        : item.kind === 'symbolic'
+        ? '符号型产物需在 summary 或实现说明中明确完成情况。'
+        : null,
+    }));
+}
+
+function buildExecutionAutoAttachedFields(roleId) {
+  const fields = [
+    'run_id',
+    'dispatch_id',
+    'role.id',
+    'role.name',
+    'flow.id',
+    'task.change_id',
+    'openspec_action',
+    'execution_id',
+    'generated_at',
+  ];
+  if (roleId === 'frontend-implementer') {
+    fields.push('verification');
+  }
+  return fields;
+}
+
+function buildExecutionExamplePayload(dispatch, roleDefinition) {
+  const roleId = dispatch.role?.id || null;
+  const artifacts = dispatch.anchor?.artifacts && typeof dispatch.anchor.artifacts === 'object'
+    ? dispatch.anchor.artifacts
+    : {};
+  const examples = {
+    'requirement-analyst': {
+      summary: '已完成 proposal/specs/design/tasks，并标记实现前审批关注点。',
+      next_action: '执行 protocol-advance，进入 before-implementation 审批。',
+      assumptions: ['默认沿用当前仓库的 mock-first 与目录落点约定。'],
+    },
+    'frontend-implementer': {
+      summary: '已完成当前范围实现，保持最小改动并准备进入规范审查。',
+      next_action: '执行 protocol-advance，进入 before-guardian 审批。',
+    },
+    'code-guardian': {
+      summary: '已完成 checklist 与 iterations，给出放行结论与残留风险。',
+      next_action: '执行 protocol-advance，进入 before-archive 审批。',
+    },
+  };
+  const roleExample = examples[roleId] || {
+    summary: '已完成当前专家任务。',
+    next_action: '执行 protocol-advance，推进下一轮。',
+  };
+
+  return {
+    schema_version: 1,
+    kind: 'expert-execution',
+    run_id: dispatch.run_id || null,
+    dispatch_id: dispatch.dispatch_id || null,
+    role: {
+      id: roleId,
+      name: dispatch.role?.name || roleDefinition?.name || null,
+    },
+    status: 'completed',
+    summary: roleExample.summary,
+    artifacts,
+    next_action: roleExample.next_action,
+    ...(roleExample.assumptions ? { assumptions: roleExample.assumptions } : {}),
+  };
+}
+
 function buildExecutionContract(targetDir, runtimePaths, dispatch, roleDefinition, writes, deliveryProfile) {
   if (dispatch.role?.id === 'archive-change') {
     return null;
   }
 
   const artifactWrites = writes
-    .filter((item) => item.kind === 'file' && item.rel_path !== runtimePaths.tmpCurrentExecution.relPath)
+    .filter((item) => item.kind !== 'symbolic' && item.rel_path !== runtimePaths.tmpCurrentExecution.relPath)
     .map((item) => item.rel_path);
   const artifactProfile = inferArtifactProfile({
     deliveryProfile,
@@ -3498,21 +3702,17 @@ function buildExecutionContract(targetDir, runtimePaths, dispatch, roleDefinitio
     artifact_profile: artifactProfile,
     required_fields: [
       'kind',
-      'run_id',
-      'dispatch_id',
-      'role.id',
       'status',
       'summary',
       'artifacts',
       'next_action',
     ],
     required_artifacts: artifactWrites,
+    auto_attached_fields: buildExecutionAutoAttachedFields(dispatch.role?.id),
+    artifact_hints: buildExecutionArtifactHints(writes, runtimePaths),
+    example_payload: buildExecutionExamplePayload(dispatch, roleDefinition),
     next_advance_command: './node_modules/.bin/ai-spec-auto protocol-advance --target . --json',
   };
-
-  if (dispatch.role?.id === 'frontend-implementer') {
-    contract.required_fields.push('verification');
-  }
 
   if (dispatch.role?.id === 'requirement-analyst') {
     contract.required_fields.push('assumptions');
@@ -4007,8 +4207,9 @@ function buildDispatchTurn(targetDir, status, currentArtifacts) {
   });
 }
 
-function buildContinueTurn(targetDir, status, currentArtifacts) {
-  const runtimePaths = resolveRuntimePaths(targetDir);
+function buildContinueTurn(targetDir, status, currentArtifacts, snapshot = null) {
+  const activeSnapshot = snapshot || createWorkflowSnapshot(targetDir, { status, currentArtifacts });
+  const runtimePaths = activeSnapshot.runtimePaths;
   const orchestratorGuidance = buildOrchestratorGuidance(
     targetDir,
     currentArtifacts.run,
@@ -4203,10 +4404,11 @@ function buildConfirmGateTurn(targetDir, status, currentArtifacts) {
   });
 }
 
-function buildApprovalGateTurn(targetDir, status, currentArtifacts) {
+function buildApprovalGateTurn(targetDir, status, currentArtifacts, snapshot = null) {
+  const activeSnapshot = snapshot || createWorkflowSnapshot(targetDir, { status, currentArtifacts });
   const pendingGate = currentArtifacts.run?.pending_gate || null;
   const gateContext = currentArtifacts.run?.gate_context || null;
-  const flowDefinition = loadFlowDefinition(targetDir, currentArtifacts.run?.flow?.id || DEFAULT_FLOW_ID);
+  const flowDefinition = getSnapshotFlowDefinition(activeSnapshot, currentArtifacts.run?.flow?.id || DEFAULT_FLOW_ID);
   const reviewPolicy = normalizeReviewPolicy(currentArtifacts.run?.review_policy || currentArtifacts.run?.plan?.review_policy || null);
   const approvalGates = buildEffectiveApprovalGates(flowDefinition.id, currentArtifacts.run?.plan?.approval_gates || flowDefinition.approval_gates, reviewPolicy);
   const resumeRole = gateContext?.resume_to_role || inferPendingGateResumeRole(targetDir, currentArtifacts.run, flowDefinition, pendingGate);
@@ -4341,9 +4543,10 @@ function buildApprovalGateTurn(targetDir, status, currentArtifacts) {
   });
 }
 
-function buildUpdateReviewTurn(targetDir, status, currentArtifacts) {
-  const runtimePaths = resolveRuntimePaths(targetDir);
-  const flowDefinition = loadFlowDefinition(targetDir, currentArtifacts.run?.flow?.id || DEFAULT_FLOW_ID);
+function buildUpdateReviewTurn(targetDir, status, currentArtifacts, snapshot = null) {
+  const activeSnapshot = snapshot || createWorkflowSnapshot(targetDir, { status, currentArtifacts });
+  const runtimePaths = activeSnapshot.runtimePaths;
+  const flowDefinition = getSnapshotFlowDefinition(activeSnapshot, currentArtifacts.run?.flow?.id || DEFAULT_FLOW_ID);
   const reviewPolicy = normalizeReviewPolicy(currentArtifacts.run?.review_policy || currentArtifacts.run?.plan?.review_policy || null);
   const approvalGates = buildEffectiveApprovalGates(flowDefinition.id, currentArtifacts.run?.plan?.approval_gates || flowDefinition.approval_gates, reviewPolicy);
   const recentUpdates = Array.isArray(currentArtifacts.run?.input_updates)
@@ -4530,12 +4733,13 @@ function buildUpdateReviewTurn(targetDir, status, currentArtifacts) {
   });
 }
 
-function buildExpertTurn(targetDir, status, currentArtifacts) {
+function buildExpertTurn(targetDir, status, currentArtifacts, snapshot = null) {
+  const activeSnapshot = snapshot || createWorkflowSnapshot(targetDir, { status, currentArtifacts });
   const dispatch = currentArtifacts.dispatch;
   if (!dispatch) {
     throw new Error('Cannot build expert turn without a recorded current expert dispatch');
   }
-  const runtimePaths = resolveRuntimePaths(targetDir);
+  const runtimePaths = activeSnapshot.runtimePaths;
 
   const roleSource = dispatch.role?.source || null;
   const roleDefinition = loadRoleDefinition(targetDir, roleSource) || {
@@ -4557,10 +4761,10 @@ function buildExpertTurn(targetDir, status, currentArtifacts) {
   const artifactProfile = currentArtifacts.run?.artifact_profile || inferArtifactProfile({
     deliveryProfile,
   });
-  const projectProfile = detectProjectProfile(targetDir);
-  const repoConventions = collectRepoConventions(targetDir, projectProfile);
-  const flowDefinition = loadFlowDefinition(targetDir, flowId);
-  const projectContextGuidance = buildProjectContextGuidance(targetDir, projectProfile, currentArtifacts.run);
+  const projectProfile = activeSnapshot.projectProfile;
+  const repoConventions = activeSnapshot.repoConventions;
+  const flowDefinition = getSnapshotFlowDefinition(activeSnapshot, flowId);
+  const projectContextGuidance = buildProjectContextGuidance(targetDir, projectProfile, currentArtifacts.run, repoConventions);
   const frontendAutoFixContract = dispatch.role?.id === 'frontend-implementer'
     ? buildFrontendAutoFixContract(targetDir, currentArtifacts.run)
     : null;
@@ -4685,17 +4889,20 @@ function buildExpertTurn(targetDir, status, currentArtifacts) {
   if (projectContextRead) {
     reads.push(projectContextRead);
   }
-  for (const item of roleRuleContract.read_targets) {
-    reads.push(item);
-  }
-  for (const item of roleSkillContract.read_targets) {
-    reads.push(item);
-  }
   if (dispatch.role?.id === 'code-guardian') {
     for (const item of buildCodeGuardianEvidenceTargets(targetDir, repoConventions)) {
       reads.push(item);
     }
   }
+  const dedupedReads = dedupeTargets(reads);
+  const dedupedWrites = dedupeTargets(writes);
+  const compactContext = buildCompactContext(
+    roleRuleContract,
+    roleSkillContract,
+    repoConventions,
+    currentArtifacts.run,
+    dedupedWrites.filter((item) => item.rel_path !== runtimePaths.tmpCurrentExecution.relPath),
+  );
 
   return attachProtocolContracts(attachActorPresentation({
     kind: 'ai-protocol-turn',
@@ -4722,10 +4929,10 @@ function buildExpertTurn(targetDir, status, currentArtifacts) {
       artifact_profile: artifactProfile,
     },
     preferred_skills: selectedSkills,
-    reads: dedupeTargets(reads),
-    writes: dedupeTargets(writes),
+    reads: dedupedReads,
+    writes: dedupedWrites,
     expected_output: [...new Set(expectedOutput)],
-    execution_contract: buildExecutionContract(targetDir, runtimePaths, dispatch, roleDefinition, writes, deliveryProfile),
+    execution_contract: buildExecutionContract(targetDir, runtimePaths, dispatch, roleDefinition, dedupedWrites, deliveryProfile),
     guidance: {
       route_decision: buildRunRouteDecision(
         targetDir,
@@ -4760,6 +4967,8 @@ function buildExpertTurn(targetDir, status, currentArtifacts) {
         : null,
       repo_map_source: '.ai-spec/repo-map.json',
       rule_hints: buildRuleHints(dispatch.role?.id, deliveryProfile, roleRuleContract),
+      compact_context: compactContext,
+      search_policy: buildSearchPolicy(),
       skills: buildSkillGuidance(
         selectedSkills.map((item) => (typeof item === 'string' ? { id: item } : item)),
       ),
@@ -4823,14 +5032,15 @@ function buildProtocolTurn(options = {}) {
     }, { userInput });
   }
 
-  const currentArtifacts = loadCurrentArtifacts(targetDir);
+  const snapshot = createWorkflowSnapshot(targetDir, { status });
+  const currentArtifacts = snapshot.currentArtifacts;
 
   if (String(currentArtifacts.run?.status || '').trim().toLowerCase() === 'paused') {
     return buildPausedTurn(targetDir, status, currentArtifacts);
   }
 
   if (currentArtifacts.run?.pending_input_update) {
-    return buildUpdateReviewTurn(targetDir, status, currentArtifacts);
+    return buildUpdateReviewTurn(targetDir, status, currentArtifacts, snapshot);
   }
 
   if (String(currentArtifacts.run?.status || '').trim().toLowerCase() === 'waiting-confirm') {
@@ -4838,15 +5048,15 @@ function buildProtocolTurn(options = {}) {
   }
 
   if (status.current.execution_role) {
-    return buildContinueTurn(targetDir, status, currentArtifacts);
+    return buildContinueTurn(targetDir, status, currentArtifacts, snapshot);
   }
 
   if (status.current.dispatch_role) {
-    return buildExpertTurn(targetDir, status, currentArtifacts);
+    return buildExpertTurn(targetDir, status, currentArtifacts, snapshot);
   }
 
   if (status.current.pending_gate) {
-    return buildApprovalGateTurn(targetDir, status, currentArtifacts);
+    return buildApprovalGateTurn(targetDir, status, currentArtifacts, snapshot);
   }
 
   return buildDispatchTurn(targetDir, status, currentArtifacts);
@@ -5016,6 +5226,54 @@ function tryApplyBeforeArchiveFastPath(targetDir, userInput) {
   };
 }
 
+function tryApplyApprovalGateFastPath(targetDir, userInput) {
+  const snapshot = createWorkflowSnapshot(targetDir);
+  const runState = snapshot.currentArtifacts.run || null;
+  const pendingGate = runState?.pending_gate || null;
+  if (
+    !runState
+    || String(runState.status || '').trim().toLowerCase() !== 'waiting-approval'
+    || !['before-implementation', 'before-guardian'].includes(pendingGate)
+    || !looksLikeApprovalInput(userInput)
+  ) {
+    return null;
+  }
+
+  const updated = recordRunInputUpdate({
+    target: targetDir,
+    userInput,
+    source: 'protocol-update',
+  });
+  const flowDefinition = getSnapshotFlowDefinition(snapshot, updated.state?.flow?.id || runState.flow?.id || DEFAULT_FLOW_ID);
+  const resumeRole = runState.gate_context?.resume_to_role
+    || inferPendingGateResumeRole(targetDir, updated.state, flowDefinition, pendingGate);
+  const advanced = runner.advanceRunnerWithRuntimeActionData({
+    target: targetDir,
+    source: `protocol-update-fast-path:${pendingGate}`,
+    payloadData: {
+      schema_version: 1,
+      kind: 'task-orchestrator-runtime-action',
+      action: 'approve',
+      gate: pendingGate,
+      to_role: resumeRole,
+      message: pendingGate === 'before-implementation'
+        ? '用户确认进入 frontend-implementer'
+        : '用户确认进入 code-guardian',
+    },
+  });
+  const finalState = loadCurrentArtifacts(targetDir).run;
+
+  return {
+    executed: true,
+    action: pendingGate === 'before-implementation'
+      ? 'approve-before-implementation'
+      : 'approve-before-guardian',
+    updated,
+    advanced,
+    final_state: finalState,
+  };
+}
+
 function tryOpenFollowupPatchFastPath(targetDir, userInput) {
   const currentArtifacts = loadCurrentArtifacts(targetDir);
   const runState = currentArtifacts.run || null;
@@ -5152,6 +5410,28 @@ function updateProtocolInput(options = {}) {
         archived_to: null,
         run_status: resumed.state?.status || null,
         current_role: resumed.state?.current_role || null,
+        requires_followup_turn: true,
+      },
+      runner_status: runner.buildStatus(targetDir),
+      turn: buildProtocolTurn({
+        target: targetDir,
+        userInput: null,
+      }),
+    };
+  }
+
+  const approvalGateFastPath = tryApplyApprovalGateFastPath(targetDir, userInput);
+  if (approvalGateFastPath) {
+    return {
+      kind: 'ai-protocol-input-update',
+      target: targetDir,
+      updated: approvalGateFastPath.updated,
+      fast_path: {
+        executed: true,
+        action: approvalGateFastPath.action,
+        archived_to: null,
+        run_status: approvalGateFastPath.final_state?.status || null,
+        current_role: approvalGateFastPath.final_state?.current_role || null,
         requires_followup_turn: true,
       },
       runner_status: runner.buildStatus(targetDir),

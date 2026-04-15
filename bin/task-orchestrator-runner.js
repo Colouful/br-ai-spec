@@ -12,7 +12,6 @@ const {
 } = require('./execution-semantics');
 const {
   resolveRuntimePaths,
-  getExistingPath,
   getCandidatePaths,
   shouldPersistHistory,
 } = require('./runtime-paths');
@@ -339,43 +338,78 @@ function inferProjectProfile(targetDir) {
   return 'unknown';
 }
 
-function resolvePendingInputs(targetDir) {
-  const runtimePaths = resolveRuntimePaths(targetDir);
-  const pending = [];
-
-  for (const spec of INBOX_SPECS) {
-    const entry = runtimePaths[spec.pathKey];
-    for (const candidatePath of getCandidatePaths(entry)) {
-      if (!fs.existsSync(candidatePath)) {
-        continue;
-      }
-
-      pending.push({
-        ...spec,
-        path: candidatePath,
-        relPath: candidatePath === entry.path ? entry.relPath : entry.legacyRelPath,
-        exists: true,
-      });
-      break;
+function resolveExistingRuntimeEntry(entry) {
+  for (const candidatePath of getCandidatePaths(entry)) {
+    if (!fs.existsSync(candidatePath)) {
+      continue;
     }
+
+    return {
+      path: candidatePath,
+      relPath: candidatePath === entry.path ? entry.relPath : entry.legacyRelPath,
+      exists: true,
+    };
   }
 
-  return pending;
-}
-
-function loadCurrentArtifacts(targetDir) {
-  const runtimePaths = resolveRuntimePaths(targetDir);
   return {
-    run: loadJsonIfExists(runtimePaths.currentRun.path, 'current run-state'),
-    dispatch: loadJsonIfExists(getExistingPath(runtimePaths.currentDispatch), 'current dispatch'),
-    execution: loadJsonIfExists(getExistingPath(runtimePaths.currentExecutionJson), 'current execution'),
-    runtimeAction: loadJsonIfExists(getExistingPath(runtimePaths.currentRuntimeActionJson), 'current runtime action'),
+    path: entry.path,
+    relPath: entry.relPath,
+    exists: false,
   };
 }
 
-function buildNextExpected(targetDir) {
-  const pendingInputs = resolvePendingInputs(targetDir);
+function createRunnerSnapshot(targetDir) {
   const runtimePaths = resolveRuntimePaths(targetDir);
+  const currentDispatchEntry = resolveExistingRuntimeEntry(runtimePaths.currentDispatch);
+  const currentExecutionEntry = resolveExistingRuntimeEntry(runtimePaths.currentExecutionJson);
+  const currentRuntimeActionEntry = resolveExistingRuntimeEntry(runtimePaths.currentRuntimeActionJson);
+
+  const pendingInputs = [];
+  for (const spec of INBOX_SPECS) {
+    const entry = resolveExistingRuntimeEntry(runtimePaths[spec.pathKey]);
+    if (!entry.exists) {
+      continue;
+    }
+
+    pendingInputs.push({
+      ...spec,
+      path: entry.path,
+      relPath: entry.relPath,
+      exists: true,
+    });
+  }
+
+  return {
+    targetDir,
+    runtimePaths,
+    pendingInputs,
+    current: {
+      run: loadJsonIfExists(runtimePaths.currentRun.path, 'current run-state'),
+      dispatch: currentDispatchEntry.exists ? readJsonFile(currentDispatchEntry.path, 'current dispatch') : null,
+      execution: currentExecutionEntry.exists ? readJsonFile(currentExecutionEntry.path, 'current execution') : null,
+      runtimeAction: currentRuntimeActionEntry.exists ? readJsonFile(currentRuntimeActionEntry.path, 'current runtime action') : null,
+    },
+  };
+}
+
+function resolvePendingInputs(targetDir, snapshot = null) {
+  const activeSnapshot = snapshot || createRunnerSnapshot(targetDir);
+  return activeSnapshot.pendingInputs.map((item) => ({ ...item }));
+}
+
+function loadCurrentArtifacts(targetDir, snapshot = null) {
+  const activeSnapshot = snapshot || createRunnerSnapshot(targetDir);
+  return {
+    run: activeSnapshot.current.run,
+    dispatch: activeSnapshot.current.dispatch,
+    execution: activeSnapshot.current.execution,
+    runtimeAction: activeSnapshot.current.runtimeAction,
+  };
+}
+
+function buildNextExpectedFromSnapshot(snapshot) {
+  const pendingInputs = snapshot.pendingInputs;
+  const runtimePaths = snapshot.runtimePaths;
   if (pendingInputs.length > 0) {
     return {
       producer: 'runner',
@@ -384,7 +418,7 @@ function buildNextExpected(targetDir) {
     };
   }
 
-  const current = loadCurrentArtifacts(targetDir);
+  const current = snapshot.current;
 
   if (!current.run) {
     return {
@@ -455,10 +489,15 @@ function buildNextExpected(targetDir) {
   };
 }
 
+function buildNextExpected(targetDir, snapshot = null) {
+  return buildNextExpectedFromSnapshot(snapshot || createRunnerSnapshot(targetDir));
+}
+
 function buildStatus(targetDir) {
-  const pendingInputs = resolvePendingInputs(targetDir);
-  const current = loadCurrentArtifacts(targetDir);
-  const nextExpected = buildNextExpected(targetDir);
+  const snapshot = createRunnerSnapshot(targetDir);
+  const pendingInputs = snapshot.pendingInputs;
+  const current = snapshot.current;
+  const nextExpected = buildNextExpectedFromSnapshot(snapshot);
 
   return {
     kind: 'task-orchestrator-runner-status',
@@ -688,8 +727,7 @@ function resolveTaskOrchestratorTurn(filePath) {
 }
 
 function readCurrentRun(targetDir) {
-  const runtimePaths = resolveRuntimePaths(targetDir);
-  return loadJsonIfExists(runtimePaths.currentRun.path, 'current run-state');
+  return createRunnerSnapshot(targetDir).current.run;
 }
 
 function buildTaskAnchorForRole(currentRun, currentRole, nextRole) {
@@ -785,7 +823,8 @@ function maybeAutoDispatchCurrentRole(targetDir, applied) {
     return null;
   }
 
-  const currentRun = readCurrentRun(targetDir);
+  const snapshot = createRunnerSnapshot(targetDir);
+  const currentRun = snapshot.current.run;
   if (
     !currentRun ||
     !currentRun.current_role ||
@@ -796,8 +835,7 @@ function maybeAutoDispatchCurrentRole(targetDir, applied) {
     return null;
   }
 
-  const currentArtifacts = loadCurrentArtifacts(targetDir);
-  if (currentArtifacts.dispatch) {
+  if (snapshot.current.dispatch) {
     return null;
   }
 
@@ -811,6 +849,36 @@ function maybeAutoDispatchCurrentRole(targetDir, applied) {
     payloadData: payload,
     source: 'runner-auto-dispatch',
   });
+}
+
+function formatAdvanceRecorded(recorded) {
+  if (!recorded) {
+    return null;
+  }
+
+  return {
+    dispatch: recorded.dispatch
+      ? {
+          run_id: recorded.dispatch.payload.run_id,
+          role: recorded.dispatch.payload.role.id,
+          dispatch_id: recorded.dispatch.payload.dispatch_id,
+        }
+      : null,
+    execution: recorded.execution
+      ? {
+          run_id: recorded.execution.payload.run_id,
+          role: recorded.execution.payload.role.id,
+          execution_id: recorded.execution.payload.execution_id,
+        }
+      : null,
+    runtime_action: recorded.runtime_action
+      ? {
+          run_id: recorded.runtime_action.payload.run_id || null,
+          action: recorded.runtime_action.payload.action || null,
+          action_id: recorded.runtime_action.payload.action_id || null,
+        }
+      : null,
+  };
 }
 
 function advanceRunner(options) {
@@ -926,31 +994,48 @@ function advanceRunner(options) {
       path: pending.relPath,
       archived_to: archivedTo,
     },
-    recorded: recorded
-      ? {
-          dispatch: recorded.dispatch
-            ? {
-                run_id: recorded.dispatch.payload.run_id,
-                role: recorded.dispatch.payload.role.id,
-                dispatch_id: recorded.dispatch.payload.dispatch_id,
-              }
-            : null,
-          execution: recorded.execution
-            ? {
-                run_id: recorded.execution.payload.run_id,
-                role: recorded.execution.payload.role.id,
-                execution_id: recorded.execution.payload.execution_id,
-              }
-            : null,
-          runtime_action: recorded.runtime_action
-            ? {
-                run_id: recorded.runtime_action.payload.run_id,
-                action: recorded.runtime_action.payload.action,
-                action_id: recorded.runtime_action.payload.action_id,
-              }
-            : null,
-        }
-      : null,
+    recorded: formatAdvanceRecorded(recorded),
+    applied: summarizeAppliedState(applied),
+    next_expected: buildNextExpected(targetDir),
+  };
+}
+
+function advanceRunnerWithRuntimeActionData(options = {}) {
+  const targetDir = path.resolve(process.cwd(), options.target || '.');
+  const payload = options.payloadData;
+  if (!payload || typeof payload !== 'object') {
+    throw new Error('Missing runtime-action payloadData for in-memory runner advance');
+  }
+  if (payload.kind !== 'task-orchestrator-runtime-action') {
+    throw new Error(`Expected kind "task-orchestrator-runtime-action" but got "${payload.kind || 'undefined'}"`);
+  }
+
+  const recorded = {
+    runtime_action: {
+      payload,
+      source: options.source || 'memory-runtime-action',
+    },
+  };
+  const applied = applyRuntimeMutation({
+    targetDir,
+    action: payload.action,
+    payload,
+    payloadSource: recorded.runtime_action.source,
+  });
+
+  if (applied) {
+    const autoDispatch = maybeAutoDispatchCurrentRole(targetDir, applied);
+    if (autoDispatch) {
+      recorded.dispatch = autoDispatch;
+    }
+  }
+
+  return {
+    kind: 'task-orchestrator-runner-advance-result',
+    status: 'success',
+    target: targetDir,
+    consumed: null,
+    recorded: formatAdvanceRecorded(recorded),
     applied: summarizeAppliedState(applied),
     next_expected: buildNextExpected(targetDir),
   };
@@ -1116,5 +1201,6 @@ module.exports = {
   parseArgs,
   buildStatus,
   advanceRunner,
+  advanceRunnerWithRuntimeActionData,
   replayReplies,
 };

@@ -2,6 +2,7 @@ const assert = require('assert');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const protocolWorkflow = require('../../internal/ai-protocol-workflow');
 const runner = require('../../bin/task-orchestrator-runner');
 const expertExecutor = require('../../bin/expert-executor');
 const expertDispatch = require('../../bin/expert-dispatch');
@@ -79,6 +80,40 @@ function buildArchiveDispatch(runId) {
       markdown: '# archive-change',
     },
   };
+}
+
+function writeRequirementArtifacts(targetDir) {
+  writeProjectFile(targetDir, 'openspec/changes/runtime-smoke-demo/proposal.md', [
+    '# Proposal',
+    '',
+    '## Goal',
+    '- Build a demo product card page for runtime smoke validation.',
+  ].join('\n'));
+  writeProjectFile(targetDir, 'openspec/changes/runtime-smoke-demo/specs/ui/spec.md', [
+    '## 新增需求',
+    '',
+    '### 需求：商品演示页',
+    '',
+    '系统必须提供一个最小商品演示页。',
+  ].join('\n'));
+  writeProjectFile(targetDir, 'openspec/changes/runtime-smoke-demo/specs/api/spec.md', [
+    '## 新增需求',
+    '',
+    '### 需求：接口约束',
+    '',
+    '系统必须明确当前示例不请求真实接口。',
+  ].join('\n'));
+  writeProjectFile(targetDir, 'openspec/changes/runtime-smoke-demo/design.md', [
+    '# 技术设计',
+    '',
+    '## 实现落点',
+    '- 页面放在 src/views/products/mock/index.vue',
+  ].join('\n'));
+  writeProjectFile(targetDir, 'openspec/changes/runtime-smoke-demo/tasks.md', [
+    '# Tasks',
+    '',
+    '- [ ] Create the page container and component structure',
+  ].join('\n'));
 }
 
 function createWorkspace() {
@@ -374,6 +409,64 @@ function main() {
   currentRun = readCurrentRun(runtimeActionTarget);
   assert.strictEqual(currentRun.status, 'success');
   assert.strictEqual(currentRun.current_role, 'archive-change');
+
+  const examplePayloadTarget = createWorkspace();
+  bootstrapRun(examplePayloadTarget);
+  writeRequirementArtifacts(examplePayloadTarget);
+  let turn = protocolWorkflow.advanceProtocolStep({
+    target: examplePayloadTarget,
+  }).turn;
+  result = expertExecutor.applyExecutionData({
+    target: examplePayloadTarget,
+    payloadData: turn.execution_contract.example_payload,
+  });
+  assert.strictEqual(result.payload.kind, 'expert-execution');
+  assert.strictEqual(result.payload.role.id, 'requirement-analyst');
+
+  const frontendExampleTarget = createWorkspace();
+  bootstrapRun(frontendExampleTarget);
+  writeRequirementArtifacts(frontendExampleTarget);
+  result = expertExecutor.applyExecution({
+    target: frontendExampleTarget,
+    payload: path.join(fixturesDir, 'current-execution-requirement-analyst.json'),
+    advanceRuntime: true,
+  });
+  assert.strictEqual(result.runtime_transition.payload.pending_gate, 'before-implementation');
+  expertExecutor.applyRuntimeActionData({
+    target: frontendExampleTarget,
+    advanceRuntime: true,
+    payloadData: {
+      schema_version: 1,
+      kind: 'task-orchestrator-runtime-action',
+      action: 'approve',
+      gate: 'before-implementation',
+      to_role: 'frontend-implementer',
+      message: 'implementation approved',
+    },
+  });
+  expertDispatch.applyDispatch({
+    target: frontendExampleTarget,
+    payload: path.join(fixturesDir, 'current-dispatch-frontend-implementer.json'),
+  });
+  turn = protocolWorkflow.advanceProtocolStep({
+    target: frontendExampleTarget,
+  }).turn;
+  const frontendExamplePayload = JSON.parse(JSON.stringify(turn.execution_contract.example_payload));
+  delete frontendExamplePayload.run_id;
+  delete frontendExamplePayload.dispatch_id;
+  delete frontendExamplePayload.verification;
+  if (frontendExamplePayload.role) {
+    delete frontendExamplePayload.role.name;
+  }
+  result = expertExecutor.applyExecutionData({
+    target: frontendExampleTarget,
+    advanceRuntime: true,
+    payloadData: frontendExamplePayload,
+  });
+  currentRun = readCurrentRun(frontendExampleTarget);
+  assert.ok(result.payload.verification, 'expected frontend example payload to auto-generate verification');
+  assert.strictEqual(result.payload.verification.kind, 'verification');
+  assert.strictEqual(currentRun.pending_gate, 'before-guardian');
 
   const registryOverrideTarget = createWorkspace();
   bootstrapRun(registryOverrideTarget);

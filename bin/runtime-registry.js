@@ -5,6 +5,7 @@ const {
 } = require('./profile-registry');
 
 const PACKAGE_ROOT = path.join(__dirname, '..');
+const REGISTRY_CACHE = new Map();
 
 function readJsonFile(filePath, label) {
   const raw = fs.readFileSync(filePath, 'utf8');
@@ -18,6 +19,40 @@ function readJsonFile(filePath, label) {
 function uniqueWorkspaceRoots(targetDir) {
   const roots = [PACKAGE_ROOT, path.resolve(targetDir || '.')];
   return [...new Set(roots)];
+}
+
+function cloneValue(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function buildRegistrySourceDescriptors(targetDir, fileName) {
+  return uniqueWorkspaceRoots(targetDir).map((root) => {
+    const filePath = path.join(root, '.agents', 'registry', fileName);
+    if (!fs.existsSync(filePath)) {
+      return {
+        root,
+        filePath,
+        exists: false,
+      };
+    }
+
+    const stat = fs.statSync(filePath);
+    return {
+      root,
+      filePath,
+      exists: true,
+      mtimeMs: stat.mtimeMs,
+      size: stat.size,
+    };
+  });
+}
+
+function buildRegistryCacheKey(targetDir, fileName, objectKey) {
+  return JSON.stringify({
+    sources: buildRegistrySourceDescriptors(targetDir, fileName),
+    fileName,
+    objectKey,
+  });
 }
 
 function mergeNamedEntries(baseEntries, overrideEntries) {
@@ -47,6 +82,11 @@ function mergeNamedEntries(baseEntries, overrideEntries) {
 }
 
 function loadRegistryFile(targetDir, fileName, objectKey) {
+  const cacheKey = buildRegistryCacheKey(targetDir, fileName, objectKey);
+  if (REGISTRY_CACHE.has(cacheKey)) {
+    return cloneValue(REGISTRY_CACHE.get(cacheKey));
+  }
+
   const roots = uniqueWorkspaceRoots(targetDir);
   const loaded = [];
 
@@ -63,12 +103,14 @@ function loadRegistryFile(targetDir, fileName, objectKey) {
   }
 
   if (loaded.length === 0) {
-    return {
+    const emptyRegistry = {
       version: 1,
       support_files: [],
       [objectKey]: {},
       _sources: [],
     };
+    REGISTRY_CACHE.set(cacheKey, emptyRegistry);
+    return cloneValue(emptyRegistry);
   }
 
   const merged = {
@@ -88,7 +130,12 @@ function loadRegistryFile(targetDir, fileName, objectKey) {
     merged[objectKey] = mergeNamedEntries(merged[objectKey], item.data[objectKey]);
   }
 
-  return merged;
+  REGISTRY_CACHE.set(cacheKey, merged);
+  return cloneValue(merged);
+}
+
+function clearRegistryCache() {
+  REGISTRY_CACHE.clear();
 }
 
 function loadRolesRegistry(targetDir) {
@@ -162,4 +209,5 @@ module.exports = {
   getRoleRuntimeConfig,
   getFlowRuntimeConfig,
   resolveRuntimeProfileId,
+  clearRegistryCache,
 };

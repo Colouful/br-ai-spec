@@ -41,6 +41,10 @@ function listTurnTargets(turn) {
   return turn.writes.map((item) => item.rel_path || item.value);
 }
 
+function listReadTargets(turn) {
+  return turn.reads.map((item) => item.rel_path || item.value);
+}
+
 function writeRuntimeActionInbox(targetDir, value) {
   writeProjectFile(targetDir, '.ai-spec/internal/tmp/current-runtime-action.json', JSON.stringify(value, null, 2));
 }
@@ -219,6 +223,18 @@ function main() {
   assert.ok(workflow.turn.guidance.optional_role_triggers.some((item) => item.role_id === 'design-collaborator'));
   assert.ok(workflow.turn.guidance.optional_role_triggers.some((item) => item.role_id === 'api-contract-specialist'));
   assert.ok(workflow.turn.guidance.analysis_contract);
+  assert.ok(workflow.turn.guidance.compact_context);
+  assert.strictEqual(workflow.turn.guidance.compact_context.do_not_search_package_source, true);
+  assert.strictEqual(workflow.turn.guidance.search_policy.prefer_repo_map_first, true);
+  assert.strictEqual(workflow.turn.guidance.search_policy.avoid_package_source_search, true);
+  assert.ok(workflow.turn.execution_contract.example_payload);
+  assert.ok(workflow.turn.execution_contract.artifact_hints.some((item) => item.artifact.endsWith('/specs/')));
+  assert.ok(workflow.turn.execution_contract.auto_attached_fields.includes('dispatch_id'));
+  assert.ok(!workflow.turn.execution_contract.required_fields.includes('dispatch_id'));
+  assert.ok(!workflow.turn.execution_contract.required_fields.includes('role.id'));
+  assert.ok(!listReadTargets(workflow.turn).some((item) => item.includes('.agents/rules/')));
+  assert.ok(!listReadTargets(workflow.turn).some((item) => item.includes('.agents/skills/')));
+  assert.ok(listReadTargets(workflow.turn).length <= 5);
   assert.deepStrictEqual(listTurnTargets(workflow.turn), [
     '.ai-spec/internal/tmp/current-execution.json',
     'openspec/changes/runtime-smoke-demo/proposal.md',
@@ -317,6 +333,15 @@ function main() {
   assert.ok(
     workflow.turn.guidance.role_skill_contract.read_targets.some((item) => item.rel_path === '.agents/skills/profiles/vue/create-route/SKILL.md' && item.exists),
   );
+  assert.ok(workflow.turn.guidance.compact_context);
+  assert.strictEqual(workflow.turn.guidance.compact_context.do_not_search_package_source, true);
+  assert.strictEqual(workflow.turn.guidance.search_policy.max_optional_repo_searches, 3);
+  assert.ok(workflow.turn.execution_contract.example_payload);
+  assert.ok(workflow.turn.execution_contract.auto_attached_fields.includes('verification'));
+  assert.ok(!workflow.turn.execution_contract.required_fields.includes('verification'));
+  assert.ok(!listReadTargets(workflow.turn).some((item) => item.includes('.agents/rules/')));
+  assert.ok(!listReadTargets(workflow.turn).some((item) => item.includes('.agents/skills/')));
+  assert.ok(listReadTargets(workflow.turn).length <= 8);
   assert.deepStrictEqual(listTurnTargets(workflow.turn), [
     '.ai-spec/internal/tmp/current-execution.json',
     'code',
@@ -372,6 +397,17 @@ function main() {
   assert.ok(workflow.turn.guidance.review_contract.scope_guard.some((item) => item.includes('proposal/specs/design/tasks')));
   assert.ok(workflow.turn.guidance.review_contract.verification_expectations.includes('pnpm run build'));
   assert.ok(workflow.turn.guidance.review_contract.latest_verification);
+  assert.ok(workflow.turn.guidance.compact_context);
+  assert.deepStrictEqual(workflow.turn.guidance.review_contract.evidence_targets, [
+    'src/router/index.ts',
+    'src/router/modules',
+    'src/api',
+    'src/styles',
+  ]);
+  assert.ok(workflow.turn.execution_contract.example_payload);
+  assert.ok(!listReadTargets(workflow.turn).some((item) => item.includes('.agents/rules/')));
+  assert.ok(!listReadTargets(workflow.turn).some((item) => item.includes('.agents/skills/')));
+  assert.ok(listReadTargets(workflow.turn).length <= 12);
   assert.deepStrictEqual(listTurnTargets(workflow.turn), [
     '.ai-spec/internal/tmp/current-execution.json',
     'openspec/changes/runtime-smoke-demo/checklist.md',

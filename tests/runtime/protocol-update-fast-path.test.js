@@ -140,15 +140,82 @@ function setupRunToArchiveGate(targetDir) {
   assert.strictEqual(currentRun.pending_gate, 'before-archive');
 }
 
+function setupRunToRequirementGate(targetDir) {
+  const bootstrap = bootstrapRun(targetDir);
+  assert.strictEqual(bootstrap.applied.adapter_action, 'bootstrap');
+
+  writeProjectFile(targetDir, 'openspec/changes/runtime-smoke-demo/proposal.md', '# Proposal');
+  writeProjectFile(targetDir, 'openspec/changes/runtime-smoke-demo/specs/ui/spec.md', '## 新增需求');
+  writeProjectFile(targetDir, 'openspec/changes/runtime-smoke-demo/design.md', '# Design');
+  writeProjectFile(targetDir, 'openspec/changes/runtime-smoke-demo/tasks.md', '# Tasks');
+  copyFixture(targetDir, 'current-execution-requirement-analyst.json', 'current-execution.json');
+  const report = runner.advanceRunner({ target: targetDir });
+  assert.strictEqual(report.applied.pending_gate, 'before-implementation');
+
+  const currentRun = readCurrentRun(targetDir);
+  assert.strictEqual(currentRun.status, 'waiting-approval');
+  assert.strictEqual(currentRun.pending_gate, 'before-implementation');
+}
+
+function setupRunToGuardianGate(targetDir) {
+  setupRunToRequirementGate(targetDir);
+  let report = approveGate(targetDir, 'before-implementation', 'frontend-implementer', 'implementation approved');
+  assert.strictEqual(report.applied.current_role, 'frontend-implementer');
+
+  copyFixture(targetDir, 'current-execution-frontend-implementer.json', 'current-execution.json');
+  report = runner.advanceRunner({ target: targetDir });
+  assert.strictEqual(report.applied.pending_gate, 'before-guardian');
+
+  const currentRun = readCurrentRun(targetDir);
+  assert.strictEqual(currentRun.status, 'waiting-approval');
+  assert.strictEqual(currentRun.pending_gate, 'before-guardian');
+}
+
 function main() {
+  const implementationTarget = createWorkspace('ai-spec-auto-fast-implementation-');
+  setupRunToRequirementGate(implementationTarget);
+
+  let result = protocolWorkflow.updateProtocolInput({
+    target: implementationTarget,
+    userInput: '同意进入实现',
+  });
+  let currentRun = readCurrentRun(implementationTarget);
+
+  assert.strictEqual(result.fast_path.executed, true);
+  assert.strictEqual(result.fast_path.action, 'approve-before-implementation');
+  assert.strictEqual(result.fast_path.requires_followup_turn, true);
+  assert.strictEqual(result.turn.mode, 'execute');
+  assert.strictEqual(result.turn.actor.id, 'frontend-implementer');
+  assert.strictEqual(currentRun.status, 'running');
+  assert.strictEqual(currentRun.current_role, 'frontend-implementer');
+  assert.strictEqual(currentRun.pending_gate, null);
+
+  const guardianTarget = createWorkspace('ai-spec-auto-fast-guardian-');
+  setupRunToGuardianGate(guardianTarget);
+
+  result = protocolWorkflow.updateProtocolInput({
+    target: guardianTarget,
+    userInput: '同意进入 code-guardian 规范审查',
+  });
+  currentRun = readCurrentRun(guardianTarget);
+
+  assert.strictEqual(result.fast_path.executed, true);
+  assert.strictEqual(result.fast_path.action, 'approve-before-guardian');
+  assert.strictEqual(result.fast_path.requires_followup_turn, true);
+  assert.strictEqual(result.turn.mode, 'execute');
+  assert.strictEqual(result.turn.actor.id, 'code-guardian');
+  assert.strictEqual(currentRun.status, 'running');
+  assert.strictEqual(currentRun.current_role, 'code-guardian');
+  assert.strictEqual(currentRun.pending_gate, null);
+
   const approveTarget = createWorkspace('ai-spec-auto-fast-approve-');
   setupRunToArchiveGate(approveTarget);
 
-  let result = protocolWorkflow.updateProtocolInput({
+  result = protocolWorkflow.updateProtocolInput({
     target: approveTarget,
     userInput: '归档',
   });
-  let currentRun = readCurrentRun(approveTarget);
+  currentRun = readCurrentRun(approveTarget);
 
   assert.strictEqual(result.fast_path.executed, true);
   assert.strictEqual(result.fast_path.action, 'archive-approved');
@@ -181,7 +248,7 @@ function main() {
   assert.ok(fs.existsSync(path.join(skipTarget, 'openspec/changes/runtime-smoke-demo')));
   assert.ok(!fs.existsSync(path.join(skipTarget, 'openspec/changes/archive')));
 
-  console.log('protocol-update fast-path test passed: before-archive decisions resolve locally without extra AI turn');
+  console.log('protocol-update fast-path test passed: approval gates and before-archive decisions resolve locally without extra AI turn');
 }
 
 main();
