@@ -472,7 +472,7 @@ flowchart LR
 - [Cursor Changelog](https://cursor.com/changelog/)
 - [GitHub Copilot Coding Agent 官方文档](https://docs.github.com/copilot/concepts/coding-agent)
   - 当前仓库内文档：
-  - `docs/paser_three/项目介绍与运行机制说明.md`
+  - `docs/four/项目介绍与运行机制说明.md`
   - `docs/paser_three/团队同学AI规范开发最佳实践.md`
   - `docs/paser_three/OpenSpec配置与协作深入版.md`
   - `docs/paser_two/规范驱动开发平台-渐进式实施与内部推广方案.md`

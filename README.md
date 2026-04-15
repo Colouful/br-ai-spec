@@ -145,7 +145,7 @@ npx @ex/ai-spec-auto@latest update . --skip-skills --skip-configs --skip-openspe
 - [培训大纲](docs/training-outline.md)
 - [协议与专家增强记录](docs/paser_three/协议与专家增强记录.md)
 - [主流程专家优化记录](docs/paser_three/主流程专家优化记录.md)
-- [项目介绍与运行机制说明](docs/paser_three/项目介绍与运行机制说明.md)
+- [项目介绍与运行机制说明](docs/four/项目介绍与运行机制说明.md)
 
 ## 兼容说明
 
