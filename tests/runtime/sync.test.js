@@ -17,6 +17,10 @@ function writeTextFile(filePath, content) {
   fs.writeFileSync(filePath, content, 'utf8');
 }
 
+function readTextFile(filePath) {
+  return fs.readFileSync(filePath, 'utf8');
+}
+
 function createWorkspace(prefix) {
   return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
 }
@@ -327,6 +331,14 @@ async function main() {
   assert.ok(fs.existsSync(path.join(ideOverrideTarget, '.cursor', 'commands', 'opsx-explore.md')));
   assert.ok(fs.existsSync(path.join(ideOverrideTarget, '.claude', 'commands', 'spec-start.md')));
   assert.ok(!fs.existsSync(path.join(ideOverrideTarget, '.claude', 'commands', 'opsx-propose.md')));
+  const cursorSpecStart = readTextFile(path.join(ideOverrideTarget, '.cursor', 'commands', 'spec-start.md'));
+  const cursorSpecUpdate = readTextFile(path.join(ideOverrideTarget, '.cursor', 'commands', 'spec-update.md'));
+  const claudeSpecStart = readTextFile(path.join(ideOverrideTarget, '.claude', 'commands', 'spec-start.md'));
+  assert.ok(cursorSpecStart.startsWith('---\n'));
+  assert.ok(cursorSpecStart.includes('protocol-step --target . --user-input'));
+  assert.ok(cursorSpecUpdate.startsWith('---\n'));
+  assert.ok(cursorSpecUpdate.includes('protocol-update --target . --user-input'));
+  assert.ok(!claudeSpecStart.startsWith('---\n'));
 
   const cleanupTarget = createWorkspace('ai-spec-auto-sync-cleanup-');
   const cleanupManifestPath = path.join(cleanupTarget, 'manifest.json');
@@ -350,6 +362,7 @@ async function main() {
   assert.ok(!fs.existsSync(path.join(cleanupTarget, '.claude', 'rules')));
   assert.ok(!fs.existsSync(path.join(cleanupTarget, '.claude', 'commands', 'spec-start.md')));
   assert.ok(fs.existsSync(path.join(cleanupTarget, '.cursor', 'mcp.json')));
+  assert.ok(readTextFile(path.join(cleanupTarget, '.cursor', 'commands', 'spec-start.md')).startsWith('---\n'));
 
   const remoteTarget = createWorkspace('ai-spec-auto-sync-remote-');
   const remoteServer = await startServer((req, res) => {

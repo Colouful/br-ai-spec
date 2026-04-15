@@ -19,6 +19,18 @@ const DEFAULT_LEVEL = 'L3';
 const DEFAULT_IDE_FILTER = 'default';
 const DEFAULT_IDES = ['cursor', 'claude'];
 const ALL_IDES = ['claude', 'cursor', 'opencode', 'trae'];
+const CURSOR_PROTOCOL_COMMAND_EXPECTATIONS = [
+  ['spec-start.md', ['protocol-step --target . --user-input']],
+  ['spec-continue.md', ['protocol-update --target . --user-input', 'protocol-advance --target . --json']],
+  ['spec-update.md', ['protocol-update --target . --user-input']],
+  ['spec-status.md', ['protocol-status --target . --json']],
+  ['spec-stop.md', ['protocol-stop --target . --json']],
+  ['spec-orchestrate.md', [
+    'protocol-step --target . --user-input',
+    'protocol-update --target . --user-input',
+    'protocol-advance --target . --json',
+  ]],
+];
 const IDE_AUTOLINK_EXCLUDED_SKILLS = new Set(['using-superpowers']);
 const PROJECT_SPECIFIC_RULES = new Set(['01-项目概述.md', '03-项目结构.md']);
 const CUSTOMIZABLE_RULES = [
@@ -1237,6 +1249,7 @@ function syncCommands(targetDir, sourceDir, ideName, overwrite) {
   const commonDir = path.join(sourceDir, '.agents', 'commands', 'common');
   const ideDir = path.join(sourceDir, '.agents', 'commands', ideName);
   const destDir = path.join(targetDir, `.${ideName}`, 'commands');
+  const copiedInThisRun = new Set();
   ensureDir(destDir);
   for (const dir of [commonDir, ideDir]) {
     if (!fs.existsSync(dir)) continue;
@@ -1244,16 +1257,50 @@ function syncCommands(targetDir, sourceDir, ideName, overwrite) {
       if (!entry.endsWith('.md')) continue;
       const sourcePath = path.join(dir, entry);
       const destPath = path.join(destDir, entry);
-      if (fs.existsSync(destPath) && !overwrite) {
+      const canReplaceCommonCopy = dir === ideDir && copiedInThisRun.has(destPath);
+      if (fs.existsSync(destPath) && !overwrite && !canReplaceCommonCopy) {
         info(`  跳过已存在命令: ${entry}`);
         continue;
       }
       copyFile(sourcePath, destPath);
+      copiedInThisRun.add(destPath);
     }
   }
   if (fs.existsSync(destDir)) {
     ok(`.${ideName}/commands/ 已同步`);
   }
+}
+
+function hasYamlFrontmatter(content) {
+  return /^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/.test(content);
+}
+
+function collectStaleCursorProtocolCommands(targetDir) {
+  const commandsDir = path.join(targetDir, '.cursor', 'commands');
+  if (!fs.existsSync(commandsDir)) {
+    return [];
+  }
+
+  const staleFiles = [];
+  for (const [fileName, requiredSnippets] of CURSOR_PROTOCOL_COMMAND_EXPECTATIONS) {
+    const filePath = path.join(commandsDir, fileName);
+    if (!fs.existsSync(filePath)) {
+      continue;
+    }
+
+    let content = '';
+    try {
+      content = fs.readFileSync(filePath, 'utf8');
+    } catch (error) {
+      staleFiles.push(fileName);
+      continue;
+    }
+
+    if (!hasYamlFrontmatter(content) || requiredSnippets.some((snippet) => !content.includes(snippet))) {
+      staleFiles.push(fileName);
+    }
+  }
+  return staleFiles;
 }
 
 function getProfileDirs(sourceDir, profileId, profilesRegistry) {
@@ -2236,6 +2283,10 @@ function handleCheck(options) {
     if (missingProtocolAssets.length > 0) {
       warn(`检测到 OpenSpec 或协议命令入口，但缺少 ${missingProtocolAssets.join('、')}；建议运行: npx @ex/ai-spec-auto@latest update .`);
     }
+  }
+  const staleCursorProtocolCommands = collectStaleCursorProtocolCommands(targetDir);
+  if (staleCursorProtocolCommands.length > 0) {
+    warn(`检测到 Cursor 协议命令模板可能过旧：${staleCursorProtocolCommands.join('、')}；建议运行: npx @ex/ai-spec-auto@latest update . 或重新执行 sync`);
   }
   printTools(detectInstalledLevel(targetDir), hasInstalledUiproData(targetDir) ? 'yes' : 'no');
   console.log('');

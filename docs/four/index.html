@@ -263,12 +263,156 @@
     }
 
     .article {
-      margin-top: 22px;
       padding: 30px;
       border-radius: var(--radius);
       background: var(--panel-strong);
       border: 1px solid rgba(255, 255, 255, 0.75);
       box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+    }
+
+    .content-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 280px;
+      gap: 22px;
+      align-items: start;
+      margin-top: 22px;
+    }
+
+    .outline {
+      position: sticky;
+      top: 28px;
+    }
+
+    .outline-card {
+      padding: 20px 18px;
+      border-radius: var(--radius);
+      background: rgba(255, 250, 242, 0.92);
+      border: 1px solid rgba(255, 255, 255, 0.72);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+    }
+
+    .outline-card[hidden] {
+      display: none;
+    }
+
+    .outline-label {
+      margin: 0 0 14px;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--muted);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .outline-list {
+      display: grid;
+      gap: 4px;
+    }
+
+    .outline-link {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 8px 10px;
+      border-radius: 12px;
+      text-decoration: none;
+      color: var(--muted);
+      transition: background-color 180ms ease, color 180ms ease, transform 180ms ease;
+    }
+
+    .outline-link:hover {
+      color: var(--text);
+      background: rgba(15, 118, 110, 0.08);
+      transform: translateX(2px);
+    }
+
+    .outline-link.is-active {
+      color: var(--text);
+      background: linear-gradient(135deg, rgba(15, 118, 110, 0.1), rgba(180, 83, 9, 0.08));
+    }
+
+    .outline-link[data-depth="0"] {
+      margin-bottom: 10px;
+      padding: 8px 10px 10px 14px;
+      border-left: 3px solid rgba(31, 42, 55, 0.82);
+      border-radius: 0 12px 12px 0;
+      color: var(--text);
+      font-weight: 700;
+    }
+
+    .outline-link[data-depth="0"]:hover {
+      transform: none;
+    }
+
+    .outline-link[data-depth="1"] {
+      padding-left: 10px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .outline-link[data-depth="2"] {
+      padding-left: 22px;
+    }
+
+    .outline-link[data-depth="3"] {
+      padding-left: 34px;
+      font-size: 14px;
+    }
+
+    .outline-link[data-depth="4"] {
+      padding-left: 46px;
+      font-size: 13px;
+    }
+
+    .outline-marker {
+      flex: 0 0 auto;
+      width: 7px;
+      height: 7px;
+      margin-top: 0.58em;
+      border-radius: 999px;
+      background: rgba(15, 118, 110, 0.18);
+    }
+
+    .outline-link.is-active .outline-marker {
+      background: var(--brand);
+      box-shadow: 0 0 0 4px rgba(15, 118, 110, 0.12);
+    }
+
+    .outline-link[data-depth="0"] .outline-marker {
+      display: none;
+    }
+
+    .outline-number {
+      flex: 0 0 auto;
+      min-width: 2.8em;
+      margin-top: 0.05em;
+      color: var(--brand);
+      font-family: var(--mono);
+      font-size: 12px;
+      line-height: 1.5;
+      font-weight: 700;
+    }
+
+    .outline-link[data-depth="1"] .outline-number {
+      min-width: 1.8em;
+    }
+
+    .outline-link[data-depth="0"] .outline-number {
+      display: none;
+    }
+
+    .outline-text {
+      display: block;
+      min-width: 0;
+      line-height: 1.55;
+      word-break: break-word;
+    }
+
+    .outline-empty {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.7;
     }
 
     .article-empty {
@@ -423,6 +567,14 @@
       .hero-meta {
         width: 100%;
       }
+
+      .content-layout {
+        grid-template-columns: 1fr;
+      }
+
+      .outline {
+        position: static;
+      }
     }
 
     @media (max-width: 720px) {
@@ -434,7 +586,8 @@
       .sidebar,
       .main,
       .hero,
-      .article {
+      .article,
+      .outline-card {
         padding-left: 18px;
         padding-right: 18px;
       }
@@ -454,6 +607,18 @@
 
       .markdown h2 {
         font-size: 24px;
+      }
+
+      .outline-link[data-depth="2"] {
+        padding-left: 18px;
+      }
+
+      .outline-link[data-depth="3"] {
+        padding-left: 26px;
+      }
+
+      .outline-link[data-depth="4"] {
+        padding-left: 34px;
       }
     }
   </style>
@@ -499,8 +664,16 @@
           </div>
         </div>
       </section>
-      <section class="article">
-        <div id="content" class="markdown"></div>
+      <section class="content-layout">
+        <section class="article">
+          <div id="content" class="markdown"></div>
+        </section>
+        <aside class="outline">
+          <div class="outline-card" id="outline-card">
+            <p class="outline-label">大纲</p>
+            <div class="outline-list" id="outline-list"></div>
+          </div>
+        </aside>
       </section>
     </main>
   </div>
@@ -523,10 +696,14 @@
     const defaultNavList = document.getElementById("default-nav-list");
     const deepNavList = document.getElementById("deep-nav-list");
     const content = document.getElementById("content");
+    const outlineCard = document.getElementById("outline-card");
+    const outlineList = document.getElementById("outline-list");
     const currentFileNode = document.getElementById("current-file");
     const rawLinkNode = document.getElementById("raw-link");
     const heroTitleNode = document.getElementById("hero-title");
     const heroDescriptionNode = document.getElementById("hero-description");
+    let outlineEntries = [];
+    let outlineLinks = [];
 
     function encodePath(path) {
       return path
@@ -558,6 +735,13 @@
         .replace(/\s+/g, "-")
         .replace(/[^\w\u4e00-\u9fa5-]/g, "");
       return slug || "section";
+    }
+
+    function buildHeadingId(text, slugCounts) {
+      const baseSlug = slugify(text);
+      const currentCount = slugCounts.get(baseSlug) || 0;
+      slugCounts.set(baseSlug, currentCount + 1);
+      return currentCount === 0 ? baseSlug : `${baseSlug}-${currentCount + 1}`;
     }
 
     function splitTableRow(row) {
@@ -654,6 +838,7 @@
     function renderMarkdown(markdown, currentFile) {
       const lines = markdown.replace(/\r\n/g, "\n").split("\n");
       const blocks = [];
+      const slugCounts = new Map();
 
       for (let i = 0; i < lines.length;) {
         const line = lines[i];
@@ -684,8 +869,9 @@
         if (/^#{1,6}\s+/.test(trimmed)) {
           const level = trimmed.match(/^#+/)[0].length;
           const text = trimmed.replace(/^#{1,6}\s+/, "");
+          const headingId = buildHeadingId(text, slugCounts);
           blocks.push(
-            `<h${level} id="${slugify(text)}">${renderInline(text, currentFile)}</h${level}>`
+            `<h${level} id="${headingId}">${renderInline(text, currentFile)}</h${level}>`
           );
           i += 1;
           continue;
@@ -795,6 +981,132 @@
       renderNavItems(deepNavList, DEEP_NAV_ITEMS, activeFile);
     }
 
+    function scrollToHeadingById(id, options = {}) {
+      const target = document.getElementById(id);
+      if (!target) {
+        return;
+      }
+
+      if (options.updateUrl !== false) {
+        const nextUrl = new URL(window.location.href);
+        nextUrl.hash = id;
+        history.replaceState(null, "", nextUrl.toString());
+      }
+
+      target.scrollIntoView({
+        behavior: options.behavior || "smooth",
+        block: "start"
+      });
+      updateActiveOutline(id);
+    }
+
+    function updateActiveOutline(forcedId) {
+      if (!outlineEntries.length) {
+        return;
+      }
+
+      let activeId = forcedId || "";
+
+      if (!activeId) {
+        const activationOffset = 180;
+        for (const entry of outlineEntries) {
+          if (entry.element.getBoundingClientRect().top - activationOffset <= 0) {
+            activeId = entry.id;
+          } else {
+            break;
+          }
+        }
+      }
+
+      if (!activeId) {
+        activeId = outlineEntries[0].id;
+      }
+
+      outlineLinks.forEach((link) => {
+        link.classList.toggle("is-active", link.dataset.headingId === activeId);
+      });
+    }
+
+    function renderOutline() {
+      const headings = Array.from(content.querySelectorAll("h1, h2, h3, h4"));
+      const rawEntries = headings.map((element) => ({
+        id: element.id,
+        level: Number(element.tagName.slice(1)),
+        text: element.textContent.trim(),
+        element
+      })).filter((entry) => entry.id && entry.text);
+
+      if (!rawEntries.length) {
+        outlineCard.hidden = false;
+        outlineList.innerHTML = `<p class="outline-empty">当前文档暂无可跳转标题。</p>`;
+        outlineLinks = [];
+        outlineEntries = [];
+        return;
+      }
+
+      const useRootHeading = rawEntries[0].level === 1;
+      const baseLevel = useRootHeading ? 2 : Math.min(...rawEntries.map((entry) => entry.level));
+      const counters = [0, 0, 0, 0];
+      let previousDepth = 0;
+
+      outlineEntries = rawEntries.map((entry, index) => {
+        if (useRootHeading && index === 0) {
+          return {
+            ...entry,
+            depth: 0,
+            number: "",
+            isRoot: true
+          };
+        }
+
+        const actualDepth = Math.max(1, entry.level - baseLevel + 1);
+        const depth = Math.min(counters.length, actualDepth > previousDepth + 1 ? previousDepth + 1 : actualDepth);
+
+        counters[depth - 1] += 1;
+        for (let i = depth; i < counters.length; i += 1) {
+          counters[i] = 0;
+        }
+        previousDepth = depth;
+
+        return {
+          ...entry,
+          depth,
+          number: counters.slice(0, depth).join("."),
+          isRoot: false
+        };
+      });
+
+      outlineCard.hidden = false;
+      outlineList.innerHTML = outlineEntries.map((entry) => `
+        <a
+          class="outline-link"
+          data-heading-id="${entry.id}"
+          data-depth="${entry.depth}"
+          href="#${entry.id}"
+        >
+          <span class="outline-marker" aria-hidden="true"></span>
+          <span class="outline-number">${entry.number ? escapeHtml(entry.number) : ""}</span>
+          <span class="outline-text">${escapeHtml(entry.text)}</span>
+        </a>
+      `).join("");
+
+      outlineLinks = Array.from(outlineList.querySelectorAll(".outline-link"));
+      outlineLinks.forEach((link) => {
+        link.addEventListener("click", (event) => {
+          event.preventDefault();
+          scrollToHeadingById(link.dataset.headingId, { updateUrl: true, behavior: "smooth" });
+        });
+      });
+      updateActiveOutline();
+    }
+
+    function handleHashChange() {
+      const anchor = decodeURIComponent(window.location.hash.slice(1));
+      if (anchor) {
+        scrollToHeadingById(anchor, { updateUrl: false, behavior: "smooth" });
+      }
+    }
+
     async function loadDocument() {
       const currentFile = getCurrentFile();
       const requestUrl = new URL(encodePath(currentFile), docsRootUrl);
@@ -812,6 +1124,7 @@
 
         const markdown = await response.text();
         content.innerHTML = renderMarkdown(markdown, currentFile);
+        renderOutline();
         const firstHeading = content.querySelector("h1, h2, h3");
         heroTitleNode.textContent = firstHeading ? firstHeading.textContent : "ai-spec-auto文档";
         heroDescriptionNode.textContent =
@@ -821,16 +1134,15 @@
 
         if (window.location.hash) {
           const anchor = decodeURIComponent(window.location.hash.slice(1));
-          const target = document.getElementById(anchor);
-          if (target) {
-            target.scrollIntoView({ behavior: "smooth", block: "start" });
-          }
+          scrollToHeadingById(anchor, { updateUrl: false, behavior: "auto" });
         } else {
           window.scrollTo({ top: 0, behavior: "auto" });
+          updateActiveOutline();
         }
       } catch (error) {
         heroTitleNode.textContent = "文档加载失败";
         heroDescriptionNode.textContent = "请确认 nginx(静态服务/反向代理) 已重载，且目标 Markdown(标记语言) 文件仍然存在。";
+        outlineCard.hidden = true;
         content.innerHTML = `
           <div class="article-empty">
             无法读取 <code>${escapeHtml(currentFile)}</code><br>
@@ -841,7 +1153,8 @@
     }
 
     window.addEventListener("popstate", loadDocument);
-    window.addEventListener("hashchange", loadDocument);
+    window.addEventListener("hashchange", handleHashChange);
+    window.addEventListener("scroll", () => updateActiveOutline(), { passive: true });
     loadDocument();
   </script>
 </body>

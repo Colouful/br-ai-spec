@@ -23,6 +23,10 @@ function writeText(filePath, value) {
   fs.writeFileSync(filePath, value, 'utf8');
 }
 
+function readText(filePath) {
+  return fs.readFileSync(filePath, 'utf8');
+}
+
 function writeExecutable(filePath, content) {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   fs.writeFileSync(filePath, content, 'utf8');
@@ -307,6 +311,26 @@ async function main() {
   result = runCli(['check', target]);
   assert.strictEqual(result.status, 0, result.stderr);
 
+  const cursorProtocolTarget = createWorkspace('ai-spec-init-cursor-protocol-');
+  writeJson(path.join(cursorProtocolTarget, 'package.json'), {
+    name: 'cursor-protocol-smoke',
+    version: '1.0.0',
+  });
+  result = runCli(['init', cursorProtocolTarget, '--profile', 'vue', '--level', 'L2', '--ide', 'cursor', '--skip-commands', '--no-lint', '--no-husky', '--no-uipro']);
+  assert.strictEqual(result.status, 0, result.stderr);
+  const cursorSpecStart = readText(path.join(cursorProtocolTarget, '.cursor', 'commands', 'spec-start.md'));
+  const cursorSpecContinue = readText(path.join(cursorProtocolTarget, '.cursor', 'commands', 'spec-continue.md'));
+  const cursorSpecUpdate = readText(path.join(cursorProtocolTarget, '.cursor', 'commands', 'spec-update.md'));
+  assert.ok(cursorSpecStart.startsWith('---\n'));
+  assert.ok(cursorSpecStart.includes('name: /spec-start'));
+  assert.ok(cursorSpecStart.includes('protocol-step --target . --user-input'));
+  assert.ok(cursorSpecContinue.startsWith('---\n'));
+  assert.ok(cursorSpecContinue.includes('protocol-advance --target . --json'));
+  assert.ok(cursorSpecContinue.includes('protocol-update --target . --user-input'));
+  assert.ok(cursorSpecUpdate.startsWith('---\n'));
+  assert.ok(cursorSpecUpdate.includes('protocol-update --target . --user-input'));
+  assert.ok(!fs.existsSync(path.join(cursorProtocolTarget, '.claude')));
+
   const uiproTarget = createWorkspace('ai-spec-uipro-install-');
   writeJson(path.join(uiproTarget, 'package.json'), {
     name: 'uipro-install-smoke',
@@ -370,6 +394,8 @@ async function main() {
   result = runCli(['check', protocolWarningTarget]);
   assert.strictEqual(result.status, 0, result.stderr);
   assert.ok(result.stdout.includes('缺少 .agents/roles、.agents/flows、.agents/orchestration'));
+  assert.ok(result.stdout.includes('Cursor 协议命令模板可能过旧'));
+  assert.ok(result.stdout.includes('spec-start.md'));
   assert.ok(!result.stdout.includes('.agents/registry'));
 
   const manifestInitTarget = createWorkspace('ai-spec-init-manifest-');
