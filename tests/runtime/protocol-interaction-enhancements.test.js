@@ -80,8 +80,8 @@ function approveGate(targetDir, gate, toRole, message) {
   return runner.advanceRunner({ target: targetDir });
 }
 
-function setupFrontendRun(targetDir) {
-  bootstrapRun(targetDir, '创建一个订单列表页面，接真实接口，支持分页和状态筛选');
+function setupRequirementGateRun(targetDir, userInput = '创建一个订单列表页面，接真实接口，支持分页和状态筛选') {
+  bootstrapRun(targetDir, userInput);
   writeProjectFile(targetDir, 'openspec/changes/runtime-smoke-demo/proposal.md', [
     '# 变更提案：runtime-smoke-demo',
     '',
@@ -130,9 +130,14 @@ function setupFrontendRun(targetDir) {
     '- [ ] 保持 mock 数据与样式变量约定',
   ].join('\n'));
   copyFixture(targetDir, 'current-execution-requirement-analyst.json', 'current-execution.json');
-  let report = runner.advanceRunner({ target: targetDir });
+  const report = runner.advanceRunner({ target: targetDir });
   assert.strictEqual(report.applied.pending_gate, 'before-implementation');
-  report = approveGate(targetDir, 'before-implementation', 'frontend-implementer', 'implementation approved');
+  return report;
+}
+
+function setupFrontendRun(targetDir) {
+  setupRequirementGateRun(targetDir);
+  const report = approveGate(targetDir, 'before-implementation', 'frontend-implementer', 'implementation approved');
   assert.strictEqual(report.applied.current_role, 'frontend-implementer');
 }
 
@@ -226,6 +231,47 @@ function main() {
   assert.strictEqual(result.turn.mode, 'execute');
   assert.strictEqual(result.turn.actor.id, 'requirement-analyst');
   assert.strictEqual(currentRun.status, 'running');
+
+  const gateUpdateTarget = createWorkspace('ai-spec-auto-gate-update-');
+  setupRequirementGateRun(gateUpdateTarget);
+  result = protocolWorkflow.updateProtocolInput({
+    target: gateUpdateTarget,
+    userInput: '管理页面增加一个验证码的功能',
+  });
+  currentRun = readCurrentRun(gateUpdateTarget);
+  assert.strictEqual(result.fast_path.executed, false);
+  assert.strictEqual(result.turn.mode, 'update-review');
+  assert.strictEqual(result.turn.guidance.update_contract.route_decision, 'scope-delta');
+  assert.strictEqual(result.turn.guidance.update_contract.change_impact, 'scope-delta');
+  assert.strictEqual(result.turn.guidance.update_contract.reconcile_strategy, 'rewind-to-requirement');
+  assert.strictEqual(result.turn.guidance.update_contract.target_role, 'requirement-analyst');
+  assert.ok(result.turn.guidance.update_contract.artifacts_to_update.includes('proposal.md'));
+  assert.ok(result.turn.guidance.update_contract.artifacts_to_update.includes('specs/'));
+  assert.ok(result.turn.guidance.update_contract.artifacts_to_update.includes('design.md'));
+  assert.ok(result.turn.guidance.update_contract.artifacts_to_update.includes('tasks.md'));
+  assert.strictEqual(currentRun.incremental_update.change_impact, 'scope-delta');
+
+  writeProjectFile(gateUpdateTarget, '.ai-spec/internal/tmp/current-runtime-action.json', JSON.stringify({
+    schema_version: 1,
+    kind: 'task-orchestrator-runtime-action',
+    action: 'handoff',
+    from_role: 'requirement-analyst',
+    to_role: 'requirement-analyst',
+    next_role: 'frontend-implementer',
+    status: 'running',
+    message: 'rewind to requirement-analyst for captcha delta reconciliation',
+  }, null, 2));
+  let report = runner.advanceRunner({ target: gateUpdateTarget });
+  assert.strictEqual(report.applied.adapter_action, 'handoff');
+  assert.strictEqual(report.applied.current_role, 'requirement-analyst');
+  assert.strictEqual(report.applied.pending_gate, null);
+  assert.strictEqual(report.recorded.dispatch.role, 'requirement-analyst');
+  currentRun = readCurrentRun(gateUpdateTarget);
+  assert.strictEqual(currentRun.pending_gate, null);
+  assert.strictEqual(currentRun.pending_input_update, false);
+  statusResult = protocolWorkflow.advanceProtocolStep({ target: gateUpdateTarget });
+  assert.strictEqual(statusResult.turn.mode, 'execute');
+  assert.strictEqual(statusResult.turn.actor.id, 'requirement-analyst');
 
   const patchTarget = createWorkspace('ai-spec-auto-patch-');
   setupFrontendRun(patchTarget);

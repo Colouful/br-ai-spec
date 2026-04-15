@@ -1460,6 +1460,18 @@ function buildStateEvent({ state, options, now, defaults = {} }) {
   };
 }
 
+function shouldClearPendingGateForHandoff(state, options = {}) {
+  if (Object.prototype.hasOwnProperty.call(options, 'clearPendingGate')) {
+    return Boolean(options.clearPendingGate);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(options, 'pendingGate')) {
+    return false;
+  }
+
+  return Boolean(state?.pending_gate && state?.pending_input_update);
+}
+
 function updateAnchorForRole(existingAnchor, taskAnchor, toRole, nextRole) {
   const sanitizedAnchor = taskAnchor ? sanitizeAnchor(taskAnchor) : existingAnchor || null;
   if (!sanitizedAnchor) {
@@ -1494,16 +1506,24 @@ function handoffRunState(options) {
     options.nextRole,
   );
   const now = new Date();
-  const event = buildHandoffEvent({ state, options, now });
+  const clearPendingGate = shouldClearPendingGateForHandoff(state, options);
+  const event = buildHandoffEvent({
+    state,
+    options: {
+      ...options,
+      clearPendingGate,
+    },
+    now,
+  });
   const updatedState = {
     ...state,
     status: options.status || 'running',
     current_role: options.toRole,
     pending_input_update: false,
-    pending_gate: options.clearPendingGate
+    pending_gate: clearPendingGate
       ? null
       : (Object.prototype.hasOwnProperty.call(options, 'pendingGate') ? options.pendingGate || null : state.pending_gate || null),
-    gate_context: options.clearPendingGate
+    gate_context: clearPendingGate
       ? null
       : buildGateContext(state, options),
     verification: options.verificationData || state.verification || null,

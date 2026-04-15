@@ -956,7 +956,7 @@ function looksLikeExplicitTraceInput(input) {
 }
 
 function looksLikeScopeDeltaInput(input) {
-  return /范围|方案|边界|验收口径|新增接口|字段调整|路由|流程|真实接口|跨模块|全局状态|store|联动/i.test(String(input || ''));
+  return /范围|方案|边界|验收口径|新增接口|字段调整|路由|流程|真实接口|跨模块|全局状态|store|联动|验证码|短信验证|短信校验|token|oauth|权限|双因子|二次验证|风控/i.test(String(input || ''));
 }
 
 function looksLikeLowRiskQuickFixInput(input) {
@@ -3411,7 +3411,7 @@ function classifyChangeImpact(runState, latestInput) {
     };
   }
 
-  if (/范围|方案|边界|改成.*详情|详情联动|新增接口|字段调整|验收口径|路由|流程/i.test(text)) {
+  if (looksLikeScopeDeltaInput(text) || /改成.*详情|详情联动/i.test(text)) {
     return {
       change_context: changeContext,
       route_decision: 'scope-delta',
@@ -4357,6 +4357,17 @@ function buildUpdateReviewTurn(targetDir, status, currentArtifacts) {
     : (pendingGate ? looksLikeApprovalInput(latestInput) : false);
   const archiveSkipIntent = pendingGate === 'before-archive' ? looksLikeArchiveSkipInput(latestInput) : false;
   const changeDecision = currentArtifacts.run?.incremental_update || classifyChangeImpact(currentArtifacts.run, latestInput);
+  const gateReconcileIntent = Boolean(
+    pendingGate
+    && !approvalIntent
+    && !archiveSkipIntent
+    && changeDecision?.target_role
+    && (
+      changeDecision?.change_impact === 'archive-fix'
+      || changeDecision?.change_impact === 'scope-delta'
+      || (changeDecision?.change_impact === 'patch' && changeDecision?.target_role === 'requirement-analyst')
+    )
+  );
   const resumeRole = gateContext?.resume_to_role || inferPendingGateResumeRole(targetDir, currentArtifacts.run, flowDefinition, pendingGate);
   const useCompactArchiveGate = pendingGate === 'before-archive' && (approvalIntent || archiveSkipIntent);
   const orchestratorGuidance = useCompactArchiveGate
@@ -4443,6 +4454,12 @@ function buildUpdateReviewTurn(targetDir, status, currentArtifacts) {
           `针对 ${pendingGate} 产出 action=approve 的最小 runtime-action`,
           '审批通过后恢复到下一位可执行专家，而不是继续停在 waiting-approval',
         ]
+      : gateReconcileIntent
+      ? [
+          '将用户的增量修订意见吸收到运行态',
+          `生成 action=handoff 的 runtime-action，并 clear_pending_gate=true，回退到 ${changeDecision?.target_role || '对应专家'} 做增量修订`,
+          '增量修订完成后，再按主流程重新回到对应审批门禁，而不是停留在旧 gate',
+        ]
       : archiveSkipIntent
       ? [
           '将用户的“不归档”决定吸收到运行态',
@@ -4493,6 +4510,8 @@ function buildUpdateReviewTurn(targetDir, status, currentArtifacts) {
             review_policy: reviewPolicy,
             next_step: approvalIntent
               ? `生成 action=approve 的 runtime-action，清除 pending_gate，并恢复到 ${resumeRole || '下一位专家'}`
+              : gateReconcileIntent
+              ? `生成 action=handoff 的 runtime-action，clear_pending_gate=true，并回退到 ${changeDecision?.target_role || '对应专家'} 做增量修订`
               : archiveSkipIntent
               ? '生成 action=complete 的 runtime-action，保持现有交付结果并结束当前运行'
               : changeDecision?.change_impact === 'archive-fix'
