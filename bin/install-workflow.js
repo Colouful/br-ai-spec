@@ -2299,7 +2299,7 @@ async function handleUninstall(options) {
   }
   cleanupEmptyIdeDirs(targetDir);
   const aiSpecDir = path.join(targetDir, '.ai-spec');
-  if (fs.existsSync(aiSpecDir) && fs.readdirSync(aiSpecDir).filter((entry) => entry !== '.DS_Store').length === 0) {
+  if (fs.existsSync(aiSpecDir)) {
     removePath(aiSpecDir);
   }
   ok('卸载完成');

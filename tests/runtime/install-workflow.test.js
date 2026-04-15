@@ -52,6 +52,7 @@ function seedAiSpecRuntimeState(targetDir) {
   });
   writeText(path.join(targetDir, '.ai-spec', 'runner', 'consumed', 'stale.log'), 'stale\n');
   writeText(path.join(targetDir, '.ai-spec', 'runtime-actions', 'legacy.json'), '{}\n');
+  writeText(path.join(targetDir, '.ai-spec', 'stale-custom.txt'), 'stale\n');
 }
 
 function createFakePackageManagerBin(targetDir) {
