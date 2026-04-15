@@ -755,7 +755,7 @@ async function selectFromList(title, items, defaultIndex = 0) {
 }
 
 function formatSingleSelectLine(item, selectedIndex, cursorIndex, index) {
-  const marker = index === selectedIndex ? '(*)' : '( )';
+  const marker = index === selectedIndex ? '[✓]' : '[ ]';
   const prefix = index === cursorIndex ? color('❯', 'cyan') : ' ';
   return `  ${prefix} ${marker} ${item.label}${item.desc ? ` — ${item.desc}` : ''}`;
 }
@@ -851,7 +851,7 @@ async function selectSingleFromList(title, items, defaultIndex = 0) {
 }
 
 function formatMultiSelectLine(item, selectedValues, cursorIndex, index) {
-  const marker = selectedValues.has(item.value) ? '[x]' : '[ ]';
+  const marker = selectedValues.has(item.value) ? '[✓]' : '[ ]';
   const prefix = index === cursorIndex ? color('❯', 'cyan') : ' ';
   return `  ${prefix} ${marker} ${item.label}${item.desc ? ` — ${item.desc}` : ''}`;
 }

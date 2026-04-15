@@ -470,7 +470,11 @@
       <div class="nav">
         <section class="nav-section">
           <p class="nav-label">默认阅读路径</p>
-          <div class="nav-list" id="nav-list"></div>
+          <div class="nav-list" id="default-nav-list"></div>
+        </section>
+        <section class="nav-section">
+          <p class="nav-label">深入阅读</p>
+          <div class="nav-list" id="deep-nav-list"></div>
         </section>
       </div>
       <div class="sidebar-footer">
@@ -503,18 +507,21 @@
 
   <script>
     const HOME_FILE = "four/README.md";
-    const NAV_ITEMS = [
+    const DEFAULT_NAV_ITEMS = [
       { path: "four/README.md", title: "文档", desc: "默认阅读与阅读路径" },
       { path: "four/开发最佳实践指南.md", title: "开发最佳实践指南", desc: "面向开发者的默认起点" },
+      { path: "quick-start.md", title: "五分钟快速上手", desc: "快速了解安装后的目录与最小使用路径" },
       { path: "four/需求示例-从发起到归档.md", title: "需求示例", desc: "从发起需求到归档的完整链路" },
-      { path: "four/小需求与补丁修正指南.md", title: "小需求与补丁修正指南", desc: "轻量修正场景的建议路径" },
+      { path: "four/小需求与补丁修正指南.md", title: "小需求与补丁修正指南", desc: "轻量修正场景的建议路径" }
+    ];
+    const DEEP_NAV_ITEMS = [
       { path: "four/Hub资产同步脚本说明.md", title: "Hub 资产同步脚本说明", desc: "资产同步与脚本侧说明" },
-      { path: "four/架构设计与治理说明.md", title: "架构设计与治理说明", desc: "适合维护者与评审的深水区文档" },
-      { path: "quick-start.md", title: "五分钟快速上手", desc: "快速了解安装后的目录与最小使用路径" }
+      { path: "four/架构设计与治理说明.md", title: "架构设计与治理说明", desc: "适合维护者与评审的深水区文档" }
     ];
 
     const docsRootUrl = new URL("../", window.location.href);
-    const navList = document.getElementById("nav-list");
+    const defaultNavList = document.getElementById("default-nav-list");
+    const deepNavList = document.getElementById("deep-nav-list");
     const content = document.getElementById("content");
     const currentFileNode = document.getElementById("current-file");
     const rawLinkNode = document.getElementById("raw-link");
@@ -771,8 +778,8 @@
       return blocks.join("\n");
     }
 
-    function renderNav(activeFile) {
-      navList.innerHTML = NAV_ITEMS.map((item) => {
+    function renderNavItems(container, items, activeFile) {
+      container.innerHTML = items.map((item) => {
         const activeClass = item.path === activeFile ? "nav-link is-active" : "nav-link";
         return `
           <a class="${activeClass}" href="${buildViewerHref(item.path)}">
@@ -781,6 +788,11 @@
           </a>
         `;
       }).join("");
+    }
+
+    function renderNav(activeFile) {
+      renderNavItems(defaultNavList, DEFAULT_NAV_ITEMS, activeFile);
+      renderNavItems(deepNavList, DEEP_NAV_ITEMS, activeFile);
     }
 
     async function loadDocument() {

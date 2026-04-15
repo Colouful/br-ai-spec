@@ -138,6 +138,8 @@ async function verifyInteractiveCustomRuleSelectionUsesSpaceToggle() {
     await selection;
 
     const output = getOutput();
+    assert.ok(output.includes('[✓] 04-组件规范'));
+    assert.ok(!output.includes('[x]'));
     assert.ok(!output.includes('1) ['));
   });
 
@@ -191,7 +193,7 @@ async function verifyInteractiveSingleSelectionUsesArrowSpaceEnter() {
 
     const output = getOutput();
     assert.ok(output.includes('空格选择'));
-    assert.ok(output.includes('(*) react'));
+    assert.ok(output.includes('[✓] react'));
     assert.ok(!output.includes('1) vue'));
   });
 
@@ -214,7 +216,7 @@ async function verifyInteractiveSingleSelectionEnterConfirmsDefault() {
     selected = await selection;
 
     const output = getOutput();
-    assert.ok(output.includes('(*) 使用标准规范'));
+    assert.ok(output.includes('[✓] 使用标准规范'));
     assert.ok(!output.includes('请选择 (1-2)'));
   });
 
