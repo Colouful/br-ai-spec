@@ -1,6 +1,7 @@
 ---
 name: create-route
 description: 指导在前端项目中按团队规范创建和维护路由与页面，包括路由模块配置、页面目录结构及懒加载用法。当前端需要新增或重构页面路由时使用本技能。
+compatibility: Requires a local React project workspace and the repository's route/page conventions under .agents/rules/.
 ---
 
 # 创建与维护路由
@@ -18,6 +19,11 @@ description: 指导在前端项目中按团队规范创建和维护路由与页�
 - 页面目录名使用 `kebab-case`，例如 `login`、`user-manage`
 - 路由模块文件名使用 `kebab-case`，例如 `user-manage.ts`
 - 必须在全局唯一路由入口注册，禁止多处维护同一条路由
+
+## 常见错误
+
+- 不要在路由模块里直接夹带页面实现逻辑
+- 不要绕过唯一入口去重复注册同一条路由
 
 ---
 

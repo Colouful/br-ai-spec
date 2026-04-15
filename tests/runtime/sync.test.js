@@ -134,7 +134,7 @@ function createSupplementZip(options = {}) {
   const skillVersion = options.skillVersion || '2.3.4';
   const ruleVersion = options.ruleVersion || '3.4.5';
 
-  const bundleRoot = createWorkspace('br-ai-spec-supplement-bundle-');
+  const bundleRoot = createWorkspace('ai-spec-auto-supplement-bundle-');
   writeJsonFile(path.join(bundleRoot, '.agents/registry/profiles.json'), {
     version: 1,
     profiles: {
@@ -209,7 +209,7 @@ function createSupplementZip(options = {}) {
     },
   });
 
-  const zipPath = path.join(createWorkspace('br-ai-spec-supplement-zip-'), 'supplement.zip');
+  const zipPath = path.join(createWorkspace('ai-spec-auto-supplement-zip-'), 'supplement.zip');
   const zipped = spawnSync('zip', ['-qr', zipPath, '.'], {
     cwd: bundleRoot,
     encoding: 'utf8',
@@ -233,11 +233,11 @@ function createSupplementZip(options = {}) {
 }
 
 async function main() {
-  let result = runCli(['sync', createWorkspace('br-ai-spec-sync-missing-arg-'), '--manifest']);
+  let result = runCli(['sync', createWorkspace('ai-spec-auto-sync-missing-arg-'), '--manifest']);
   assert.strictEqual(result.status, 1);
   assert.ok(result.stderr.includes('选项 --manifest 需要一个参数值'));
 
-  const localTarget = createWorkspace('br-ai-spec-sync-local-');
+  const localTarget = createWorkspace('ai-spec-auto-sync-local-');
   const localManifestPath = path.join(localTarget, 'manifest.json');
   writeJsonFile(localManifestPath, createManifest('vue'));
 
@@ -251,7 +251,7 @@ async function main() {
     'vue',
   );
 
-  const legacySkillTarget = createWorkspace('br-ai-spec-sync-legacy-skill-');
+  const legacySkillTarget = createWorkspace('ai-spec-auto-sync-legacy-skill-');
   const legacySkillManifestPath = path.join(legacySkillTarget, 'manifest.json');
   writeJsonFile(
     legacySkillManifestPath,
@@ -264,7 +264,7 @@ async function main() {
   assert.ok(payload.warnings.some((item) => item.includes('create-api-react')));
   assert.ok(fs.existsSync(path.join(legacySkillTarget, '.agents', 'skills', 'create-api', 'SKILL.md')));
 
-  const legacyRuleTarget = createWorkspace('br-ai-spec-sync-legacy-rule-');
+  const legacyRuleTarget = createWorkspace('ai-spec-auto-sync-legacy-rule-');
   const legacyRuleManifestPath = path.join(legacyRuleTarget, 'manifest.json');
   writeJsonFile(
     legacyRuleManifestPath,
@@ -277,7 +277,7 @@ async function main() {
   assert.ok(payload.warnings.some((item) => item.includes('react-project-overview')));
   assert.ok(fs.existsSync(path.join(legacyRuleTarget, '.agents', 'rules', '01-项目概述.md')));
 
-  const scenarioMetadataTarget = createWorkspace('br-ai-spec-sync-scenario-metadata-');
+  const scenarioMetadataTarget = createWorkspace('ai-spec-auto-sync-scenario-metadata-');
   const scenarioMetadataManifestPath = path.join(scenarioMetadataTarget, 'manifest.json');
   writeJsonFile(
     scenarioMetadataManifestPath,
@@ -289,7 +289,7 @@ async function main() {
   assert.deepStrictEqual(payload.warnings, []);
   assert.ok(fs.existsSync(path.join(scenarioMetadataTarget, '.ai-spec', 'manifest.json')));
 
-  const metadataPreserveTarget = createWorkspace('br-ai-spec-sync-local-preferences-');
+  const metadataPreserveTarget = createWorkspace('ai-spec-auto-sync-local-preferences-');
   const metadataPreserveManifestPath = path.join(metadataPreserveTarget, 'manifest.json');
   writeJsonFile(
     metadataPreserveManifestPath,
@@ -316,7 +316,7 @@ async function main() {
     ['04-组件规范.md', '05-API规范.md'],
   );
 
-  const ideOverrideTarget = createWorkspace('br-ai-spec-sync-ide-');
+  const ideOverrideTarget = createWorkspace('ai-spec-auto-sync-ide-');
   const ideOverrideManifestPath = path.join(ideOverrideTarget, 'manifest.json');
   writeJsonFile(ideOverrideManifestPath, createManifest('vue', ['cursor', 'claude']));
   result = runCli(['sync', ideOverrideTarget, '--manifest', ideOverrideManifestPath, '--json']);
@@ -328,7 +328,7 @@ async function main() {
   assert.ok(fs.existsSync(path.join(ideOverrideTarget, '.claude', 'commands', 'spec-start.md')));
   assert.ok(!fs.existsSync(path.join(ideOverrideTarget, '.claude', 'commands', 'opsx-propose.md')));
 
-  const cleanupTarget = createWorkspace('br-ai-spec-sync-cleanup-');
+  const cleanupTarget = createWorkspace('ai-spec-auto-sync-cleanup-');
   const cleanupManifestPath = path.join(cleanupTarget, 'manifest.json');
   writeJsonFile(cleanupManifestPath, createManifest('vue', ['cursor', 'claude']));
   result = runCli(['sync', cleanupTarget, '--manifest', cleanupManifestPath, '--json']);
@@ -351,7 +351,7 @@ async function main() {
   assert.ok(!fs.existsSync(path.join(cleanupTarget, '.claude', 'commands', 'spec-start.md')));
   assert.ok(fs.existsSync(path.join(cleanupTarget, '.cursor', 'mcp.json')));
 
-  const remoteTarget = createWorkspace('br-ai-spec-sync-remote-');
+  const remoteTarget = createWorkspace('ai-spec-auto-sync-remote-');
   const remoteServer = await startServer((req, res) => {
     if (req.url === '/manifest.json') {
       res.writeHead(200, { 'content-type': 'application/json' });
@@ -384,16 +384,16 @@ async function main() {
       assert.strictEqual(lock.source.manifest, remoteManifestUrl);
       assert.strictEqual(sources.manifest.source, remoteManifestUrl);
 
-      result = await runCliAsync(['sync', createWorkspace('br-ai-spec-sync-invalid-'), '--manifest', `${origin}/invalid.json`, '--json']);
+      result = await runCliAsync(['sync', createWorkspace('ai-spec-auto-sync-invalid-'), '--manifest', `${origin}/invalid.json`, '--json']);
       assert.strictEqual(result.status, 1);
       assert.ok(result.stderr.includes('Remote manifest is not valid JSON'));
 
-      result = await runCliAsync(['sync', createWorkspace('br-ai-spec-sync-404-'), '--manifest', `${origin}/missing.json`, '--json']);
+      result = await runCliAsync(['sync', createWorkspace('ai-spec-auto-sync-404-'), '--manifest', `${origin}/missing.json`, '--json']);
       assert.strictEqual(result.status, 1);
       assert.ok(result.stderr.includes('Remote manifest request failed with status 404'));
 
       result = await runCliAsync(
-        ['sync', createWorkspace('br-ai-spec-sync-timeout-'), '--manifest', `${origin}/timeout.json`, '--json'],
+        ['sync', createWorkspace('ai-spec-auto-sync-timeout-'), '--manifest', `${origin}/timeout.json`, '--json'],
         { AI_SPEC_REMOTE_MANIFEST_TIMEOUT_MS: '50' },
       );
       assert.strictEqual(result.status, 1);
@@ -406,7 +406,7 @@ async function main() {
   }
 
   const supplement = createSupplementZip();
-  const remoteSupplementTarget = createWorkspace('br-ai-spec-sync-supplement-remote-');
+  const remoteSupplementTarget = createWorkspace('ai-spec-auto-sync-supplement-remote-');
   const supplementManifest = createManifest('vue', ['cursor'], {
     roles: [supplement.roleId],
     skills: [supplement.skillId],
@@ -471,7 +471,7 @@ async function main() {
       assert.strictEqual(lockRule.version, supplement.ruleVersion);
       assert.ok(remoteSources.registries.some((item) => item.type === 'hub-supplement' && item.source === origin));
 
-      const localSupplementTarget = createWorkspace('br-ai-spec-sync-supplement-local-');
+      const localSupplementTarget = createWorkspace('ai-spec-auto-sync-supplement-local-');
       const localSupplementManifestPath = path.join(localSupplementTarget, 'manifest.json');
       writeJsonFile(localSupplementManifestPath, supplementManifest);
       result = await runCliAsync(
@@ -480,7 +480,7 @@ async function main() {
       assert.strictEqual(result.status, 0, result.stderr);
       assert.ok(fs.existsSync(path.join(localSupplementTarget, '.agents/rules', `${supplement.ruleId}.md`)));
 
-      const noHubFetchTarget = createWorkspace('br-ai-spec-sync-no-hub-fetch-');
+      const noHubFetchTarget = createWorkspace('ai-spec-auto-sync-no-hub-fetch-');
       const noHubFetchManifestPath = path.join(noHubFetchTarget, 'manifest.json');
       writeJsonFile(noHubFetchManifestPath, supplementManifest);
       result = await runCliAsync(
@@ -495,7 +495,7 @@ async function main() {
     console.warn(`sync test notice: supplement HTTP checks skipped (${supplementServer.reason})`);
   }
 
-  const wrapperTarget = createWorkspace('br-ai-spec-install-sync-');
+  const wrapperTarget = createWorkspace('ai-spec-auto-install-sync-');
   const wrapperManifestPath = path.join(wrapperTarget, 'wrapper-manifest.json');
   writeJsonFile(wrapperManifestPath, createManifest('vue', ['cursor', 'claude']));
   result = runInstall(['sync', wrapperTarget, '--manifest', wrapperManifestPath], {

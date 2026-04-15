@@ -1,6 +1,6 @@
 # Hub 资产同步脚本说明
 
-这份说明对应当前项目里的本地脚本 [scripts/hub-sync-assets.js](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/scripts/hub-sync-assets.js)。
+这份说明对应当前项目里的本地脚本 [scripts/hub-sync-assets.js](../../scripts/hub-sync-assets.js)。
 
 目标只有一个：把当前仓库维护的 `skill / rule / 专家 / 场景方案` 批量同步到本地启动的 Hub 平台，减少在管理弹窗里重复上传文档的成本。
 
@@ -15,10 +15,10 @@
 
 本地来源分别是：
 
-- `skill`: [.agents/registry/skills.json](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/.agents/registry/skills.json)
-- `rule`: [.agents/registry/rules.json](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/.agents/registry/rules.json)
-- `role`: [.agents/registry/roles.json](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/.agents/registry/roles.json)
-- `scenario`: [.agents/registry/scenario-packages.json](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/.agents/registry/scenario-packages.json)
+- `skill`: [.agents/registry/skills.json](../../.agents/registry/skills.json)
+- `rule`: [.agents/registry/rules.json](../../.agents/registry/rules.json)
+- `role`: [.agents/registry/roles.json](../../.agents/registry/roles.json)
+- `scenario`: [.agents/registry/scenario-packages.json](../../.agents/registry/scenario-packages.json)
 
 ## 脚本能力
 
@@ -131,7 +131,7 @@ version update requires agent login
 
 示例配置在：
 
-- [scripts/hub-sync-assets.config.example.json](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/scripts/hub-sync-assets.config.example.json)
+- [scripts/hub-sync-assets.config.example.json](../../scripts/hub-sync-assets.config.example.json)
 
 实际本地私有配置建议新建：
 
@@ -347,7 +347,7 @@ node ./scripts/hub-sync-assets.js \
 - `resources.scenarios`
   - 场景 `name` 和 `description` 都配置中文
 
-当前仓库的 [scripts/hub-sync-assets.config.example.json](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/scripts/hub-sync-assets.config.example.json) 已经包含一套可直接复用的中文名称映射。常见映射示例：
+当前仓库的 [scripts/hub-sync-assets.config.example.json](../../scripts/hub-sync-assets.config.example.json) 已经包含一套可直接复用的中文名称映射。常见映射示例：
 
 - skill
   - `using-superpowers` -> `技能调度核心规范`
@@ -373,9 +373,9 @@ node ./scripts/hub-sync-assets.js \
 
 ## 相关文件
 
-- [scripts/hub-sync-assets.js](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/scripts/hub-sync-assets.js)
-- [scripts/hub-sync-assets.config.example.json](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/scripts/hub-sync-assets.config.example.json)
-- [.agents/registry/skills.json](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/.agents/registry/skills.json)
-- [.agents/registry/rules.json](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/.agents/registry/rules.json)
-- [.agents/registry/roles.json](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/.agents/registry/roles.json)
-- [.agents/registry/scenario-packages.json](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/.agents/registry/scenario-packages.json)
+- [scripts/hub-sync-assets.js](../../scripts/hub-sync-assets.js)
+- [scripts/hub-sync-assets.config.example.json](../../scripts/hub-sync-assets.config.example.json)
+- [.agents/registry/skills.json](../../.agents/registry/skills.json)
+- [.agents/registry/rules.json](../../.agents/registry/rules.json)
+- [.agents/registry/roles.json](../../.agents/registry/roles.json)
+- [.agents/registry/scenario-packages.json](../../.agents/registry/scenario-packages.json)

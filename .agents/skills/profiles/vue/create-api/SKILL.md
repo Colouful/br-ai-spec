@@ -1,6 +1,7 @@
 ---
 name: create-api
 description: 指导在 Vue 3 项目中按团队规范创建和维护 HTTP 接口，包括类型定义、请求封装、命名约定与错误处理。当前端需要新增或调整 API 时使用本技能。
+compatibility: Requires a local Vue project workspace and the repository's API/rule conventions under .agents/rules/.
 ---
 
 # 创建与维护 API

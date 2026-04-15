@@ -18,6 +18,11 @@ function writeJson(filePath, value) {
   fs.writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
 }
 
+function writeText(filePath, value) {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, value, 'utf8');
+}
+
 function writeExecutable(filePath, content) {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   fs.writeFileSync(filePath, content, 'utf8');
@@ -232,6 +237,14 @@ async function main() {
   assert.strictEqual(result.status, 0, result.stderr);
   assert.ok(fs.existsSync(path.join(target, '.agents', 'rules', '01-项目概述.md')));
   assert.ok(fs.existsSync(path.join(target, '.agents', 'skills', 'create-proposal', 'SKILL.md')));
+  assert.ok(fs.existsSync(path.join(target, '.agents', 'roles', 'common', 'task-orchestrator.md')));
+  assert.ok(fs.existsSync(path.join(target, '.agents', 'roles', 'domains', 'testing', 'unit-test-specialist.md')));
+  assert.ok(!fs.existsSync(path.join(target, '.agents', 'roles', 'domains', 'governance', 'lint-policy-specialist.md')));
+  assert.ok(fs.existsSync(path.join(target, '.agents', 'flows', 'common', 'prd-to-delivery.md')));
+  assert.ok(fs.existsSync(path.join(target, '.agents', 'flows', 'common', 'bugfix-to-verification.md')));
+  assert.ok(fs.existsSync(path.join(target, '.agents', 'orchestration', 'task-orchestrator-run-plan-template.md')));
+  assert.ok(!fs.existsSync(path.join(target, '.agents', 'orchestration', 'expert-dispatch-spec.md')));
+  assert.ok(!fs.existsSync(path.join(target, '.agents', 'registry')));
   assert.ok(fs.existsSync(path.join(target, 'node_modules', '.bin', 'ai-spec-auto')) || fs.existsSync(path.join(target, 'node_modules', '.bin', 'ai-spec-auto.cmd')));
   assert.ok(!fs.existsSync(path.join(target, '.cursor')));
 
@@ -257,6 +270,35 @@ async function main() {
   result = runCli(['check', syncOnlyTarget]);
   assert.strictEqual(result.status, 0, result.stderr);
   assert.ok(result.stdout.includes('sync --manifest 同步资源'));
+
+  const updateBackfillTarget = createWorkspace('ai-spec-update-backfill-');
+  writeJson(path.join(updateBackfillTarget, 'package.json'), {
+    name: 'update-backfill-smoke',
+    version: '1.0.0',
+  });
+  fs.mkdirSync(path.join(updateBackfillTarget, '.agents', 'rules'), { recursive: true });
+  fs.mkdirSync(path.join(updateBackfillTarget, '.agents', 'skills'), { recursive: true });
+  result = runCli(['update', updateBackfillTarget, '--skip-skills', '--skip-configs', '--skip-openspec', '--skip-uipro']);
+  assert.strictEqual(result.status, 0, result.stderr);
+  assert.ok(fs.existsSync(path.join(updateBackfillTarget, '.agents', 'roles', 'common', 'task-orchestrator.md')));
+  assert.ok(fs.existsSync(path.join(updateBackfillTarget, '.agents', 'flows', 'common', 'prd-to-delivery.md')));
+  assert.ok(fs.existsSync(path.join(updateBackfillTarget, '.agents', 'orchestration', 'task-orchestrator-runtime-hooks.md')));
+  assert.ok(!fs.existsSync(path.join(updateBackfillTarget, '.agents', 'registry')));
+
+  const protocolWarningTarget = createWorkspace('ai-spec-check-protocol-warning-');
+  writeJson(path.join(protocolWarningTarget, 'package.json'), {
+    name: 'check-protocol-warning-smoke',
+    version: '1.0.0',
+  });
+  fs.mkdirSync(path.join(protocolWarningTarget, '.agents', 'rules'), { recursive: true });
+  fs.mkdirSync(path.join(protocolWarningTarget, '.agents', 'skills'), { recursive: true });
+  writeText(path.join(protocolWarningTarget, 'node_modules', '.bin', 'ai-spec-auto'), '#!/bin/sh\nexit 0\n');
+  writeText(path.join(protocolWarningTarget, '.cursor', 'commands', 'spec-start.md'), '# spec-start\n');
+  writeText(path.join(protocolWarningTarget, '.cursor', 'rules'), '');
+  result = runCli(['check', protocolWarningTarget]);
+  assert.strictEqual(result.status, 0, result.stderr);
+  assert.ok(result.stdout.includes('缺少 .agents/roles、.agents/flows、.agents/orchestration'));
+  assert.ok(!result.stdout.includes('.agents/registry'));
 
   const manifestInitTarget = createWorkspace('ai-spec-init-manifest-');
   writeJson(path.join(manifestInitTarget, 'package.json'), {
@@ -303,6 +345,9 @@ exit 1
   assert.ok(!fs.existsSync(path.join(manifestInitTarget, '.agents', 'skills', 'create-api')));
   assert.ok(fs.existsSync(path.join(manifestInitTarget, '.agents', 'rules', '05-API规范.md')));
   assert.ok(!fs.existsSync(path.join(manifestInitTarget, '.agents', 'rules', '01-项目概述.md')));
+  assert.ok(fs.existsSync(path.join(manifestInitTarget, '.agents', 'roles', 'common', 'task-orchestrator.md')));
+  assert.ok(fs.existsSync(path.join(manifestInitTarget, '.agents', 'flows', 'common', 'prd-to-delivery.md')));
+  assert.ok(!fs.existsSync(path.join(manifestInitTarget, '.agents', 'registry')));
   assert.ok(fs.existsSync(path.join(manifestInitTarget, '.cursor', 'commands', 'opsx-propose.md')));
   assert.ok(fs.existsSync(path.join(manifestInitTarget, 'node_modules', '.bin', 'ai-spec-auto')) || fs.existsSync(path.join(manifestInitTarget, 'node_modules', '.bin', 'ai-spec-auto.cmd')));
   assert.ok(result.stdout.includes('预校验通过'));

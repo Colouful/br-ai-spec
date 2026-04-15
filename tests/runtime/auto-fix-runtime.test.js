@@ -40,7 +40,7 @@ function writePackageJson(targetDir, buildCommand) {
 }
 
 function createWorkspace(buildCommand = 'node -e "process.exit(1)"') {
-  const targetDir = fs.mkdtempSync(path.join(os.tmpdir(), 'br-ai-spec-auto-fix-test-'));
+  const targetDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-spec-auto-auto-fix-test-'));
   writePackageJson(targetDir, buildCommand);
   writeProjectFile(targetDir, 'pnpm-lock.yaml', 'lockfileVersion: 9.0');
   writeProjectFile(targetDir, 'src/router/index.ts', 'export const router = {}');

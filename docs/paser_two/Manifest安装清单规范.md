@@ -17,7 +17,7 @@
 
 配套状态文件规范见：
 
-- [lock与sources结构规范-03-27-17-17.md](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/paser_two/lock与sources结构规范-03-27-17-17.md)
+- [lock与sources结构规范-03-27-17-17.md](lock与sources结构规范-03-27-17-17.md)
 
 不在本阶段定义：
 
@@ -239,7 +239,7 @@ flowchart LR
   "sources": [
     {
       "type": "hub",
-      "name": "br-ai-spec-hub",
+      "name": "ai-spec-auto-hub",
       "url": "https://hub.example.com/manifests/vue-frontend-basic.json"
     }
   ],
@@ -382,7 +382,7 @@ CLI 读取 `manifest（安装清单）` 后，建议按下面顺序做校验：
 
 `sync（同步）` 的输入输出契约详见：
 
-- [ai-spec-auto-sync输入输出契约-03-27-17-09.md](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/paser_two/ai-spec-sync输入输出契约-03-27-17-09.md)
+- [ai-spec-auto-sync输入输出契约-03-27-17-09.md](ai-spec-sync输入输出契约-03-27-17-09.md)
 
 ### 10.1 初始化安装
 

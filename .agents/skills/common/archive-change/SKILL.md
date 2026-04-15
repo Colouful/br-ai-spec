@@ -1,6 +1,7 @@
 ---
 name: archive-change
-description: 变更归档增强层。在执行 /opsx:archive 时确保增量规范正确合并到 openspec/specs/，变更目录归档到正确路径，并输出合并摘要。
+description: 当用户执行 `/opsx:archive`、`/opsx-archive` 或要求归档当前 OpenSpec 变更时，校验归档前置条件、合并增量规范并输出归档摘要。
+compatibility: Requires an OpenSpec workspace with openspec/changes/, the local ai-spec-auto archive-change command, and repository write access for spec/archive updates.
 ---
 
 # 归档变更（OpenSpec 增强层）
@@ -34,6 +35,18 @@ description: 变更归档增强层。在执行 /opsx:archive 时确保增量规�
 
 除非该命令不可用，否则不要手工执行 `mkdir`、`cp`、`mv` 去合并或迁移目录。
 该命令成功后会直接完成运行收尾；不要再手工补 `runtime-state complete`，也不要额外执行 `protocol-advance`。
+
+## 环境依赖
+
+- 需要本地存在 `openspec/changes/<change-id>/` 与 `openspec/specs/`
+- 默认依赖 `ai-spec-auto archive-change` 命令而不是手工目录操作
+- 会引用仓库内的 OpenSpec 与 `.agents/rules` 约束，不适合作为脱离仓库的通用归档 skill
+
+## 归档前核对清单
+
+- [ ] 变更目录和关键文档齐全
+- [ ] `tasks.md` 完成状态已核对
+- [ ] 已确认优先使用 `ai-spec-auto archive-change`
 
 ---
 

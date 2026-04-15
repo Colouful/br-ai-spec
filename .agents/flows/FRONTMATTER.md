@@ -10,7 +10,7 @@
 
 与 `ai-spec-auto run` 的最小 JSON 输出约定见：
 
-- [RUN_OUTPUT.md](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/.agents/flows/RUN_OUTPUT.md)
+- [RUN_OUTPUT.md](RUN_OUTPUT.md)
 
 ## 1. 基本规则
 

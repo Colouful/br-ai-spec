@@ -23,7 +23,7 @@
 优先使用：
 
 ```bash
-bash /Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/scripts/setup-cursor-spec-archive-test.sh
+bash ./scripts/setup-cursor-spec-archive-test.sh
 ```
 
 默认目标目录就是：

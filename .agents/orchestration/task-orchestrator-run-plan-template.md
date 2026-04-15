@@ -280,5 +280,5 @@ ai-spec-auto runtime-state bootstrap --payload ./.ai-spec/internal/tmp/task-orch
 
 对应规范见：
 
-- [task-anchor-spec.md](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/.agents/roles/common/task-anchor-spec.md)
-- [task-orchestrator-bootstrap-payload.md](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/.agents/roles/common/task-orchestrator-bootstrap-payload.md)
+- [task-anchor-spec.md](../roles/common/task-anchor-spec.md)
+- [task-orchestrator-bootstrap-payload.md](../roles/common/task-orchestrator-bootstrap-payload.md)

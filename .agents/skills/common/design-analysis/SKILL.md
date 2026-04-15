@@ -1,6 +1,7 @@
 ---
 name: design-analysis
-description: 通用设计稿分析技能。只要需要「分析设计稿、梳理前端 UI 开发任务」，就使用本技能。产出 UI 分析清单，供开发与验收参照。
+description: 当用户提供设计稿、UI 描述或页面还原需求时，分析界面结构与交互细节，输出可执行的 UI 分析清单供开发和验收使用。
+compatibility: Requires access to design artifacts and the local repository output path docs/样式还原/; may reference sibling skills and local .agents/rules.
 ---
 
 # 设计稿分析
@@ -13,6 +14,11 @@ description: 通用设计稿分析技能。只要需要「分析设计稿、梳�
 - 需要产出一份**UI 分析清单**文档，供后续开发按清单实现、或供验收时对照
 
 不限定阶段：可在写提案前、写提案中、或单独做一次「只分析不写提案」时使用。
+
+## 环境依赖
+
+- 默认将分析清单落到 `docs/样式还原/`
+- 若涉及复杂交互，会引用本仓库内的交互摘要模板与提案 skill
 
 ---
 

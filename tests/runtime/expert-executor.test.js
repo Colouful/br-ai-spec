@@ -82,7 +82,7 @@ function buildArchiveDispatch(runId) {
 }
 
 function createWorkspace() {
-  const targetDir = fs.mkdtempSync(path.join(os.tmpdir(), 'br-ai-spec-executor-test-'));
+  const targetDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-spec-auto-executor-test-'));
   writeProjectFile(targetDir, 'package.json', JSON.stringify({
     name: 'executor-smoke',
     scripts: {

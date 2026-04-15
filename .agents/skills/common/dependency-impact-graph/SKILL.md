@@ -1,6 +1,7 @@
 ---
 name: dependency-impact-graph
 description: 分析 monorepo、多包仓库或单仓模块间的依赖关系，判断“改一个包、目录或文件会影响谁”，并给出回归测试范围与潜在消费者提醒。当用户说“改了这个包会影响谁”“依赖影响分析”“回归测试范围”时使用。
+compatibility: Requires a local repository workspace with dependency manifests, package/module boundaries, and source files available for static inspection.
 ---
 
 # 依赖影响分析

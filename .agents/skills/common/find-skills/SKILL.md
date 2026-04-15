@@ -18,6 +18,17 @@ Use this skill when the user:
 - Wants to search for tools, templates, or workflows
 - Mentions they wish they had help with a specific domain (design, testing, deployment, etc.)
 
+## Search Checklist
+
+- [ ] Confirm the user is asking for a capability, workflow, or installable help
+- [ ] Extract the domain and the concrete task
+- [ ] Search with specific keywords before suggesting manual reinvention
+
+## Gotchas
+
+- Do not recommend a skill before checking whether it actually matches the user request
+- Do not present installation steps as mandatory if the user only asked what exists
+
 ## What is the Skills CLI?
 
 The Skills CLI (`npx skills`) is the package manager for the open agent skills ecosystem. Skills are modular packages that extend agent capabilities with specialized knowledge, workflows, and tools.

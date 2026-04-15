@@ -1,6 +1,7 @@
 ---
 name: config-and-secret-scan
 description: 统一配置项命名、分层与校验方式，并扫描代码与配置文件中的硬编码密钥、敏感信息或不安全配置。当用户说“检查配置”“新增配置项”“扫描敏感信息”“密钥泄露”“secret scan”“环境变量规范”时使用。
+compatibility: Requires access to a local repository workspace and project config files; designed for source scanning rather than remote-only review.
 ---
 
 # 配置与敏感信息扫描

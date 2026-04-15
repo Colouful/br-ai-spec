@@ -1,12 +1,24 @@
 ---
 name: using-superpowers
-description: 技能调度核心规范。默认在对话开始前检查适用技能；若当前已进入 br-ai-spec 协议驱动轮次，则切换为轻量豁免模式，避免重复展开重型技能检查。
-version: 1.0.0
+description: 当开始新对话、准备分派任务或尚未进入协议驱动执行轮次时，先检查适用 skill；若已进入 ai-spec-auto 协议轮次，则按轻量豁免模式避免重复调度。
+compatibility: Requires the ai-spec-auto skill/runtime environment, local skill registry, and protocol-step/protocol-advance style turn metadata for protocol-aware bypass.
+metadata:
+  version: "1.0.0"
 ---
 
 # Superpowers 技能调度规范
 
 > 核心原则：**在执行任何操作之前，先检查是否有适用的技能。**
+
+## 环境依赖
+
+- 依赖本仓库的 `.agents/skills/` 目录与协议运行时约定
+- 不适合作为与仓库无关的通用“永远先扫技能”模板
+
+## 注意事项
+
+- 一旦进入协议驱动轮次，不要再把本技能当成新的主流程
+- 子代理和协议回合都属于明确豁免场景，不能重复抢控制权
 
 ## 协议驱动轮次的轻量豁免
 

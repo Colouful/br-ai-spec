@@ -333,10 +333,10 @@ ai-spec-auto sync . --manifest https://hub.example.com/manifests/project-abc.jso
 
 这份契约与下面两份规范配套使用：
 
-- [Manifest安装清单规范.md](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/paser_two/Manifest安装清单规范.md)
-- [lock与sources结构规范-03-27-17-17.md](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/paser_two/lock与sources结构规范-03-27-17-17.md)
-- [ai-spec-auto-run输入输出契约-03-27-17-55.md](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/paser_two/ai-spec-run输入输出契约-03-27-17-55.md)
-- [RUN_OUTPUT.md](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/.agents/flows/RUN_OUTPUT.md)
+- [Manifest安装清单规范.md](Manifest安装清单规范.md)
+- [lock与sources结构规范-03-27-17-17.md](lock与sources结构规范-03-27-17-17.md)
+- [ai-spec-auto-run输入输出契约-03-27-17-55.md](ai-spec-run输入输出契约-03-27-17-55.md)
+- [RUN_OUTPUT.md](../../.agents/flows/RUN_OUTPUT.md)
 
 关系是：
 

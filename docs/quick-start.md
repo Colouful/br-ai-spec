@@ -152,6 +152,6 @@ npx @ex/ai-spec-auto@latest update . --skip-skills --skip-configs --skip-openspe
 
 ## 7. 继续阅读
 
-- [安装指南](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/install-guide.md)
-- [OpenSpec / 协议流说明](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/openspec-guide.md)
-- [文档索引](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/README.md)
+- [安装指南](install-guide.md)
+- [OpenSpec / 协议流说明](openspec-guide.md)
+- [文档索引](README.md)

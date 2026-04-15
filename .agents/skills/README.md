@@ -13,6 +13,33 @@ description: 技能目录索引。安装到目标项目后此目录为扁平结�
 - 优先按“复用范围”和“技术栈”组织 skill
 - 角色负责职责边界，skill 负责具体方法
 
+## 官方标准与本仓库约束
+
+本仓库的 skill 资产默认同时满足两层约束：
+
+- 官方 Agent Skills 规范：frontmatter、description、progressive disclosure、bundled resources
+- 本仓库扩展：`.agents/rules/`、OpenSpec、Hub 同步、eval 基线
+
+强制规则：
+
+- `SKILL.md` frontmatter 只允许 `name`、`description`、`license`、`compatibility`、`metadata`、`allowed-tools`
+- `description` 必须同时表达“能力范围”和“何时使用”
+- 依赖本仓库目录、OpenSpec、Browser、Vitest 等环境时，必须写 `compatibility`
+- bundled resources 统一使用 skill 根目录下的 `references/`、`scripts/`、`assets/`
+- 新建 skill 默认补 `evals/train_queries.json`、`evals/validation_queries.json`、`evals/evals.json`
+
+校验入口：
+
+```bash
+node ./bin/validate-registry.js --json
+python3 .agents/skills/common/skill-creator/scripts/quick_validate.py <skill-dir>
+```
+
+详细说明见：
+
+- [Skill官方标准与创建规范](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/four/Skill官方标准与创建规范.md)
+- [Skill官方审计基线](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/four/Skill官方审计基线.md)
+
 ## common/ — 通用技能（与技术栈无关）
 
 | 技能 | 用途 | 配合规范 |

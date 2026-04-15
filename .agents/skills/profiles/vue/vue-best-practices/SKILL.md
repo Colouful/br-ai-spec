@@ -11,6 +11,18 @@ metadata:
 
 Use this skill as an instruction set. Follow the workflow in order unless the user explicitly asks for a different order.
 
+## Workflow Checklist
+
+- [ ] Confirm the project really is Vue and identify the expected architecture
+- [ ] Read the required core references before implementation
+- [ ] Apply optional references only when the requirement needs them
+- [ ] Verify behavior first, then run the performance pass
+
+## Gotchas
+
+- Do not force Options API or JSX patterns into a Composition API project without explicit repo evidence
+- Do not load every reference file by default; keep the working set scoped to the current task
+
 ## Core Principles
 - **Keep state predictable:** one source of truth, derive everything else.
 - **Make data flow explicit:** Props down, Events up for most cases.

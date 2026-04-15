@@ -1304,6 +1304,75 @@ function copyAgents(targetDir, sourceDir, profilesRegistry, options, copyMode = 
   ok(`.agents/ 同步完成 (profile: ${options.profile})`);
 }
 
+function readInstallRegistry(sourceDir, fileName, objectKey) {
+  const filePath = path.join(sourceDir, '.agents', 'registry', fileName);
+  if (!fs.existsSync(filePath)) {
+    throw new Error(`Registry file not found: ${filePath}`);
+  }
+  const data = readJson(filePath, fileName);
+  if (!data || typeof data !== 'object' || !data[objectKey] || typeof data[objectKey] !== 'object') {
+    throw new Error(`Registry ${fileName} is missing root key "${objectKey}"`);
+  }
+  return data;
+}
+
+function copyRequiredProtocolFile(sourceDir, targetDir, relPath, copiedPaths) {
+  if (!relPath || copiedPaths.has(relPath)) {
+    return;
+  }
+
+  const sourcePath = path.join(sourceDir, relPath);
+  const targetPath = path.join(targetDir, relPath);
+  if (!copyFile(sourcePath, targetPath)) {
+    throw new Error(`Protocol asset missing: ${relPath}`);
+  }
+  copiedPaths.add(relPath);
+}
+
+function syncProtocolAssets(targetDir, sourceDir) {
+  info('同步协议资产（roles / flows / orchestration）...');
+  const rolesRegistry = readInstallRegistry(sourceDir, 'roles.json', 'roles');
+  const flowsRegistry = readInstallRegistry(sourceDir, 'flows.json', 'flows');
+  const copiedPaths = new Set();
+  const activeRoles = Object.entries(rolesRegistry.roles || {})
+    .filter(([, entry]) => entry?.status === 'active')
+    .map(([id, entry]) => ({ id, ...entry }));
+  const activeFlows = Object.entries(flowsRegistry.flows || {})
+    .filter(([, entry]) => entry?.status === 'active')
+    .map(([id, entry]) => ({ id, ...entry }));
+
+  for (const relPath of normalizeList(rolesRegistry.support_files)) {
+    copyRequiredProtocolFile(sourceDir, targetDir, relPath, copiedPaths);
+  }
+  for (const relPath of normalizeList(flowsRegistry.support_files)) {
+    copyRequiredProtocolFile(sourceDir, targetDir, relPath, copiedPaths);
+  }
+
+  for (const role of activeRoles) {
+    if (typeof role.source !== 'string' || !role.source.trim()) {
+      throw new Error(`Active role is missing source: ${role.id}`);
+    }
+    copyRequiredProtocolFile(sourceDir, targetDir, role.source, copiedPaths);
+    const domainMatch = role.source.match(/^\.agents\/roles\/domains\/([^/]+)\//);
+    if (domainMatch) {
+      copyRequiredProtocolFile(sourceDir, targetDir, `.agents/roles/domains/${domainMatch[1]}/README.md`, copiedPaths);
+    }
+  }
+
+  for (const flow of activeFlows) {
+    if (typeof flow.source !== 'string' || !flow.source.trim()) {
+      throw new Error(`Active flow is missing source: ${flow.id}`);
+    }
+    copyRequiredProtocolFile(sourceDir, targetDir, flow.source, copiedPaths);
+  }
+
+  ok(`协议资产同步完成 (roles: ${activeRoles.length}, flows: ${activeFlows.length})`);
+  return {
+    roles: activeRoles.map((item) => item.id),
+    flows: activeFlows.map((item) => item.id),
+  };
+}
+
 function copyConfigs(targetDir, sourceDir, profilesRegistry, options, skipExisting = true) {
   const commonDir = path.join(sourceDir, 'configs', 'common');
   const { configsDir } = getProfileDirs(sourceDir, options.profile, profilesRegistry);
@@ -1703,7 +1772,7 @@ function printInstallReport(targetDir, options, pending) {
   }
   console.log('');
   info('已部署内容：');
-  console.log(`  ${color('✔', 'green')} .agents/rules + skills (profile: ${options.profile})`);
+  console.log(`  ${color('✔', 'green')} .agents/rules + skills + roles + flows + orchestration (profile: ${options.profile})`);
   console.log(`  ${options.installLint === 'yes' ? color('✔', 'green') : color('—', 'yellow')} lint/format 配置${options.installLint === 'yes' ? ' (.prettierrc, .eslintrc, .stylelintrc)' : '（已跳过）'}`);
   console.log(`  ${options.installHusky === 'yes' ? color('✔', 'green') : color('—', 'yellow')} 提交校验${options.installHusky === 'yes' ? ' (.husky, .lintstagedrc, commitlint.config.js)' : '（已跳过）'}`);
   if (fs.existsSync(path.join(targetDir, '.agents', 'skills', 'ui-ux-pro-max', 'SKILL.md'))) {
@@ -1919,6 +1988,7 @@ async function handleInit(options) {
   const pending = { failures: [], configs: [], warnings: [] };
   const previousInstallState = readInstallState(targetDir);
   copyAgents(targetDir, sourceDir, profilesRegistry, options);
+  syncProtocolAssets(targetDir, sourceDir);
   installStateAdditions.addedDevDependencies.push(...installLocalCli(targetDir, sourceDir, pkgManager, pending));
   if (options.installLint === 'yes') {
     installStateAdditions.createdConfigFiles.push(...copyConfigs(targetDir, sourceDir, profilesRegistry, options, true));
@@ -2026,6 +2096,7 @@ async function handleUpdate(options) {
       skipSkills: options.updateSkills !== 'yes',
     });
   }
+  syncProtocolAssets(targetDir, sourceDir);
   installStateAdditions.addedDevDependencies.push(...installLocalCli(targetDir, sourceDir, pkgManager, pending));
   if (options.updateConfigs === 'yes') {
     installStateAdditions.createdConfigFiles.push(...copyConfigs(targetDir, sourceDir, profilesRegistry, options, true));
@@ -2101,6 +2172,22 @@ function handleCheck(options) {
     ok('openspec/ 存在');
   } else {
     info('openspec/ 不存在（默认完整安装会生成；兼容 L1/L2 可无）');
+  }
+  const hasProtocolCommandEntry = ALL_IDES.some((ide) => (
+    fs.existsSync(path.join(targetDir, `.${ide}`, 'commands', 'spec-start.md')) ||
+    fs.existsSync(path.join(targetDir, `.${ide}`, 'commands', 'spec-continue.md')) ||
+    fs.existsSync(path.join(targetDir, `.${ide}`, 'commands', 'spec-update.md')) ||
+    fs.existsSync(path.join(targetDir, `.${ide}`, 'commands', 'spec-orchestrate.md'))
+  ));
+  const requiresProtocolAssets = fs.existsSync(path.join(targetDir, 'openspec')) || hasProtocolCommandEntry;
+  if (requiresProtocolAssets) {
+    const missingProtocolAssets = [];
+    if (!fs.existsSync(path.join(agentsDir, 'roles'))) missingProtocolAssets.push('.agents/roles');
+    if (!fs.existsSync(path.join(agentsDir, 'flows'))) missingProtocolAssets.push('.agents/flows');
+    if (!fs.existsSync(path.join(agentsDir, 'orchestration'))) missingProtocolAssets.push('.agents/orchestration');
+    if (missingProtocolAssets.length > 0) {
+      warn(`检测到 OpenSpec 或协议命令入口，但缺少 ${missingProtocolAssets.join('、')}；建议运行: npx @ex/ai-spec-auto@latest update .`);
+    }
   }
   printTools(detectInstalledLevel(targetDir), fs.existsSync(path.join(targetDir, '.agents', 'skills', 'ui-ux-pro-max')) ? 'yes' : 'no');
   console.log('');

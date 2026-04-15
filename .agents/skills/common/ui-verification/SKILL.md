@@ -1,6 +1,7 @@
 ---
 name: ui-verification
-description: 通用 UI 验收技能。验收必须以「实际页面效果 vs 设计稿」为准，必须使用浏览器工具 (Browser) 查看目标页面，通过页面截图与设计稿截图比对、或页面元素与 .pen 设计稿元素比对等落地方式完成验收，并产出问题清单与反思。
+description: 当用户需要按设计稿验收页面、复核 UI 还原质量或输出 UI 问题清单时，使用浏览器工具对实际页面与设计稿做可追踪比对并沉淀验收结论。
+compatibility: Requires browser tooling plus access to the target page, design source (.pen/Figma), and local docs/样式还原/ output paths.
 ---
 
 # UI 验收
@@ -23,6 +24,16 @@ description: 通用 UI 验收技能。验收必须以「实际页面效果 vs �
 - 实现完成后，需要对照设计稿检查还原度
 - 需要产出一份可追踪的 **UI 问题清单**，并据此修复与再验证
 - 需要做「分析不足反思」，反哺设计稿分析（design-analysis）
+
+## 环境依赖
+
+- 优先依赖 Browser 工具；不可用时再退回 Playwright MCP
+- 默认问题清单与反思文档写入 `docs/样式还原/`
+
+## 注意事项
+
+- 只看代码不看页面，验收结果无效
+- 没有设计稿时，本技能不能替代需求定义
 
 ---
 

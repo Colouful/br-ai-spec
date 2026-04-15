@@ -184,7 +184,7 @@ function setupRunToArchiveGate(targetDir) {
 }
 
 function main() {
-  const stopTarget = createWorkspace('br-ai-spec-stop-');
+  const stopTarget = createWorkspace('ai-spec-auto-stop-');
   bootstrapRun(stopTarget, '创建一个欢迎页面，mock 数据即可');
 
   let result = protocolWorkflow.stopProtocolStep({ target: stopTarget });
@@ -209,7 +209,7 @@ function main() {
   assert.strictEqual(result.turn.actor.id, 'requirement-analyst');
   assert.strictEqual(currentRun.status, 'running');
 
-  const patchTarget = createWorkspace('br-ai-spec-patch-');
+  const patchTarget = createWorkspace('ai-spec-auto-patch-');
   setupFrontendRun(patchTarget);
   result = protocolWorkflow.updateProtocolInput({
     target: patchTarget,
@@ -225,7 +225,7 @@ function main() {
   assert.ok(result.turn.guidance.update_contract.artifacts_to_update.includes('tasks.md'));
   assert.ok(result.turn.guidance.update_contract.artifacts_to_update.includes('code'));
 
-  const archiveFixTarget = createWorkspace('br-ai-spec-archive-fix-');
+  const archiveFixTarget = createWorkspace('ai-spec-auto-archive-fix-');
   setupRunToArchiveGate(archiveFixTarget);
   result = protocolWorkflow.updateProtocolInput({
     target: archiveFixTarget,
@@ -271,7 +271,7 @@ function main() {
   assert.strictEqual(currentRun.incremental_update.reconcile_strategy, 'followup-patch');
   assert.ok(currentRun.plan.activated_optional_roles.includes('unit-test-specialist'));
 
-  const confirmTarget = createWorkspace('br-ai-spec-confirm-');
+  const confirmTarget = createWorkspace('ai-spec-auto-confirm-');
   bootstrapRun(confirmTarget, '创建一个带复杂交互的报表页');
   runtimeState.gateBlockedRunState({
     target: confirmTarget,
@@ -297,7 +297,7 @@ function main() {
   assert.strictEqual(result.fast_path.action, 'confirm-resume');
   assert.strictEqual(currentRun.status, 'running');
 
-  const optionalRoleTarget = createWorkspace('br-ai-spec-optional-');
+  const optionalRoleTarget = createWorkspace('ai-spec-auto-optional-');
   statusResult = protocolWorkflow.advanceProtocolStep({
     target: optionalRoleTarget,
     userInput: '根据设计稿创建一个大列表页，涉及接口字段调整、性能优化，并补充关键回归测试',

@@ -202,7 +202,7 @@ flowchart LR
 - 27 个候选专家模板
 - 9 个能力域目录
 - 角色展示索引：
-  - [.agents/roles/INDEX.md](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/.agents/roles/INDEX.md#L1)
+  - [.agents/roles/INDEX.md](../../.agents/roles/INDEX.md#L1)
 
 ### 7.2 当前还没有完全实现的部分
 

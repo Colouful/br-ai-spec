@@ -11,7 +11,7 @@ function writeProjectFile(targetDir, relPath, content) {
   fs.writeFileSync(filePath, `${content}\n`, 'utf8');
 }
 
-function createWorkspace(prefix = 'br-ai-spec-small-routing-') {
+function createWorkspace(prefix = 'ai-spec-auto-small-routing-') {
   const targetDir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
   writeProjectFile(targetDir, 'package.json', JSON.stringify({
     name: 'small-request-routing',
@@ -106,7 +106,7 @@ function readCurrentRun(targetDir) {
 }
 
 function main() {
-  const quickFixTarget = createWorkspace('br-ai-spec-quick-fix-');
+  const quickFixTarget = createWorkspace('ai-spec-auto-quick-fix-');
   let result = protocolWorkflow.advanceProtocolStep({
     target: quickFixTarget,
     userInput: '把列表标题文案改一下，按钮也更简洁一点',
@@ -122,7 +122,7 @@ function main() {
   assert.ok(result.turn.guidance.quick_fix_boundary.some((item) => item.includes('单页面')));
   assert.ok(result.turn.guidance.upgrade_to_full_change_when.some((item) => item.includes('真实 API')));
 
-  const fullChangeTarget = createWorkspace('br-ai-spec-full-change-');
+  const fullChangeTarget = createWorkspace('ai-spec-auto-full-change-');
   result = protocolWorkflow.advanceProtocolStep({
     target: fullChangeTarget,
     userInput: '新增一个订单详情路由，接真实接口并补一个全局状态 store',
@@ -134,7 +134,7 @@ function main() {
   assert.strictEqual(result.turn.guidance.route_decision.enter_openspec, true);
   assert.strictEqual(result.turn.guidance.route_decision.next_expert, 'requirement-analyst');
 
-  const openPatchTarget = createWorkspace('br-ai-spec-open-patch-');
+  const openPatchTarget = createWorkspace('ai-spec-auto-open-patch-');
   writeOpenChange(openPatchTarget, 'copy-adjustment');
   result = protocolWorkflow.advanceProtocolStep({
     target: openPatchTarget,
@@ -147,7 +147,7 @@ function main() {
   assert.strictEqual(result.turn.guidance.route_decision.reuse_change_id, 'copy-adjustment');
   assert.strictEqual(result.turn.guidance.route_decision.next_expert, 'frontend-implementer');
 
-  const openScopeTarget = createWorkspace('br-ai-spec-open-scope-');
+  const openScopeTarget = createWorkspace('ai-spec-auto-open-scope-');
   writeOpenChange(openScopeTarget, 'orders-rework');
   result = protocolWorkflow.advanceProtocolStep({
     target: openScopeTarget,
@@ -159,7 +159,7 @@ function main() {
   assert.strictEqual(result.turn.guidance.route_decision.reuse_change_id, 'orders-rework');
   assert.strictEqual(result.turn.guidance.route_decision.next_expert, 'requirement-analyst');
 
-  const ambiguousTarget = createWorkspace('br-ai-spec-ambiguous-open-');
+  const ambiguousTarget = createWorkspace('ai-spec-auto-ambiguous-open-');
   writeOpenChange(ambiguousTarget, 'change-a');
   writeOpenChange(ambiguousTarget, 'change-b');
   result = protocolWorkflow.advanceProtocolStep({
@@ -171,7 +171,7 @@ function main() {
   assert.strictEqual(result.turn.guidance.route_decision.waiting_confirm_required, true);
   assert.strictEqual(result.turn.guidance.route_decision.candidate_changes.length, 2);
 
-  const runtimeTarget = createWorkspace('br-ai-spec-quick-fix-runtime-');
+  const runtimeTarget = createWorkspace('ai-spec-auto-quick-fix-runtime-');
   const runId = 'run_20260414_100000_bugfix';
   let report = bootstrapQuickFixRun(runtimeTarget, runId, '把列表标题文案改一下，按钮也更简洁一点');
   assert.strictEqual(report.applied.adapter_action, 'bootstrap');
@@ -297,7 +297,7 @@ function main() {
   ];
 
   for (const item of quickFixOptionalCases) {
-    const optionalTarget = createWorkspace(`br-ai-spec-${item.roleId}-`);
+    const optionalTarget = createWorkspace(`ai-spec-auto-${item.roleId}-`);
     const optionalRunId = `run_20260414_${item.roleId.replace(/[^a-z]/g, '').slice(0, 8)}_quickfix`;
     report = bootstrapQuickFixRun(optionalTarget, optionalRunId, item.rawInput, {
       first_handoff: item.roleId,

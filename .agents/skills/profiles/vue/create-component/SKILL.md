@@ -1,6 +1,7 @@
 ---
 name: create-component
 description: 指导在 Vue 3 项目中按团队规范创建和拆分 SFC 组件，包括目录结构、文件命名、样式与主题变量使用。当前端需要新增或重构组件时使用本技能。
+compatibility: Requires a local Vue project workspace and the repository's component/style conventions under .agents/rules/.
 ---
 
 # 创建与拆分 Vue 组件

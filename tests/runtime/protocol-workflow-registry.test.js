@@ -24,7 +24,7 @@ function writeJsonFile(targetDir, relPath, value) {
 }
 
 function createWorkspace() {
-  const targetDir = fs.mkdtempSync(path.join(os.tmpdir(), 'br-ai-spec-protocol-registry-test-'));
+  const targetDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-spec-auto-protocol-registry-test-'));
   writeProjectFile(targetDir, 'package.json', JSON.stringify({
     name: 'protocol-registry-smoke',
     scripts: {
@@ -170,7 +170,7 @@ function main() {
     ['proposal'],
   );
 
-  const futureProfileTarget = fs.mkdtempSync(path.join(os.tmpdir(), 'br-ai-spec-protocol-future-profile-'));
+  const futureProfileTarget = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-spec-auto-protocol-future-profile-'));
   writeProjectFile(futureProfileTarget, 'package.json', JSON.stringify({
     name: 'protocol-future-profile',
     dependencies: {

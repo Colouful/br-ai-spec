@@ -1,6 +1,7 @@
 ---
 name: create-store
 description: 指导在 Vue 3 项目中按团队规范使用 Pinia 创建和维护全局状态 store，包括目录结构、命名与持久化策略。当前端需要新增或重构状态管理时使用本技能。
+compatibility: Requires a local Vue project workspace and the repository's store conventions under .agents/rules/.
 ---
 
 # 创建与维护 Pinia Store

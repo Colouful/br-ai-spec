@@ -4,7 +4,7 @@
 
 这篇文档主要给两类人看：
 
-- 维护 `br-ai-spec` 的平台开发者
+- 维护 `ai-spec-auto` 的平台开发者
 - 需要设计或调整 `openspec/config.yaml`、`.agents/rules/`、`.agents/skills/` 协作方式的人
 
 如果你只是第一次接触项目，建议先读 [团队成员 5 分钟上手](./团队成员5分钟上手.md)。

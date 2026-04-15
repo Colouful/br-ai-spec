@@ -38,7 +38,7 @@ ai-spec-auto task-orchestrator-adapter apply --payload <file>
 
 直接复用：
 
-- [task-orchestrator-bootstrap-payload.md](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/.agents/roles/common/task-orchestrator-bootstrap-payload.md)
+- [task-orchestrator-bootstrap-payload.md](../roles/common/task-orchestrator-bootstrap-payload.md)
 
 也就是说，这类输入本身就可直接交给适配器：
 

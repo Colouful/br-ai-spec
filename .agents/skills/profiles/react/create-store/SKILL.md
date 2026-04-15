@@ -1,6 +1,7 @@
 ---
 name: create-store
 description: 指导在前端项目中按团队规范创建和维护全局状态 store（Zustand 或经典 Redux），包括目录结构、命名与持久化策略。当前端需要新增或重构状态管理时使用本技能。
+compatibility: Requires a local React project workspace and the repository's store conventions under .agents/rules/.
 ---
 
 # 创建与维护 Store
@@ -15,6 +16,11 @@ description: 指导在前端项目中按团队规范创建和维护全局状态 
 请使用本技能，并同时遵守 `.agents/rules/03-项目结构.md`（目录结构约束）与 `.agents/rules/07-状态管理.md`。
 
 **重要**：先确认项目使用的是 Zustand 还是经典 Redux（查看 `src/store/index.ts` 或 `package.json`），然后按对应方案执行。同一项目禁止混用。
+
+## 注意事项
+
+- 不要在同一项目里混用 Zustand 和 Redux
+- 不要把页面局部状态提升成全局 store，除非确实跨边界共享
 
 ---
 

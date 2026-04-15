@@ -80,7 +80,7 @@ function rewriteCurrentDispatchGoal(targetDir, rawGoal) {
   fs.writeFileSync(dispatchPath, JSON.stringify(dispatch, null, 2));
 }
 
-function createWorkspace(prefix = 'br-ai-spec-runner-test-') {
+function createWorkspace(prefix = 'ai-spec-auto-runner-test-') {
   const targetDir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
   writeProjectFile(targetDir, 'package.json', JSON.stringify({
     name: 'runner-smoke',
@@ -400,7 +400,7 @@ function main() {
   assert.ok(fs.existsSync(path.join(targetDir, 'openspec/specs/ui/spec.md')));
   assert.ok(fs.existsSync(path.join(targetDir, 'openspec/specs/api/spec.md')));
 
-  const apiOnlyTarget = createWorkspace('br-ai-spec-api-only-');
+  const apiOnlyTarget = createWorkspace('ai-spec-auto-api-only-');
   step(apiOnlyTarget, '创建一个商品组件');
   copyFixture(apiOnlyTarget, 'task-orchestrator-bootstrap-reply.md', 'task-orchestrator-turn.json');
   advance(apiOnlyTarget);
@@ -413,7 +413,7 @@ function main() {
   assert.strictEqual(apiOnlyWorkflow.turn.actor.id, 'frontend-implementer');
   assert.strictEqual(apiOnlyWorkflow.turn.guidance.role_skill_contract.primary_skills[0], 'create-api');
 
-  const pageTarget = createWorkspace('br-ai-spec-page-order-');
+  const pageTarget = createWorkspace('ai-spec-auto-page-order-');
   step(pageTarget, '创建一个商品组件');
   copyFixture(pageTarget, 'task-orchestrator-bootstrap-reply.md', 'task-orchestrator-turn.json');
   advance(pageTarget);
@@ -429,7 +429,7 @@ function main() {
     ['create-view', 'create-route', 'theme-variables'],
   );
 
-  const archiveBlockedTarget = createWorkspace('br-ai-spec-archive-blocked-');
+  const archiveBlockedTarget = createWorkspace('ai-spec-auto-archive-blocked-');
   step(archiveBlockedTarget, '创建一个商品组件');
   copyFixture(archiveBlockedTarget, 'task-orchestrator-bootstrap-reply.md', 'task-orchestrator-turn.json');
   advance(archiveBlockedTarget);

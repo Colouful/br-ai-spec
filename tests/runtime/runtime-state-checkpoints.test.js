@@ -11,7 +11,7 @@ function writeProjectFile(targetDir, relPath, content) {
 }
 
 function createWorkspace() {
-  const targetDir = fs.mkdtempSync(path.join(os.tmpdir(), 'br-ai-spec-runtime-state-'));
+  const targetDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-spec-auto-runtime-state-'));
   writeProjectFile(targetDir, 'package.json', JSON.stringify({
     name: 'runtime-state-smoke',
     scripts: {

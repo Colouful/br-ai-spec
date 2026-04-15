@@ -5,6 +5,9 @@ const {
   getProfileIds,
   readProfilesRegistry,
 } = require('./profile-registry');
+const {
+  validateSkillSpec,
+} = require('./skill-spec-validator');
 
 function printUsage() {
   console.log(`Usage:
@@ -291,7 +294,16 @@ function validateSkillsRegistry(sourceDir, skillsRegistry, report, supportedProf
       report.errors.push(`skills.json entry "${skillId}" must be an object`);
       continue;
     }
-    validateSourceDefinition(report, sourceDir, entry, `skills.json entry "${skillId}"`, supportedProfiles);
+    const { hasSource, hasSourceByProfile } = validateSourceDefinition(
+      report,
+      sourceDir,
+      entry,
+      `skills.json entry "${skillId}"`,
+      supportedProfiles,
+    );
+    if (!hasSource && !hasSourceByProfile) {
+      report.errors.push(`skills.json entry "${skillId}" must define source or sourceByProfile`);
+    }
     if (entry.domains !== undefined) {
       assertArrayOfStrings(report, entry.domains, `skills.json entry "${skillId}" domains`);
     }
@@ -301,6 +313,66 @@ function validateSkillsRegistry(sourceDir, skillsRegistry, report, supportedProf
   }
 
   return skillIds;
+}
+
+function collectSkillSourceEntries(skillsRegistry) {
+  const entries = [];
+  for (const [skillId, entry] of Object.entries(skillsRegistry.skills || {})) {
+    if (entry && typeof entry.source === 'string' && entry.source.trim()) {
+      entries.push({
+        skillId,
+        profile: null,
+        relPath: entry.source,
+      });
+    }
+    if (entry && entry.sourceByProfile && typeof entry.sourceByProfile === 'object') {
+      for (const [profile, relPath] of Object.entries(entry.sourceByProfile)) {
+        if (typeof relPath === 'string' && relPath.trim()) {
+          entries.push({
+            skillId,
+            profile,
+            relPath,
+          });
+        }
+      }
+    }
+  }
+  return entries;
+}
+
+function validateSkillSourceSpecs(sourceDir, skillsRegistry, report) {
+  const skillSourceEntries = collectSkillSourceEntries(skillsRegistry);
+  const stats = {
+    checked: 0,
+    error_count: 0,
+    warning_count: 0,
+  };
+
+  for (const entry of skillSourceEntries) {
+    const absPath = path.join(sourceDir, entry.relPath);
+    const label = entry.profile
+      ? `skills.json entry "${entry.skillId}" (${entry.profile})`
+      : `skills.json entry "${entry.skillId}"`;
+
+    if (!fs.existsSync(absPath)) {
+      continue;
+    }
+
+    const skillReport = validateSkillSpec(absPath);
+    stats.checked += 1;
+    stats.error_count += skillReport.errors.length;
+    stats.warning_count += skillReport.warnings.length;
+    report.checked_files.push(entry.relPath);
+
+    for (const error of skillReport.errors) {
+      report.errors.push(`${label} skill-spec: ${error}`);
+    }
+    for (const warning of skillReport.warnings) {
+      report.warnings.push(`${label} skill-spec: ${warning}`);
+    }
+  }
+
+  return stats;
 }
 
 function validateRolesRegistry(sourceDir, rolesRegistry, report, supportedProfiles) {
@@ -572,6 +644,7 @@ function validateRegistry(sourceDir) {
   const skillIds = validateSkillsRegistry(sourceDir, skillsRegistry, report, supportedProfiles);
   const roleIds = validateRolesRegistry(sourceDir, rolesRegistry, report, supportedProfiles);
   const flowIds = validateFlowsRegistry(sourceDir, flowsRegistry, report, supportedProfiles);
+  const skillSpecStats = validateSkillSourceSpecs(sourceDir, skillsRegistry, report);
   const ids = {
     profiles: profileIds,
     roles: roleIds,
@@ -594,6 +667,13 @@ function validateRegistry(sourceDir) {
     flow_count: flowIds.size,
     scenario_package_count: scenariosRegistry ? Object.keys(scenariosRegistry.scenario_packages || {}).length : 0,
   };
+  report.stats = {
+    ...report.summary,
+    checked_file_count: report.checked_files.length,
+    warning_count: report.warnings.length,
+    error_count: report.errors.length,
+    skill_spec: skillSpecStats,
+  };
 
   return report;
 }
@@ -608,6 +688,9 @@ function printPretty(report) {
     console.log(`roles（专家角色）: ${report.summary.role_count}`);
     console.log(`flows（流程模板）: ${report.summary.flow_count}`);
     console.log(`scenario_packages（场景方案包）: ${report.summary.scenario_package_count}`);
+    if (report.stats && report.stats.skill_spec) {
+      console.log(`skill_spec_sources（技能源码校验）: ${report.stats.skill_spec.checked}`);
+    }
   }
   if (report.warnings.length > 0) {
     console.log('warnings（警告）:');

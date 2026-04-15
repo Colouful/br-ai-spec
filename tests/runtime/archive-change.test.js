@@ -11,7 +11,7 @@ function writeFile(targetDir, relPath, content) {
 }
 
 function main() {
-  const targetDir = fs.mkdtempSync(path.join(os.tmpdir(), 'br-ai-spec-archive-test-'));
+  const targetDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-spec-auto-archive-test-'));
   writeFile(targetDir, 'openspec/specs/ui/spec.md', [
     '## 新增需求',
     '',
@@ -72,7 +72,7 @@ function main() {
   assert.ok(mergedApiSpec.includes('已有接口规范'));
   assert.ok(mergedApiSpec.includes('本地 mock 数据'));
 
-  const targetDirWithRuntime = fs.mkdtempSync(path.join(os.tmpdir(), 'br-ai-spec-archive-runtime-test-'));
+  const targetDirWithRuntime = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-spec-auto-archive-runtime-test-'));
   writeFile(targetDirWithRuntime, '.ai-spec/current-run.json', JSON.stringify({
     schema_version: 1,
     kind: 'run-state',

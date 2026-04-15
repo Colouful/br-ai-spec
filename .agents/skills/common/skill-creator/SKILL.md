@@ -59,6 +59,7 @@ skill-name/
     ├── scripts/          - Executable code (Python/Bash/etc.)
     ├── references/       - Documentation intended to be loaded into context as needed
     └── assets/           - Files used in output (templates, icons, fonts, etc.)
+└── evals/                - Trigger/query samples and output-quality checks (project convention)
 ```
 
 #### SKILL.md (required)
@@ -66,6 +67,7 @@ skill-name/
 Every SKILL.md consists of:
 
 - **Frontmatter** (YAML): Contains `name` and `description` fields. These are the only fields that Claude reads to determine when the skill gets used, thus it is very important to be clear and comprehensive in describing what the skill is, and when it should be used.
+- **Optional frontmatter**: `license`, `compatibility`, `metadata`, `allowed-tools`. Keep `metadata` as a flat string-to-string mapping.
 - **Body** (Markdown): Instructions and guidance for using the skill. Only loaded AFTER the skill triggers (if at all).
 
 #### Bundled Resources (optional)
@@ -110,6 +112,18 @@ A skill should only contain essential files that directly support its functional
 - etc.
 
 The skill should only contain the information needed for an AI agent to do the job at hand. It should not contain auxilary context about the process that went into creating it, setup and testing procedures, user-facing documentation, etc. Creating additional documentation files just adds clutter and confusion.
+
+### Creation Checklist
+
+- [ ] Frontmatter uses only official top-level fields
+- [ ] Description states both capability and trigger timing
+- [ ] compatibility is added only when there is a real environment dependency
+- [ ] evals/ contains train, validation, and output-quality fixtures
+
+### Gotchas
+
+- Do not treat example paths as required bundled resources unless the files truly exist in the skill
+- Do not hide core workflow steps only inside references; SKILL.md still needs the navigation contract
 
 ### Progressive Disclosure Design Principle
 

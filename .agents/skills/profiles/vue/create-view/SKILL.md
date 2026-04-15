@@ -1,6 +1,7 @@
 ---
 name: create-view
 description: 指导在 Vue 3 项目中按团队规范创建和维护页面视图，包括目录结构、路由模块配置及懒加载用法。当前端需要新增或重构页面时使用本技能。
+compatibility: Requires a local Vue project workspace and the repository's page/view conventions under .agents/rules/.
 ---
 
 # 创建与维护页面视图

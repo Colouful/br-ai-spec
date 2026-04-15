@@ -1,6 +1,7 @@
 ---
 name: route-permission-map
 description: 从路由配置、权限守卫和菜单/侧栏配置中整理“路由 ↔ 权限 ↔ 菜单”映射，并检查未保护路由、死链、权限不一致和懒加载问题。当用户说“路由和菜单对一下”“未保护路由”“路由权限映射”“菜单权限不一致”时使用。
+compatibility: Requires a local repository workspace with route definitions, menu/sidebar config, and permission guard code available for inspection.
 ---
 
 # 路由权限映射与审计

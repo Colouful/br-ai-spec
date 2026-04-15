@@ -4,8 +4,8 @@
 
 这份规范和下面两份文档配套使用：
 
-- [Manifest安装清单规范.md](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/paser_two/Manifest安装清单规范.md)
-- [ai-spec-auto-sync输入输出契约-03-27-17-09.md](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/paser_two/ai-spec-sync输入输出契约-03-27-17-09.md)
+- [Manifest安装清单规范.md](Manifest安装清单规范.md)
+- [ai-spec-auto-sync输入输出契约-03-27-17-09.md](ai-spec-sync输入输出契约-03-27-17-09.md)
 
 三者的职责边界是：
 
@@ -201,7 +201,7 @@
   "registries": [
     {
       "type": "hub",
-      "name": "br-ai-spec-hub",
+      "name": "ai-spec-auto-hub",
       "url": "https://hub.example.com"
     }
   ],
@@ -291,7 +291,7 @@
 
 ## 11. 与 `sync（同步）` 契约的关系
 
-在 [ai-spec-auto-sync输入输出契约-03-27-17-09.md](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/paser_two/ai-spec-sync输入输出契约-03-27-17-09.md) 中：
+在 [ai-spec-auto-sync输入输出契约-03-27-17-09.md](ai-spec-sync输入输出契约-03-27-17-09.md) 中：
 
 - `sync-result（同步结果）.artifacts.manifest`
   - 指向 `.ai-spec/manifest.json`

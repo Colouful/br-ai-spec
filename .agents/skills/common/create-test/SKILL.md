@@ -1,6 +1,7 @@
 ---
 name: create-test
 description: 当需要为功能模块编写单元测试或集成测试时使用本技能。指导按团队规范创建 Vitest 测试文件，涵盖命名约定、断言模式、Mock 策略与覆盖率要求。
+compatibility: Assumes a local TypeScript/JavaScript repository with Vitest-compatible tooling and .agents/rules/common testing conventions.
 ---
 
 # 创建测试
@@ -13,6 +14,17 @@ description: 当需要为功能模块编写单元测试或集成测试时使用�
 - 为关键用户交互流程编写**组件测试**或**集成测试**
 - 重构现有模块后需补充或更新测试用例
 - `execute-task` 技能中 TDD 落地编码阶段需要创建测试文件
+
+## 环境依赖
+
+- 默认面向本仓库的 `.agents/rules/common/11-测试规范.md`
+- 示例以 Vitest 为主，若项目测试栈不同，需要按项目实际工具调整
+
+## 注意事项
+
+- 不要为了“补覆盖率”去 mock 被测模块内部逻辑
+- 测试文件应跟随真实代码落点，不要新造一套平行目录
+- 组件测试只在项目已具备对应测试运行条件时再补
 
 ---
 

@@ -1426,7 +1426,7 @@ function buildSources(manifest, manifestSource, resolved, sourceDir) {
     registries: [
       {
         type: 'local-workspace',
-        name: 'br-ai-spec-local',
+        name: 'ai-spec-auto-local',
         path: sourceDir,
       },
       ...unique(

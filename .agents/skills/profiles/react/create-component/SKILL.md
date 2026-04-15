@@ -1,6 +1,7 @@
 ---
 name: create-component
 description: 指导在前端项目中按团队规范创建和拆分 React 组件，包括目录结构、文件命名、样式与主题变量使用。当前端需要新增或重构组件时使用本技能。
+compatibility: Requires a local React project workspace and the repository's component/style conventions under .agents/rules/.
 ---
 
 # 创建与拆分组件
@@ -14,6 +15,11 @@ description: 指导在前端项目中按团队规范创建和拆分 React 组件
 - 拆分过大的页面/组件文件
 
 请使用本技能，并同时遵守 `.agents/rules/03-项目结构.md` 与 `.agents/rules/04-组件规范.md`。
+
+## 注意事项
+
+- 不要把页面私有组件错误放进全局 `src/components/`
+- 样式还原场景下禁止直接硬编码主题主色
 
 ---
 

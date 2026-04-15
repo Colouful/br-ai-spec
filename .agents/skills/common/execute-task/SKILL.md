@@ -1,10 +1,10 @@
 ---
 name: execute-task
-description: 严格按照 Superpowers 模式（头脑风暴、TDD驱动、双重审查、审计汇报）执行具体的开发任务清单。刚性技能，四步不可简化。
-version: 2.0.0
+description: 当用户要求按 `tasks.md`、`/opsx:apply` 或同类任务清单开始实施时，严格按 Superpowers 四步执行具体开发任务并输出审计结果。
+compatibility: Requires tasks.md, local .agents/rules execution policies, and an ai-spec-auto/OpenSpec workspace with write access to task state.
 metadata:
-  openclaw:
-    user-invocable: true
+  version: "2.0.0"
+  openclaw-user-invocable: "true"
   type: rigid
 ---
 
@@ -29,6 +29,17 @@ metadata:
 - "执行下一个 task"
 
 本技能也会被 `/opsx:apply` / `/opsx-apply` 命令自动触发。
+
+## 环境依赖
+
+- 依赖 `tasks.md`、`.agents/rules/12-Superpowers执行规范.md` 和 `.agents/rules/14-审计汇报规范.md`
+- 默认在 ai-spec-auto / OpenSpec 协议驱动仓库中运行
+
+## 注意事项
+
+- 未经过第一步确认，不得直接进入编码
+- 没有测试环境时也要明确记录 RED/GREEN/REFACTOR 的替代验证方式
+- 审计报告是强制产物，不能因为任务很小而省略
 
 ## 前置要求
 

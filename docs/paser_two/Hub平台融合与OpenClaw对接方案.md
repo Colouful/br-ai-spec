@@ -387,7 +387,7 @@ Hub 最好输出结构化安装清单，而不是只输出一段说明文字。
 
 完整规范建议见：
 
-- [Manifest安装清单规范.md](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/paser_two/Manifest安装清单规范.md)
+- [Manifest安装清单规范.md](Manifest安装清单规范.md)
 
 推荐最小格式：
 
@@ -424,7 +424,7 @@ CLI 读取这份清单后：
 
 如果需要实现侧的详细输入输出定义，建议配套阅读：
 
-- [ai-spec-auto-sync输入输出契约-03-27-17-09.md](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/paser_two/ai-spec-sync输入输出契约-03-27-17-09.md)
+- [ai-spec-auto-sync输入输出契约-03-27-17-09.md](ai-spec-sync输入输出契约-03-27-17-09.md)
 
 ### 7.3 为什么不要只“复制 prompt 给 IDE”
 

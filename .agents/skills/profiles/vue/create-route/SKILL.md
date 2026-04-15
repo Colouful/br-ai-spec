@@ -1,6 +1,7 @@
 ---
 name: create-route
 description: 指导在 Vue 3 项目中按团队规范创建和维护页面路由，包括路由模块配置、页面落点、懒加载与 meta 约束。当前端需要新增或调整页面路由时使用本技能。
+compatibility: Requires a local Vue project workspace and the repository's route/page conventions under .agents/rules/.
 ---
 
 # 创建与维护 Vue 路由

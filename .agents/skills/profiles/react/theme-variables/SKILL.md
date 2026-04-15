@@ -1,6 +1,7 @@
 ---
 name: theme-variables
 description: 指导在前端项目中正确使用 Ant Design 与自定义主题 CSS 变量，避免硬编码颜色并保证暗色/浅色主题切换一致性。当前端编写或修改样式时使用本技能。
+compatibility: Requires a local React project workspace plus the repository's style conventions and theme variable setup.
 ---
 
 # 主题 CSS 变量与样式规范
@@ -79,4 +80,3 @@ border-color: var(--ant-color-border);
 - [ ] 所有颜色是否都来自 `var(--xxx)` 变量？
 - [ ] 是否优先使用 Antd 自带变量，其次再用自定义变量？
 - [ ] 是否避免在组件/页面样式中写死颜色值？
-

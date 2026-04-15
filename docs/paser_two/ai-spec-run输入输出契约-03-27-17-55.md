@@ -24,18 +24,18 @@
 ### 1.1 已经有的内容
 
 - 流程模板 frontmatter（元数据）解析约定
-  - [.agents/flows/FRONTMATTER.md](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/.agents/flows/FRONTMATTER.md)
+  - [.agents/flows/FRONTMATTER.md](../../.agents/flows/FRONTMATTER.md)
 - `run（运行）` 的最小解析器和输出草案
-  - [.agents/flows/RUN_OUTPUT.md](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/.agents/flows/RUN_OUTPUT.md)
+  - [.agents/flows/RUN_OUTPUT.md](../../.agents/flows/RUN_OUTPUT.md)
 - `task-orchestrator（任务主代理）` 角色骨架
-  - [/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/.agents/roles/common/task-orchestrator.md](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/.agents/roles/common/task-orchestrator.md)
+  - [.agents/roles/common/task-orchestrator.md](../../.agents/roles/common/task-orchestrator.md)
 - `prd-to-delivery（需求到交付）` 流程模板骨架
-  - [/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/.agents/flows/common/prd-to-delivery.md](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/.agents/flows/common/prd-to-delivery.md)
+  - [.agents/flows/common/prd-to-delivery.md](../../.agents/flows/common/prd-to-delivery.md)
 
 ### 1.2 还没有的内容
 
 - CLI（命令行工具）里还没有真正可执行的 `ai-spec-auto run（运行）` 子命令
-- 当前 [bin/cli.js](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/bin/cli.js#L1) 仍然只是安装脚本代理，不负责 `run（运行）` 路由
+- 当前 [bin/cli.js](../../bin/cli.js#L1) 仍然只是安装脚本代理，不负责 `run（运行）` 路由
 - 还没有完整的 `run-result（运行结果）` 状态机实现
 - 虽然已经补了 `gate-blocked（阻断） / approve（审批） / resume（恢复） / status（状态） / complete（完成） / fail（失败） / cancel（取消）` 的最小命令，但还没有继续覆盖完整的审批、恢复和结束状态机
 - 当前默认的运行入口更适合定义为 `IDE（开发工具） / OpenClaw（远程入口）` 里的 `task-orchestrator（任务主代理）` 触发，而不是 CLI（命令行工具）子命令
@@ -218,7 +218,7 @@ ai-spec-auto run . \
 
 当前统一规范见：
 
-- [task-anchor-spec.md](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/.agents/orchestration/task-anchor-spec.md)
+- [task-anchor-spec.md](../../.agents/orchestration/task-anchor-spec.md)
 
 ### 6.6 首轮桥接写盘阶段
 
@@ -232,7 +232,7 @@ ai-spec-auto run . \
 
 对应规范见：
 
-- [task-orchestrator-bootstrap-payload.md](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/.agents/orchestration/task-orchestrator-bootstrap-payload.md)
+- [task-orchestrator-bootstrap-payload.md](../../.agents/orchestration/task-orchestrator-bootstrap-payload.md)
 
 ### 6.7 执行阶段
 
@@ -306,7 +306,7 @@ ai-spec-auto run . \
 
 当前阶段建议主代理的首轮输出统一遵循：
 
-- [task-orchestrator-run-plan-template.md](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/.agents/orchestration/task-orchestrator-run-plan-template.md)
+- [task-orchestrator-run-plan-template.md](../../.agents/orchestration/task-orchestrator-run-plan-template.md)
 
 ```json
 {
@@ -359,7 +359,7 @@ ai-spec-auto run . \
 
 推荐补充规范见：
 
-- [运行状态落盘规范-03-30-14-58.md](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/paser_two/运行状态落盘规范-03-30-14-58.md)
+- [运行状态落盘规范-03-30-14-58.md](运行状态落盘规范-03-30-14-58.md)
 
 ## 9. 字段说明
 
@@ -464,13 +464,13 @@ ai-spec-auto run . \
 
 这份契约与下面几份规范配套使用：
 
-- [Manifest安装清单规范.md](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/paser_two/Manifest安装清单规范.md)
-- [ai-spec-auto-sync输入输出契约-03-27-17-09.md](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/paser_two/ai-spec-sync输入输出契约-03-27-17-09.md)
-- [lock与sources结构规范-03-27-17-17.md](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/paser_two/lock与sources结构规范-03-27-17-17.md)
-- [运行状态落盘规范-03-30-14-58.md](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/paser_two/运行状态落盘规范-03-30-14-58.md)
-- [IDE里触发run的最小交互协议-03-30-14-04.md](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/paser_two/IDE里触发run的最小交互协议-03-30-14-04.md)
-- [.agents/flows/FRONTMATTER.md](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/.agents/flows/FRONTMATTER.md)
-- [.agents/flows/RUN_OUTPUT.md](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/.agents/flows/RUN_OUTPUT.md)
+- [Manifest安装清单规范.md](Manifest安装清单规范.md)
+- [ai-spec-auto-sync输入输出契约-03-27-17-09.md](ai-spec-sync输入输出契约-03-27-17-09.md)
+- [lock与sources结构规范-03-27-17-17.md](lock与sources结构规范-03-27-17-17.md)
+- [运行状态落盘规范-03-30-14-58.md](运行状态落盘规范-03-30-14-58.md)
+- [IDE里触发run的最小交互协议-03-30-14-04.md](IDE里触发run的最小交互协议-03-30-14-04.md)
+- [.agents/flows/FRONTMATTER.md](../../.agents/flows/FRONTMATTER.md)
+- [.agents/flows/RUN_OUTPUT.md](../../.agents/flows/RUN_OUTPUT.md)
 
 这几份文档的职责边界建议统一理解为：
 

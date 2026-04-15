@@ -1,7 +1,9 @@
 ---
 name: project-init
 description: 自动分析当前项目的技术栈、目录结构与实现约定，生成 01-项目概述.md、03-项目结构.md、context/PROJECT.md，并在自定义规则缺失时补生成 04/05/06/07/09。当需要初始化项目规范、生成项目概述、填写项目信息或根据项目生成自定义规则时使用本技能。
-version: 2.1.0
+compatibility: Requires a local project workspace with package.json, .agents/rules/, and optional openspec/ for synchronized project documentation updates.
+metadata:
+  version: "2.1.0"
 ---
 
 # 项目规范初始化
@@ -23,6 +25,23 @@ version: 2.1.0
 - "生成项目规则"
 - "project-init"
 - "project init"
+
+## 环境依赖
+
+- 依赖本仓库的 `.agents/rules/` 目录结构和可写的 `context/`
+- 若存在 `openspec/`，会同步写入 `openspec/project.md`
+
+## 注意事项
+
+- 只要判定需要补 `04/05/06/07/09`，就不能只写 `01/03`
+- 不能根据猜测编造业务背景，缺失信息只能写已确认事实
+
+## 执行核对清单
+
+- [ ] `01-项目概述.md` 已生成或刷新
+- [ ] `03-项目结构.md` 已生成或刷新
+- [ ] `context/PROJECT.md` 已生成或刷新
+- [ ] 待生成/待刷新规则已全部落盘
 
 ## 前置要求
 

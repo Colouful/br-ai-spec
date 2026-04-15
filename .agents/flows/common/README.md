@@ -20,7 +20,7 @@
 
 流程模板的结构化元数据统一约定见：
 
-- [../FRONTMATTER.md](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/.agents/flows/FRONTMATTER.md)
-- [../RUN_OUTPUT.md](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/.agents/flows/RUN_OUTPUT.md)
+- [../FRONTMATTER.md](../FRONTMATTER.md)
+- [../RUN_OUTPUT.md](../RUN_OUTPUT.md)
 
 后续 CLI、插件页面、OpenClaw 调度层都应优先解析 frontmatter，而不是依赖正文做关键路由判断。

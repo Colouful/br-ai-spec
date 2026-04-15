@@ -131,19 +131,19 @@ npx @ex/ai-spec-auto@latest update . --skip-skills --skip-configs --skip-openspe
 
 如果只从一个入口开始阅读，优先看第四阶段文档入口。
 
-- [第四阶段文档入口](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/four/README.md)
-- [开发最佳实践指南](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/four/开发最佳实践指南.md)
-- [需求示例：从发起到归档](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/four/需求示例-从发起到归档.md)
-- [架构设计与治理说明](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/four/架构设计与治理说明.md)
-- [5 分钟快速上手](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/quick-start.md)
-- [安装指南](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/install-guide.md)
-- [文档索引](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/README.md)
-- [OpenSpec / 协议流说明](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/openspec-guide.md)
-- [小需求与补丁修正指南](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/four/小需求与补丁修正指南.md)
-- [培训大纲](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/training-outline.md)
-- [协议与专家增强记录](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/paser_three/协议与专家增强记录.md)
-- [主流程专家优化记录](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/paser_three/主流程专家优化记录.md)
-- [项目介绍与运行机制说明](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/paser_three/项目介绍与运行机制说明.md)
+- [第四阶段文档入口](docs/four/README.md)
+- [开发最佳实践指南](docs/four/开发最佳实践指南.md)
+- [需求示例：从发起到归档](docs/four/需求示例-从发起到归档.md)
+- [架构设计与治理说明](docs/four/架构设计与治理说明.md)
+- [5 分钟快速上手](docs/quick-start.md)
+- [安装指南](docs/install-guide.md)
+- [文档索引](docs/README.md)
+- [OpenSpec / 协议流说明](docs/openspec-guide.md)
+- [小需求与补丁修正指南](docs/four/小需求与补丁修正指南.md)
+- [培训大纲](docs/training-outline.md)
+- [协议与专家增强记录](docs/paser_three/协议与专家增强记录.md)
+- [主流程专家优化记录](docs/paser_three/主流程专家优化记录.md)
+- [项目介绍与运行机制说明](docs/paser_three/项目介绍与运行机制说明.md)
 
 ## 兼容说明
 

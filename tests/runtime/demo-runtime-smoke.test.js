@@ -5,7 +5,7 @@ const path = require('path');
 const demo = require('../../bin/demo-runtime-smoke');
 
 function main() {
-  const targetDir = fs.mkdtempSync(path.join(os.tmpdir(), 'br-ai-spec-demo-runtime-'));
+  const targetDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-spec-auto-demo-runtime-'));
   const result = demo.runDemoRuntimeSmoke({
     target: targetDir,
     userInput: '新增一个商品 mock 页面',

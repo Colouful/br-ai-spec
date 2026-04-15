@@ -1,6 +1,7 @@
 ---
 name: theme-variables
 description: 指导在 Vue 3 项目中正确使用主题 CSS 变量，避免硬编码颜色并保证暗色/浅色主题切换一致性。当前端编写或修改样式时使用本技能。
+compatibility: Requires a local Vue project workspace plus the repository's style conventions and theme variable setup.
 ---
 
 # 主题 CSS 变量与样式规范

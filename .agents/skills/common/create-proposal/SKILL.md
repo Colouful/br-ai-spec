@@ -1,6 +1,7 @@
 ---
 name: create-proposal
-description: 提案前置分析与 OpenSpec 增强层。在调用 /opsx:propose 之前完成需求分析（设计稿、接口、交付形态），将分析结论注入 OpenSpec 上下文，由 OpenSpec 在 openspec/changes/ 下生成原生产物，最后做后置检查与增强。
+description: 当用户需要为新需求、改版需求或补充方案发起 OpenSpec 提案时，在 `/opsx:propose` 前完成需求分析、上下文注入和提案后置检查。
+compatibility: Requires an OpenSpec workspace, local .agents/rules constraints, and repository paths such as openspec/changes/ and docs/样式还原/.
 ---
 
 # 创建提案（OpenSpec 增强层）
@@ -25,6 +26,18 @@ description: 提案前置分析与 OpenSpec 增强层。在调用 /opsx:propose 
 - 开发一系列**功能组件**（有或没有 UI 描述）
 - **有接口**或**无接口**（后端未就绪时用 mock）
 - 纯逻辑、纯接口、或 UI + 接口 等组合
+
+## 环境依赖
+
+- 依赖本仓库的 `openspec/` 目录、`.agents/rules/` 规范和相关命令约定
+- 设计稿分析与 UI 产物默认落到 `docs/样式还原/`
+- 会引用兄弟 skill 与 OpenSpec 命令，不适合作为脱离仓库的通用提案模板
+
+## 注意事项
+
+- 本技能只做提案增强，不替代 OpenSpec 原生产物生成
+- 复杂交互必须先整理交互摘要，不能把实现口径留到编码阶段临时补
+- 只要进入后置检查，就必须按审计汇报规范输出结论
 
 ---
 

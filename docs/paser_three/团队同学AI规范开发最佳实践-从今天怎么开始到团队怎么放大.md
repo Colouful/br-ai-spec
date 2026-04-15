@@ -23,7 +23,7 @@
 - 一次任务做完后只剩代码，没有 proposal、design、tasks、checklist、archive 这些资产
 - Review 依然要花大量时间纠正“规范问题”，而不是讨论真正重要的设计取舍
 
-这也是 [AI Coding时代，我们处在什么位置？](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/AI Coding时代，我们处在什么位置？.md) 里最值得团队吸收的判断：
+这也是 [AI Coding时代，我们处在什么位置？](../AI Coding时代，我们处在什么位置？.md) 里最值得团队吸收的判断：
 
 > AI Coding 的竞争，已经不是“谁更会写 prompt”，而是“谁能把 AI 稳定纳入软件工程体系”。
 
@@ -32,7 +32,7 @@
 - 过去，拼的是谁更会用 AI
 - 现在，拼的是谁能把 AI 变成团队可复用的工程能力
 
-所以我们现在做 `br-ai-spec`，并不是想再多造一个工具，而是想把下面这些能力沉淀下来：
+所以我们现在做 `ai-spec-auto`，并不是想再多造一个工具，而是想把下面这些能力沉淀下来：
 
 - 团队规范能不能被 AI 稳定遵守
 - 一次需求能不能先形成结构化产物，再进入实现
@@ -212,7 +212,7 @@
 
 当前已经有一个很清晰的放大路径，就是 `skill-q-platform` 这条 Hub 方案链。
 
-结合 [虾球 Hub README](/Users/lizhenwei/workspace/vueworkspace/bairong/skill-q-platform/README.md)、[scenario-manifest.ts](/Users/lizhenwei/workspace/vueworkspace/bairong/skill-q-platform/src/lib/scenario-manifest.ts)、[Scenario 页面](/Users/lizhenwei/workspace/vueworkspace/bairong/skill-q-platform/src/app/scenarios/[slug]/page.tsx) 和 [Manifest安装清单规范](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/paser_two/Manifest安装清单规范.md)，这条链路已经可以讲得很明确：
+结合 [虾球 Hub README](/Users/lizhenwei/workspace/vueworkspace/bairong/skill-q-platform/README.md)、[scenario-manifest.ts](/Users/lizhenwei/workspace/vueworkspace/bairong/skill-q-platform/src/lib/scenario-manifest.ts)、[Scenario 页面](/Users/lizhenwei/workspace/vueworkspace/bairong/skill-q-platform/src/app/scenarios/[slug]/page.tsx) 和 [Manifest安装清单规范](../paser_two/Manifest安装清单规范.md)，这条链路已经可以讲得很明确：
 
 1. **Hub 负责“选资产”**  
    在 Hub 里维护和组织：
@@ -405,7 +405,7 @@
 
 中期重点不是再多写几篇文档，而是降低使用门槛。
 
-结合 [AI规范驱动开发平台-综合蓝图](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/paser_two/AI规范驱动开发平台-综合蓝图.md) 和 [流程模板矩阵与分阶段建设建议](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/paser_two/流程模板矩阵与分阶段建设建议.md)，中期最值得期待的事情是：
+结合 [AI规范驱动开发平台-综合蓝图](../paser_two/AI规范驱动开发平台-综合蓝图.md) 和 [流程模板矩阵与分阶段建设建议](../paser_two/流程模板矩阵与分阶段建设建议.md)，中期最值得期待的事情是：
 
 - Hub 场景包和 manifest 安装链更成熟
 - works 插件成为更自然的团队入口
@@ -428,7 +428,7 @@
 - 控制层：远程触发、审批放行、状态回传
 - 治理层：CI/CD 校验、度量统计、效果复盘
 
-结合 [OpenClaw团队协同控制面定位与价值说明](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/paser_two/OpenClaw团队协同控制面定位与价值说明-03-31-13-03.md)，长期最值得期待的变化是：
+结合 [OpenClaw团队协同控制面定位与价值说明](../paser_two/OpenClaw团队协同控制面定位与价值说明-03-31-13-03.md)，长期最值得期待的变化是：
 
 - 任务不只从本地 IDE 发起
 - 审批和状态回传不只在个人会话里完成
@@ -457,11 +457,11 @@ AI 规范开发的核心，不是多装一个工具，也不是多加几层流�
 
 ## 延伸阅读
 
-- [AI Coding时代，我们处在什么位置？](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/AI Coding时代，我们处在什么位置？.md)
-- [AI规范驱动开发平台-综合蓝图.md](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/paser_two/AI规范驱动开发平台-综合蓝图.md)
-- [流程模板矩阵与分阶段建设建议.md](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/paser_two/流程模板矩阵与分阶段建设建议.md)
-- [OpenClaw团队协同控制面定位与价值说明-03-31-13-03.md](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/paser_two/OpenClaw团队协同控制面定位与价值说明-03-31-13-03.md)
-- [Manifest安装清单规范.md](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/paser_two/Manifest安装清单规范.md)
+- [AI Coding时代，我们处在什么位置？](../AI Coding时代，我们处在什么位置？.md)
+- [AI规范驱动开发平台-综合蓝图.md](../paser_two/AI规范驱动开发平台-综合蓝图.md)
+- [流程模板矩阵与分阶段建设建议.md](../paser_two/流程模板矩阵与分阶段建设建议.md)
+- [OpenClaw团队协同控制面定位与价值说明-03-31-13-03.md](../paser_two/OpenClaw团队协同控制面定位与价值说明-03-31-13-03.md)
+- [Manifest安装清单规范.md](../paser_two/Manifest安装清单规范.md)
 - [GitHub Spec Kit](https://github.com/github/spec-kit)
 - [obra/superpowers](https://github.com/obra/superpowers)
 - [Harness Engineering](https://www.harness-engineering.xyz/)

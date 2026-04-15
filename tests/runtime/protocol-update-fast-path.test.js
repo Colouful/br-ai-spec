@@ -125,7 +125,7 @@ function setupRunToArchiveGate(targetDir) {
 }
 
 function main() {
-  const approveTarget = createWorkspace('br-ai-spec-fast-approve-');
+  const approveTarget = createWorkspace('ai-spec-auto-fast-approve-');
   setupRunToArchiveGate(approveTarget);
 
   let result = protocolWorkflow.updateProtocolInput({
@@ -146,7 +146,7 @@ function main() {
   assert.ok(fs.existsSync(path.join(approveTarget, 'openspec/specs/product-demo/spec.md')));
   assert.ok(!fs.existsSync(path.join(approveTarget, 'openspec/changes/runtime-smoke-demo')));
 
-  const skipTarget = createWorkspace('br-ai-spec-fast-skip-');
+  const skipTarget = createWorkspace('ai-spec-auto-fast-skip-');
   setupRunToArchiveGate(skipTarget);
 
   result = protocolWorkflow.updateProtocolInput({
