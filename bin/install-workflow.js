@@ -622,6 +622,28 @@ function removeManagedPaths(targetDir, relPaths) {
   }
 }
 
+const AI_SPEC_MANAGED_RUNTIME_PATHS = [
+  '.ai-spec/current-run.json',
+  '.ai-spec/repo-map.json',
+  '.ai-spec/checkpoints',
+  '.ai-spec/internal',
+  '.ai-spec/tmp',
+  '.ai-spec/current-dispatch.json',
+  '.ai-spec/current-execution.json',
+  '.ai-spec/current-execution.md',
+  '.ai-spec/current-runtime-action.json',
+  '.ai-spec/current-runtime-action.md',
+  '.ai-spec/runs',
+  '.ai-spec/dispatches',
+  '.ai-spec/executions',
+  '.ai-spec/runtime-actions',
+  '.ai-spec/runner',
+];
+
+function removeManagedAiSpecRuntime(targetDir) {
+  removeManagedPaths(targetDir, AI_SPEC_MANAGED_RUNTIME_PATHS);
+}
+
 function listLegacyManagedPaths(targetDir, sourceDir) {
   const managed = [];
   if (fs.existsSync(path.join(targetDir, '.agents'))) {
@@ -2238,7 +2260,7 @@ async function handleUninstall(options) {
   const hasInstallState = fs.existsSync(installStatePath);
   const installState = hasInstallState ? readInstallState(targetDir) : normalizeInstallState(null);
   warn(`将移除 ${targetDir} 下的规范库文件`);
-  console.log('  包括: .agents/、IDE 链接、命令模板，以及可证明由本工具创建的共享配置/依赖');
+  console.log('  包括: .agents/、IDE 链接、命令模板、.ai-spec/ 运行态，以及可证明由本工具创建的共享配置/依赖');
   console.log('');
   if (!options.force && isInteractive()) {
     const goOn = await confirm('确认？', false);
@@ -2249,6 +2271,7 @@ async function handleUninstall(options) {
   }
   const managedPaths = hasInstallState ? installState.managed_paths : listLegacyManagedPaths(targetDir, sourceDir);
   removeManagedPaths(targetDir, managedPaths);
+  removeManagedAiSpecRuntime(targetDir);
   removePath(path.join(targetDir, '.ai-spec', 'manifest.json'));
   removePath(path.join(targetDir, '.ai-spec', 'lock.json'));
   removePath(path.join(targetDir, '.ai-spec', 'sources.json'));

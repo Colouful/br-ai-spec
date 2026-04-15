@@ -29,6 +29,31 @@ function writeExecutable(filePath, content) {
   fs.chmodSync(filePath, 0o755);
 }
 
+function seedAiSpecRuntimeState(targetDir) {
+  writeJson(path.join(targetDir, '.ai-spec', 'current-run.json'), {
+    schema_version: 1,
+    kind: 'run-state',
+    run_id: 'run_seed',
+    status: 'waiting-approval',
+  });
+  writeJson(path.join(targetDir, '.ai-spec', 'repo-map.json'), {
+    pages: ['src/views/login/index.vue'],
+  });
+  writeJson(path.join(targetDir, '.ai-spec', 'internal', 'current-dispatch.json'), {
+    role: { id: 'requirement-analyst' },
+  });
+  writeJson(path.join(targetDir, '.ai-spec', 'internal', 'tmp', 'task-orchestrator-turn.json'), {
+    schema_version: 1,
+    kind: 'run-plan',
+  });
+  writeJson(path.join(targetDir, '.ai-spec', 'checkpoints', 'run_seed', '001-bootstrap.json'), {
+    schema_version: 1,
+    kind: 'checkpoint',
+  });
+  writeText(path.join(targetDir, '.ai-spec', 'runner', 'consumed', 'stale.log'), 'stale\n');
+  writeText(path.join(targetDir, '.ai-spec', 'runtime-actions', 'legacy.json'), '{}\n');
+}
+
 function createFakePackageManagerBin(targetDir) {
   const fakeBinDir = path.join(targetDir, 'fake-pkg-bin');
   const script = `#!/bin/sh
@@ -493,6 +518,7 @@ exit 1
   writeJson(path.join(uninstallTarget, '.ai-spec', 'manifest.json'), { profile: 'vue', ides: ['cursor'] });
   writeJson(path.join(uninstallTarget, '.ai-spec', 'lock.json'), { resolved: {} });
   writeJson(path.join(uninstallTarget, '.ai-spec', 'sources.json'), { assets: [] });
+  seedAiSpecRuntimeState(uninstallTarget);
   writeJson(path.join(uninstallTarget, '.ai-spec', 'install-state.json'), {
     schema_version: 1,
     managed_paths: ['.agents', '.cursor/commands/opsx-propose.md'],
@@ -560,6 +586,7 @@ exit 1
   writeJson(path.join(legacyUninstallTarget, '.ai-spec', 'manifest.json'), { profile: 'vue', ides: ['cursor'] });
   writeJson(path.join(legacyUninstallTarget, '.ai-spec', 'lock.json'), { resolved: {} });
   writeJson(path.join(legacyUninstallTarget, '.ai-spec', 'sources.json'), { assets: [] });
+  seedAiSpecRuntimeState(legacyUninstallTarget);
   result = runCli(['uninstall', legacyUninstallTarget, '-y'], { PATH: `${legacyFakeBin}:${process.env.PATH || ''}` });
   assert.strictEqual(result.status, 0, result.stderr);
   const legacyPkg = JSON.parse(fs.readFileSync(path.join(legacyUninstallTarget, 'package.json'), 'utf8'));
@@ -567,6 +594,7 @@ exit 1
   assert.ok(!fs.existsSync(path.join(legacyUninstallTarget, '.cursor', 'commands', 'opsx-propose.md')));
   assert.ok(fs.existsSync(path.join(legacyUninstallTarget, '.eslintrc.js')));
   assert.ok('eslint' in (legacyPkg.devDependencies || {}));
+  assert.ok(!fs.existsSync(path.join(legacyUninstallTarget, '.ai-spec')));
 
   result = runInstallWrapper(['help']);
   assert.strictEqual(result.status, 0, result.stderr);
