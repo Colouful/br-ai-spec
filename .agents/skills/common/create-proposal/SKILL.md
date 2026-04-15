@@ -38,6 +38,7 @@ description: 提案前置分析与 OpenSpec 增强层。在调用 /opsx:propose 
 | **是否有接口（已提供或约定）** | 有 / 无 / 未就绪 | 有 → 正常对接；无 → 可不做数据层；未就绪 → mock，见项目 Mock 数据策略 |
 | **交付形态** | 新页面 / 功能组件 / 能力模块 / 其它 | 决定目录结构（routes vs components）与 OpenSpec design.md 中的技术方案 |
 | **是否仅样式/还原类** | 是 / 否 | 是 → 重点在 design-analysis + 验收 |
+| **是否存在复杂交互** | 有 / 无 | 有 → 先按 `references/interaction-spec-template.md` 收口搜索、表单、弹窗、批量操作等交互说明，再写 proposal/design/tasks |
 
 ---
 
@@ -49,6 +50,8 @@ description: 提案前置分析与 OpenSpec 增强层。在调用 /opsx:propose 
 - **产出**：`docs/样式还原/<名称>-UI分析清单.md`
 
 分析清单应在 OpenSpec 生成提案前或同步完成，以便 OpenSpec 的 specs/、design.md、tasks.md 能引用分析结果。
+
+若页面包含搜索、表单、弹窗、批量操作、复杂状态切换等交互，先参考 `references/interaction-spec-template.md` 把交互说明整理成摘要，再写入 `proposal.md / design.md / tasks.md`，避免实现阶段自己补口径。
 
 ---
 
@@ -95,6 +98,7 @@ OpenSpec 生成提案后，检查以下项目并按需补充：
 - 涉及接口时，是否包含接口封装任务（引用 `.agents/rules/05-API规范.md`）
 - 图标/图片未定时，是否标注占位元素（`.agents/rules/08-通用约束.md`）
 - 有 UI 分析清单时，开发任务是否引用 `docs/样式还原/<名称>-UI分析清单.md`
+- 存在复杂交互时，是否把搜索、表单、弹窗、批量操作和异常状态写成明确任务项，而不是只留一句“完善交互”
 
 ### 4.3 specs/ 检查
 - 每个 capability 的验收场景是否可测试
@@ -171,4 +175,5 @@ create-route、create-component 等技能中「涉及 UI 还原时」可引用�
 - `.agents/skills/execute-task/SKILL.md` - Superpowers 四步循环执行
 - `.agents/skills/design-analysis/SKILL.md` - 设计稿分析（有设计稿时使用，产出 UI 分析清单）
 - `.agents/skills/ui-verification/SKILL.md` - UI 验收（实现后需验收时使用）
+- `references/interaction-spec-template.md` - 搜索、表单、弹窗、批量操作等复杂交互的摘要模板
 - `openspec/config.yaml` - OpenSpec 配置（含 ai-spec-auto  上下文注入）

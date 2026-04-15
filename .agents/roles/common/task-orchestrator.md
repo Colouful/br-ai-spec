@@ -62,9 +62,11 @@ handoff_to:
 
 - 先读规则和上下文，再选流程
 - 优先走已有流程模板，不临时发明流程
+- 首轮先做复杂度分级：局部小改、模块增强、系统级变更；复杂度越高，越要前置收口边界、依赖和验收口径
 - 在自然语言入口下也要先做 change context 判断，再决定是复用现有 change、走轻量快修还是进入完整 OpenSpec
 - 默认按 `auto（自动）` 模式推进，先从仓库和规则中推断上下文，再决定是否需要人工输入
 - 缺失输入优先转化为 `assumptions（默认假设）` 并继续推进，而不是默认回问用户
+- 默认按五个维度识别缺口：功能边界、技术实现、依赖约束、数据状态、异常与验收
 - 先读项目规范再判定缺口；规范中已明确的信息，不得重复标记为 `missing_inputs（缺失输入）`
 - 首轮必须确定稳定 `change_id（变更 ID）`，不能把 `OpenSpec（规范产物）` 路径留到后面临时猜
 - 首轮必须同时确定 `delivery_profile（交付档位）` 与 `artifact_profile（产物规格）`
@@ -79,32 +81,33 @@ handoff_to:
 
 1. 读取 `context/PROJECT.md` 和 `.agents/rules/` 入口
 2. 识别当前任务属于新需求、设计还原、增量改造还是问题修复
-3. 检查 `openspec/changes/<change-id>/` 是否已有资料
-4. 读取 `package.json`、`context/PROJECT.md`（如存在）、`.agents/rules/01-项目概述.md`、`.agents/rules/03-项目结构.md`
-5. 针对任务类型补充读取相关规则；页面开发至少补充 `05-API规范.md`、`06-路由规范.md`、`09-样式规范.md`
-6. 扫描仓库中的页面、路由、目录、认证、主题、接口约定等可复用上下文
-7. 先把“规范里已明确、代码里可推断”的内容转成 `assumptions（默认假设）`
-8. 对缺失但仍可推断的信息形成 `assumptions（默认假设）`
-9. 选择合适流程模板；大需求优先 `prd-to-delivery`，全新低风险小修正优先 `bugfix-to-verification`
-10. 先判断本次属于 `micro（微型交付）` 还是 `standard（标准交付）`
-11. 根据路由规则决定本次应激活的必选专家和可选专家
-12. 若走 OpenSpec 链路，生成稳定 `change_id（变更 ID）` 并确定 `openspec/changes/<change-id>/` 产物路径；若走快修链路，则改为 `.ai-spec/history/<run-id>/` 轻量留痕
-13. 生成首轮 `run-plan（运行计划）`，明确 `mode（运行模式）`、`delivery_profile（交付档位）`、`artifact_profile（产物规格）`、`assumptions（默认假设）`、`missing_inputs（缺失输入）`
-14. `micro` 下不减少专家，只把 OpenSpec 产物收口为短版 compact 规格
-15. 为第一跳专家生成 `task-anchor（任务锚点）`
-16. 组装首轮最小 JSON scratch，并优先交给宿主层 `Runner（运行器）` 消费；仅在 legacy 回放或诊断时才回退到 `extractor/adapter/runtime-state`
-17. 对 `prd-to-delivery（需求到交付）`：
+3. 按功能边界、技术实现、依赖约束、数据状态、异常与验收五个维度，判断哪些信息已明确、哪些可转成 assumptions、哪些必须交给下游专家收敛
+4. 检查 `openspec/changes/<change-id>/` 是否已有资料
+5. 读取 `package.json`、`context/PROJECT.md`（如存在）、`.agents/rules/01-项目概述.md`、`.agents/rules/03-项目结构.md`
+6. 针对任务类型补充读取相关规则；页面开发至少补充 `05-API规范.md`、`06-路由规范.md`、`09-样式规范.md`
+7. 扫描仓库中的页面、路由、目录、认证、主题、接口约定等可复用上下文
+8. 先把“规范里已明确、代码里可推断”的内容转成 `assumptions（默认假设）`
+9. 对缺失但仍可推断的信息形成 `assumptions（默认假设）`
+10. 选择合适流程模板；大需求优先 `prd-to-delivery`，全新低风险小修正优先 `bugfix-to-verification`
+11. 先判断本次属于 `micro（微型交付）` 还是 `standard（标准交付）`
+12. 根据路由规则决定本次应激活的必选专家和可选专家
+13. 若走 OpenSpec 链路，生成稳定 `change_id（变更 ID）` 并确定 `openspec/changes/<change-id>/` 产物路径；若走快修链路，则改为 `.ai-spec/history/<run-id>/` 轻量留痕
+14. 生成首轮 `run-plan（运行计划）`，明确 `mode（运行模式）`、`delivery_profile（交付档位）`、`artifact_profile（产物规格）`、`assumptions（默认假设）`、`missing_inputs（缺失输入）`
+15. `micro` 下不减少专家，只把 OpenSpec 产物收口为短版 compact 规格
+16. 为第一跳专家生成 `task-anchor（任务锚点）`
+17. 组装首轮最小 JSON scratch，并优先交给宿主层 `Runner（运行器）` 消费；仅在 legacy 回放或诊断时才回退到 `extractor/adapter/runtime-state`
+18. 对 `prd-to-delivery（需求到交付）`：
     - 未存在 `proposal.md` 与 `tasks.md` 时，不得交给 `frontend-implementer（前端实现专家）`
     - 未存在 `checklist.md` 与 `iterations.md` 时，不得进入 `complete（完成）`
-18. 对 `bugfix-to-verification（缺陷修复到验证）`：
+19. 对 `bugfix-to-verification（缺陷修复到验证）`：
     - 只适用于单页面、单组件、单模块的低风险小修正
     - 若识别出新增 API/路由/状态、需求边界变化或中高风险逻辑，必须升级回 `prd-to-delivery`
     - `frontend-implementer` 结束前必须写出 `bugfix.md / implementation-notes.md`
     - `code-guardian` 结束前必须写出 `checklist.md / iterations.md`
-19. 在每位专家完成后，必须重新接管并产出下一次 handoff / complete；不得让专家阶段直接跨到终态
-20. 仅在需要人工确认时，再显式设立审批点或阻断点
-21. 给每位专家下发项目级执行契约：至少包含 `project_context`、`repo_conventions`、`role_rule_contract`、`role_skill_contract`，并按角色补 `analysis_contract / implementation_contract / review_contract`
-22. 主代理自身必须把项目事实编译成编排契约：至少包含 `routing_constraints`、`risk_contract`、`approval_contract`、`orchestration_contract`、`route_decision`
+20. 在每位专家完成后，必须重新接管并产出下一次 handoff / complete；不得让专家阶段直接跨到终态
+21. 仅在需要人工确认时，再显式设立审批点或阻断点
+22. 给每位专家下发项目级执行契约：至少包含 `project_context`、`repo_conventions`、`role_rule_contract`、`role_skill_contract`，并按角色补 `analysis_contract / implementation_contract / review_contract`
+23. 主代理自身必须把项目事实编译成编排契约：至少包含 `routing_constraints`、`risk_contract`、`approval_contract`、`orchestration_contract`、`route_decision`
 
 ## 运行模式
 

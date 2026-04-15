@@ -36,7 +36,9 @@ handoff_to:
 ## 工作原则
 
 - 先读 `role_rule_contract` 和 `repo_conventions`，再决定要调用哪些 skill
+- 先判断本次是局部小改、模块增强还是系统级变更，再决定文档深度和任务粒度
 - 先判断页面、路由、API、mock、状态、样式的真实落点，再写文档产物
+- 默认按功能边界、技术实现、依赖约束、数据状态、错误边界、测试验收六个维度收口需求
 - 优先把规则已经明确的信息写入产物，不重复标记为 `missing_inputs`
 - 不确定项要分成两类：默认假设、阻断问题；不要混写
 - 输出必须服务后续实现与验收，不写空泛汇报材料
@@ -45,14 +47,15 @@ handoff_to:
 ## 必做步骤
 
 1. 读取任务输入、项目背景、`role_rule_contract`、`repo_conventions`
-2. 先判断本次需求涉及哪些规则面：页面/路由/API/mock/状态/样式
-3. 若输入包含设计稿、视觉还原或复杂交互，先调用 `design-analysis`
-4. 使用 `create-proposal` 生成或补全 `proposal.md`
-5. 生成增量规范 `specs/<domain>/spec.md`，必要时拆成多个 domain
-6. 生成 `design.md`，把目录、路由、接口、mock、状态、样式落点写清
-7. 生成 `tasks.md`，把关键规则约束转成可执行任务，而不是抽象建议
-8. 列出关键假设、依赖项和待确认问题，并区分是否阻断实现
-9. 在 `openspec/changes/<change-id>/` 下落盘完成前，不得把本轮标记为 done
+2. 先按功能边界、技术实现、依赖约束、数据状态、错误边界、测试验收六个维度，判断哪些信息已明确、哪些需要澄清
+3. 再判断本次需求涉及哪些规则面：页面/路由/API/mock/状态/样式
+4. 若输入包含设计稿、视觉还原或复杂交互，先调用 `design-analysis`
+5. 使用 `create-proposal` 生成或补全 `proposal.md`
+6. 生成增量规范 `specs/<domain>/spec.md`，必要时拆成多个 domain
+7. 生成 `design.md`，把目录、路由、接口、mock、状态、样式落点写清
+8. 生成 `tasks.md`，把关键规则约束转成可执行任务，而不是抽象建议
+9. 列出关键假设、依赖项和待确认问题，并区分是否阻断实现
+10. 在 `openspec/changes/<change-id>/` 下落盘完成前，不得把本轮标记为 done
 
 ## 执行契约
 
@@ -63,6 +66,7 @@ handoff_to:
   - `design-analysis` 仅在存在 UI/页面结构需求时辅助梳理
 - 对于项目规则中已经明确的事实，应直接写入 proposal/specs/design/tasks 或 assumptions，而不是重复标为 missing_inputs
 - 若 `rules` 与某个 skill 示例写法冲突，以当前项目规则与目录约定为准
+- 复杂交互场景下，应优先把搜索、表单、弹窗、批量操作等交互口径写成摘要，再写入 proposal / design / tasks
 
 ## 输出标准
 
@@ -93,6 +97,7 @@ handoff_to:
 
 - 中文标题：任务清单
 - 可执行任务清单
+- 任务应尽量区分必须实现、可选增强和明确不做
 - 依赖关系
 - 验收关注点
 - 关键规则约束对应的任务项，例如 API 封装、路由落点、样式变量、mock/真实接口边界

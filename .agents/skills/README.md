@@ -20,12 +20,16 @@ description: 技能目录索引。安装到目标项目后此目录为扁平结�
 | `create-proposal` | 提案前置分析与 OpenSpec 增强层 | - |
 | `archive-change` | 变更归档增强层（规范合并 + 目录校验） | - |
 | `design-analysis` | 设计稿分析，产出 UI 分析清单 | - |
+| `config-and-secret-scan` | 配置规范与敏感信息扫描 | `08-通用约束` |
+| `route-permission-map` | 路由、权限与菜单映射审计 | `06-路由规范` |
+| `dependency-impact-graph` | 依赖影响分析与回归范围评估 | - |
 | `ui-verification` | UI 还原验收 | - |
 | `execute-task` | Superpowers 四步循环执行 | `12-Superpowers执行规范` |
 | `project-init` | 自动分析项目生成 01/03，并在自定义规则缺失时补生成 04/05/06/07/09 | - |
 | `using-superpowers` | 技能调度核心规范 | - |
 | `find-skills` | 查找开源 skills | - |
 | `skill-creator` | 创建 skill 指导 | - |
+| `skill-optimizer` | 审查与优化现有 skill | - |
 | `web-design-guidelines` | 网页设计指导 | - |
 
 ## profiles/react/ — React 技术栈技能
@@ -104,8 +108,12 @@ description: 技能目录索引。安装到目标项目后此目录为扁平结�
 | 开始执行 tasks.md | `.agents/skills/common/execute-task/SKILL.md` |
 | 分析设计稿 | `.agents/skills/common/design-analysis/SKILL.md` |
 | UI 还原验收 | `.agents/skills/common/ui-verification/SKILL.md` |
+| 扫描敏感信息 / 统一配置规范 | `.agents/skills/common/config-and-secret-scan/SKILL.md` |
+| 核对路由、菜单和权限 | `.agents/skills/common/route-permission-map/SKILL.md` |
+| 评估包或模块改动影响 | `.agents/skills/common/dependency-impact-graph/SKILL.md` |
 | 初始化项目规范 | `.agents/skills/common/project-init/SKILL.md` |
 | 每次对话启动的技能调度 | `.agents/skills/common/using-superpowers/SKILL.md` |
+| 优化现有 skill | `.agents/skills/common/skill-optimizer/SKILL.md` |
 
 ## 使用说明
 

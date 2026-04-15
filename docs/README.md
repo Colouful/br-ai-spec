@@ -35,9 +35,10 @@
 - [开发最佳实践指南](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/four/开发最佳实践指南.md)
 - [架构设计与治理说明](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/four/架构设计与治理说明.md)
 - [第五阶段专题入口](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/five/README.md)
+- [项目介绍与运行机制说明（第五阶段版）](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/five/项目介绍与运行机制说明.md)
 - [入口体验优化方案](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/five/入口体验优化方案.md)
 - [入口最佳实践指南](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/five/入口最佳实践指南.md)
-- [项目介绍与运行机制说明](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/paser_three/项目介绍与运行机制说明.md)
+- [项目介绍与运行机制说明（第三阶段历史版）](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/paser_three/项目介绍与运行机制说明.md)
 - [最小示例运行说明](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/paser_three/最小示例运行说明.md)
 - [开发人员规范化开发实践-流程图版](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/paser_three/开发人员规范化开发实践-流程图版.md)
 
@@ -57,15 +58,15 @@
 - `docs/install-guide.md`
   - 参数、兼容、Monorepo、自定义规则、排错
 - `docs/openspec-guide.md`
-  - OpenSpec 与协议流
+  - OpenSpec(规范产物框架) 与协议流
 - `docs/four/小需求与补丁修正指南.md`
-  - 小需求如何在 quick-fix / patch / archive-fix / followup-patch / full-change 之间分流
+  - 小需求如何在 quick-fix(轻量快修) / patch(当前变更补丁) / archive-fix(归档前修正) / followup-patch(归档后补丁) / full-change(完整变更) 之间分流
 - `docs/four/README.md`
   - 第四阶段主入口
   - 按受众分层的阅读路径
 - `docs/four/Hub资产同步脚本说明.md`
-  - 本地脚本如何同步 skill / rule / role / scenario 到 Hub
-  - 认证、分类、domain 映射与场景覆盖策略
+  - 本地脚本如何同步 skill(技能) / rule(规则) / role(角色) / scenario(场景) 到 Hub
+  - 认证、分类、domain(领域) 映射与场景覆盖策略
 - `docs/four/开发最佳实践指南.md`
   - 面向普通开发者的上手与实践说明
 - `docs/four/需求示例-从发起到归档.md`
@@ -74,6 +75,8 @@
   - 面向维护者与评审的架构、治理和排障说明
 - `docs/five/README.md`
   - 第五阶段专题入口
+- `docs/five/项目介绍与运行机制说明.md`
+  - 第五阶段对齐后的项目总览、双流程分层、运行机制与治理价值说明
 - `docs/five/入口体验优化方案.md`
   - 当前项目入口体验问题与优化方案
 - `docs/five/入口最佳实践指南.md`

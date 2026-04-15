@@ -38,13 +38,20 @@
   - 本地环境允许时可以不登录
 - `role / scenario`
   - 继续走 `/api/admin/*`
-  - 需要管理员会话
+  - 如果 Hub 已按推荐方式放宽 `requireAdminJson`，可以直接用 `HUB_ADMIN_SECRET`
+  - 否则仍然需要管理员会话
+
+当前仓库推荐把 `skill / rule / role / scenario` 的 Hub 展示名称统一收口到本地 config：
+
+- `scripts/hub-sync-assets.config.example.json` 提供了完整中文名称映射模板
+- 实际使用时复制为 `scripts/hub-sync-assets.config.json`
+- 换机器后只要补本地凭据，不需要重新整理中文显示名
 
 ## 前置条件
 
 1. Hub 本地服务已经启动
 2. Hub 地址可访问
-3. 如果要同步 `role / scenario`，需要拿到 Hub 管理员登录方式
+3. 如果要同步 `role / scenario`，需要拿到 Hub 管理员鉴权方式
 
 你当前环境里的默认地址可以直接用：
 
@@ -108,7 +115,10 @@ version update requires agent login
 - 现有 `skill / rule` 的作者校验绕过
 - 避免作者名和 agent 归属不完全一致时被拦住
 
-但它不能替代 `/api/admin/*` 的管理员登录。
+如果 Hub 已经把 `requireAdminJson` 改成接受 `HUB_ADMIN_SECRET`，那它也可以直接用于：
+
+- `role`
+- `scenario`
 
 脚本会优先从这些地方找：
 
@@ -128,6 +138,12 @@ version update requires agent login
 - `scripts/hub-sync-assets.config.json`
 
 这个文件已经建议加入 `.gitignore`，避免把凭据提交进仓库。
+
+推荐做法：
+
+1. 先复制示例配置
+2. 只修改 `hub.adminSecret / agentApiKey / adminSessionCookie` 这类本地凭据
+3. 保留示例里已经整理好的中文名称映射、默认分类和场景中文名
 
 ## 最常用命令
 
@@ -172,20 +188,35 @@ node ./scripts/hub-sync-assets.js \
 
 - 从 `skills.json` 读取 `source` 或 `sourceByProfile`
 - 单路径 skill 会上传整个 skill 目录
-- 多 profile skill 会把 profile 目录内容一起打成同一组版本文件
+- 多 profile skill 分两种情况：
+  - Hub 已存在按 profile 拆分的资源时，脚本会分别同步到实际变体 slug
+  - Hub 还没有拆分资源时，脚本会回退为单资源同步
 - 创建时优先直连 `POST /api/skills`
 - 更新时优先直连 `POST /api/skills/:slug`
 - 版本对比走 `/api/skills/:slug/versions`
 - 只有文件变化才发 patch version
+- 变体场景下，推荐直接按实际 slug 配中文名称：
+  - `create-api-vue`
+  - `create-api-react`
+  - `theme-variables-vue`
+  - `theme-variables-react`
 
 ### rule
 
 - 从 `rules.json` 读取 `source` 或 `sourceByProfile`
 - 规则通常是 markdown 单文件
+- 多 profile rule 分两种情况：
+  - Hub 已存在按 profile 拆分的资源时，脚本会优先同步到实际变体 slug
+  - Hub 还没有拆分资源时，脚本会回退为单资源同步
 - 创建时优先直连 `POST /api/rules`
 - 更新时优先直连 `POST /api/rules/:slug`
 - 版本对比走 `/api/rules/:slug/versions`
 - 只有文件变化才发 patch version
+- 变体场景下，推荐直接按实际 slug 配中文名称：
+  - `vue-project-overview`
+  - `react-project-overview`
+  - `vue-project-structure`
+  - `react-project-structure`
 
 ### role
 
@@ -212,6 +243,7 @@ node ./scripts/hub-sync-assets.js \
 - `skillIds / ruleIds` 会自动聚合：
   - 场景显式声明的 skill/rule
   - 关联 role 上已经挂载的 skill/rule
+- 推荐把场景 `name` 直接配置为中文展示名，避免 Hub 后台显示 slug
 
 ## 场景方案建议
 
@@ -226,6 +258,14 @@ node ./scripts/hub-sync-assets.js \
 - `supportedProfiles`
 - `tags`
 - `isFeatured`
+
+当前示例配置已经内置了 5 个场景的中文名称：
+
+- `前端基础交付场景`
+- `设计到代码交付场景`
+- `质量治理场景`
+- `企业文档需求沉淀场景`
+- `缺陷修复到验证场景`
 
 也就是说：
 
@@ -249,6 +289,11 @@ node ./scripts/hub-sync-assets.js \
 5. 如果当前拿到了 admin 分类且该资源类型只有一个分类，就直接用那个
 
 如果还是找不到，脚本会跳过创建并报 warning。
+
+当前项目的推荐默认值已经收口到示例配置：
+
+- `defaults.skillCategorySlug = dev-tools`
+- `defaults.ruleCategorySlug = rule-sets`
 
 ### domain
 
@@ -285,11 +330,45 @@ node ./scripts/hub-sync-assets.js \
 - role 依赖 skill/rule 的 Hub 真实 ID
 - scenario 依赖 role 的 Hub 真实 ID
 
+## 中文名称映射建议
+
+如果你希望 Hub 后台统一显示中文，不要只配基础 slug，建议直接在 config 里按最终资源 slug 维护名称。
+
+建议最少覆盖这 4 组：
+
+- `resources.skills`
+  - 基础 skill 用 registry id
+  - profile 拆分 skill 用真实 slug，例如 `create-api-vue`
+- `resources.rules`
+  - 基础 rule 用 registry id
+  - profile 拆分 rule 用真实 slug，例如 `vue-project-overview`
+- `resources.roles`
+  - 主链和增强专家都直接配置中文名
+- `resources.scenarios`
+  - 场景 `name` 和 `description` 都配置中文
+
+当前仓库的 [scripts/hub-sync-assets.config.example.json](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/scripts/hub-sync-assets.config.example.json) 已经包含一套可直接复用的中文名称映射。常见映射示例：
+
+- skill
+  - `using-superpowers` -> `技能调度核心规范`
+  - `create-api-vue` -> `Vue 接口创建与维护`
+  - `create-api-react` -> `React 接口创建与维护`
+- rule
+  - `api-standard` -> `API 规范`
+  - `vue-project-overview` -> `Vue 项目概述`
+  - `react-project-overview` -> `React 项目概述`
+- role
+  - `task-orchestrator` -> `任务主代理`
+  - `code-guardian` -> `规范守护者`
+- scenario
+  - `bugfix-to-verification` -> `缺陷修复到验证场景`
+
 ## 已知限制
 
 - `skill / rule` 在无管理员模式下，会优先走直连接口；如果资源已存在，更新通常仍建议补 `adminSecret` 或 `agentApiKey`
 - 如果 Hub 开启上传登录，已有 `skill / rule` 发版本必须提供 agent API key
 - `scenario-packages.json` 本身没有描述类字段，所以更推荐通过 config 补全场景展示信息
+- profile 拆分资源是否按变体同步，取决于 Hub 里是否已经存在同一 `registryId/manifestId` 的拆分资源
 - 脚本目前是本地运行工具，不会自动监听文件变化
 
 ## 相关文件

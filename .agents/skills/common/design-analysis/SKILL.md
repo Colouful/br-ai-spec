@@ -35,7 +35,8 @@ description: 通用设计稿分析技能。只要需要「分析设计稿、梳�
 1. **建立布局 Map**：获取设计稿结构，记录页面状态、整体尺寸、区域划分。详见 `rules/workflow-layout-map.md`
 2. **区域与元素提取**：对每个区域按「从外到里」逐项提取，确保文字、图片、布局、层级四者均准确记录。详见 `rules/workflow-element-extraction.md`
 3. **样式规范汇总**：汇总颜色、字体、圆角、间距、阴影等样式规范。详见 `rules/workflow-style-summary.md`
-4. **输出 UI 分析清单文档**：将分析结果输出为文档。详见 `rules/workflow-output-checklist.md` 和 `rules/output-analysis-checklist.md`
+4. **复杂交互补充**：若页面含搜索、表单、弹窗、批量操作或复杂状态切换，补一段交互说明摘要。可参考 `../create-proposal/references/interaction-spec-template.md`
+5. **输出 UI 分析清单文档**：将分析结果输出为文档。详见 `rules/workflow-output-checklist.md` 和 `rules/output-analysis-checklist.md`
 
 ---
 
@@ -69,6 +70,7 @@ description: 通用设计稿分析技能。只要需要「分析设计稿、梳�
 ## 与其它技能的关系
 
 - **create-proposal**：提案前置分析时，若涉及「有设计稿或 UI 描述」的页面/组件，可先或同步使用本技能产出分析清单，再委托 `/opsx:propose` 生成提案
+- **复杂交互说明**：若页面包含搜索、表单、弹窗、批量操作等复杂交互，可先按 `../create-proposal/references/interaction-spec-template.md` 整理摘要，再回写到 proposal / design / tasks
 - **ui-verification**：以本分析清单为基准做 UI 验收时使用；验收若发现「分析遗漏」或「描述不清」，应将结论反哺本技能
 - **create-route / create-component**：开发时若涉及样式还原，应引用本分析清单中的区域与样式规范
 

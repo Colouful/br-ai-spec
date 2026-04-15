@@ -128,6 +128,19 @@ version: 2.1.0
 - HTTP 请求：`axios` / `fetch` / 自有请求封装
 - 常用工具：`ahooks` / `@vueuse/core` / `lodash*` / `dayjs` 等
 
+**若仓库同时存在后端工程标记文件，也要补读后端入口线索，用于完善 `01-项目概述.md` 与 `context/PROJECT.md`，但不改变当前前端规则生成范围。**
+
+至少检查：
+
+- Java / JVM：`pom.xml`、`build.gradle`、`build.gradle.kts`
+- Python：`pyproject.toml`、`requirements.txt`、`setup.py`
+
+能确认时写清：
+
+- 是否为前后端混合仓库
+- 后端技术栈大类
+- 前后端目录的基本分工
+
 **1.2 `README.md` / 已有项目说明（如存在）**
 
 提取稳定背景：
@@ -156,6 +169,7 @@ version: 2.1.0
 - SPA
 - SSR/SSG
 - 微前端
+- 前后端混合仓库
 - 组件库/工具库
 - Monorepo
 

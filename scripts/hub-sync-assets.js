@@ -66,19 +66,19 @@ async function run(cliOptions) {
     !resolved.skipRoles ||
     !resolved.skipScenarios ||
     resolved.hasAdminAuthInput;
-  if (shouldUseAdminSession) {
+  if (shouldUseAdminSession && !client.hasAdminAccess()) {
     await client.ensureAdminSession();
   }
 
   const categories = resolved.skipSkills && resolved.skipRules
     ? { skill: [], rule: [] }
-    : client.hasAdminSession()
+    : client.hasAdminAccess()
       ? await loadCategories(client, resolved)
       : { skill: [], rule: [] };
-  const skillBrowseItems = !client.hasAdminSession() || (resolved.skipSkills && resolved.skipRoles && resolved.skipScenarios)
+  const skillBrowseItems = !client.hasAdminAccess() || (resolved.skipSkills && resolved.skipRoles && resolved.skipScenarios)
     ? []
     : await loadBrowseItems(client, "skill", resolved);
-  const ruleBrowseItems = !client.hasAdminSession() || (resolved.skipRules && resolved.skipRoles && resolved.skipScenarios)
+  const ruleBrowseItems = !client.hasAdminAccess() || (resolved.skipRules && resolved.skipRoles && resolved.skipScenarios)
     ? []
     : await loadBrowseItems(client, "rule", resolved);
   const roleResponse = resolved.skipRoles && resolved.skipScenarios
@@ -266,7 +266,7 @@ Options:
   --admin-email <email>        Hub admin email for login
   --admin-password <pwd>       Hub admin password for login
   --admin-cookie <cookie>      Existing admin_session cookie
-  --admin-secret <secret>      HUB_ADMIN_SECRET, used for skill/rule version author bypass
+  --admin-secret <secret>      HUB_ADMIN_SECRET, used for skill/rule author bypass and admin API bypass
   --agent-api-key <key>        Agent API key, required when Hub enforces upload login for skill/rule version updates
   --skills <all|csv|none>      Sync selected skills
   --rules <all|csv|none>       Sync selected rules
@@ -285,7 +285,8 @@ Notes:
   - Existing skill/rule resources need version publishing for file changes. If Hub requires upload login,
     you must provide --agent-api-key or config hub.agentApiKey for those version updates.
   - existing skill/rule updates usually still need --admin-secret or --agent-api-key.
-  - roles/scenarios are admin-only and still require the admin session.
+  - if your local Hub lets requireAdminJson accept HUB_ADMIN_SECRET, roles/scenarios can also use --admin-secret.
+  - otherwise roles/scenarios still require the admin session.
   - A config example is available at ${path.relative(PROJECT_ROOT, DEFAULT_CONFIG_EXAMPLE_PATH)}.
 `.trim());
 }
@@ -345,8 +346,9 @@ function resolveRuntimeOptions(cliOptions, config) {
       "",
     hasAdminAuthInput: Boolean(
       cliOptions.adminCookie ||
-        process.env.HUB_SYNC_ADMIN_COOKIE ||
-        config?.hub?.adminSessionCookie ||
+      process.env.HUB_SYNC_ADMIN_COOKIE ||
+      config?.hub?.adminSessionCookie ||
+        adminSecret ||
         ((cliOptions.adminEmail ||
           process.env.HUB_SYNC_ADMIN_EMAIL ||
           config?.hub?.adminEmail) &&
@@ -442,6 +444,10 @@ class HubClient {
 
   hasAdminSession() {
     return Boolean(this.cookie);
+  }
+
+  hasAdminAccess() {
+    return Boolean(this.cookie || this.adminSecret);
   }
 
   async ensureAdminSession() {
@@ -565,87 +571,122 @@ async function syncRules(context) {
   const ids = selectResourceIds(context.localRules, context.resolved.ruleSelection);
   for (const ruleId of ids) {
     const local = context.localRules[ruleId];
-    const desired = buildRuleAsset(ruleId, local, context);
-    if (!desired) {
+    const desiredAssets = buildRuleAssets(ruleId, local, context);
+    if (desiredAssets.length === 0) {
       context.summary.rule.skipped += 1;
       continue;
     }
-
-    const existing = context.hubState.rulesBySlug[desired.slug];
-    if (!existing) {
-      if (!desired.categorySlug) {
-        warn(`rule ${ruleId}: missing categorySlug, skip create`);
+    for (const desired of desiredAssets) {
+      if (!desired) {
         context.summary.rule.skipped += 1;
         continue;
       }
-      if (context.resolved.dryRun) {
+
+      let existing = context.hubState.rulesBySlug[desired.slug];
+      if (!existing) {
         const publicExisting = await fetchPublicResource(context.client, "rule", desired.slug);
-        info(`rule ${ruleId}: ${publicExisting ? "update" : "create"}`);
         if (publicExisting) {
-          context.summary.rule.updated += 1;
-        } else {
-          context.summary.rule.created += 1;
+          existing = publicExisting;
+          context.hubState.rulesBySlug[desired.slug] = buildPreviewSkillRuleState(
+            "rule",
+            publicExisting,
+            desired,
+          );
         }
-        continue;
+      }
+      if (!existing) {
+        if (!desired.categorySlug) {
+          warn(`rule ${ruleId}: missing categorySlug, skip create`);
+          context.summary.rule.skipped += 1;
+          continue;
+        }
+        if (context.resolved.dryRun) {
+          info(`rule ${desired.slug}: create`);
+          context.summary.rule.created += 1;
+          context.hubState.rulesBySlug[desired.slug] = buildPreviewSkillRuleState(
+            "rule",
+            null,
+            desired,
+          );
+          continue;
+        }
+
+        const createResult = await createSkillRuleOrNull({
+          type: "rule",
+          desired,
+          client: context.client,
+        });
+        if (createResult?.created) {
+          info(`rule ${desired.slug}: created`);
+          context.summary.rule.created += 1;
+          context.hubState.rulesBySlug[desired.slug] = {
+            id: createResult.resource?.id || desired.slug,
+            slug: desired.slug,
+            name: desired.name,
+            registryId: desired.registryId,
+            manifestId: desired.manifestId,
+            tags: desired.tags,
+            supportedProfiles: desired.supportedProfiles,
+            categoryName: createResult.resource?.category?.name || desired.categorySlug,
+          };
+          continue;
+        }
+
+        const conflictExisting = await fetchConflictResource({
+          type: "rule",
+          desiredSlug: desired.slug,
+          conflictSlugs: createResult?.conflictSlugs || [],
+          client: context.client,
+        });
+        if (!conflictExisting) {
+          throw new Error(`rule ${ruleId}: resource create conflicted but public resource was not found`);
+        }
+        existing = conflictExisting;
+        context.hubState.rulesBySlug[desired.slug] = buildPreviewSkillRuleState(
+          "rule",
+          conflictExisting,
+          desired,
+        );
       }
 
-      const createResult = await createSkillRuleOrNull({
+      const existingDetails = existing
+        ? await fetchPublicResource(context.client, "rule", existing.slug || desired.slug) || existing
+        : null;
+      const metadataPatch = existingDetails
+        ? buildSkillRuleMetadataPatch("rule", desired, existingDetails)
+        : buildSkillRuleFullPatch(desired);
+      if (metadataPatch) {
+        if (context.resolved.dryRun) {
+          info(`rule ${desired.slug}: update metadata`);
+        } else {
+          await context.client.postJson(
+            `/api/rules/${encodeURIComponent(existingDetails?.slug || existing?.slug || desired.slug)}`,
+            metadataPatch,
+          );
+          info(`rule ${desired.slug}: metadata updated`);
+        }
+        context.summary.rule.updated += 1;
+      }
+
+      const versionChanged = await ensureSkillRuleVersion({
         type: "rule",
         desired,
+        slug: desired.slug,
         client: context.client,
+        dryRun: context.resolved.dryRun,
       });
-      if (createResult?.created) {
-        info(`rule ${ruleId}: created`);
-        context.summary.rule.created += 1;
-        context.hubState.rulesBySlug[desired.slug] = {
-          id: createResult.resource?.id || desired.slug,
-          slug: desired.slug,
-          name: desired.name,
-          registryId: desired.registryId,
-          manifestId: desired.manifestId,
-          tags: desired.tags,
-          supportedProfiles: desired.supportedProfiles,
-          categoryName: createResult.resource?.category?.name || desired.categorySlug,
-        };
-        continue;
+      if (versionChanged === "versioned") {
+        context.summary.rule.versioned += 1;
+      } else if (!metadataPatch) {
+        context.summary.rule.skipped += 1;
       }
-    }
 
-    const metadataPatch =
-      existing && context.client.hasAdminSession()
-        ? buildSkillRuleMetadataPatch("rule", desired, existing)
-        : buildSkillRuleFullPatch(desired);
-    if (metadataPatch) {
-      if (context.resolved.dryRun) {
-        info(`rule ${ruleId}: update metadata`);
-      } else {
-        await context.client.postJson(`/api/rules/${encodeURIComponent(desired.slug)}`, metadataPatch);
-        info(`rule ${ruleId}: metadata updated`);
-      }
-      context.summary.rule.updated += 1;
+      context.hubState.rulesBySlug[desired.slug] = buildPreviewSkillRuleState(
+        "rule",
+        existing,
+        desired,
+      );
     }
-
-    const versionChanged = await ensureSkillRuleVersion({
-      type: "rule",
-      desired,
-      slug: desired.slug,
-      client: context.client,
-      dryRun: context.resolved.dryRun,
-    });
-    if (versionChanged === "versioned") {
-      context.summary.rule.versioned += 1;
-    } else if (!metadataPatch) {
-      context.summary.rule.skipped += 1;
-    }
-
-    context.hubState.rulesBySlug[desired.slug] = {
-      ...existing,
-      name: desired.name,
-      registryId: desired.registryId,
-      manifestId: desired.manifestId,
-      tags: desired.tags,
-      supportedProfiles: desired.supportedProfiles,
-    };
   }
 }
 
@@ -653,87 +694,122 @@ async function syncSkills(context) {
   const ids = selectResourceIds(context.localSkills, context.resolved.skillSelection);
   for (const skillId of ids) {
     const local = context.localSkills[skillId];
-    const desired = buildSkillAsset(skillId, local, context);
-    if (!desired) {
+    const desiredAssets = buildSkillAssets(skillId, local, context);
+    if (desiredAssets.length === 0) {
       context.summary.skill.skipped += 1;
       continue;
     }
-
-    const existing = context.hubState.skillsBySlug[desired.slug];
-    if (!existing) {
-      if (!desired.categorySlug) {
-        warn(`skill ${skillId}: missing categorySlug, skip create`);
+    for (const desired of desiredAssets) {
+      if (!desired) {
         context.summary.skill.skipped += 1;
         continue;
       }
-      if (context.resolved.dryRun) {
+
+      let existing = context.hubState.skillsBySlug[desired.slug];
+      if (!existing) {
         const publicExisting = await fetchPublicResource(context.client, "skill", desired.slug);
-        info(`skill ${skillId}: ${publicExisting ? "update" : "create"}`);
         if (publicExisting) {
-          context.summary.skill.updated += 1;
-        } else {
-          context.summary.skill.created += 1;
+          existing = publicExisting;
+          context.hubState.skillsBySlug[desired.slug] = buildPreviewSkillRuleState(
+            "skill",
+            publicExisting,
+            desired,
+          );
         }
-        continue;
+      }
+      if (!existing) {
+        if (!desired.categorySlug) {
+          warn(`skill ${skillId}: missing categorySlug, skip create`);
+          context.summary.skill.skipped += 1;
+          continue;
+        }
+        if (context.resolved.dryRun) {
+          info(`skill ${desired.slug}: create`);
+          context.summary.skill.created += 1;
+          context.hubState.skillsBySlug[desired.slug] = buildPreviewSkillRuleState(
+            "skill",
+            null,
+            desired,
+          );
+          continue;
+        }
+
+        const createResult = await createSkillRuleOrNull({
+          type: "skill",
+          desired,
+          client: context.client,
+        });
+        if (createResult?.created) {
+          info(`skill ${desired.slug}: created`);
+          context.summary.skill.created += 1;
+          context.hubState.skillsBySlug[desired.slug] = {
+            id: createResult.resource?.id || desired.slug,
+            slug: desired.slug,
+            name: desired.name,
+            registryId: desired.registryId,
+            manifestId: desired.manifestId,
+            tags: desired.tags,
+            supportedProfiles: desired.supportedProfiles,
+            categoryName: createResult.resource?.category?.name || desired.categorySlug,
+          };
+          continue;
+        }
+
+        const conflictExisting = await fetchConflictResource({
+          type: "skill",
+          desiredSlug: desired.slug,
+          conflictSlugs: createResult?.conflictSlugs || [],
+          client: context.client,
+        });
+        if (!conflictExisting) {
+          throw new Error(`skill ${skillId}: resource create conflicted but public resource was not found`);
+        }
+        existing = conflictExisting;
+        context.hubState.skillsBySlug[desired.slug] = buildPreviewSkillRuleState(
+          "skill",
+          conflictExisting,
+          desired,
+        );
       }
 
-      const createResult = await createSkillRuleOrNull({
+      const existingDetails = existing
+        ? await fetchPublicResource(context.client, "skill", existing.slug || desired.slug) || existing
+        : null;
+      const metadataPatch = existingDetails
+        ? buildSkillRuleMetadataPatch("skill", desired, existingDetails)
+        : buildSkillRuleFullPatch(desired);
+      if (metadataPatch) {
+        if (context.resolved.dryRun) {
+          info(`skill ${desired.slug}: update metadata`);
+        } else {
+          await context.client.postJson(
+            `/api/skills/${encodeURIComponent(existingDetails?.slug || existing?.slug || desired.slug)}`,
+            metadataPatch,
+          );
+          info(`skill ${desired.slug}: metadata updated`);
+        }
+        context.summary.skill.updated += 1;
+      }
+
+      const versionChanged = await ensureSkillRuleVersion({
         type: "skill",
         desired,
+        slug: desired.slug,
         client: context.client,
+        dryRun: context.resolved.dryRun,
       });
-      if (createResult?.created) {
-        info(`skill ${skillId}: created`);
-        context.summary.skill.created += 1;
-        context.hubState.skillsBySlug[desired.slug] = {
-          id: createResult.resource?.id || desired.slug,
-          slug: desired.slug,
-          name: desired.name,
-          registryId: desired.registryId,
-          manifestId: desired.manifestId,
-          tags: desired.tags,
-          supportedProfiles: desired.supportedProfiles,
-          categoryName: createResult.resource?.category?.name || desired.categorySlug,
-        };
-        continue;
+      if (versionChanged === "versioned") {
+        context.summary.skill.versioned += 1;
+      } else if (!metadataPatch) {
+        context.summary.skill.skipped += 1;
       }
-    }
 
-    const metadataPatch =
-      existing && context.client.hasAdminSession()
-        ? buildSkillRuleMetadataPatch("skill", desired, existing)
-        : buildSkillRuleFullPatch(desired);
-    if (metadataPatch) {
-      if (context.resolved.dryRun) {
-        info(`skill ${skillId}: update metadata`);
-      } else {
-        await context.client.postJson(`/api/skills/${encodeURIComponent(desired.slug)}`, metadataPatch);
-        info(`skill ${skillId}: metadata updated`);
-      }
-      context.summary.skill.updated += 1;
+      context.hubState.skillsBySlug[desired.slug] = buildPreviewSkillRuleState(
+        "skill",
+        existing,
+        desired,
+      );
     }
-
-    const versionChanged = await ensureSkillRuleVersion({
-      type: "skill",
-      desired,
-      slug: desired.slug,
-      client: context.client,
-      dryRun: context.resolved.dryRun,
-    });
-    if (versionChanged === "versioned") {
-      context.summary.skill.versioned += 1;
-    } else if (!metadataPatch) {
-      context.summary.skill.skipped += 1;
-    }
-
-    context.hubState.skillsBySlug[desired.slug] = {
-      ...existing,
-      name: desired.name,
-      registryId: desired.registryId,
-      manifestId: desired.manifestId,
-      tags: desired.tags,
-      supportedProfiles: desired.supportedProfiles,
-    };
   }
 }
 
@@ -752,6 +828,7 @@ async function syncRoles(context) {
       if (context.resolved.dryRun) {
         info(`role ${roleId}: create`);
         context.summary.role.created += 1;
+        context.hubState.rolesBySlug[desired.slug] = buildPreviewRoleState(null, desired);
       } else {
         await context.client.postJson("/api/admin/roles", desired.payload);
         info(`role ${roleId}: created`);
@@ -780,6 +857,7 @@ async function syncRoles(context) {
       if (needsVersion) {
         context.summary.role.versioned += 1;
       }
+      context.hubState.rolesBySlug[desired.slug] = buildPreviewRoleState(existing, desired);
       continue;
     }
 
@@ -819,6 +897,7 @@ async function syncScenarios(context) {
       if (context.resolved.dryRun) {
         info(`scenario ${scenarioId}: create`);
         context.summary.scenario.created += 1;
+        context.hubState.scenariosBySlug[desired.slug] = buildPreviewScenarioState(null, desired);
       } else {
         await context.client.postJson("/api/admin/scenarios", desired.payload);
         info(`scenario ${scenarioId}: created`);
@@ -839,6 +918,7 @@ async function syncScenarios(context) {
     if (context.resolved.dryRun) {
       info(`scenario ${scenarioId}: update`);
       context.summary.scenario.updated += 1;
+      context.hubState.scenariosBySlug[desired.slug] = buildPreviewScenarioState(existing, desired);
       continue;
     }
 
@@ -854,9 +934,44 @@ async function syncScenarios(context) {
   }
 }
 
-function buildSkillAsset(skillId, local, context) {
-  const override = context.config?.resources?.skills?.[skillId] || {};
-  const files = collectSkillFiles(local, skillId);
+function buildSkillAssets(skillId, local, context) {
+  const variants = buildProfileVariantSpecs({
+    type: "skill",
+    resourceId: skillId,
+    local,
+    hubState: context.hubState,
+  });
+  if (variants.length === 0) {
+    return [buildSkillAsset(skillId, local, context, null)].filter(Boolean);
+  }
+  return variants
+    .map((variant) => buildSkillAsset(skillId, local, context, variant))
+    .filter(Boolean);
+}
+
+function buildRuleAssets(ruleId, local, context) {
+  const variants = buildProfileVariantSpecs({
+    type: "rule",
+    resourceId: ruleId,
+    local,
+    hubState: context.hubState,
+  });
+  if (variants.length === 0) {
+    return [buildRuleAsset(ruleId, local, context, null)].filter(Boolean);
+  }
+  return variants
+    .map((variant) => buildRuleAsset(ruleId, local, context, variant))
+    .filter(Boolean);
+}
+
+function buildSkillAsset(skillId, local, context, variant) {
+  const override = resolveResourceOverride({
+    config: context.config,
+    type: "skills",
+    resourceId: skillId,
+    variantSlug: variant?.slug,
+  });
+  const files = collectSkillFiles(local, skillId, variant?.sourcePaths);
   if (files.length === 0) {
     warn(`skill ${skillId}: no files collected`);
     return null;
@@ -864,9 +979,16 @@ function buildSkillAsset(skillId, local, context) {
 
   const primaryFile = pickPrimaryTextFile(files, "SKILL.md") || files[0];
   const parsed = parseFrontmatterFile(primaryFile.content, "skill");
-  const name = override.name || parsed.name || skillId;
-  const description = override.description || parsed.description || `Sync from local skill ${skillId}`;
-  const supportedProfiles = override.supportedProfiles || Object.keys(local.sourceByProfile || {});
+  const name = override.name || variant?.existing?.name || parsed.name || skillId;
+  const description =
+    override.description ||
+    parsed.description ||
+    variant?.existing?.description ||
+    `Sync from local skill ${skillId}`;
+  const supportedProfiles =
+    override.supportedProfiles ||
+    variant?.supportedProfiles ||
+    Object.keys(local.sourceByProfile || {});
   const domains = Array.isArray(local.domains) ? local.domains : [];
   const categorySlug = resolveCategorySlug({
     type: "skill",
@@ -878,7 +1000,7 @@ function buildSkillAsset(skillId, local, context) {
   });
 
   return {
-    slug: override.slug || skillId,
+    slug: variant?.slug || override.slug || skillId,
     registryId: override.registryId || skillId,
     manifestId: override.manifestId || override.registryId || skillId,
     name,
@@ -893,9 +1015,14 @@ function buildSkillAsset(skillId, local, context) {
   };
 }
 
-function buildRuleAsset(ruleId, local, context) {
-  const override = context.config?.resources?.rules?.[ruleId] || {};
-  const files = collectRuleFiles(local);
+function buildRuleAsset(ruleId, local, context, variant) {
+  const override = resolveResourceOverride({
+    config: context.config,
+    type: "rules",
+    resourceId: ruleId,
+    variantSlug: variant?.slug,
+  });
+  const files = collectRuleFiles(local, variant?.sourcePaths);
   if (files.length === 0) {
     warn(`rule ${ruleId}: no files collected`);
     return null;
@@ -903,9 +1030,16 @@ function buildRuleAsset(ruleId, local, context) {
 
   const primaryFile = files[0];
   const parsed = parseFrontmatterFile(primaryFile.content, "rule");
-  const name = override.name || parsed.name || ruleId;
-  const description = override.description || parsed.description || `Sync from local rule ${ruleId}`;
-  const supportedProfiles = override.supportedProfiles || Object.keys(local.sourceByProfile || {});
+  const name = override.name || variant?.existing?.name || parsed.name || ruleId;
+  const description =
+    override.description ||
+    parsed.description ||
+    variant?.existing?.description ||
+    `Sync from local rule ${ruleId}`;
+  const supportedProfiles =
+    override.supportedProfiles ||
+    variant?.supportedProfiles ||
+    Object.keys(local.sourceByProfile || {});
   const domains = Array.isArray(local.domains) ? local.domains : [];
   const categorySlug = resolveCategorySlug({
     type: "rule",
@@ -917,7 +1051,7 @@ function buildRuleAsset(ruleId, local, context) {
   });
 
   return {
-    slug: override.slug || ruleId,
+    slug: variant?.slug || override.slug || ruleId,
     registryId: override.registryId || ruleId,
     manifestId: override.manifestId || override.registryId || ruleId,
     name,
@@ -933,7 +1067,11 @@ function buildRuleAsset(ruleId, local, context) {
 }
 
 async function buildRoleAsset(roleId, local, context) {
-  const override = context.config?.resources?.roles?.[roleId] || {};
+  const override = resolveResourceOverride({
+    config: context.config,
+    type: "roles",
+    resourceId: roleId,
+  });
   const sourcePath = path.resolve(PROJECT_ROOT, local.source);
   if (!fs.existsSync(sourcePath)) {
     warn(`role ${roleId}: source not found ${local.source}`);
@@ -947,12 +1085,12 @@ async function buildRoleAsset(roleId, local, context) {
     ...(Array.isArray(uploadParsed.roleData.preferredSkills) ? uploadParsed.roleData.preferredSkills : []),
   ]);
   const registryRuleSlugs = uniqueKeepOrder(Array.isArray(local.rule_ids) ? local.rule_ids : []);
-  const skillIds = registrySkillSlugs
-    .map((slug) => context.hubState.skillsBySlug[slug]?.id)
-    .filter(Boolean);
-  const ruleIds = registryRuleSlugs
-    .map((slug) => context.hubState.rulesBySlug[slug]?.id)
-    .filter(Boolean);
+  const skillIds = uniqueKeepOrder(
+    registrySkillSlugs.flatMap((slug) => resolveLinkedResourceIds("skill", slug, context.hubState)),
+  );
+  const ruleIds = uniqueKeepOrder(
+    registryRuleSlugs.flatMap((slug) => resolveLinkedResourceIds("rule", slug, context.hubState)),
+  );
   const domainIds = resolveRoleDomainIds({
     override,
     local,
@@ -1009,7 +1147,11 @@ async function buildRoleAsset(roleId, local, context) {
 }
 
 function buildScenarioAsset(scenarioId, local, context) {
-  const override = context.config?.resources?.scenarios?.[scenarioId] || {};
+  const override = resolveResourceOverride({
+    config: context.config,
+    type: "scenarios",
+    resourceId: scenarioId,
+  });
   const roleItems = [];
   for (const roleSlug of local.roles || []) {
     const role = context.hubState.rolesBySlug[roleSlug];
@@ -1023,12 +1165,12 @@ function buildScenarioAsset(scenarioId, local, context) {
     });
   }
 
-  const explicitSkillIds = (local.skills || [])
-    .map((slug) => context.hubState.skillsBySlug[slug]?.id)
-    .filter(Boolean);
-  const explicitRuleIds = (local.rules || [])
-    .map((slug) => context.hubState.rulesBySlug[slug]?.id)
-    .filter(Boolean);
+  const explicitSkillIds = uniqueKeepOrder(
+    (local.skills || []).flatMap((slug) => resolveLinkedResourceIds("skill", slug, context.hubState)),
+  );
+  const explicitRuleIds = uniqueKeepOrder(
+    (local.rules || []).flatMap((slug) => resolveLinkedResourceIds("rule", slug, context.hubState)),
+  );
   const roleSkillIds = roleItems.flatMap((item) => {
     const role = findRoleById(context.hubState, item.id);
     return role ? (role.skillLinks || []).map((link) => link.skillId).filter(Boolean) : [];
@@ -1071,10 +1213,10 @@ function buildScenarioAsset(scenarioId, local, context) {
       typeof override.isFeatured === "boolean"
         ? override.isFeatured
         : Boolean(context.config?.defaults?.scenarioFeatured),
-    roles: roleItems,
-    skillIds,
-    ruleIds,
-    domainIds,
+    roles: sortByKey(roleItems, (row) => `${row.id}:${row.isOptional ? 1 : 0}`),
+    skillIds: sortStrings(skillIds),
+    ruleIds: sortStrings(ruleIds),
+    domainIds: sortStrings(domainIds),
   };
 
   if (!payload.entryRoleId && roleItems.length > 0) {
@@ -1163,8 +1305,65 @@ async function roleVersionWouldChange({ client, slug, desiredVersionFiles }) {
   return !deepEqual(currentFiles, desiredFiles);
 }
 
-function collectSkillFiles(local, skillId) {
-  const sourcePaths = resolveSourcePaths(local);
+function buildProfileVariantSpecs({ type, resourceId, local, hubState }) {
+  if (!local?.sourceByProfile || typeof local.sourceByProfile !== "object") {
+    return [];
+  }
+  const profiles = Object.keys(local.sourceByProfile).sort();
+  if (profiles.length <= 1) {
+    return [];
+  }
+  const existingMatches = findResourcesByRegistryKey(type, resourceId, hubState);
+  if (existingMatches.length === 0) {
+    return [];
+  }
+  return profiles.map((profile) => {
+    const existing = pickProfileResourceVariant(type, resourceId, profile, existingMatches);
+    return {
+      profile,
+      slug: existing?.slug || defaultSplitResourceSlug(type, resourceId, profile),
+      sourcePaths: [local.sourceByProfile[profile]].filter(Boolean),
+      supportedProfiles: [profile],
+      existing,
+    };
+  });
+}
+
+function findResourcesByRegistryKey(type, resourceId, hubState) {
+  const collection = type === "skill" ? hubState.skillsBySlug : hubState.rulesBySlug;
+  return Object.values(collection || {}).filter(
+    (item) =>
+      item &&
+      (item.registryId === resourceId || item.manifestId === resourceId),
+  );
+}
+
+function pickProfileResourceVariant(type, resourceId, profile, items) {
+  const fallbackSlug = defaultSplitResourceSlug(type, resourceId, profile);
+  return (
+    items.find((item) => normalizeStringArray(item.supportedProfiles).includes(profile)) ||
+    items.find((item) => item.slug === fallbackSlug) ||
+    null
+  );
+}
+
+function defaultSplitResourceSlug(type, resourceId, profile) {
+  return type === "rule" ? `${profile}-${resourceId}` : `${resourceId}-${profile}`;
+}
+
+function resolveLinkedResourceIds(type, resourceId, hubState) {
+  const collection = type === "skill" ? hubState.skillsBySlug : hubState.rulesBySlug;
+  const direct = collection?.[resourceId];
+  if (direct?.id) {
+    return [direct.id];
+  }
+  return findResourcesByRegistryKey(type, resourceId, hubState)
+    .map((item) => item.id)
+    .filter(Boolean);
+}
+
+function collectSkillFiles(local, skillId, forcedSourcePaths) {
+  const sourcePaths = forcedSourcePaths || resolveSourcePaths(local);
   if (sourcePaths.length === 0) return [];
   const absoluteSkillDirs = uniqueKeepOrder(
     sourcePaths.map((relativePath) => path.dirname(path.resolve(PROJECT_ROOT, relativePath))),
@@ -1189,8 +1388,8 @@ function collectSkillFiles(local, skillId) {
   return normalizeFiles(fileEntries);
 }
 
-function collectRuleFiles(local) {
-  const sourcePaths = resolveSourcePaths(local);
+function collectRuleFiles(local, forcedSourcePaths) {
+  const sourcePaths = forcedSourcePaths || resolveSourcePaths(local);
   if (sourcePaths.length === 0) return [];
   const absoluteFiles = uniqueKeepOrder(sourcePaths.map((relativePath) => path.resolve(PROJECT_ROOT, relativePath)));
   const baseDir = commonAncestor(absoluteFiles.map((absoluteFile) => path.dirname(absoluteFile)));
@@ -1242,9 +1441,19 @@ function resolveCategorySlug({ type, resourceId, override, domains, categories, 
   return null;
 }
 
+function resolveResourceOverride({ config, type, resourceId, variantSlug }) {
+  const resources = config?.resources?.[type] || {};
+  const base = resources?.[resourceId] || {};
+  const variant = variantSlug ? resources?.[variantSlug] || {} : {};
+  return {
+    ...base,
+    ...variant,
+  };
+}
+
 function buildSkillRuleMetadataPatch(type, desired, existing) {
   const patch = {};
-  const existingCategorySlug = existing.categorySlug || null;
+  const existingCategorySlug = existing.categorySlug || existing.category?.slug || null;
   if (desired.name && desired.name !== existing.name) patch.name = desired.name;
   if (desired.slug && desired.slug !== existing.slug) patch.slug = desired.slug;
   if (desired.registryId !== undefined && desired.registryId !== existing.registryId) {
@@ -1253,15 +1462,27 @@ function buildSkillRuleMetadataPatch(type, desired, existing) {
   if (desired.manifestId !== undefined && desired.manifestId !== existing.manifestId) {
     patch.manifestId = desired.manifestId;
   }
-  patch.description = desired.description;
-  patch.longDescription = desired.longDescription || null;
-  patch.author = desired.author;
+  if (desired.description !== existing.description) {
+    patch.description = desired.description;
+  }
+  if ((desired.longDescription || null) !== (existing.longDescription || null)) {
+    patch.longDescription = desired.longDescription || null;
+  }
+  if (desired.author !== existing.author) {
+    patch.author = desired.author;
+  }
   if (desired.categorySlug && desired.categorySlug !== existingCategorySlug) {
     patch.categorySlug = desired.categorySlug;
   }
-  patch.tags = desired.tags;
-  patch.supportedProfiles = desired.supportedProfiles;
-  patch.downloadPolicy = desired.downloadPolicy;
+  if (!sameStringArray(desired.tags, existing.tags)) {
+    patch.tags = desired.tags;
+  }
+  if (!sameStringArray(desired.supportedProfiles, existing.supportedProfiles)) {
+    patch.supportedProfiles = desired.supportedProfiles;
+  }
+  if (desired.downloadPolicy !== existing.downloadPolicy) {
+    patch.downloadPolicy = desired.downloadPolicy;
+  }
   return Object.keys(patch).length > 0 ? patch : null;
 }
 
@@ -1304,7 +1525,11 @@ async function createSkillRuleOrNull({ type, desired, client }) {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (isConflictMessage(message)) {
-      return { created: false, resource: null };
+      return {
+        created: false,
+        resource: null,
+        conflictSlugs: extractConflictResourceSlugs(message),
+      };
     }
     throw error;
   }
@@ -1316,6 +1541,17 @@ async function fetchPublicResource(client, type, slug) {
   } catch {
     return null;
   }
+}
+
+async function fetchConflictResource({ type, desiredSlug, conflictSlugs, client }) {
+  const candidates = uniqueKeepOrder([desiredSlug, ...(conflictSlugs || [])]);
+  for (const candidate of candidates) {
+    const resource = await fetchPublicResource(client, type, candidate);
+    if (resource) {
+      return resource;
+    }
+  }
+  return null;
 }
 
 function resolveRoleDomainIds({ override, local, uploadParsed, config }) {
@@ -1402,6 +1638,36 @@ function normalizeRoleResponseToPayload(item) {
   };
 }
 
+function buildPreviewSkillRuleState(type, existing, desired) {
+  return {
+    ...(existing || {}),
+    id: existing?.id || previewResourceId(type, desired.slug),
+    slug: desired.slug,
+    name: desired.name,
+    registryId: desired.registryId ?? existing?.registryId ?? null,
+    manifestId: desired.manifestId ?? existing?.manifestId ?? null,
+    description: desired.description,
+    longDescription: desired.longDescription || null,
+    author: desired.author,
+    tags: desired.tags,
+    supportedProfiles: desired.supportedProfiles,
+    categorySlug: desired.categorySlug || existing?.categorySlug || null,
+    categoryName: existing?.categoryName || desired.categorySlug || null,
+    downloadPolicy: desired.downloadPolicy,
+  };
+}
+
+function buildPreviewRoleState(existing, desired) {
+  return {
+    ...(existing || {}),
+    id: existing?.id || previewResourceId("role", desired.slug),
+    ...desired.payload,
+    skillLinks: (desired.payload.skillIds || []).map((skillId) => ({ skillId })),
+    ruleLinks: (desired.payload.ruleIds || []).map((ruleId) => ({ ruleId })),
+    domainLinks: (desired.payload.domainIds || []).map((domainId) => ({ domainId })),
+  };
+}
+
 function normalizeScenarioResponseToPayload(item) {
   return {
     name: item.name,
@@ -1414,13 +1680,31 @@ function normalizeScenarioResponseToPayload(item) {
     recommendedIdes: normalizeStringArray(item.recommendedIdes),
     entryRoleId: item.entryRoleId || null,
     isFeatured: Boolean(item.isFeatured),
-    roles: (item.roles || []).map((link) => ({
-      id: link.roleId,
+    roles: sortByKey(
+      (item.roles || []).map((link) => ({
+        id: link.roleId,
+        isOptional: Boolean(link.isOptional),
+      })),
+      (row) => `${row.id}:${row.isOptional ? 1 : 0}`,
+    ),
+    skillIds: sortStrings((item.skills || []).map((link) => link.skillId)),
+    ruleIds: sortStrings((item.rules || []).map((link) => link.ruleId)),
+    domainIds: sortStrings((item.domainLinks || []).map((link) => link.domainId)),
+  };
+}
+
+function buildPreviewScenarioState(existing, desired) {
+  return {
+    ...(existing || {}),
+    id: existing?.id || previewResourceId("scenario", desired.slug),
+    ...desired.payload,
+    roles: (desired.payload.roles || []).map((link) => ({
+      roleId: link.id,
       isOptional: Boolean(link.isOptional),
     })),
-    skillIds: (item.skills || []).map((link) => link.skillId),
-    ruleIds: (item.rules || []).map((link) => link.ruleId),
-    domainIds: (item.domainLinks || []).map((link) => link.domainId),
+    skills: (desired.payload.skillIds || []).map((skillId) => ({ skillId })),
+    rules: (desired.payload.ruleIds || []).map((ruleId) => ({ ruleId })),
+    domainLinks: (desired.payload.domainIds || []).map((domainId) => ({ domainId })),
   };
 }
 
@@ -1555,6 +1839,22 @@ function normalizeStringArray(value) {
   return value.filter((item) => typeof item === "string");
 }
 
+function sortStrings(value) {
+  return normalizeStringArray(value).slice().sort((left, right) => left.localeCompare(right));
+}
+
+function sortByKey(items, pickKey) {
+  return [...(items || [])].sort((left, right) => pickKey(left).localeCompare(pickKey(right)));
+}
+
+function sameStringArray(left, right) {
+  return deepEqual(sortStrings(left), sortStrings(right));
+}
+
+function previewResourceId(type, slug) {
+  return `preview-${type}-${slug}`;
+}
+
 function looksBinary(buffer, absolutePath) {
   const extension = path.extname(absolutePath).toLowerCase();
   if (TEXT_FILE_EXTENSIONS.has(extension)) {
@@ -1623,6 +1923,12 @@ function isConflictMessage(message) {
       message.includes("duplicate") ||
       message.includes("Unique"))
   );
+}
+
+function extractConflictResourceSlugs(message) {
+  if (typeof message !== "string") return [];
+  const matches = [...message.matchAll(/对应\s*(?:Rule|Skill)\s*：([a-z0-9._-]+)/gi)];
+  return uniqueKeepOrder(matches.map((match) => match[1]).filter(Boolean));
 }
 
 function indexBy(items, key) {

@@ -13,6 +13,14 @@
       "source": ".agents/skills/common/create-test/SKILL.md",
       "domains": ["testing"]
     },
+    "config-and-secret-scan": {
+      "source": ".agents/skills/common/config-and-secret-scan/SKILL.md",
+      "domains": ["governance"]
+    },
+    "dependency-impact-graph": {
+      "source": ".agents/skills/common/dependency-impact-graph/SKILL.md",
+      "domains": ["engineering"]
+    },
     "design-analysis": {
       "source": ".agents/skills/common/design-analysis/SKILL.md",
       "domains": ["demand-design"]
@@ -29,8 +37,16 @@
       "source": ".agents/skills/common/project-init/SKILL.md",
       "domains": ["documentation"]
     },
+    "route-permission-map": {
+      "source": ".agents/skills/common/route-permission-map/SKILL.md",
+      "domains": ["governance"]
+    },
     "skill-creator": {
       "source": ".agents/skills/common/skill-creator/SKILL.md",
+      "domains": ["documentation"]
+    },
+    "skill-optimizer": {
+      "source": ".agents/skills/common/skill-optimizer/SKILL.md",
       "domains": ["documentation"]
     },
     "ui-verification": {

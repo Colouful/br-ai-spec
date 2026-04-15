@@ -163,7 +163,70 @@ npx @ex/ai-spec-auto@latest update . --no-update-rules
 
 交互式 `update` 也支持直接勾选模块，不必先记这些参数。
 
-## 6. configs 同步策略
+## 6. Hub / manifest 安装清单
+
+如果你的项目不是手动选参数安装，而是通过 Hub 平台选择了一组规则、技能、专家和场景方案，那么推荐使用 `manifest` 驱动同步。
+
+最常用的命令是：
+
+```bash
+npx @ex/ai-spec-auto@latest sync . --manifest ./manifest.json
+```
+
+或者直接使用 Hub 导出的远程清单：
+
+```bash
+npx @ex/ai-spec-auto@latest sync . --manifest https://hub.example.com/manifests/project-abc.json
+```
+
+### 什么时候用 `sync --manifest`
+
+适合下面这些场景：
+
+- 你已经在 Hub 平台上选好了场景方案、技能包或规则包
+- 你希望项目安装状态来自一份固定清单，而不是靠人工重新选择参数
+- 你需要把同一套能力组合稳定同步到多个项目
+
+### 本地 manifest 示例
+
+如果是本地文件，命令形式如下：
+
+```bash
+npx @ex/ai-spec-auto@latest sync . --manifest ./ai-spec.manifest.json
+```
+
+同步完成后，项目内通常会更新这些文件：
+
+- `.ai-spec/manifest.json`
+- `.ai-spec/lock.json`
+- `.ai-spec/sources.json`
+
+### Hub / CLI 的分工
+
+建议按下面的边界理解：
+
+- Hub 平台负责“用户选了什么”
+- `manifest` 负责“把选择结果结构化描述出来”
+- CLI `sync` 负责“把这份清单真正同步到项目里”
+
+也就是说，Hub 不直接改项目，`sync --manifest` 才是最终执行入口。
+
+### 常用命令汇总
+
+```bash
+# 通过本地 manifest 文件同步
+npx @ex/ai-spec-auto@latest sync . --manifest ./manifest.json
+
+# 通过 Hub 导出的远程 manifest URL 同步
+npx @ex/ai-spec-auto@latest sync . --manifest https://hub.example.com/manifests/project-abc.json
+
+# 如果项目已经有 .ai-spec/manifest.json，通常继续用 sync 刷新这套能力组合
+npx @ex/ai-spec-auto@latest sync .
+```
+
+如果你需要进一步了解 Hub 资产怎么同步到平台，可继续看 [Hub 资产同步脚本说明](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/four/Hub资产同步脚本说明.md)。
+
+## 7. configs 同步策略
 
 `configs/` 下的文件现在采用**增量补齐**策略：
 
@@ -173,7 +236,7 @@ npx @ex/ai-spec-auto@latest update . --no-update-rules
 
 这意味着目标项目里你已经手改过的配置，不会因为一次 `update` 被整份顶掉。
 
-## 7. OpenSpec / MCP / 本地 CLI
+## 8. OpenSpec / MCP / 本地 CLI
 
 ### OpenSpec
 
@@ -203,7 +266,7 @@ npx @ex/ai-spec-auto@latest update . --no-update-rules
 
 这样 IDE 命令和宿主桥就可以稳定调用项目内版本。
 
-## 8. Windows / PowerShell
+## 9. Windows / PowerShell
 
 PowerShell 入口仍然支持：
 
@@ -223,7 +286,7 @@ PowerShell 入口仍然支持：
 powershell -ExecutionPolicy Bypass -File .\install.ps1 init .
 ```
 
-## 9. 常见排错
+## 10. 常见排错
 
 ### 1）`npx @ex/ai-spec-auto@latest init .` 拉不到包
 
@@ -264,9 +327,30 @@ npx @ex/ai-spec-auto@latest update . --uipro
 npx @ex/ai-spec-auto@latest check .
 ```
 
-## 10. 相关文档
+### 6）Hub 导出的 manifest 不生效
+
+优先检查：
+
+- `--manifest` 传入的是本地 JSON 路径还是远程 URL
+- 同步后 `.ai-spec/manifest.json` 是否已经更新
+- 当前项目是否本来就有旧的 `.ai-spec/lock.json / sources.json`
+
+建议重新执行：
+
+```bash
+npx @ex/ai-spec-auto@latest sync . --manifest ./manifest.json
+```
+
+或者：
+
+```bash
+npx @ex/ai-spec-auto@latest sync . --manifest https://hub.example.com/manifests/project-abc.json
+```
+
+## 11. 相关文档
 
 - [README](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/README.md)
 - [5 分钟快速上手](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/quick-start.md)
 - [OpenSpec / 协议流说明](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/openspec-guide.md)
+- [Hub 资产同步脚本说明](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/four/Hub资产同步脚本说明.md)
 - [文档索引](/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/README.md)

@@ -27,6 +27,33 @@
       "skills": ["create-proposal"],
       "rules": ["doc-standard"],
       "domains": ["demand-design", "documentation"]
+    },
+    "bugfix-to-verification": {
+      "profiles": ["vue", "react"],
+      "roles": [
+        "task-orchestrator",
+        "frontend-implementer",
+        "code-guardian",
+        "unit-test-specialist",
+        "verification-reviewer",
+        "performance-auditor"
+      ],
+      "skills": [
+        "execute-task",
+        "create-test",
+        "ui-verification",
+        "web-design-guidelines"
+      ],
+      "rules": [
+        "coding-standard",
+        "api-standard",
+        "route-standard",
+        "style-standard",
+        "test-standard",
+        "format-check-standard",
+        "audit-report-standard"
+      ],
+      "domains": ["orchestration", "engineering", "testing", "governance", "performance"]
     }
   }
 }
