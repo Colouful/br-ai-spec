@@ -53,6 +53,7 @@ python3 .agents/skills/common/skill-creator/scripts/quick_validate.py <skill-dir
 | `ui-verification` | UI 还原验收 | - |
 | `execute-task` | Superpowers 四步循环执行 | `12-Superpowers执行规范` |
 | `project-init` | 自动分析项目生成 01/03，并在自定义规则缺失时补生成 04/05/06/07/09 | - |
+| `install-ai-spec-auto` | 在当前项目自动执行 ai-spec-auto init 安装，并完成安装前检查与安装后自检 | - |
 | `using-superpowers` | 技能调度核心规范 | - |
 | `find-skills` | 查找开源 skills | - |
 | `skill-creator` | 创建 skill 指导 | - |
@@ -144,6 +145,7 @@ python3 .agents/skills/common/skill-creator/scripts/quick_validate.py <skill-dir
 | 扫描敏感信息 / 统一配置规范 | `.agents/skills/common/config-and-secret-scan/SKILL.md` |
 | 核对路由、菜单和权限 | `.agents/skills/common/route-permission-map/SKILL.md` |
 | 评估包或模块改动影响 | `.agents/skills/common/dependency-impact-graph/SKILL.md` |
+| 安装 ai-spec-auto 到当前项目 | `.agents/skills/common/install-ai-spec-auto/SKILL.md` |
 | 初始化项目规范 | `.agents/skills/common/project-init/SKILL.md` |
 | 每次对话启动的技能调度 | `.agents/skills/common/using-superpowers/SKILL.md` |
 | 优化现有 skill | `.agents/skills/common/skill-optimizer/SKILL.md` |
