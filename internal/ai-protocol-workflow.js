@@ -29,6 +29,10 @@ const {
 const {
   getRuntimeTransition,
 } = require('../bin/execution-semantics');
+const {
+  buildSuperpowersContract,
+  loadSuperpowersState,
+} = require('../bin/superpowers');
 const PACKAGE_ROOT = path.resolve(__dirname, '..');
 
 const START_INSTRUCTION_FILES = [
@@ -1242,6 +1246,7 @@ function buildOrchestratorGuidance(targetDir, runState = null, userInput = null,
 
   return {
     project_context: projectContextGuidance,
+    superpowers_contract: buildSuperpowersContract(targetDir, 'task-orchestrator'),
     repo_map_source: '.ai-spec/repo-map.json',
     repo_conventions: buildRepoConventionGuidance(repoConventions),
     role: buildRoleGuidance('task-orchestrator', deliveryProfile),
@@ -1888,7 +1893,8 @@ function getSnapshotFlowDefinition(snapshot, flowId) {
   return snapshot.flowDefinitions.get(resolvedFlowId);
 }
 
-function buildSummary(status, runState = null) {
+function buildSummary(status, runState = null, targetDir = null) {
+  const superpowersState = targetDir ? loadSuperpowersState(targetDir) : null;
   return {
     run_id: status.current.run_id || null,
     run_status: status.current.run_status || null,
@@ -1910,6 +1916,8 @@ function buildSummary(status, runState = null) {
     parent_change_id: runState?.task?.parent_change_id || runState?.incremental_update?.parent_change_id || null,
     auto_fix_active: Boolean(runState?.auto_fix?.active),
     auto_fix_attempts: Number(runState?.auto_fix?.attempts) || 0,
+    superpowers_mode: superpowersState?.mode || 'off',
+    superpowers_fallback_reason: superpowersState?.last_fallback_reason || null,
   };
 }
 
@@ -2183,7 +2191,13 @@ function selectRoleSkills(targetDir, roleId, skills, deliveryProfile) {
     return skills;
   }
 
-  return skills.filter((item) => allowlist.includes(item?.id || item));
+  return skills.filter((item) => {
+    const skillId = item?.id || item;
+    if (skillId === 'using-superpowers') {
+      return true;
+    }
+    return allowlist.includes(skillId);
+  });
 }
 
 function getSourceCandidates(entry, projectProfile, fallbackConfig = null) {
@@ -2334,14 +2348,26 @@ function normalizeSkillIds(skills) {
 function resolveRoleSkillPriority(targetDir, roleId, selectedSkills) {
   const registryEntry = getRoleRuntimeConfig(targetDir, roleId);
   const configured = normalizeStringArray(registryEntry?.skill_priority || registryEntry?.preferred_skills);
+  const normalizedSelected = normalizeSkillIds(selectedSkills);
   if (configured.length > 0) {
+    if (normalizedSelected.includes('using-superpowers') && !configured.includes('using-superpowers')) {
+      return ['using-superpowers', ...configured];
+    }
     return configured;
   }
-  const normalized = normalizeSkillIds(selectedSkills);
-  if (normalized.length > 0) {
-    return normalized;
+  if (normalizedSelected.length > 0) {
+    return normalizedSelected;
   }
   return FALLBACK_ROLE_SKILL_PRIORITY[roleId] || [];
+}
+
+function injectSuperpowersSkills(targetDir, roleId, selectedSkills) {
+  const contract = buildSuperpowersContract(targetDir, roleId);
+  const normalized = normalizeSkillIds(selectedSkills);
+  if (!contract.enabled || !contract.allowed_roles.includes(roleId)) {
+    return normalized;
+  }
+  return ['using-superpowers', ...normalized.filter((item) => item !== 'using-superpowers')];
 }
 
 function resolveRoleMicroSkillAllowlist(targetDir, roleId) {
@@ -4094,6 +4120,8 @@ function buildStartTurn(targetDir, userInput, options = {}) {
       change_context: routeDecision.change_context,
       route_decision: routeDecision.route_decision,
       trace_mode: routeDecision.trace_mode,
+      superpowers_mode: loadSuperpowersState(targetDir).mode || 'off',
+      superpowers_fallback_reason: loadSuperpowersState(targetDir).last_fallback_reason || null,
     },
     input: {
       user_request: userInput || null,
@@ -4178,7 +4206,7 @@ function buildDispatchTurn(targetDir, status, currentArtifacts) {
     },
     command: 'task-orchestrator:dispatch',
     reason: status.next_expected.reason,
-    summary: buildSummary(status, currentArtifacts.run),
+    summary: buildSummary(status, currentArtifacts.run, targetDir),
     input: {
       user_request: currentArtifacts.run?.trigger?.raw_input || null,
       flow_id: currentArtifacts.run?.flow?.id || null,
@@ -4246,7 +4274,7 @@ function buildContinueTurn(targetDir, status, currentArtifacts, snapshot = null)
     },
     command: '/spec-continue',
     reason: status.next_expected.reason,
-    summary: buildSummary(status, currentArtifacts.run),
+    summary: buildSummary(status, currentArtifacts.run, targetDir),
     input: {
       user_request: currentArtifacts.run?.trigger?.raw_input || null,
       current_role: currentArtifacts.run?.current_role || null,
@@ -4292,7 +4320,7 @@ function buildPausedTurn(targetDir, status, currentArtifacts) {
     },
     command: '/spec-continue',
     reason: 'current run has been paused and is waiting for an explicit resume',
-    summary: buildSummary(status, runState),
+    summary: buildSummary(status, runState, targetDir),
     input: {
       user_request: runState?.trigger?.raw_input || null,
       current_role: runState?.current_role || null,
@@ -4348,7 +4376,7 @@ function buildConfirmGateTurn(targetDir, status, currentArtifacts) {
     },
     command: '/spec-continue',
     reason: 'current run is waiting for a lightweight confirm decision before continuing',
-    summary: buildSummary(status, runState),
+    summary: buildSummary(status, runState, targetDir),
     input: {
       user_request: runState?.trigger?.raw_input || null,
       latest_user_input: runState?.trigger?.latest_user_input || null,
@@ -4490,7 +4518,7 @@ function buildApprovalGateTurn(targetDir, status, currentArtifacts, snapshot = n
     },
     command: '/spec-continue',
     reason: `run is waiting at approval gate "${pendingGate}"`,
-    summary: buildSummary(status, currentArtifacts.run),
+    summary: buildSummary(status, currentArtifacts.run, targetDir),
     input: {
       user_request: currentArtifacts.run?.trigger?.raw_input || null,
       pending_gate: pendingGate,
@@ -4629,7 +4657,7 @@ function buildUpdateReviewTurn(targetDir, status, currentArtifacts, snapshot = n
     },
     command: '/spec-update',
     reason: 'new user input has been appended; task-orchestrator must reconcile it before normal progression',
-    summary: buildSummary(status, currentArtifacts.run),
+    summary: buildSummary(status, currentArtifacts.run, targetDir),
     input: {
       user_request: currentArtifacts.run?.trigger?.raw_input || null,
       latest_user_input: currentArtifacts.run?.trigger?.latest_user_input || null,
@@ -4833,9 +4861,13 @@ function buildExpertTurn(targetDir, status, currentArtifacts, snapshot = null) {
   const selectedSkills = selectRoleSkills(
     targetDir,
     dispatch.role?.id,
-    Array.isArray(dispatch.execution?.skills) && dispatch.execution.skills.length > 0
-      ? dispatch.execution.skills
-      : roleDefinition.preferred_skills,
+    injectSuperpowersSkills(
+      targetDir,
+      dispatch.role?.id,
+      Array.isArray(dispatch.execution?.skills) && dispatch.execution.skills.length > 0
+        ? dispatch.execution.skills
+        : roleDefinition.preferred_skills,
+    ),
     deliveryProfile,
   );
   const roleRuleContract = buildRoleRuleContract(
@@ -4918,7 +4950,7 @@ function buildExpertTurn(targetDir, status, currentArtifacts, snapshot = null) {
     reason: archivePreflightBlocked
       ? 'archive-preflight 检查未通过，需先补齐缺失产物后才能执行归档命令'
       : status.next_expected.reason,
-    summary: buildSummary(status, currentArtifacts.run),
+    summary: buildSummary(status, currentArtifacts.run, targetDir),
     input: {
       user_request: dispatch.task?.raw_goal || currentArtifacts.run?.trigger?.raw_input || null,
       change_id: context.changeId,
@@ -4969,6 +5001,7 @@ function buildExpertTurn(targetDir, status, currentArtifacts, snapshot = null) {
       rule_hints: buildRuleHints(dispatch.role?.id, deliveryProfile, roleRuleContract),
       compact_context: compactContext,
       search_policy: buildSearchPolicy(),
+      superpowers_contract: buildSuperpowersContract(targetDir, dispatch.role?.id),
       skills: buildSkillGuidance(
         selectedSkills.map((item) => (typeof item === 'string' ? { id: item } : item)),
       ),
@@ -4996,7 +5029,7 @@ function buildProtocolTurn(options = {}) {
       },
       command: 'advance-runner',
       reason: status.next_expected.reason,
-      summary: buildSummary(status),
+      summary: buildSummary(status, null, targetDir),
       input: {
         pending_inputs: status.pending_inputs,
       },
@@ -5022,7 +5055,7 @@ function buildProtocolTurn(options = {}) {
       actor: null,
       command: null,
       reason: status.next_expected.reason,
-      summary: buildSummary(status),
+      summary: buildSummary(status, null, targetDir),
       input: {
         user_request: null,
       },

@@ -340,6 +340,39 @@ async function main() {
   assert.ok(cursorSpecUpdate.includes('protocol-update --target . --user-input'));
   assert.ok(!claudeSpecStart.startsWith('---\n'));
 
+  const superpowersTarget = createWorkspace('ai-spec-auto-sync-superpowers-');
+  const superpowersManifestPath = path.join(superpowersTarget, 'manifest.json');
+  writeJsonFile(superpowersManifestPath, createManifest('vue', ['cursor', 'codex'], {
+    skills: ['create-proposal', 'using-superpowers'],
+    superpowers: {
+      enabled: true,
+      policy: 'ask',
+      preferred_mode: 'host-enhanced',
+      codex_entry: 'agents-skill-wrapper',
+    },
+  }));
+  result = runCli(['sync', superpowersTarget, '--manifest', superpowersManifestPath, '--json'], {
+    HOME: path.join(superpowersTarget, 'fake-home'),
+    CODEX_HOME: path.join(superpowersTarget, 'fake-codex-home'),
+  });
+  assert.strictEqual(result.status, 0, result.stderr);
+  payload = JSON.parse(result.stdout);
+  const syncedManifest = JSON.parse(fs.readFileSync(path.join(superpowersTarget, '.ai-spec', 'manifest.json'), 'utf8'));
+  const syncedSuperpowers = JSON.parse(fs.readFileSync(path.join(superpowersTarget, '.ai-spec', 'superpowers.json'), 'utf8'));
+  const syncedLock = JSON.parse(fs.readFileSync(path.join(superpowersTarget, '.ai-spec', 'lock.json'), 'utf8'));
+  const syncedSources = JSON.parse(fs.readFileSync(path.join(superpowersTarget, '.ai-spec', 'sources.json'), 'utf8'));
+  assert.strictEqual(syncedManifest.superpowers.enabled, true);
+  assert.strictEqual(syncedSuperpowers.enabled, true);
+  assert.strictEqual(syncedSuperpowers.mode, 'project-minimal');
+  assert.ok(fs.existsSync(path.join(superpowersTarget, '.codex', 'commands', 'spec-start.md')));
+  assert.ok(fs.existsSync(path.join(superpowersTarget, '.codex', 'skills', 'using-superpowers')));
+  assert.ok(fs.existsSync(path.join(superpowersTarget, 'AGENTS.md')));
+  assert.ok(fs.readFileSync(path.join(superpowersTarget, 'AGENTS.md'), 'utf8').includes('ai-spec-auto superpowers bridge'));
+  assert.ok(syncedLock.assets.superpowers);
+  assert.ok(syncedSources.assets.some((item) => item.kind === 'superpowers-config'));
+  assert.ok(syncedSources.assets.some((item) => item.kind === 'ide-superpowers-entry' && item.id === 'codex:using-superpowers'));
+  assert.ok(syncedSources.assets.some((item) => item.kind === 'codex-agents-bridge'));
+
   const cleanupTarget = createWorkspace('ai-spec-auto-sync-cleanup-');
   const cleanupManifestPath = path.join(cleanupTarget, 'manifest.json');
   writeJsonFile(cleanupManifestPath, createManifest('vue', ['cursor', 'claude']));

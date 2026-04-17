@@ -10,11 +10,18 @@ const {
   readProfilesRegistry,
   resolveProfileId,
 } = require('./profile-registry');
+const {
+  normalizeSuperpowersManifest,
+  buildSuperpowersState,
+  writeSuperpowersState,
+  shouldExposeSkillToIde,
+  SUPERPOWERS_STATE_REL_PATH,
+  upsertManagedAgentsBlock,
+} = require('./superpowers');
 
-const SUPPORTED_IDES = ['cursor', 'claude', 'opencode', 'trae'];
+const SUPPORTED_IDES = ['cursor', 'claude', 'codex', 'opencode', 'trae'];
 const DEFAULT_IDES = ['cursor', 'claude'];
 const ALL_IDES = [...SUPPORTED_IDES];
-const IDE_AUTOLINK_EXCLUDED_SKILLS = new Set(['using-superpowers']);
 const DEFAULT_REMOTE_MANIFEST_TIMEOUT_MS = 15000;
 
 function printUsage(profilesRegistry = null) {
@@ -27,7 +34,9 @@ function printUsage(profilesRegistry = null) {
 Options:
   --manifest <file|url>   Local manifest JSON file path or remote manifest URL
   --profile <profile>     Override profile from manifest (${profileHint})
-  --ide <preset>          Override ides (default | all | cursor | claude | comma-separated)
+  --ide <preset>          Override ides (default | all | cursor | claude | codex | comma-separated)
+  --superpowers           Force enable superpowers（超能力桥接）
+  --no-superpowers        Force disable superpowers（超能力桥接）
   --hub-origin <origin>   Hub origin for supplement fetch when manifest is local
   --no-hub-fetch          Disable Hub supplement fetch for missing assets
   --json                  Print JSON output only
@@ -64,6 +73,12 @@ function parseArgs(argv) {
         break;
       case '--ide':
         options.ide = requireArg(arg, args);
+        break;
+      case '--superpowers':
+        options.superpowers = true;
+        break;
+      case '--no-superpowers':
+        options.superpowers = false;
         break;
       case '--json':
         options.json = true;
@@ -126,10 +141,6 @@ function targetRel(targetDir, filePath) {
 
 function ensureDir(dirPath) {
   fs.mkdirSync(dirPath, { recursive: true });
-}
-
-function shouldExposeSkillToIde(skillId) {
-  return !IDE_AUTOLINK_EXCLUDED_SKILLS.has(skillId);
 }
 
 function readJsonFile(filePath, label) {
@@ -280,6 +291,10 @@ function loadSyncRegistry(sourceDir) {
   const flows = fs.existsSync(flowsPath)
     ? readJsonFile(flowsPath, 'Registry flows.json')
     : { version: 1, support_files: [], flows: {} };
+  const scenarioPackagesPath = path.join(sourceDir, '.agents/registry/scenario-packages.json');
+  const scenarioPackages = fs.existsSync(scenarioPackagesPath)
+    ? readJsonFile(scenarioPackagesPath, 'Registry scenario-packages.json')
+    : { version: 1, scenario_packages: {} };
   return {
     roles: {
       ...roles,
@@ -288,6 +303,10 @@ function loadSyncRegistry(sourceDir) {
     rules: buildRuleRegistryForSource(readRegistryJson(sourceDir, 'rules.json', 'rules'), sourceDir, new Map()),
     flows: {
       ...flows,
+      __sourceRoot: sourceDir,
+    },
+    scenarioPackages: {
+      ...scenarioPackages,
       __sourceRoot: sourceDir,
     },
   };
@@ -463,6 +482,12 @@ function normalizeManifest(rawManifest, existingManifest, options, profilesRegis
   const resolvedProfile = resolveProfileId(profilesRegistry, rawProfile);
   const rawLocalPreferences = parseLocalPreferences(rawManifest?.local_preferences);
   const existingLocalPreferences = parseLocalPreferences(existingManifest?.local_preferences);
+  const normalizedSuperpowers = normalizeSuperpowersManifest(
+    options.superpowers === undefined
+      ? rawManifest?.superpowers
+      : { ...(rawManifest?.superpowers || existingManifest?.superpowers || {}), enabled: options.superpowers },
+    existingManifest?.superpowers,
+  );
   const manifest = {
     schema_version: Number(rawManifest?.schema_version || existingManifest?.schema_version || 1),
     manifest_type: rawManifest?.manifest_type || existingManifest?.manifest_type || 'hub-install',
@@ -481,6 +506,9 @@ function normalizeManifest(rawManifest, existingManifest, options, profilesRegis
     notes: normalizeList(rawManifest?.notes || existingManifest?.notes),
     sources: Array.isArray(rawManifest?.sources) ? rawManifest.sources : Array.isArray(existingManifest?.sources) ? existingManifest.sources : [],
   };
+  if (normalizedSuperpowers) {
+    manifest.superpowers = normalizedSuperpowers;
+  }
   const localPreferences = rawLocalPreferences !== null ? rawLocalPreferences : existingLocalPreferences;
   if (localPreferences) {
     manifest.local_preferences = localPreferences;
@@ -571,6 +599,18 @@ function resolveManifest(manifest, catalogs, options = {}) {
   const roleIds = new Set(manifest.roles);
   const skillIds = new Set(manifest.skills);
   const ruleIds = new Set(manifest.rules);
+  for (const scenarioId of manifest.scenario_packages || []) {
+    const scenarioEntry = catalogs.scenarioPackages?.get(scenarioId);
+    if (!scenarioEntry) {
+      continue;
+    }
+    for (const roleId of scenarioEntry.roles || []) roleIds.add(roleId);
+    for (const skillId of scenarioEntry.skills || []) skillIds.add(skillId);
+    for (const ruleId of scenarioEntry.rules || []) ruleIds.add(ruleId);
+    if (manifest.superpowers?.enabled && ['frontend-basic', 'bugfix-to-verification'].includes(scenarioId)) {
+      ruleIds.add('superpowers-standard');
+    }
+  }
   const domains = new Set();
   const missing = {
     roles: [],
@@ -1029,13 +1069,19 @@ function isManagedPruneAsset(asset) {
   if (rel === '.agents' || rel.startsWith('.agents/roles/') || rel.startsWith('.agents/skills/') || rel.startsWith('.agents/rules/')) {
     return true;
   }
-  if (/^\.(claude|cursor|opencode|trae)\/rules$/.test(rel)) {
+  if (rel === SUPERPOWERS_STATE_REL_PATH) {
     return true;
   }
-  if (/^\.(claude|cursor|opencode|trae)\/skills\/[^/]+$/.test(rel)) {
+  if (/^\.(claude|cursor|codex|opencode|trae)\/rules$/.test(rel)) {
     return true;
   }
-  if (/^\.(claude|cursor|opencode|trae)\/commands\/[^/]+\.md$/.test(rel)) {
+  if (/^\.(claude|cursor|codex|opencode|trae)\/skills\/[^/]+$/.test(rel)) {
+    return true;
+  }
+  if (/^\.(claude|cursor|codex|opencode|trae)\/commands\/[^/]+\.md$/.test(rel)) {
+    return true;
+  }
+  if (/^\.codex\/commands\/[^/]+\.md$/.test(rel)) {
     return true;
   }
   return false;
@@ -1212,7 +1258,7 @@ function installFlows(targetDir, catalogs, flowRegistry, changes) {
   }
 }
 
-function installIdeAssets(sourceDir, targetDir, ides, resolvedSkills, changes) {
+function installIdeAssets(sourceDir, targetDir, ides, resolvedSkills, changes, superpowersEnabled = false) {
   const commandsDir = path.join(sourceDir, '.agents/commands/common');
   const commandFiles = fs.existsSync(commandsDir)
     ? fs.readdirSync(commandsDir).filter((name) => name.endsWith('.md')).sort()
@@ -1226,7 +1272,7 @@ function installIdeAssets(sourceDir, targetDir, ides, resolvedSkills, changes) {
 
     for (const skill of resolvedSkills) {
       const linkPath = path.join(ideDir, 'skills', skill.id);
-      if (!shouldExposeSkillToIde(skill.id)) {
+      if (!shouldExposeSkillToIde(skill.id, superpowersEnabled)) {
         removePathTracked(targetDir, linkPath, changes);
         continue;
       }
@@ -1275,6 +1321,7 @@ function buildLock(manifest, targetDir, manifestSource, resolved, cliVersion) {
       roles: manifest.roles,
       skills: manifest.skills,
       rules: manifest.rules,
+      superpowers: manifest.superpowers || null,
     },
     resolved: {
       domains: resolved.domains,
@@ -1303,6 +1350,13 @@ function buildLock(manifest, targetDir, manifestSource, resolved, cliVersion) {
         ...(item.hubSlug ? { hub_slug: item.hubSlug } : {}),
       })),
       flows: resolved.installed_flows.map((id) => ({ id, version: 'workspace' })),
+      superpowers: manifest.superpowers
+        ? {
+            enabled: manifest.superpowers.enabled,
+            preferred_mode: manifest.superpowers.preferred_mode,
+            codex_entry: manifest.superpowers.codex_entry,
+          }
+        : null,
     },
     installer: {
       command: 'ai-spec-auto sync',
@@ -1317,6 +1371,7 @@ function buildLock(manifest, targetDir, manifestSource, resolved, cliVersion) {
         roles: resolved.roles.map((item) => item.id),
         skills: resolved.skills.map((item) => item.id),
         rules: resolved.rules.map((item) => item.id),
+        superpowers: manifest.superpowers || null,
       }),
     },
     status: 'success',
@@ -1325,6 +1380,14 @@ function buildLock(manifest, targetDir, manifestSource, resolved, cliVersion) {
 
 function buildSources(manifest, manifestSource, resolved, sourceDir) {
   const assets = [];
+
+  assets.push({
+    kind: 'superpowers-config',
+    id: 'project-superpowers',
+    source_type: 'local',
+    source_ref: `local://${SUPERPOWERS_STATE_REL_PATH}`,
+    local_path: SUPERPOWERS_STATE_REL_PATH,
+  });
 
   for (const role of resolved.roles) {
     assets.push({
@@ -1384,7 +1447,7 @@ function buildSources(manifest, manifestSource, resolved, sourceDir) {
 
   for (const ide of manifest.ides || []) {
     for (const skill of resolved.skills) {
-      if (!shouldExposeSkillToIde(skill.id)) {
+      if (!shouldExposeSkillToIde(skill.id, manifest.superpowers?.enabled)) {
         continue;
       }
       assets.push({
@@ -1394,6 +1457,15 @@ function buildSources(manifest, manifestSource, resolved, sourceDir) {
         source_ref: `local://.${ide}/skills/${skill.id}`,
         local_path: `.${ide}/skills/${skill.id}`,
       });
+      if (skill.id === 'using-superpowers') {
+        assets.push({
+          kind: 'ide-superpowers-entry',
+          id: `${ide}:${skill.id}`,
+          source_type: 'local',
+          source_ref: `local://.${ide}/skills/${skill.id}`,
+          local_path: `.${ide}/skills/${skill.id}`,
+        });
+      }
     }
   }
 
@@ -1413,6 +1485,16 @@ function buildSources(manifest, manifestSource, resolved, sourceDir) {
         local_path: `.${ide}/commands/${fileName}`,
       });
     }
+  }
+
+  if (manifest.superpowers?.enabled && (manifest.ides || []).includes('codex')) {
+    assets.push({
+      kind: 'codex-agents-bridge',
+      id: 'codex:agents-md',
+      source_type: 'local',
+      source_ref: 'local://AGENTS.md',
+      local_path: 'AGENTS.md',
+    });
   }
 
   return {
@@ -1590,6 +1672,7 @@ async function prepareSync(options) {
     skills: readSkillCatalog(sourceDir),
     rules: readRuleCatalog(registry.rules),
     flows: readFlowCatalog(registry.flows),
+    scenarioPackages: new Map(Object.entries(registry.scenarioPackages?.scenario_packages || {})),
   };
   let prepared = {
     options,
@@ -1653,7 +1736,14 @@ async function runSync(options, preparedState = null) {
     installSkills(prepared.targetDir, prepared.resolvedResult.resolved.skills, changes);
     installRules(prepared.targetDir, prepared.resolvedResult.resolved.rules, changes);
     installFlows(prepared.targetDir, prepared.catalogs, prepared.registry.flows, changes);
-    installIdeAssets(prepared.sourceDir, prepared.targetDir, prepared.manifest.ides, prepared.resolvedResult.resolved.skills, changes);
+    installIdeAssets(
+      prepared.sourceDir,
+      prepared.targetDir,
+      prepared.manifest.ides,
+      prepared.resolvedResult.resolved.skills,
+      changes,
+      Boolean(prepared.manifest.superpowers?.enabled),
+    );
 
     const aiSpecDir = path.join(prepared.targetDir, '.ai-spec');
     ensureDir(aiSpecDir);
@@ -1664,6 +1754,16 @@ async function runSync(options, preparedState = null) {
     const previousSources = readPreviousSources(prepared.targetDir);
 
     writeJsonTracked(prepared.targetDir, manifestOutPath, prepared.manifest, changes);
+    const superpowersState = buildSuperpowersState({
+      targetDir: prepared.targetDir,
+      enabled: Boolean(prepared.manifest.superpowers?.enabled),
+      manifestConfig: prepared.manifest.superpowers || null,
+      ides: prepared.manifest.ides,
+      env: process.env,
+      cliVersion: prepared.cliVersion,
+      source: 'sync',
+    });
+    writeSuperpowersState(prepared.targetDir, superpowersState);
     const lock = buildLock(prepared.manifest, prepared.targetDir, prepared.manifestSource, prepared.resolvedResult.resolved, prepared.cliVersion);
     writeJsonTracked(prepared.targetDir, lockOutPath, lock, changes);
     const sources = buildSources(prepared.manifest, prepared.manifestSource, prepared.resolvedResult.resolved, prepared.sourceDir);
@@ -1671,6 +1771,10 @@ async function runSync(options, preparedState = null) {
       pruneManagedAssets(prepared.targetDir, previousSources, sources, changes);
     }
     writeJsonTracked(prepared.targetDir, sourcesOutPath, sources, changes);
+    upsertManagedAgentsBlock(
+      prepared.targetDir,
+      Boolean(prepared.manifest.superpowers?.enabled) && prepared.manifest.ides.includes('codex'),
+    );
 
     return buildResult(prepared, dedupeChanges(changes));
   } finally {

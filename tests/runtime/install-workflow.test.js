@@ -505,6 +505,53 @@ exit 1
   assert.strictEqual(result.status, 0, result.stderr);
   assert.ok(fs.existsSync(path.join(updateScopeTarget, '.claude', 'commands', 'spec-start.md')));
 
+  const superpowersTarget = createWorkspace('ai-spec-superpowers-init-');
+  writeJson(path.join(superpowersTarget, 'package.json'), {
+    name: 'superpowers-init-smoke',
+    version: '1.0.0',
+  });
+  const fakeHome = path.join(superpowersTarget, 'fake-home');
+  const fakeCodexHome = path.join(superpowersTarget, 'fake-codex-home');
+  const fakeSuperpowersPkgBin = createFakePackageManagerBin(superpowersTarget);
+  result = runCli(
+    ['init', superpowersTarget, '--profile', 'vue', '--level', 'L2', '--ide', 'cursor,codex', '--superpowers', '--no-lint', '--no-husky', '--no-uipro'],
+    {
+      PATH: `${fakeSuperpowersPkgBin}:${process.env.PATH || ''}`,
+      HOME: fakeHome,
+      CODEX_HOME: fakeCodexHome,
+    },
+  );
+  assert.strictEqual(result.status, 0, result.stderr);
+  const superpowersStatePath = path.join(superpowersTarget, '.ai-spec', 'superpowers.json');
+  assert.ok(fs.existsSync(superpowersStatePath));
+  const superpowersState = JSON.parse(fs.readFileSync(superpowersStatePath, 'utf8'));
+  assert.strictEqual(superpowersState.enabled, true);
+  assert.strictEqual(superpowersState.mode, 'project-minimal');
+  assert.strictEqual(superpowersState.bindings.cursor.enabled, true);
+  assert.strictEqual(superpowersState.bindings.codex.enabled, true);
+  assert.ok(fs.existsSync(path.join(superpowersTarget, '.codex', 'commands', 'spec-start.md')));
+  assert.ok(fs.existsSync(path.join(superpowersTarget, '.codex', 'skills', 'using-superpowers')));
+  assert.ok(fs.lstatSync(path.join(superpowersTarget, '.codex', 'rules')).isSymbolicLink());
+  assert.ok(fs.existsSync(path.join(superpowersTarget, 'AGENTS.md')));
+  assert.ok(fs.readFileSync(path.join(superpowersTarget, 'AGENTS.md'), 'utf8').includes('ai-spec-auto superpowers bridge'));
+
+  writeText(path.join(fakeHome, '.claude', 'skills', 'using-superpowers', 'SKILL.md'), '# claude superpowers\n');
+  writeText(path.join(fakeCodexHome, 'skills', 'using-superpowers', 'SKILL.md'), '# codex superpowers\n');
+  result = runCli(
+    ['update', superpowersTarget, '--refresh-superpowers', '--skip-skills', '--skip-configs', '--skip-openspec', '--skip-uipro', '--skip-commands'],
+    {
+      PATH: `${fakeSuperpowersPkgBin}:${process.env.PATH || ''}`,
+      HOME: fakeHome,
+      CODEX_HOME: fakeCodexHome,
+    },
+  );
+  assert.strictEqual(result.status, 0, result.stderr);
+  const refreshedSuperpowersState = JSON.parse(fs.readFileSync(superpowersStatePath, 'utf8'));
+  assert.strictEqual(refreshedSuperpowersState.enabled, true);
+  assert.strictEqual(refreshedSuperpowersState.mode, 'host-enhanced');
+  assert.strictEqual(refreshedSuperpowersState.host.capabilities.claude, true);
+  assert.strictEqual(refreshedSuperpowersState.host.capabilities.codex, true);
+
   const legacyUiproUpdateTarget = createWorkspace('ai-spec-uipro-legacy-update-');
   writeJson(path.join(legacyUiproUpdateTarget, 'package.json'), {
     name: 'uipro-legacy-update-smoke',

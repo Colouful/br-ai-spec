@@ -70,6 +70,18 @@ function readCurrentRun(targetDir) {
   return JSON.parse(fs.readFileSync(path.join(targetDir, '.ai-spec', 'current-run.json'), 'utf8'));
 }
 
+function approveGate(targetDir, gate, toRole, message) {
+  writeProjectFile(targetDir, '.ai-spec/internal/tmp/current-runtime-action.json', JSON.stringify({
+    schema_version: 1,
+    kind: 'task-orchestrator-runtime-action',
+    action: 'approve',
+    gate,
+    to_role: toRole,
+    message,
+  }, null, 2));
+  return advance(targetDir);
+}
+
 function seedOpenSpecArtifacts(targetDir) {
   writeProjectFile(targetDir, 'openspec/changes/runtime-smoke-demo/proposal.md', [
     '# 变更提案：runtime-smoke-demo',
@@ -120,6 +132,8 @@ function bootstrapToFrontend(targetDir) {
   seedOpenSpecArtifacts(targetDir);
   copyFixture(targetDir, 'current-execution-requirement-analyst.json', 'current-execution.json');
   report = advance(targetDir);
+  assert.strictEqual(report.applied.pending_gate, 'before-implementation');
+  report = approveGate(targetDir, 'before-implementation', 'frontend-implementer', 'implementation approved');
   assert.strictEqual(report.applied.current_role, 'frontend-implementer');
   assert.strictEqual(report.recorded.dispatch.role, 'frontend-implementer');
   return report;
@@ -157,11 +171,13 @@ function main() {
   writePackageJson(successAfterFixTarget, 'node -e "process.exit(0)"');
   copyFixture(successAfterFixTarget, 'current-execution-frontend-implementer.json', 'current-execution.json');
   report = advance(successAfterFixTarget);
+  assert.strictEqual(report.applied.pending_gate, 'before-guardian');
+  report = approveGate(successAfterFixTarget, 'before-guardian', 'code-guardian', 'guardian review approved');
   assert.strictEqual(report.applied.current_role, 'code-guardian');
   assert.strictEqual(report.recorded.dispatch.role, 'code-guardian');
 
   currentRun = readCurrentRun(successAfterFixTarget);
-  assert.strictEqual(currentRun.auto_fix.active, false);
+  assert.strictEqual(currentRun.auto_fix.active, true);
   assert.strictEqual(currentRun.auto_fix.attempts, 1);
   assert.strictEqual(currentRun.verification.overall_status, 'passed');
 

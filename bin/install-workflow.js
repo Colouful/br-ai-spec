@@ -11,6 +11,14 @@ const {
   getProfileEntries,
   formatSupportedProfiles,
 } = require('./profile-registry');
+const {
+  normalizeSuperpowersManifest,
+  buildSuperpowersState,
+  writeSuperpowersState,
+  readSuperpowersState,
+  shouldExposeSkillToIde,
+  upsertManagedAgentsBlock,
+} = require('./superpowers');
 
 const PKG_ROOT = path.join(__dirname, '..');
 const VERSION = '2.0.0';
@@ -18,7 +26,7 @@ const DEFAULT_PROFILE = 'vue';
 const DEFAULT_LEVEL = 'L3';
 const DEFAULT_IDE_FILTER = 'default';
 const DEFAULT_IDES = ['cursor', 'claude'];
-const ALL_IDES = ['claude', 'cursor', 'opencode', 'trae'];
+const ALL_IDES = ['claude', 'cursor', 'codex', 'opencode', 'trae'];
 const CURSOR_PROTOCOL_COMMAND_EXPECTATIONS = [
   ['spec-start.md', ['protocol-step --target . --user-input']],
   ['spec-continue.md', ['protocol-update --target . --user-input', 'protocol-advance --target . --json']],
@@ -31,7 +39,6 @@ const CURSOR_PROTOCOL_COMMAND_EXPECTATIONS = [
     'protocol-advance --target . --json',
   ]],
 ];
-const IDE_AUTOLINK_EXCLUDED_SKILLS = new Set(['using-superpowers']);
 const PROJECT_SPECIFIC_RULES = new Set(['01-项目概述.md', '03-项目结构.md']);
 const CUSTOMIZABLE_RULES = [
   ['01-项目概述.md', '项目定位、技术栈、业务边界、关键约束'],
@@ -151,6 +158,7 @@ function parseArgs(argv) {
     installLint: 'ask',
     installHusky: 'ask',
     uipro: 'ask',
+    superpowers: 'ask',
     updateSkills: 'yes',
     updateRules: 'yes',
     updateConfigs: 'yes',
@@ -166,6 +174,8 @@ function parseArgs(argv) {
     levelExplicit: false,
     hubOrigin: '',
     hubFetch: true,
+    refreshSuperpowers: false,
+    superpowersExplicit: false,
   };
 
   while (args.length > 0) {
@@ -230,6 +240,17 @@ function parseArgs(argv) {
         break;
       case '--no-uipro':
         options.uipro = 'no';
+        break;
+      case '--superpowers':
+        options.superpowers = 'yes';
+        options.superpowersExplicit = true;
+        break;
+      case '--no-superpowers':
+        options.superpowers = 'no';
+        options.superpowersExplicit = true;
+        break;
+      case '--refresh-superpowers':
+        options.refreshSuperpowers = true;
         break;
       case '--update-rules':
         options.updateRules = 'yes';
@@ -412,6 +433,15 @@ function copyDirIncremental(sourceDir, destDir, options = {}) {
     }
   }
   return { copiedAny, createdPaths };
+}
+
+function readInstalledManifestSuperpowers(targetDir) {
+  const manifestPath = path.join(targetDir, '.ai-spec', 'manifest.json');
+  if (!fs.existsSync(manifestPath)) {
+    return null;
+  }
+  const manifest = readJson(manifestPath, 'existing manifest');
+  return normalizeSuperpowersManifest(manifest?.superpowers, null);
 }
 
 function createDirLink(targetAbsolute, linkPath) {
@@ -1096,6 +1126,14 @@ async function selectBootstrapChoices(options) {
     ok(options.uipro === 'yes' ? '将安装 UI UX Pro Max' : '跳过 UI UX Pro Max');
   }
 
+  if (options.superpowers === 'ask') {
+    console.log('');
+    info('是否启用 Superpowers 平台增强？');
+    console.log('  启用后会生成项目级 superpowers bridge（超能力桥接）配置，并按 IDE 入口注入增强资产。');
+    options.superpowers = (await confirm('启用 superpowers?', false)) ? 'yes' : 'no';
+    ok(options.superpowers === 'yes' ? '将启用 superpowers 平台增强' : '跳过 superpowers 平台增强');
+  }
+
   if (options.installLint === 'ask') {
     console.log('');
     info('是否安装 ESLint + Prettier + Stylelint 配置？');
@@ -1570,7 +1608,7 @@ function installCommitHooks(targetDir, pkgManager, pending) {
   };
 }
 
-function createIdeLinks(targetDir, sourceDir, options) {
+function createIdeLinks(targetDir, sourceDir, options, superpowersEnabled = false) {
   for (const ide of normalizeIdeFilter(options.ideFilter)) {
     const ideDir = path.join(targetDir, `.${ide}`);
     ensureDir(ideDir);
@@ -1584,7 +1622,7 @@ function createIdeLinks(targetDir, sourceDir, options) {
         if (!entry.isDirectory()) continue;
         if (entry.name === 'common' || entry.name === 'profiles') continue;
         const linkPath = path.join(ideSkillsDir, entry.name);
-        if (IDE_AUTOLINK_EXCLUDED_SKILLS.has(entry.name)) {
+        if (!shouldExposeSkillToIde(entry.name, superpowersEnabled)) {
           removePath(linkPath);
           continue;
         }
@@ -1601,12 +1639,43 @@ function createIdeLinks(targetDir, sourceDir, options) {
       copyFile(mcpSrc, mcpDest);
       info('.cursor/mcp.json 已生成（请在 Cursor「设置 → MCP」中按需启用并完成凭证配置）');
     }
-    syncCommands(targetDir, sourceDir, 'cursor', options.updateCommands === 'yes');
   }
 
-  if (normalizeIdeFilter(options.ideFilter).includes('claude')) {
-    syncCommands(targetDir, sourceDir, 'claude', options.updateCommands === 'yes');
+  for (const ide of normalizeIdeFilter(options.ideFilter)) {
+    syncCommands(targetDir, sourceDir, ide, options.updateCommands === 'yes');
   }
+}
+
+function resolveSuperpowersEnabled(targetDir, options, manifestConfig = null) {
+  if (options.superpowers === 'yes') {
+    return true;
+  }
+  if (options.superpowers === 'no') {
+    return false;
+  }
+  const normalizedManifest = normalizeSuperpowersManifest(manifestConfig, readInstalledManifestSuperpowers(targetDir));
+  if (normalizedManifest) {
+    return Boolean(normalizedManifest.enabled);
+  }
+  const existingState = readSuperpowersState(targetDir);
+  return Boolean(existingState?.enabled);
+}
+
+function applySuperpowersBridge(targetDir, options, source = 'init', manifestConfig = null) {
+  const enabled = resolveSuperpowersEnabled(targetDir, options, manifestConfig);
+  const state = buildSuperpowersState({
+    targetDir,
+    enabled,
+    manifestConfig: normalizeSuperpowersManifest(manifestConfig, null),
+    ides: normalizeIdeFilter(options.ideFilter),
+    env: process.env,
+    cliVersion: VERSION,
+    source,
+    previousState: readSuperpowersState(targetDir),
+  });
+  writeSuperpowersState(targetDir, state);
+  upsertManagedAgentsBlock(targetDir, enabled && normalizeIdeFilter(options.ideFilter).includes('codex'));
+  return state;
 }
 
 function ensureOpenSpecDirs(targetDir) {
@@ -1941,6 +2010,7 @@ async function handleInitWithManifest(options, sourceDir, profilesRegistry, targ
     hubFetch: options.hubFetch,
     ...(options.profileExplicit ? { profile: options.profile } : {}),
     ...(options.ideExplicit ? { ide: options.ideFilter } : {}),
+    ...(options.superpowersExplicit ? { superpowers: options.superpowers === 'yes' } : {}),
     ...(options.hubOrigin ? { hubOrigin: options.hubOrigin } : {}),
   };
   info('预解析 manifest 与 registry ...');
@@ -1967,6 +2037,7 @@ async function handleInitWithManifest(options, sourceDir, profilesRegistry, targ
   options.level = DEFAULT_LEVEL;
   options.profile = prepared.manifest.profile;
   options.ideFilter = prepared.manifest.ides.join(',');
+  options.superpowers = prepared.manifest.superpowers?.enabled ? 'yes' : 'no';
   options.installMode = 'init-with-manifest';
   options.manifestSource = prepared.manifestSource;
   options.profileSource = options.profileExplicit && manifestProfile
@@ -1986,6 +2057,12 @@ async function handleInitWithManifest(options, sourceDir, profilesRegistry, targ
     prepared.manifest.local_preferences = localPreferences;
   } else {
     delete prepared.manifest.local_preferences;
+  }
+  if (options.superpowersExplicit) {
+    prepared.manifest.superpowers = normalizeSuperpowersManifest({
+      ...(prepared.manifest.superpowers || {}),
+      enabled: options.superpowers === 'yes',
+    }, null);
   }
 
   await selectBootstrapChoices(options);
@@ -2024,6 +2101,7 @@ async function handleInitWithManifest(options, sourceDir, profilesRegistry, targ
     pending.configs.push('.cursor/mcp.json：在 Cursor 设置 → MCP 中按需启用服务后，再补齐 project-id、access-token 等凭证。');
   }
   setupOpenSpec(targetDir, sourceDir, options, pkgManager, pending);
+  applySuperpowersBridge(targetDir, options, 'init-with-manifest', prepared.manifest.superpowers || null);
   writeInstallState(targetDir, sourceDir, previousInstallState, installStateAdditions);
   printTools(options.level, options.uipro);
   printInstallReport(targetDir, options, pending);
@@ -2097,14 +2175,18 @@ async function handleInit(options) {
   if (options.uipro === 'yes') {
     setupUipro(targetDir, pkgManager, pending);
   }
+  const superpowersEnabled = resolveSuperpowersEnabled(targetDir, options, null);
   if (options.level !== 'L1') {
-    createIdeLinks(targetDir, sourceDir, options);
+    createIdeLinks(targetDir, sourceDir, options, superpowersEnabled);
     if (normalizeIdeFilter(options.ideFilter).includes('cursor')) {
       pending.configs.push('.cursor/mcp.json：在 Cursor 设置 → MCP 中按需启用服务后，再补齐 project-id、access-token 等凭证。');
     }
   }
   if (options.level === 'L3') {
     setupOpenSpec(targetDir, sourceDir, options, pkgManager, pending);
+  }
+  if (options.superpowers === 'yes') {
+    applySuperpowersBridge(targetDir, options, 'init', null);
   }
   writeInstallState(targetDir, sourceDir, previousInstallState, installStateAdditions);
   printTools(options.level, options.uipro);
@@ -2174,6 +2256,7 @@ async function handleUpdate(options) {
   console.log(`  IDE Links:${options.updateIdeLinks === 'yes' ? ' 重建' : ' 跳过'}`);
   console.log(`  OpenSpec: ${options.level === 'L3' && options.updateOpenSpec === 'yes' ? '更新' : '跳过'}`);
   console.log(`  UIPro:    ${options.updateUipro === 'yes' ? '重新安装' : '跳过'}`);
+  console.log(`  Superpowers: ${options.refreshSuperpowers || options.superpowersExplicit ? '刷新/更新' : '保持当前状态'}`);
   console.log('');
 
   const pending = { failures: [], configs: [] };
@@ -2195,8 +2278,9 @@ async function handleUpdate(options) {
     installStateAdditions.createdConfigFiles.push(...copyConfigs(targetDir, sourceDir, profilesRegistry, options, true));
   }
   if (options.level !== 'L1') {
+    const superpowersEnabled = resolveSuperpowersEnabled(targetDir, options, null);
     if (options.updateIdeLinks === 'yes') {
-      createIdeLinks(targetDir, sourceDir, options);
+      createIdeLinks(targetDir, sourceDir, options, superpowersEnabled);
     }
     for (const ide of normalizeIdeFilter(options.ideFilter)) {
       syncCommands(targetDir, sourceDir, ide, options.updateCommands === 'yes');
@@ -2210,6 +2294,9 @@ async function handleUpdate(options) {
     removePath(legacySkillDir);
     removePath(skillDir);
     setupUipro(targetDir, pkgManager, pending);
+  }
+  if (options.refreshSuperpowers || options.superpowersExplicit || readSuperpowersState(targetDir)) {
+    applySuperpowersBridge(targetDir, options, 'update', null);
   }
   writeInstallState(targetDir, sourceDir, previousInstallState, installStateAdditions);
   ok(`更新完成 (profile: ${options.profile}, compatibility level: ${options.level})`);
@@ -2349,6 +2436,7 @@ async function handleUninstall(options) {
     removePath(huskyDir);
   }
   cleanupEmptyIdeDirs(targetDir);
+  upsertManagedAgentsBlock(targetDir, false);
   const aiSpecDir = path.join(targetDir, '.ai-spec');
   if (fs.existsSync(aiSpecDir)) {
     removePath(aiSpecDir);
@@ -2386,6 +2474,8 @@ function printUsage() {
   console.log('  --package <path>           Monorepo 下指定子包');
   console.log('  --workspace-root           Monorepo 下显式在根目录安装');
   console.log('  --uipro / --no-uipro       安装或跳过 UI UX Pro Max');
+  console.log('  --superpowers / --no-superpowers  启用或关闭 superpowers 平台增强');
+  console.log('  --refresh-superpowers      update 时仅刷新 superpowers 绑定状态');
   console.log('  --lint / --no-lint         安装或跳过 lint/format');
   console.log('  --husky / --no-husky       安装或跳过提交校验');
   console.log('  --manifest <path|url>      init/sync 时指定安装清单');

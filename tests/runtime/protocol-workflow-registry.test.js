@@ -250,6 +250,54 @@ function main() {
     ),
   );
 
+  const superpowersTarget = createWorkspace();
+  writeJsonFile(superpowersTarget, '.ai-spec/superpowers.json', {
+    schema_version: 1,
+    enabled: true,
+    mode: 'host-enhanced',
+    bindings: {
+      cursor: { enabled: true, entry_mode: 'project-minimal' },
+      claude: { enabled: true, entry_mode: 'host-enhanced' },
+      codex: { enabled: true, entry_mode: 'agents-skill-wrapper' },
+    },
+    host: {
+      capabilities: {
+        cursor: false,
+        claude: true,
+        codex: true,
+      },
+    },
+    allowed_roles: ['requirement-analyst', 'frontend-implementer', 'code-guardian'],
+    fallback_strategy: 'graceful-degrade',
+    last_fallback_reason: null,
+    cli_version: '2.0.0',
+  });
+
+  workflow = protocolWorkflow.advanceProtocolStep({
+    target: superpowersTarget,
+    userInput: '新增一个订单详情页，接真实接口并补状态流转说明',
+  });
+
+  assert.strictEqual(workflow.turn.summary.superpowers_mode, 'host-enhanced');
+  assert.strictEqual(workflow.turn.guidance.superpowers_contract.enabled, true);
+  assert.strictEqual(workflow.turn.guidance.superpowers_contract.mode, 'host-enhanced');
+  assert.ok(workflow.turn.guidance.superpowers_contract.allowed_roles.includes('frontend-implementer'));
+
+  copyFixture(superpowersTarget, 'task-orchestrator-bootstrap-reply.md', 'task-orchestrator-turn.json');
+  runner.advanceRunner({ target: superpowersTarget });
+  workflow = protocolWorkflow.advanceProtocolStep({
+    target: superpowersTarget,
+  });
+
+  assert.strictEqual(workflow.turn.actor.id, 'requirement-analyst');
+  assert.strictEqual(workflow.turn.summary.superpowers_mode, 'host-enhanced');
+  assert.deepStrictEqual(
+    workflow.turn.guidance.role_skill_contract.primary_skills.slice(0, 3),
+    ['using-superpowers', 'create-proposal', 'design-analysis'],
+  );
+  assert.ok(workflow.turn.guidance.superpowers_contract.host_enhanced_hints.includes('brainstorming'));
+  assert.ok(workflow.turn.guidance.superpowers_contract.host_enhanced_hints.includes('plan'));
+
   const futureProfileTarget = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-spec-auto-protocol-future-profile-'));
   writeProjectFile(futureProfileTarget, 'package.json', JSON.stringify({
     name: 'protocol-future-profile',
