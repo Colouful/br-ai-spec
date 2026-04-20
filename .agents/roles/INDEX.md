@@ -11,8 +11,8 @@ description: 供插件页面读取的角色展示索引。优先解析下方的 
 
 当前统计：
 
-- `active` 角色：10 个
-- `planned` 候选角色：22 个
+- `active` 角色：19 个
+- `planned` 候选角色：13 个
 
 插件页面建议优先解析下面的 `yaml` 数据块。
 
@@ -145,7 +145,7 @@ roles:
 
   - id: build-specialist
     name: 构建专家
-    status: planned
+    status: active
     bucket: domains
     visibility: public
     domains: [engineering]
@@ -153,7 +153,7 @@ roles:
 
   - id: dependency-governor
     name: 依赖治理专家
-    status: planned
+    status: active
     bucket: domains
     visibility: public
     domains: [engineering]
@@ -161,7 +161,7 @@ roles:
 
   - id: architecture-advisor
     name: 架构顾问专家
-    status: planned
+    status: active
     bucket: domains
     visibility: public
     domains: [engineering]
@@ -177,7 +177,7 @@ roles:
 
   - id: e2e-test-specialist
     name: E2E 测试专家
-    status: planned
+    status: active
     bucket: domains
     visibility: public
     domains: [testing]
@@ -201,7 +201,7 @@ roles:
 
   - id: pipeline-specialist
     name: 流水线专家
-    status: planned
+    status: active
     bucket: domains
     visibility: public
     domains: [delivery]
@@ -217,7 +217,7 @@ roles:
 
   - id: deployment-specialist
     name: 部署专家
-    status: planned
+    status: active
     bucket: domains
     visibility: public
     domains: [delivery]
@@ -273,7 +273,7 @@ roles:
 
   - id: error-tracker
     name: 错误追踪专家
-    status: planned
+    status: active
     bucket: domains
     visibility: public
     domains: [observability]
@@ -281,7 +281,7 @@ roles:
 
   - id: rum-analyst
     name: RUM 分析专家
-    status: planned
+    status: active
     bucket: domains
     visibility: public
     domains: [observability]
@@ -289,7 +289,7 @@ roles:
 
   - id: event-instrumentation-specialist
     name: 埋点方案专家
-    status: planned
+    status: active
     bucket: domains
     visibility: public
     domains: [observability]

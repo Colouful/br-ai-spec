@@ -157,6 +157,14 @@ function readCurrentRun(targetDir) {
 }
 
 function main() {
+  const smallRequestGuide = fs.readFileSync(path.join(__dirname, '..', '..', 'docs', 'four', '小需求与补丁修正指南.md'), 'utf8');
+  const bestPracticeGuide = fs.readFileSync(path.join(__dirname, '..', '..', 'docs', 'four', '开发最佳实践指南.md'), 'utf8');
+  const deliveryExampleGuide = fs.readFileSync(path.join(__dirname, '..', '..', 'docs', 'four', '需求示例-从发起到归档.md'), 'utf8');
+
+  assert.ok(smallRequestGuide.includes('完整主流程默认是 `auto（自动） + none（无阻塞审核）`'));
+  assert.ok(bestPracticeGuide.includes('`review_policy（审核策略） = none（无阻塞审核）`'));
+  assert.ok(deliveryExampleGuide.includes('`review_policy（审核策略） = none（无阻塞审核）`'));
+
   const quickFixTarget = createWorkspace('ai-spec-auto-quick-fix-');
   let result = protocolWorkflow.advanceProtocolStep({
     target: quickFixTarget,
@@ -172,6 +180,18 @@ function main() {
   assert.ok(Array.isArray(result.turn.guidance.bugfix_route_contract.allowed_as_quick_fix));
   assert.ok(result.turn.guidance.quick_fix_boundary.some((item) => item.includes('单页面')));
   assert.ok(result.turn.guidance.upgrade_to_full_change_when.some((item) => item.includes('真实 API')));
+
+  const mockPageTarget = createWorkspace('ai-spec-auto-mock-page-');
+  result = protocolWorkflow.advanceProtocolStep({
+    target: mockPageTarget,
+    userInput: '创建一个商品详情 mock 页面，只做演示版，数据本地 mock',
+  });
+  assert.strictEqual(result.turn.mode, 'start');
+  assert.strictEqual(result.turn.guidance.route_decision.change_context, 'no-change');
+  assert.strictEqual(result.turn.guidance.route_decision.route_decision, 'full-change');
+  assert.strictEqual(result.turn.guidance.route_decision.selected_flow, 'prd-to-delivery');
+  assert.strictEqual(result.turn.guidance.route_decision.enter_openspec, true);
+  assert.strictEqual(result.turn.guidance.route_decision.next_expert, 'requirement-analyst');
 
   const fullChangeTarget = createWorkspace('ai-spec-auto-full-change-');
   result = protocolWorkflow.advanceProtocolStep({

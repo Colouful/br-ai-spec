@@ -1,7 +1,7 @@
 ---
 id: architecture-advisor
 name: 架构顾问专家
-status: planned
+status: active
 domains:
   - engineering
 description: 负责在复杂变更前给出目录、模块边界和技术方案建议，避免实现阶段再返工。
@@ -10,6 +10,7 @@ triggers:
   - module-boundary-design
 preferred_skills:
   - create-proposal
+  - dependency-impact-graph
 reads:
   - context/PROJECT.md
   - .agents/rules/

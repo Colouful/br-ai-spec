@@ -1,7 +1,7 @@
 ---
 id: e2e-test-specialist
 name: E2E 测试专家
-status: planned
+status: active
 domains:
   - testing
 description: 负责围绕关键用户路径设计端到端测试场景，验证真实交付链路。
@@ -10,6 +10,7 @@ triggers:
   - critical-user-flow
 preferred_skills:
   - ui-verification
+  - web-design-guidelines
 reads:
   - openspec/changes/<change-id>/proposal.md
   - openspec/changes/<change-id>/tasks.md

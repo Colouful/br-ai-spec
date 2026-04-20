@@ -1,14 +1,15 @@
 ---
 id: event-instrumentation-specialist
 name: 埋点方案专家
-status: planned
+status: active
 domains:
   - observability
 description: 负责设计事件埋点口径、字段规范和关键行为追踪方案。
 triggers:
   - analytics-design
   - event-instrumentation
-preferred_skills: []
+preferred_skills:
+  - design-analysis
 reads:
   - product-metrics-plan
   - event-requirements

@@ -225,21 +225,66 @@
     },
     "build-specialist": {
       "name": "构建专家",
-      "status": "planned",
+      "status": "active",
       "domains": ["engineering"],
-      "source": ".agents/roles/domains/engineering/build-specialist.md"
+      "source": ".agents/roles/domains/engineering/build-specialist.md",
+      "rule_ids": ["coding-standard", "format-check-standard", "audit-report-standard"],
+      "skill_priority": ["config-and-secret-scan"],
+      "micro_skill_allowlist": ["config-and-secret-scan"],
+      "rule_contract_profiles": {
+        "default": {
+          "must_follow": [
+            "先判断问题位于构建入口、构建性能还是产物异常，再给出建议。",
+            "优先复用现有构建脚本和配置，不新增无必要工具链。"
+          ],
+          "blocked_when": [
+            "若构建变更会影响发布链但未给出验证与回滚路径，不得直接放行。"
+          ]
+        }
+      },
+      "required_outputs": []
     },
     "dependency-governor": {
       "name": "依赖治理专家",
-      "status": "planned",
+      "status": "active",
       "domains": ["engineering"],
-      "source": ".agents/roles/domains/engineering/dependency-governor.md"
+      "source": ".agents/roles/domains/engineering/dependency-governor.md",
+      "rule_ids": ["coding-standard", "format-check-standard", "audit-report-standard"],
+      "skill_priority": ["dependency-impact-graph", "config-and-secret-scan"],
+      "micro_skill_allowlist": ["dependency-impact-graph", "config-and-secret-scan"],
+      "rule_contract_profiles": {
+        "default": {
+          "must_follow": [
+            "先区分新增、升级、移除三类依赖变更，再给最小影响建议。",
+            "涉及安装来源、registry 或脚本依赖时，需要补验证与回滚说明。"
+          ],
+          "blocked_when": [
+            "若依赖变更影响面未分析清楚，不得直接建议进入实现或发布。"
+          ]
+        }
+      },
+      "required_outputs": []
     },
     "architecture-advisor": {
       "name": "架构顾问专家",
-      "status": "planned",
+      "status": "active",
       "domains": ["engineering"],
-      "source": ".agents/roles/domains/engineering/architecture-advisor.md"
+      "source": ".agents/roles/domains/engineering/architecture-advisor.md",
+      "rule_ids": ["project-overview", "project-structure", "api-standard", "route-standard", "style-standard"],
+      "skill_priority": ["create-proposal", "dependency-impact-graph"],
+      "micro_skill_allowlist": ["create-proposal", "dependency-impact-graph"],
+      "rule_contract_profiles": {
+        "default": {
+          "must_follow": [
+            "先收口模块边界和职责拆分，再讨论实现细节。",
+            "若结构性改动会影响多个模块，需要显式列出影响面和拆分建议。"
+          ],
+          "blocked_when": [
+            "若关键边界仍不清楚，不得把结构性问题直接下放到实现阶段临时决定。"
+          ]
+        }
+      },
+      "required_outputs": []
     },
     "unit-test-specialist": {
       "name": "单元测试专家",
@@ -265,9 +310,24 @@
     },
     "e2e-test-specialist": {
       "name": "E2E 测试专家",
-      "status": "planned",
+      "status": "active",
       "domains": ["testing"],
-      "source": ".agents/roles/domains/testing/e2e-test-specialist.md"
+      "source": ".agents/roles/domains/testing/e2e-test-specialist.md",
+      "rule_ids": ["test-standard", "audit-report-standard"],
+      "skill_priority": ["ui-verification", "web-design-guidelines"],
+      "micro_skill_allowlist": ["ui-verification", "web-design-guidelines"],
+      "rule_contract_profiles": {
+        "default": {
+          "must_follow": [
+            "优先围绕关键发布路径设计验证，不穷举所有页面动作。",
+            "验证步骤应能直接服务发布前回归，而不是只做理想化脚本清单。"
+          ],
+          "blocked_when": [
+            "若关键主路径没有任何端到端验证证据，不得给出低风险判断。"
+          ]
+        }
+      },
+      "required_outputs": []
     },
     "coverage-analyst": {
       "name": "覆盖率分析专家",
@@ -299,9 +359,24 @@
     },
     "pipeline-specialist": {
       "name": "流水线专家",
-      "status": "planned",
+      "status": "active",
       "domains": ["delivery"],
-      "source": ".agents/roles/domains/delivery/pipeline-specialist.md"
+      "source": ".agents/roles/domains/delivery/pipeline-specialist.md",
+      "rule_ids": ["coding-standard", "format-check-standard", "audit-report-standard"],
+      "skill_priority": ["config-and-secret-scan"],
+      "micro_skill_allowlist": ["config-and-secret-scan"],
+      "rule_contract_profiles": {
+        "default": {
+          "must_follow": [
+            "先梳理当前流水线里已有的构建、校验和发布步骤，再给治理建议。",
+            "要把失败重试、人工确认和回滚关注点写清楚，不只写 happy path。"
+          ],
+          "blocked_when": [
+            "若流水线改动会影响发布稳定性但没有回退思路，不得直接放行。"
+          ]
+        }
+      },
+      "required_outputs": []
     },
     "container-specialist": {
       "name": "容器专家",
@@ -311,9 +386,24 @@
     },
     "deployment-specialist": {
       "name": "部署专家",
-      "status": "planned",
+      "status": "active",
       "domains": ["delivery"],
-      "source": ".agents/roles/domains/delivery/deployment-specialist.md"
+      "source": ".agents/roles/domains/delivery/deployment-specialist.md",
+      "rule_ids": ["coding-standard", "format-check-standard", "audit-report-standard"],
+      "skill_priority": ["config-and-secret-scan"],
+      "micro_skill_allowlist": ["config-and-secret-scan"],
+      "rule_contract_profiles": {
+        "default": {
+          "must_follow": [
+            "先区分环境差异、配置依赖和发布窗口，再讨论部署动作。",
+            "上线前检查项要覆盖配置、回滚和监控观察点。"
+          ],
+          "blocked_when": [
+            "若部署差异与回滚策略不清楚，不得给出可上线结论。"
+          ]
+        }
+      },
+      "required_outputs": []
     },
     "component-doc-specialist": {
       "name": "组件文档专家",
@@ -369,21 +459,64 @@
     },
     "error-tracker": {
       "name": "错误追踪专家",
-      "status": "planned",
+      "status": "active",
       "domains": ["observability"],
-      "source": ".agents/roles/domains/observability/error-tracker.md"
+      "source": ".agents/roles/domains/observability/error-tracker.md",
+      "rule_ids": ["audit-report-standard"],
+      "skill_priority": [],
+      "micro_skill_allowlist": [],
+      "rule_contract_profiles": {
+        "default": {
+          "must_follow": [
+            "先按频次、影响面和可归因程度整理错误，再给排查优先级建议。"
+          ],
+          "blocked_when": [
+            "若错误口径仍混乱，不得输出看似精确但不可执行的结论。"
+          ]
+        }
+      },
+      "required_outputs": []
     },
     "rum-analyst": {
       "name": "RUM 分析专家",
-      "status": "planned",
+      "status": "active",
       "domains": ["observability"],
-      "source": ".agents/roles/domains/observability/rum-analyst.md"
+      "source": ".agents/roles/domains/observability/rum-analyst.md",
+      "rule_ids": ["audit-report-standard"],
+      "skill_priority": [],
+      "micro_skill_allowlist": [],
+      "rule_contract_profiles": {
+        "default": {
+          "must_follow": [
+            "先区分真实用户观测与实验室数据，再判断体验影响。"
+          ],
+          "blocked_when": [
+            "若没有真实用户数据支撑，不得把推测包装成 RUM 结论。"
+          ]
+        }
+      },
+      "required_outputs": []
     },
     "event-instrumentation-specialist": {
       "name": "埋点方案专家",
-      "status": "planned",
+      "status": "active",
       "domains": ["observability"],
-      "source": ".agents/roles/domains/observability/event-instrumentation-specialist.md"
+      "source": ".agents/roles/domains/observability/event-instrumentation-specialist.md",
+      "rule_ids": ["api-standard", "doc-standard", "audit-report-standard"],
+      "skill_priority": ["design-analysis"],
+      "micro_skill_allowlist": ["design-analysis"],
+      "rule_contract_profiles": {
+        "default": {
+          "must_follow": [
+            "先对齐事件目标、触发时机和字段口径，再给埋点建议。",
+            "优先复用现有事件命名和字段前缀，不新增孤立口径。"
+          ],
+          "blocked_when": [
+            "若埋点承载关键业务判断但口径未确认，不得直接推进到实现。"
+          ]
+        }
+      },
+      "required_outputs": []
     },
     "security-reviewer": {
       "name": "安全审查专家",

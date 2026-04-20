@@ -1,7 +1,7 @@
 ---
 id: error-tracker
 name: 错误追踪专家
-status: planned
+status: active
 domains:
   - observability
 description: 负责整理错误追踪链路、定位高频问题并提出归因视角。

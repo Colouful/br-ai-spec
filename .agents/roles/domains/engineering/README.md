@@ -2,7 +2,7 @@
 
 展示名：工程构建域
 
-状态：planned
+状态：active
 
 建议专家：
 
@@ -13,5 +13,5 @@
 
 说明：
 
-- 当前 MVP 已启用 `frontend-implementer`
-- 构建和依赖类专家后续按需补充
+- 当前已启用 `frontend-implementer`
+- 构建、依赖与架构评审类专家已经进入可启用状态

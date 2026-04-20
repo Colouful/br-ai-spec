@@ -25,6 +25,7 @@
 - 支持新增和更新
 - 支持 `--dry-run`
 - 支持只同步指定资源
+- 支持通过 `--from-scenarios` 自动展开场景关联的 `role / skill`
 - `role` 解析直接复用 Hub 的 `/api/upload`
 - `skill / rule` 会对比最新版本文件，只有文件变化才发新版本
 - `scenario` 会自动聚合显式绑定的 role/skill/rule
@@ -182,6 +183,16 @@ node ./scripts/hub-sync-assets.js \
   --config scripts/hub-sync-assets.config.json
 ```
 
+按场景只同步关联的专家和 skill：
+
+```bash
+node ./scripts/hub-sync-assets.js \
+  --from-scenarios change-to-release,requirement-to-observability,change-to-architecture-review \
+  --rules none \
+  --scenarios none \
+  --config scripts/hub-sync-assets.config.json
+```
+
 ## 同步策略
 
 ### skill
@@ -245,6 +256,18 @@ node ./scripts/hub-sync-assets.js \
   - 关联 role 上已经挂载的 skill/rule
 - 推荐把场景 `name` 直接配置为中文展示名，避免 Hub 后台显示 slug
 
+### from-scenarios
+
+- 用于“只想上传某几个场景对应的专家和 skill，但不想手工列一长串参数”的场景
+- 它会从 `scenario-packages.json` 读取指定场景
+- 自动展开：
+  - 场景显式声明的 `roles`
+  - 场景显式声明的 `skills`
+  - 这些 `role` 在 `roles.json` 中声明的 `skill_priority / micro_skill_allowlist / preferred_skills`
+- 默认只影响 `role / skill` 的实际选择结果
+- 不会自动把 `scenario` 自己也上传；如需上传场景，仍显式传 `--scenarios`
+- 如果你显式传了 `--roles none` 或 `--skills none`，显式参数优先，不会被自动展开覆盖
+
 ## 场景方案建议
 
 当前 `scenario-packages.json` 比较轻，所以推荐把下面这些内容放进本地 config 覆盖：
@@ -259,13 +282,16 @@ node ./scripts/hub-sync-assets.js \
 - `tags`
 - `isFeatured`
 
-当前示例配置已经内置了 5 个场景的中文名称：
+当前示例配置已经内置了 8 个场景的中文名称：
 
 - `前端基础交付场景`
 - `设计到代码交付场景`
 - `质量治理场景`
 - `企业文档需求沉淀场景`
 - `缺陷修复到验证场景`
+- `变更到发布场景`
+- `需求到可观测场景`
+- `变更到架构评审场景`
 
 也就是说：
 

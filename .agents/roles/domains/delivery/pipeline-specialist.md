@@ -1,14 +1,15 @@
 ---
 id: pipeline-specialist
 name: 流水线专家
-status: planned
+status: active
 domains:
   - delivery
 description: 负责持续集成和发布流水线设计，确保构建、校验和发布步骤稳定可复用。
 triggers:
   - ci-pipeline-design
   - release-automation
-preferred_skills: []
+preferred_skills:
+  - config-and-secret-scan
 reads:
   - ci-config
   - project-config

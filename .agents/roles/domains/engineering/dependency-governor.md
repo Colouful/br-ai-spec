@@ -1,14 +1,16 @@
 ---
 id: dependency-governor
 name: 依赖治理专家
-status: planned
+status: active
 domains:
   - engineering
 description: 负责梳理依赖引入、升级、淘汰和风险控制，减少依赖膨胀与版本漂移。
 triggers:
   - dependency-audit
   - package-upgrade
-preferred_skills: []
+preferred_skills:
+  - dependency-impact-graph
+  - config-and-secret-scan
 reads:
   - package-manifest
   - lockfile

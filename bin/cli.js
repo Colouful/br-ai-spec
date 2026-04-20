@@ -81,6 +81,11 @@ const INSTALL_COMMANDS = new Set(['init', 'update', 'check', 'uninstall', 'sync'
       process.exit(archiveChange.main(args.slice(1)));
     }
 
+    if (args[0] === 'visual-bridge') {
+      const visualBridge = require('./visual-bridge');
+      process.exit(await visualBridge.main(args.slice(1)));
+    }
+
     throw new Error(`Unknown command: ${args[0]}`);
   } catch (e) {
     if (e && e.message && !e.cmd) {

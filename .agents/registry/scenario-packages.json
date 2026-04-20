@@ -54,6 +54,70 @@
         "audit-report-standard"
       ],
       "domains": ["orchestration", "engineering", "testing", "governance", "performance"]
+    },
+    "change-to-release": {
+      "profiles": ["vue", "react"],
+      "roles": [
+        "build-specialist",
+        "e2e-test-specialist",
+        "pipeline-specialist",
+        "deployment-specialist",
+        "code-guardian"
+      ],
+      "skills": [
+        "config-and-secret-scan",
+        "ui-verification",
+        "web-design-guidelines"
+      ],
+      "rules": [
+        "coding-standard",
+        "test-standard",
+        "format-check-standard",
+        "audit-report-standard"
+      ],
+      "domains": ["engineering", "testing", "delivery", "governance"]
+    },
+    "requirement-to-observability": {
+      "profiles": ["vue", "react"],
+      "roles": [
+        "requirement-analyst",
+        "event-instrumentation-specialist",
+        "error-tracker",
+        "rum-analyst"
+      ],
+      "skills": [
+        "create-proposal",
+        "design-analysis"
+      ],
+      "rules": [
+        "project-overview",
+        "api-standard",
+        "doc-standard",
+        "audit-report-standard"
+      ],
+      "domains": ["demand-design", "observability", "documentation", "governance"]
+    },
+    "change-to-architecture-review": {
+      "profiles": ["vue", "react"],
+      "roles": [
+        "architecture-advisor",
+        "dependency-governor",
+        "code-guardian"
+      ],
+      "skills": [
+        "create-proposal",
+        "dependency-impact-graph",
+        "config-and-secret-scan"
+      ],
+      "rules": [
+        "project-overview",
+        "project-structure",
+        "coding-standard",
+        "api-standard",
+        "route-standard",
+        "style-standard"
+      ],
+      "domains": ["engineering", "governance"]
     }
   }
 }

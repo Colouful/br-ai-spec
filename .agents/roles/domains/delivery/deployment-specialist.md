@@ -1,14 +1,15 @@
 ---
 id: deployment-specialist
 name: 部署专家
-status: planned
+status: active
 domains:
   - delivery
 description: 负责环境部署策略、配置差异梳理和上线前检查建议。
 triggers:
   - deployment-design
   - environment-release
-preferred_skills: []
+preferred_skills:
+  - config-and-secret-scan
 reads:
   - deployment-config
   - env-config

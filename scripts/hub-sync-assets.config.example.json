@@ -168,14 +168,41 @@
       "api-contract-specialist": {
         "name": "API 契约专家"
       },
+      "build-specialist": {
+        "name": "构建专家"
+      },
+      "dependency-governor": {
+        "name": "依赖治理专家"
+      },
+      "architecture-advisor": {
+        "name": "架构顾问专家"
+      },
       "unit-test-specialist": {
         "name": "单元测试专家"
+      },
+      "e2e-test-specialist": {
+        "name": "E2E 测试专家"
       },
       "verification-reviewer": {
         "name": "验证评审专家"
       },
       "performance-auditor": {
         "name": "性能审计专家"
+      },
+      "pipeline-specialist": {
+        "name": "流水线专家"
+      },
+      "deployment-specialist": {
+        "name": "部署专家"
+      },
+      "event-instrumentation-specialist": {
+        "name": "埋点方案专家"
+      },
+      "error-tracker": {
+        "name": "错误追踪专家"
+      },
+      "rum-analyst": {
+        "name": "RUM 分析专家"
       }
     },
     "scenarios": {
@@ -223,6 +250,42 @@
           "unit-test-specialist",
           "verification-reviewer",
           "performance-auditor"
+        ],
+        "supportedProfiles": ["vue", "react"],
+        "recommendedIdes": ["cursor"],
+        "isFeatured": false
+      },
+      "change-to-release": {
+        "name": "变更到发布场景",
+        "description": "构建、回归验证、流水线与部署准备场景",
+        "entryRoleSlug": "build-specialist",
+        "optionalRoles": [
+          "e2e-test-specialist",
+          "code-guardian"
+        ],
+        "supportedProfiles": ["vue", "react"],
+        "recommendedIdes": ["cursor"],
+        "isFeatured": false
+      },
+      "requirement-to-observability": {
+        "name": "需求到可观测场景",
+        "description": "埋点、错误追踪与真实用户监控方案设计场景",
+        "entryRoleSlug": "requirement-analyst",
+        "optionalRoles": [
+          "error-tracker",
+          "rum-analyst",
+          "code-guardian"
+        ],
+        "supportedProfiles": ["vue", "react"],
+        "recommendedIdes": ["cursor"],
+        "isFeatured": false
+      },
+      "change-to-architecture-review": {
+        "name": "变更到架构评审场景",
+        "description": "模块边界、依赖影响与结构性改动评审场景",
+        "entryRoleSlug": "architecture-advisor",
+        "optionalRoles": [
+          "code-guardian"
         ],
         "supportedProfiles": ["vue", "react"],
         "recommendedIdes": ["cursor"],

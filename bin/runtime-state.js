@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 const fs = require('fs');
 const path = require('path');
+const { spawnSync } = require('child_process');
 const {
   resolveRuntimePaths,
   getExistingPath,
@@ -1227,6 +1228,23 @@ function saveUpdatedRunState({
   }
   if (syncCurrent || forceSyncCurrent) {
     writeJsonFile(currentRunPath, nextState);
+  }
+
+  try {
+    const bridgePath = path.join(__dirname, 'visual-bridge.js');
+    if (fs.existsSync(bridgePath)) {
+      const child = spawnSync(process.execPath, [bridgePath, 'push-current', '--target', targetDir, '--event-name', checkpointEvent || 'runtime-state-updated', '--json'], {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      if (child.status !== 0 && process.env.AI_SPEC_VISUAL_BRIDGE_DEBUG === '1') {
+        console.warn(`visual bridge skipped: ${child.stderr || child.stdout || 'unknown error'}`);
+      }
+    }
+  } catch (error) {
+    if (process.env.AI_SPEC_VISUAL_BRIDGE_DEBUG === '1') {
+      console.warn(`visual bridge error: ${error.message}`);
+    }
   }
 
   return nextState;

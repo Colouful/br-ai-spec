@@ -1,14 +1,15 @@
 ---
 id: build-specialist
 name: 构建专家
-status: planned
+status: active
 domains:
   - engineering
 description: 负责构建配置、打包策略和构建性能问题分析，保障产物稳定与构建效率。
 triggers:
   - build-optimization
   - bundle-issue
-preferred_skills: []
+preferred_skills:
+  - config-and-secret-scan
 reads:
   - build-config
   - project-config

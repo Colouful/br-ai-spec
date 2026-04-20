@@ -1,7 +1,7 @@
 ---
 id: rum-analyst
 name: RUM 分析专家
-status: planned
+status: active
 domains:
   - observability
 description: 负责从真实用户数据中识别性能和稳定性问题，辅助判断实际体验影响。

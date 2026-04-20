@@ -2,6 +2,10 @@
 
 const fs = require("fs");
 const path = require("path");
+const {
+  collectRelatedAssetIdsFromScenarios,
+  mergeSelectionWithDerivedIds,
+} = require("../internal/hub-sync-selection");
 
 const PROJECT_ROOT = process.cwd();
 const DEFAULT_BASE_URL = "http://localhost:3000";
@@ -95,6 +99,29 @@ async function run(cliOptions) {
     scenarios:
       readJson(path.resolve(PROJECT_ROOT, ".agents/registry/scenario-packages.json")).scenario_packages || {},
   };
+  const relatedScenarioIds = selectResourceIds(
+    localRegistries.scenarios,
+    resolved.fromScenarioSelection,
+  );
+  const relatedAssets = collectRelatedAssetIdsFromScenarios({
+    scenarioIds: relatedScenarioIds,
+    localScenarios: localRegistries.scenarios,
+    localRoles: localRegistries.roles,
+  });
+  resolved.roleSelection = mergeSelectionWithDerivedIds({
+    selection: resolved.roleSelection,
+    selectionSpecified: resolved.roleSelectionSpecified,
+    derivedIds: relatedAssets.roleIds,
+    preferDerivedWhenImplicitAll: relatedScenarioIds.length > 0,
+  });
+  resolved.skillSelection = mergeSelectionWithDerivedIds({
+    selection: resolved.skillSelection,
+    selectionSpecified: resolved.skillSelectionSpecified,
+    derivedIds: relatedAssets.skillIds,
+    preferDerivedWhenImplicitAll: relatedScenarioIds.length > 0,
+  });
+  resolved.skipRoles = isSelectionNone(resolved.roleSelection);
+  resolved.skipSkills = isSelectionNone(resolved.skillSelection);
 
   const hubState = {
     categories,
@@ -174,6 +201,7 @@ function parseArgs(argv) {
     rules: undefined,
     roles: undefined,
     scenarios: undefined,
+    fromScenarios: undefined,
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -247,6 +275,11 @@ function parseArgs(argv) {
       index += 1;
       continue;
     }
+    if (current === "--from-scenarios") {
+      args.fromScenarios = next;
+      index += 1;
+      continue;
+    }
     throw new Error(`unknown argument: ${current}`);
   }
 
@@ -272,11 +305,14 @@ Options:
   --rules <all|csv|none>       Sync selected rules
   --roles <all|csv|none>       Sync selected roles
   --scenarios <all|csv|none>   Sync selected scenarios
+  --from-scenarios <all|csv|none>
+                               Expand related roles and skills from scenario packages
   --help                       Show help
 
 Examples:
   node ./scripts/hub-sync-assets.js --dry-run
   node ./scripts/hub-sync-assets.js --skills create-api,create-route --rules none
+  node ./scripts/hub-sync-assets.js --from-scenarios change-to-release --rules none --scenarios none
   node ./scripts/hub-sync-assets.js --config scripts/hub-sync-assets.config.json
 
 Notes:
@@ -358,10 +394,15 @@ function resolveRuntimeOptions(cliOptions, config) {
     ),
     dryRun: Boolean(cliOptions.dryRun),
     config,
+    skillSelectionSpecified: typeof cliOptions.skills !== "undefined",
+    roleSelectionSpecified: typeof cliOptions.roles !== "undefined",
     skillSelection: normalizeSelection(cliOptions.skills),
     ruleSelection: normalizeSelection(cliOptions.rules),
     roleSelection: normalizeSelection(cliOptions.roles),
     scenarioSelection: normalizeSelection(cliOptions.scenarios),
+    fromScenarioSelection: normalizeSelection(
+      typeof cliOptions.fromScenarios === "undefined" ? "none" : cliOptions.fromScenarios,
+    ),
     skipSkills: isSelectionNone(normalizeSelection(cliOptions.skills)),
     skipRules: isSelectionNone(normalizeSelection(cliOptions.rules)),
     skipRoles: isSelectionNone(normalizeSelection(cliOptions.roles)),
