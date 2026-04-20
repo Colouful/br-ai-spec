@@ -19,6 +19,7 @@ const {
   shouldExposeSkillToIde,
   upsertManagedAgentsBlock,
 } = require('./superpowers');
+const { readRenderedCommandTemplate } = require('./command-template-renderer');
 
 const PKG_ROOT = path.join(__dirname, '..');
 const VERSION = '2.0.0';
@@ -1300,7 +1301,9 @@ function syncCommands(targetDir, sourceDir, ideName, overwrite) {
         info(`  跳过已存在命令: ${entry}`);
         continue;
       }
-      copyFile(sourcePath, destPath);
+      const rendered = readRenderedCommandTemplate(sourcePath);
+      ensureDir(path.dirname(destPath));
+      fs.writeFileSync(destPath, rendered, 'utf8');
       copiedInThisRun.add(destPath);
     }
   }

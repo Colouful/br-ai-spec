@@ -1,6 +1,6 @@
 {
   "name": "@ex/ai-spec-auto",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "AI Coding 团队规范驱动开发 CLI — 一键安装规范、技能与工具配置",
   "bin": {
     "ai-spec-auto": "./bin/cli.js"
@@ -16,7 +16,7 @@
     "demo:runtime": "node ./bin/cli.js demo-runtime-smoke",
     "hub:sync-assets": "node ./scripts/hub-sync-assets.js",
     "test:registry": "node ./tests/registry/validate-registry.test.js",
-    "test:runtime": "node ./tests/runtime/runtime-state-checkpoints.test.js && node ./tests/runtime/archive-change.test.js && node ./tests/runtime/task-orchestrator-runner.test.js && node ./tests/runtime/expert-executor.test.js && node ./tests/runtime/auto-fix-runtime.test.js && node ./tests/runtime/protocol-workflow-registry.test.js && node ./tests/runtime/protocol-update-fast-path.test.js && node ./tests/runtime/protocol-interaction-enhancements.test.js && node ./tests/runtime/demo-runtime-smoke.test.js && node ./tests/runtime/expert-delivery-template-content.test.js && node ./tests/runtime/sync.test.js",
+    "test:runtime": "node ./tests/runtime/command-template-renderer.test.js && node ./tests/runtime/runtime-bootstrap.test.js && node ./tests/runtime/runtime-launcher.test.js && node ./tests/runtime/runtime-state-checkpoints.test.js && node ./tests/runtime/archive-change.test.js && node ./tests/runtime/task-orchestrator-runner.test.js && node ./tests/runtime/expert-executor.test.js && node ./tests/runtime/auto-fix-runtime.test.js && node ./tests/runtime/protocol-workflow-registry.test.js && node ./tests/runtime/protocol-update-fast-path.test.js && node ./tests/runtime/protocol-interaction-enhancements.test.js && node ./tests/runtime/demo-runtime-smoke.test.js && node ./tests/runtime/expert-delivery-template-content.test.js && node ./tests/runtime/sync.test.js",
     "verify:install-ps1-bom": "node ./scripts/verify-install-ps1-bom.js",
     "prepack": "npm run verify:install-ps1-bom"
   },

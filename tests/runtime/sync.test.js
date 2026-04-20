@@ -335,9 +335,12 @@ async function main() {
   const cursorSpecUpdate = readTextFile(path.join(ideOverrideTarget, '.cursor', 'commands', 'spec-update.md'));
   const claudeSpecStart = readTextFile(path.join(ideOverrideTarget, '.claude', 'commands', 'spec-start.md'));
   assert.ok(cursorSpecStart.startsWith('---\n'));
+  assert.ok(cursorSpecStart.includes('$HOME/.ai-spec-auto/bin/ai-spec-auto'));
   assert.ok(cursorSpecStart.includes('protocol-step --target . --user-input'));
   assert.ok(cursorSpecUpdate.startsWith('---\n'));
+  assert.ok(cursorSpecUpdate.includes('$HOME/.ai-spec-auto/bin/ai-spec-auto'));
   assert.ok(cursorSpecUpdate.includes('protocol-update --target . --user-input'));
+  assert.ok(claudeSpecStart.includes('$HOME/.ai-spec-auto/bin/ai-spec-auto'));
   assert.ok(!claudeSpecStart.startsWith('---\n'));
 
   const superpowersTarget = createWorkspace('ai-spec-auto-sync-superpowers-');

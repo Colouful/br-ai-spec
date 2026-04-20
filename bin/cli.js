@@ -9,6 +9,18 @@ const INSTALL_COMMANDS = new Set(['init', 'update', 'check', 'uninstall', 'sync'
 
 (async () => {
   try {
+    if (env.AI_SPEC_SKIP_LAUNCHER_SYNC !== '1') {
+      try {
+        const runtimeLauncher = require('./runtime-launcher');
+        runtimeLauncher.ensureGlobalLauncher({
+          pkgRoot,
+          env,
+        });
+      } catch (_error) {
+        // launcher sync is best-effort and must not block local execution
+      }
+    }
+
     if (args.length === 0 || INSTALL_COMMANDS.has(args[0])) {
       const installWorkflow = require('./install-workflow');
       process.exit(await installWorkflow.main(args));
@@ -34,6 +46,18 @@ const INSTALL_COMMANDS = new Set(['init', 'update', 'check', 'uninstall', 'sync'
 
     if (args[0] === 'task-orchestrator-runner') {
       throw new Error('task-orchestrator-runner is an internal runtime module; call it from the AI host layer instead of ai-spec-auto CLI');
+    }
+
+    const runtimeBootstrap = require('./runtime-bootstrap');
+    const runtimeHandOff = await runtimeBootstrap.maybeHandOffToRuntime({
+      pkgRoot,
+      args,
+      env,
+      cwd: opts.cwd,
+      stdio: opts.stdio,
+    });
+    if (runtimeHandOff.handedOff) {
+      process.exit(runtimeHandOff.status);
     }
 
     if (args[0] === 'protocol-step') {

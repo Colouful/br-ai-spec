@@ -18,6 +18,7 @@ const {
   SUPERPOWERS_STATE_REL_PATH,
   upsertManagedAgentsBlock,
 } = require('./superpowers');
+const { readRenderedCommandTemplate } = require('./command-template-renderer');
 
 const SUPPORTED_IDES = ['cursor', 'claude', 'codex', 'opencode', 'trae'];
 const DEFAULT_IDES = ['cursor', 'claude'];
@@ -1017,6 +1018,31 @@ function copyFileTracked(sourceDir, targetDir, sourceRel, destRel, changes) {
   changes.updated.push(rel);
 }
 
+function copyRenderedCommandTracked(sourceDir, targetDir, sourceRel, destRel, changes) {
+  const sourcePath = path.join(sourceDir, sourceRel);
+  const destPath = path.join(targetDir, destRel);
+  const content = readRenderedCommandTemplate(sourcePath);
+  ensureDir(path.dirname(destPath));
+  const rel = targetRel(targetDir, destPath);
+
+  if (!fs.existsSync(destPath)) {
+    fs.writeFileSync(destPath, content, 'utf8');
+    changes.created.push(rel);
+    return;
+  }
+
+  const current = fs.readFileSync(destPath, 'utf8');
+  if (current === content) {
+    if (!changes.skipped.includes(rel)) {
+      changes.skipped.push(rel);
+    }
+    return;
+  }
+
+  fs.writeFileSync(destPath, content, 'utf8');
+  changes.updated.push(rel);
+}
+
 function copyFileIfMissingTracked(sourceDir, targetDir, sourceRel, destRel, changes) {
   const sourcePath = path.join(sourceDir, sourceRel);
   const destPath = path.join(targetDir, destRel);
@@ -1281,7 +1307,7 @@ function installIdeAssets(sourceDir, targetDir, ides, resolvedSkills, changes, s
     }
 
     for (const fileName of commandFiles) {
-      copyFileTracked(sourceDir, targetDir, `.agents/commands/common/${fileName}`, `.${ide}/commands/${fileName}`, changes);
+      copyRenderedCommandTracked(sourceDir, targetDir, `.agents/commands/common/${fileName}`, `.${ide}/commands/${fileName}`, changes);
     }
 
     const ideCommandsDir = path.join(sourceDir, '.agents/commands', ide);
@@ -1290,7 +1316,7 @@ function installIdeAssets(sourceDir, targetDir, ides, resolvedSkills, changes, s
       : [];
 
     for (const fileName of ideCommandFiles) {
-      copyFileTracked(sourceDir, targetDir, `.agents/commands/${ide}/${fileName}`, `.${ide}/commands/${fileName}`, changes);
+      copyRenderedCommandTracked(sourceDir, targetDir, `.agents/commands/${ide}/${fileName}`, `.${ide}/commands/${fileName}`, changes);
     }
 
     if (ide === 'cursor') {

@@ -348,11 +348,14 @@ async function main() {
   const cursorSpecUpdate = readText(path.join(cursorProtocolTarget, '.cursor', 'commands', 'spec-update.md'));
   assert.ok(cursorSpecStart.startsWith('---\n'));
   assert.ok(cursorSpecStart.includes('name: /spec-start'));
+  assert.ok(cursorSpecStart.includes('$HOME/.ai-spec-auto/bin/ai-spec-auto'));
   assert.ok(cursorSpecStart.includes('protocol-step --target . --user-input'));
   assert.ok(cursorSpecContinue.startsWith('---\n'));
+  assert.ok(cursorSpecContinue.includes('$HOME/.ai-spec-auto/bin/ai-spec-auto'));
   assert.ok(cursorSpecContinue.includes('protocol-advance --target . --json'));
   assert.ok(cursorSpecContinue.includes('protocol-update --target . --user-input'));
   assert.ok(cursorSpecUpdate.startsWith('---\n'));
+  assert.ok(cursorSpecUpdate.includes('$HOME/.ai-spec-auto/bin/ai-spec-auto'));
   assert.ok(cursorSpecUpdate.includes('protocol-update --target . --user-input'));
   assert.ok(!fs.existsSync(path.join(cursorProtocolTarget, '.claude')));
 
