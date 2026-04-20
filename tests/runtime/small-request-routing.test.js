@@ -99,17 +99,12 @@ function bootstrapQuickFixRun(targetDir, runId, rawInput, options = {}) {
 
 function bootstrapMainFlowRun(targetDir, runId, rawInput, options = {}) {
   const mode = options.mode || 'auto';
-  const reviewPolicy = options.review_policy || 'main-flow-blocking';
   const flowId = options.flow_id || 'prd-to-delivery';
-  const approvalGates = Array.isArray(options.approval_gates)
-    ? options.approval_gates
-    : ['before-implementation', 'before-guardian', 'before-archive'];
-  writeProjectFile(targetDir, '.ai-spec/internal/tmp/task-orchestrator-turn.json', JSON.stringify({
+  const payload = {
     kind: 'run-plan',
     schema_version: 1,
     run_id: runId,
     mode,
-    review_policy: reviewPolicy,
     status: 'planned',
     delivery_profile: 'standard',
     artifact_profile: 'full',
@@ -131,15 +126,24 @@ function bootstrapMainFlowRun(targetDir, runId, rawInput, options = {}) {
       required_roles: ['requirement-analyst', 'frontend-implementer', 'code-guardian'],
       activated_optional_roles: [],
       skipped_optional_roles: ['design-collaborator', 'api-contract-specialist', 'unit-test-specialist', 'verification-reviewer', 'performance-auditor'],
-      approval_gates: approvalGates,
       first_handoff: 'requirement-analyst',
       delivery_profile: 'standard',
       artifact_profile: 'full',
-      review_policy: reviewPolicy,
     },
     assumptions: ['默认沿用当前项目的页面目录、路由和主题变量约定。'],
     missing_inputs: [],
-  }, null, 2));
+  };
+
+  if (Object.prototype.hasOwnProperty.call(options, 'review_policy')) {
+    payload.review_policy = options.review_policy;
+    payload.plan.review_policy = options.review_policy;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(options, 'approval_gates')) {
+    payload.plan.approval_gates = Array.isArray(options.approval_gates) ? options.approval_gates : [];
+  }
+
+  writeProjectFile(targetDir, '.ai-spec/internal/tmp/task-orchestrator-turn.json', JSON.stringify(payload, null, 2));
 
   return runner.advanceRunner({ target: targetDir });
 }
@@ -180,6 +184,9 @@ function main() {
   assert.strictEqual(result.turn.guidance.route_decision.selected_flow, 'prd-to-delivery');
   assert.strictEqual(result.turn.guidance.route_decision.enter_openspec, true);
   assert.strictEqual(result.turn.guidance.route_decision.next_expert, 'requirement-analyst');
+  assert.strictEqual(result.turn.summary.review_policy, 'none');
+  assert.strictEqual(result.turn.guidance.routing.review_policy, 'none');
+  assert.deepStrictEqual(result.turn.guidance.approval_contract.gates, []);
 
   const openPatchTarget = createWorkspace('ai-spec-auto-open-patch-');
   writeOpenChange(openPatchTarget, 'copy-adjustment');
@@ -227,7 +234,7 @@ function main() {
   assert.strictEqual(result.turn.mode, 'confirm-gate');
   assert.strictEqual(result.turn.guidance.confirm_gate.gate, 'manual-flow-required');
   assert.strictEqual(result.turn.input.requested_mode, 'manual');
-  assert.strictEqual(result.turn.summary.review_policy, 'main-flow-blocking');
+  assert.strictEqual(result.turn.summary.review_policy, 'none');
 
   const manualFlowTarget = createWorkspace('ai-spec-auto-manual-flow-');
   result = protocolWorkflow.advanceProtocolStep({
@@ -240,7 +247,7 @@ function main() {
   assert.strictEqual(result.turn.input.requested_mode, 'manual');
   assert.strictEqual(result.turn.input.requested_flow, 'prd-to-delivery');
   assert.strictEqual(result.turn.guidance.routing.selected_flow, 'prd-to-delivery');
-  assert.strictEqual(result.turn.guidance.routing.review_policy, 'main-flow-blocking');
+  assert.strictEqual(result.turn.guidance.routing.review_policy, 'none');
 
   const suggestTarget = createWorkspace('ai-spec-auto-suggest-start-');
   result = protocolWorkflow.advanceProtocolStep({
@@ -250,7 +257,7 @@ function main() {
   });
   assert.strictEqual(result.turn.mode, 'start');
   assert.strictEqual(result.turn.input.requested_mode, 'suggest');
-  assert.strictEqual(result.turn.guidance.routing.review_policy, 'main-flow-blocking');
+  assert.strictEqual(result.turn.guidance.routing.review_policy, 'none');
 
   let report = bootstrapMainFlowRun(
     suggestTarget,
@@ -262,8 +269,8 @@ function main() {
   let currentRun = readCurrentRun(suggestTarget);
   assert.strictEqual(currentRun.mode, 'suggest');
   assert.strictEqual(currentRun.status, 'waiting-confirm');
-  assert.strictEqual(currentRun.review_policy, 'main-flow-blocking');
-  assert.deepStrictEqual(currentRun.plan.approval_gates, ['before-implementation', 'before-guardian', 'before-archive']);
+  assert.strictEqual(currentRun.review_policy, 'none');
+  assert.deepStrictEqual(currentRun.plan.approval_gates, []);
 
   let workflow = protocolWorkflow.advanceProtocolStep({ target: suggestTarget });
   assert.strictEqual(workflow.turn.mode, 'confirm-gate');
@@ -271,10 +278,24 @@ function main() {
   assert.strictEqual(workflow.turn.guidance.confirm_gate.resume_to_role, 'requirement-analyst');
   assert.strictEqual(workflow.turn.summary.run_status, 'waiting-confirm');
 
+  const blockingPolicyTarget = createWorkspace('ai-spec-auto-blocking-review-');
+  report = bootstrapMainFlowRun(
+    blockingPolicyTarget,
+    'run_20260415_100001_blocking',
+    '新增一个订单详情路由，接真实接口并补一个全局状态 store',
+    {
+      review_policy: 'main-flow-blocking',
+    },
+  );
+  assert.strictEqual(report.applied.adapter_action, 'bootstrap');
+  currentRun = readCurrentRun(blockingPolicyTarget);
+  assert.strictEqual(currentRun.review_policy, 'main-flow-blocking');
+  assert.deepStrictEqual(currentRun.plan.approval_gates, ['before-implementation', 'before-guardian', 'before-archive']);
+
   const noReviewPolicyTarget = createWorkspace('ai-spec-auto-none-review-');
   report = bootstrapMainFlowRun(
     noReviewPolicyTarget,
-    'run_20260415_100001_noreview',
+    'run_20260415_100002_noreview',
     '新增一个订单详情路由，接真实接口并补一个全局状态 store',
     {
       review_policy: 'none',

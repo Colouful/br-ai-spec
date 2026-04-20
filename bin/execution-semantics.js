@@ -8,7 +8,7 @@ const {
 } = require('./runtime-registry');
 
 const AUTO_ADVANCE_EXECUTION_STATUSES = new Set(['done', 'success', 'completed']);
-const DEFAULT_REVIEW_POLICY = 'main-flow-blocking';
+const DEFAULT_REVIEW_POLICY = 'none';
 
 const FLOW_RUNTIME_TRANSITIONS = {
   'prd-to-delivery': {
@@ -588,6 +588,22 @@ function buildAutoRuntimeAction(targetDir, executionPayload) {
       message: 'frontend delivery is waiting for manual review before code-guardian',
       source: 'expert-executor-auto-transition',
       verification: executionPayload.verification || null,
+    };
+  }
+
+  if (transition.action === 'gate-blocked' && roleId === 'code-guardian' && !mainFlowBlocking) {
+    return {
+      schema_version: 1,
+      kind: 'task-orchestrator-runtime-action',
+      action: 'handoff',
+      run_id: executionPayload.run_id,
+      from_role: roleId,
+      to_role: transition.next_role || 'archive-change',
+      next_role: null,
+      status: 'running',
+      clear_pending_gate: true,
+      message: 'handoff to archive-change after code-guardian closeout',
+      source: 'expert-executor-auto-transition',
     };
   }
 

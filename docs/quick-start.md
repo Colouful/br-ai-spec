@@ -73,6 +73,8 @@ npx @ex/ai-spec-auto@latest init .
 | `/spec-stop` | 暂停当前 run |
 | `/spec-status` | 查看当前阶段、门禁和下一步 |
 
+默认情况下，`/spec-start` 会以 `auto（自动） + none（无阻塞审核）` 启动；如果需要保留人工审核，再显式切换到 `main-flow-blocking（主流程阻塞审核）`。
+
 如果你走 OpenSpec 提案流：
 
 - Cursor：`/opsx-propose`、`/opsx-apply`、`/opsx-archive`、`/opsx-explore`

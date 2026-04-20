@@ -21,9 +21,7 @@ optional_roles:
   - unit-test-specialist
   - verification-reviewer
   - performance-auditor
-approval_gates:
-  - before-implementation
-  - before-archive
+approval_gates: []
 artifacts:
   - openspec/changes/<change-id>/proposal.md
   - openspec/changes/<change-id>/specs/
@@ -99,23 +97,21 @@ domains:
 
 ## 审批点
 
-本模板的基础审批点定义为两个：
+本模板默认不内建阻塞审批点，主流程会自动推进。
+
+当运行时显式启用 `review_policy = main-flow-blocking（主流程阻塞审核）` 时，才会按顺序注入以下审批点：
 
 1. `before-implementation`
 说明：
 需求边界、关键假设或方案取舍未确认时，不能直接进入实现。
 
-2. `before-archive`
-说明：
-存在阻断项、验证结论不清晰或残留风险较高时，不能直接判定交付完成。
-
-运行时如果启用了 `review_policy = main-flow-blocking（主流程阻塞审核）`，还会在 `frontend-implementer（前端实现专家）` 完成后，额外注入：
-
-3. `before-guardian`
+2. `before-guardian`
 说明：
 实现结果需要先经过人工确认，再进入 `code-guardian（规范守护专家）` 守护审查。
 
-这也是为什么当前内测默认链路看起来是“三段门禁”，而不是只保留模板 frontmatter（前置信息）里的两段门禁。
+3. `before-archive`
+说明：
+存在阻断项、验证结论不清晰或残留风险较高时，不能直接判定交付完成。
 
 ## 主要产物
 
@@ -183,6 +179,6 @@ domains:
 
 约束：
 
-- 保持完整门禁
+- 默认自动推进；需要人工审核时显式切换到 `main-flow-blocking（主流程阻塞审核）`
 - 使用完整 OpenSpec 产物
 - 允许更完整的设计、任务和审查说明

@@ -279,12 +279,13 @@ activated_optional_roles:
   - api-contract-specialist
 skipped_optional_roles:
   - unit-test-specialist
-approval_gates:
-  - before-implementation
+approval_gates: []
 missing_inputs:
   - API 字段说明未确认
 first_handoff: requirement-analyst
 ```
+
+若当前显式启用 `review_policy = main-flow-blocking（主流程阻塞审核）`，再把需要的 `approval_gates（审批点）` 写进去。
 
 ## 当前阶段建议
 

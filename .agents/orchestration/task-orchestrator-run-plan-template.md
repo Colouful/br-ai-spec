@@ -111,10 +111,10 @@ description: 定义 task-orchestrator 在首次识别任务时必须输出的最
     "required_roles": ["frontend-implementer", "code-guardian"],
     "activated_optional_roles": ["requirement-analyst"],
     "first_handoff": "requirement-analyst",
-    "approval_gates": ["before-implementation", "before-guardian", "before-archive"],
+    "approval_gates": [],
     "delivery_profile": "micro",
     "artifact_profile": "compact",
-    "review_policy": "main-flow-blocking"
+    "review_policy": "none"
   },
   "assumptions": [
     "默认沿用项目现有组件目录与命名规范",
@@ -147,9 +147,11 @@ description: 定义 task-orchestrator 在首次识别任务时必须输出的最
 - 把推断结果写入 `assumptions（默认假设）`
 - 在不引入明显高风险的前提下继续交给下一跳专家
 
-默认内测配置下，`auto（自动）` 通常会搭配 `review_policy = main-flow-blocking（主流程阻塞审核）`。
+默认配置下，`auto（自动）` 应优先搭配 `review_policy = none（无阻塞审核）`。
 
-此时 `prd-to-delivery（需求到交付流程）` 需要保留：
+此时 `prd-to-delivery（需求到交付流程）` 默认不保留阻塞审批点，会自动推进。
+
+若用户明确要求人工审核，再切换到 `review_policy = main-flow-blocking（主流程阻塞审核）`，并保留：
 
 - `before-implementation（实现前门禁）`
 - `before-guardian（守护前门禁）`

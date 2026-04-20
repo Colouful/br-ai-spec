@@ -9,6 +9,7 @@
     "kind": "run-plan",
     "run_id": "run_20260331_160700_smoke",
     "status": "planned",
+    "review_policy": "main-flow-blocking",
     "task": {
       "type": "component-development",
       "raw_input": "创建一个商品组件",

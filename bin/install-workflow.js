@@ -1130,7 +1130,7 @@ async function selectBootstrapChoices(options) {
     console.log('');
     info('是否启用 Superpowers 平台增强？');
     console.log('  启用后会生成项目级 superpowers bridge（超能力桥接）配置，并按 IDE 入口注入增强资产。');
-    options.superpowers = (await confirm('启用 superpowers?', false)) ? 'yes' : 'no';
+    options.superpowers = (await confirm('启用 superpowers?', true)) ? 'yes' : 'no';
     ok(options.superpowers === 'yes' ? '将启用 superpowers 平台增强' : '跳过 superpowers 平台增强');
   }
 
@@ -2530,6 +2530,7 @@ module.exports = {
     selectFromList,
     selectCustomRuleList,
     selectMultipleFromList,
+    selectBootstrapChoices,
   },
 };
 

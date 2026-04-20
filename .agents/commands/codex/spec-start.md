@@ -9,13 +9,13 @@
 先执行：
 
 ```bash
-./node_modules/.bin/ai-spec-auto protocol-step --target . --user-input "<本次 /spec-start 的用户原始需求>" --mode auto --review-policy main-flow-blocking --json
+./node_modules/.bin/ai-spec-auto protocol-step --target . --user-input "<本次 /spec-start 的用户原始需求>" --mode auto --review-policy none --json
 ```
 
 若用户明确要求先看建议计划，再改用：
 
 ```bash
-./node_modules/.bin/ai-spec-auto protocol-step --target . --user-input "<本次 /spec-start 的用户原始需求>" --mode suggest --review-policy main-flow-blocking --json
+./node_modules/.bin/ai-spec-auto protocol-step --target . --user-input "<本次 /spec-start 的用户原始需求>" --mode suggest --review-policy none --json
 ```
 
 若用户明确要求手动锁定流程模板，再改用：

@@ -174,6 +174,7 @@ function createBootstrapPayload(runId, userInput, changeId) {
       kind: 'run-plan',
       run_id: runId,
       status: 'planned',
+      review_policy: 'main-flow-blocking',
       task: {
         type: 'page-development',
         raw_input: userInput,
@@ -204,6 +205,7 @@ function createBootstrapPayload(runId, userInput, changeId) {
         skipped_optional_roles: [],
         first_handoff: 'requirement-analyst',
         approval_gates: ['before-implementation', 'before-archive'],
+        review_policy: 'main-flow-blocking',
       },
       missing_inputs: [
         '组件目录位置未明确，采用最小 mock 页面默认结构',
@@ -568,6 +570,7 @@ function runDemoRuntimeSmoke(options = {}) {
   const start = protocolWorkflow.advanceProtocolStep({
     target: targetDir,
     userInput,
+    reviewPolicy: 'main-flow-blocking',
   });
 
   writeBootstrapTurn(targetDir, createBootstrapPayload(runId, userInput, changeId));

@@ -524,7 +524,41 @@ function main() {
     payload: path.join(fixturesDir, 'current-execution-requirement-analyst.json'),
     advanceRuntime: true,
   });
+  assert.strictEqual(result.runtime_transition.payload.action, 'handoff');
+  assert.strictEqual(result.runtime_transition.payload.to_role, 'frontend-implementer');
+  assert.ok(!Object.prototype.hasOwnProperty.call(result.runtime_transition.payload, 'pending_gate'));
   assert.strictEqual(result.runtime_transition.payload.message, 'registry override handoff message');
+
+  const autoArchiveTarget = createWorkspace();
+  bootstrapRun(autoArchiveTarget);
+  const autoArchiveRun = readCurrentRun(autoArchiveTarget);
+  autoArchiveRun.review_policy = 'none';
+  if (autoArchiveRun.plan && typeof autoArchiveRun.plan === 'object') {
+    autoArchiveRun.plan.review_policy = 'none';
+    autoArchiveRun.plan.approval_gates = [];
+  }
+  autoArchiveRun.current_role = 'code-guardian';
+  autoArchiveRun.status = 'running';
+  autoArchiveRun.pending_gate = null;
+  autoArchiveRun.gate_context = null;
+  writeJsonFile(autoArchiveTarget, '.ai-spec/current-run.json', autoArchiveRun);
+  expertDispatch.applyDispatch({
+    target: autoArchiveTarget,
+    payload: path.join(fixturesDir, 'current-dispatch-code-guardian.json'),
+  });
+  writeRequirementArtifacts(autoArchiveTarget);
+  writeProjectFile(autoArchiveTarget, 'openspec/changes/runtime-smoke-demo/checklist.md', '# checklist');
+  writeProjectFile(autoArchiveTarget, 'openspec/changes/runtime-smoke-demo/iterations.md', '# iterations');
+  result = expertExecutor.applyExecution({
+    target: autoArchiveTarget,
+    payload: path.join(fixturesDir, 'current-execution-code-guardian.json'),
+    advanceRuntime: true,
+  });
+  assert.strictEqual(result.runtime_transition.payload.action, 'handoff');
+  assert.strictEqual(result.runtime_transition.payload.to_role, 'archive-change');
+  currentRun = readCurrentRun(autoArchiveTarget);
+  assert.strictEqual(currentRun.current_role, 'archive-change');
+  assert.strictEqual(currentRun.pending_gate, null);
 
   console.log('expert-executor test passed: execution semantics advance runtime-state with specs and archive confirmation linkage');
 }

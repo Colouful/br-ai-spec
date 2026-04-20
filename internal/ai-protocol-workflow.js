@@ -173,19 +173,19 @@ const FALLBACK_ROLE_OPENSPEC_RULE_SECTIONS = {
 const DEFAULT_FLOW_ID = 'prd-to-delivery';
 const QUICK_FIX_FLOW_ID = 'bugfix-to-verification';
 const DEFAULT_RUN_MODE = 'auto';
-const DEFAULT_REVIEW_POLICY = 'main-flow-blocking';
+const DEFAULT_REVIEW_POLICY = 'none';
 const RUN_MODES = new Set(['auto', 'suggest', 'manual']);
 const REVIEW_POLICIES = new Set(['none', 'main-flow-blocking']);
 const DEFAULT_FLOW_CONSTRAINTS = {
   required_roles: ['requirement-analyst', 'frontend-implementer', 'code-guardian'],
-  approval_gates: ['before-implementation', 'before-archive'],
+  approval_gates: [],
   required_artifacts: ['proposal.md', 'specs', 'design.md', 'tasks.md', 'checklist.md', 'iterations.md'],
 };
 
 const DEFAULT_HANDOFF_GATE_POLICY = {
   'requirement-analyst->frontend-implementer': 'silent',
   'frontend-implementer->code-guardian': 'silent',
-  'code-guardian->archive-change': 'approval',
+  'code-guardian->archive-change': 'silent',
 };
 
 function normalizeRunMode(value) {
@@ -4171,7 +4171,7 @@ function buildStartTurn(targetDir, userInput, options = {}) {
           ? '当前启用 main-flow-blocking 审核策略：主流程 requirement / frontend / guardian 完成后都需人工审核。'
           : deliveryProfile === 'micro'
             ? '当前需求更适合微型交付档位：保留三专家，但产物使用短版 compact 规格。'
-            : '当前需求更适合标准交付档位：保留完整门禁与完整 OpenSpec 产物。',
+            : '当前需求更适合标准交付档位：保留完整 OpenSpec 产物，默认自动推进；如需人工审核，可显式切换到 main-flow-blocking。',
       },
       orchestrator_contract: {
         kind: 'run-plan',

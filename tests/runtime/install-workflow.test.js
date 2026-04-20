@@ -7,7 +7,7 @@ const { spawnSync } = require('child_process');
 const { __test__ } = require('../../bin/install-workflow');
 
 const repoRoot = path.join(__dirname, '..', '..');
-const { selectCustomRuleList, selectFromList } = __test__;
+const { selectCustomRuleList, selectFromList, selectBootstrapChoices } = __test__;
 
 function createWorkspace(prefix) {
   return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -280,9 +280,34 @@ async function verifyInteractiveSingleSelectionEnterConfirmsDefault() {
   assert.strictEqual(selected, 'standard');
 }
 
+async function verifyInteractiveSuperpowersDefaultsToEnabled() {
+  const options = {
+    uipro: 'no',
+    superpowers: 'ask',
+    installLint: 'no',
+    installHusky: 'no',
+  };
+
+  await withMockTTY(async ({ input, getOutput }) => {
+    const selection = selectBootstrapChoices(options);
+
+    setImmediate(() => {
+      input.write('\r');
+    });
+
+    await selection;
+
+    const output = getOutput();
+    assert.ok(output.includes('启用 superpowers? (Y/n) [默认 Y]'));
+  });
+
+  assert.strictEqual(options.superpowers, 'yes');
+}
+
 async function main() {
   await verifyInteractiveSingleSelectionUsesArrowSpaceEnter();
   await verifyInteractiveSingleSelectionEnterConfirmsDefault();
+  await verifyInteractiveSuperpowersDefaultsToEnabled();
   await verifyInteractiveCustomRuleSelectionUsesSpaceToggle();
   await verifyInteractiveEmptySelectionFallsBackToStandard();
 

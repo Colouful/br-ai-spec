@@ -15,16 +15,16 @@
       "required_roles": ["requirement-analyst", "frontend-implementer", "code-guardian"],
       "optional_roles": ["design-collaborator", "api-contract-specialist", "unit-test-specialist", "verification-reviewer", "performance-auditor"],
       "first_handoff": "requirement-analyst",
-      "approval_gates": ["before-implementation", "before-archive"],
+      "approval_gates": [],
       "handoff_gate_policy": {
         "requirement-analyst->frontend-implementer": "silent",
         "frontend-implementer->code-guardian": "silent",
-        "code-guardian->archive-change": "approval"
+        "code-guardian->archive-change": "silent"
       },
       "core_artifacts": ["proposal", "specs", "design", "tasks", "checklist", "iterations"],
       "required_artifacts": ["proposal.md", "specs", "design.md", "tasks.md", "checklist.md", "iterations.md"],
-      "handoff_policy": "task-orchestrator -> requirement-analyst -> frontend-implementer -> code-guardian -> before-archive -> archive-change(可选) -> terminal",
-      "completion_policy": "proposal.md、specs/、design.md、tasks.md、checklist.md、iterations.md 缺一不可；若用户同意归档，再执行 archive-change"
+      "handoff_policy": "task-orchestrator -> requirement-analyst -> frontend-implementer -> code-guardian -> archive-change(可选) -> terminal",
+      "completion_policy": "proposal.md、specs/、design.md、tasks.md、checklist.md、iterations.md 缺一不可；默认自动进入 archive-change，如需人工审核可切换到 main-flow-blocking"
     },
     "bugfix-to-verification": {
       "name": "缺陷修复到验证",

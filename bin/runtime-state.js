@@ -199,7 +199,7 @@ function parseArgs(argv) {
 }
 
 const DEFAULT_RUN_MODE = 'auto';
-const DEFAULT_REVIEW_POLICY = 'main-flow-blocking';
+const DEFAULT_REVIEW_POLICY = 'none';
 const RUN_MODES = new Set(['auto', 'suggest', 'manual']);
 const REVIEW_POLICIES = new Set(['none', 'main-flow-blocking']);
 
