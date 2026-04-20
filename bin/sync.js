@@ -18,6 +18,13 @@ const {
   SUPERPOWERS_STATE_REL_PATH,
   upsertManagedAgentsBlock,
 } = require('./superpowers');
+const {
+  normalizeVisualBridgeManifest,
+  buildVisualBridgeState,
+  writeVisualBridgeState,
+  readVisualBridgeState,
+  VISUAL_BRIDGE_STATE_REL_PATH,
+} = require('./visual-bridge-config');
 const { readRenderedCommandTemplate } = require('./command-template-renderer');
 
 const SUPPORTED_IDES = ['cursor', 'claude', 'codex', 'opencode', 'trae'];
@@ -489,6 +496,10 @@ function normalizeManifest(rawManifest, existingManifest, options, profilesRegis
       : { ...(rawManifest?.superpowers || existingManifest?.superpowers || {}), enabled: options.superpowers },
     existingManifest?.superpowers,
   );
+  const normalizedVisualBridge = normalizeVisualBridgeManifest(
+    rawManifest?.visual_bridge,
+    existingManifest?.visual_bridge,
+  );
   const manifest = {
     schema_version: Number(rawManifest?.schema_version || existingManifest?.schema_version || 1),
     manifest_type: rawManifest?.manifest_type || existingManifest?.manifest_type || 'hub-install',
@@ -509,6 +520,9 @@ function normalizeManifest(rawManifest, existingManifest, options, profilesRegis
   };
   if (normalizedSuperpowers) {
     manifest.superpowers = normalizedSuperpowers;
+  }
+  if (normalizedVisualBridge) {
+    manifest.visual_bridge = normalizedVisualBridge;
   }
   const localPreferences = rawLocalPreferences !== null ? rawLocalPreferences : existingLocalPreferences;
   if (localPreferences) {
@@ -1098,6 +1112,9 @@ function isManagedPruneAsset(asset) {
   if (rel === SUPERPOWERS_STATE_REL_PATH) {
     return true;
   }
+  if (rel === VISUAL_BRIDGE_STATE_REL_PATH) {
+    return true;
+  }
   if (/^\.(claude|cursor|codex|opencode|trae)\/rules$/.test(rel)) {
     return true;
   }
@@ -1383,6 +1400,17 @@ function buildLock(manifest, targetDir, manifestSource, resolved, cliVersion) {
             codex_entry: manifest.superpowers.codex_entry,
           }
         : null,
+      visual_bridge: manifest.visual_bridge
+        ? {
+            enabled: manifest.visual_bridge.enabled,
+            server_url: manifest.visual_bridge.server_url,
+            workspace_id: manifest.visual_bridge.workspace_id,
+            agent_id: manifest.visual_bridge.agent_id,
+            push_on_runtime_state: manifest.visual_bridge.push_on_runtime_state,
+            push_on_sync: manifest.visual_bridge.push_on_sync,
+            fail_open: manifest.visual_bridge.fail_open,
+          }
+        : null,
     },
     installer: {
       command: 'ai-spec-auto sync',
@@ -1414,6 +1442,15 @@ function buildSources(manifest, manifestSource, resolved, sourceDir) {
     source_ref: `local://${SUPERPOWERS_STATE_REL_PATH}`,
     local_path: SUPERPOWERS_STATE_REL_PATH,
   });
+  if (manifest.visual_bridge) {
+    assets.push({
+      kind: 'visual-bridge-config',
+      id: 'project-visual-bridge',
+      source_type: 'local',
+      source_ref: `local://${VISUAL_BRIDGE_STATE_REL_PATH}`,
+      local_path: VISUAL_BRIDGE_STATE_REL_PATH,
+    });
+  }
 
   for (const role of resolved.roles) {
     assets.push({
@@ -1790,6 +1827,16 @@ async function runSync(options, preparedState = null) {
       source: 'sync',
     });
     writeSuperpowersState(prepared.targetDir, superpowersState);
+    const visualBridgeState = buildVisualBridgeState({
+      targetDir: prepared.targetDir,
+      manifestConfig: prepared.manifest.visual_bridge || null,
+      previousState: readVisualBridgeState(prepared.targetDir),
+      cliVersion: prepared.cliVersion,
+      source: 'sync',
+    });
+    if (visualBridgeState) {
+      writeVisualBridgeState(prepared.targetDir, visualBridgeState);
+    }
     const lock = buildLock(prepared.manifest, prepared.targetDir, prepared.manifestSource, prepared.resolvedResult.resolved, prepared.cliVersion);
     writeJsonTracked(prepared.targetDir, lockOutPath, lock, changes);
     const sources = buildSources(prepared.manifest, prepared.manifestSource, prepared.resolvedResult.resolved, prepared.sourceDir);

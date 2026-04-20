@@ -36,6 +36,8 @@ function main() {
   assert.ok(fs.existsSync(launcherPaths.launcherBootstrapFile));
   const embeddedEntry = path.join(homeDir, '.ai-spec-auto', 'runtime', 'embedded', 'bin', process.platform === 'win32' ? 'ai-spec-auto.cmd' : 'ai-spec-auto');
   assert.ok(fs.existsSync(embeddedEntry));
+  assert.ok(fs.existsSync(path.join(homeDir, '.ai-spec-auto', 'runtime', 'embedded', 'package', 'bin', 'visual-bridge.js')));
+  assert.ok(fs.existsSync(path.join(homeDir, '.ai-spec-auto', 'runtime', 'embedded', 'package', 'bin', 'visual-bridge-config.js')));
 
   const bootstrapConfig = runtimeBootstrap.__test__.readBootstrapConfig(env);
   assert.strictEqual(bootstrapConfig.install_spec, repoRoot);
@@ -73,6 +75,21 @@ function main() {
   });
   assert.strictEqual(fallbackResult.status, 0, fallbackResult.stderr);
   assert.strictEqual(fs.readFileSync(markerPath, 'utf8').trim(), 'protocol-step --json');
+
+  writeExecutable(entryPath, `#!/bin/sh\nprintf '%s\\n' "$*" > "${markerPath}"\nexit 0\n`);
+  runtimeBootstrap.__test__.writeRuntimeState(env, {
+    active_release: releaseId,
+    last_checked_at: '2026-04-20T11:30:00.000Z',
+    last_successful_refresh_at: '2026-04-20T11:30:00.000Z',
+    last_error: '',
+  });
+  const visualBridgeResult = spawnSync('node', [launcherPaths.launcherFile, 'visual-bridge', 'push-current', '--json'], {
+    cwd: repoRoot,
+    env,
+    encoding: 'utf8',
+  });
+  assert.strictEqual(visualBridgeResult.status, 0, visualBridgeResult.stderr);
+  assert.strictEqual(fs.readFileSync(markerPath, 'utf8').trim(), 'visual-bridge push-current --json');
 
   console.log('runtime launcher test passed: global launcher files and runtime forwarding all work');
 }

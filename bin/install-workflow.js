@@ -19,6 +19,13 @@ const {
   shouldExposeSkillToIde,
   upsertManagedAgentsBlock,
 } = require('./superpowers');
+const {
+  VISUAL_BRIDGE_STATE_REL_PATH,
+  normalizeVisualBridgeManifest,
+  buildVisualBridgeState,
+  writeVisualBridgeState,
+  readVisualBridgeState,
+} = require('./visual-bridge-config');
 const { readRenderedCommandTemplate } = require('./command-template-renderer');
 
 const PKG_ROOT = path.join(__dirname, '..');
@@ -160,6 +167,7 @@ function parseArgs(argv) {
     installHusky: 'ask',
     uipro: 'ask',
     superpowers: 'ask',
+    visualBridge: 'ask',
     updateSkills: 'yes',
     updateRules: 'yes',
     updateConfigs: 'yes',
@@ -177,6 +185,7 @@ function parseArgs(argv) {
     hubFetch: true,
     refreshSuperpowers: false,
     superpowersExplicit: false,
+    visualBridgeExplicit: false,
   };
 
   while (args.length > 0) {
@@ -252,6 +261,14 @@ function parseArgs(argv) {
         break;
       case '--refresh-superpowers':
         options.refreshSuperpowers = true;
+        break;
+      case '--visual-bridge':
+        options.visualBridge = 'yes';
+        options.visualBridgeExplicit = true;
+        break;
+      case '--no-visual-bridge':
+        options.visualBridge = 'no';
+        options.visualBridgeExplicit = true;
         break;
       case '--update-rules':
         options.updateRules = 'yes';
@@ -443,6 +460,15 @@ function readInstalledManifestSuperpowers(targetDir) {
   }
   const manifest = readJson(manifestPath, 'existing manifest');
   return normalizeSuperpowersManifest(manifest?.superpowers, null);
+}
+
+function readInstalledManifestVisualBridge(targetDir) {
+  const manifestPath = path.join(targetDir, '.ai-spec', 'manifest.json');
+  if (!fs.existsSync(manifestPath)) {
+    return null;
+  }
+  const manifest = readJson(manifestPath, 'existing manifest');
+  return normalizeVisualBridgeManifest(manifest?.visual_bridge, null);
 }
 
 function createDirLink(targetAbsolute, linkPath) {
@@ -668,6 +694,7 @@ function removeManagedPaths(targetDir, relPaths) {
 const AI_SPEC_MANAGED_RUNTIME_PATHS = [
   '.ai-spec/current-run.json',
   '.ai-spec/repo-map.json',
+  '.ai-spec/visual-bridge.json',
   '.ai-spec/checkpoints',
   '.ai-spec/internal',
   '.ai-spec/tmp',
@@ -1125,6 +1152,14 @@ async function selectBootstrapChoices(options) {
     console.log('  提供 67 种 UI 风格、161 套配色方案、57 组字体搭配、99 条 UX 准则');
     options.uipro = (await confirm('安装 UI UX Pro Max?', true)) ? 'yes' : 'no';
     ok(options.uipro === 'yes' ? '将安装 UI UX Pro Max' : '跳过 UI UX Pro Max');
+  }
+
+  if (options.visualBridge === 'ask') {
+    console.log('');
+    info('是否启用 Visual 平台桥接？');
+    console.log('  启用后会在 .ai-spec/visual-bridge.json 落可视化桥接配置，但默认不影响现有协议执行链。');
+    options.visualBridge = (await confirm('启用 visual bridge?', false)) ? 'yes' : 'no';
+    ok(options.visualBridge === 'yes' ? '将启用 visual 平台桥接配置' : '跳过 visual 平台桥接配置');
   }
 
   if (options.superpowers === 'ask') {
@@ -1664,6 +1699,21 @@ function resolveSuperpowersEnabled(targetDir, options, manifestConfig = null) {
   return Boolean(existingState?.enabled);
 }
 
+function resolveVisualBridgeEnabled(targetDir, options, manifestConfig = null) {
+  if (options.visualBridge === 'yes') {
+    return true;
+  }
+  if (options.visualBridge === 'no') {
+    return false;
+  }
+  const normalizedManifest = normalizeVisualBridgeManifest(manifestConfig, readInstalledManifestVisualBridge(targetDir));
+  if (normalizedManifest) {
+    return Boolean(normalizedManifest.enabled);
+  }
+  const existingState = readVisualBridgeState(targetDir);
+  return Boolean(existingState?.enabled);
+}
+
 function applySuperpowersBridge(targetDir, options, source = 'init', manifestConfig = null) {
   const enabled = resolveSuperpowersEnabled(targetDir, options, manifestConfig);
   const state = buildSuperpowersState({
@@ -1678,6 +1728,25 @@ function applySuperpowersBridge(targetDir, options, source = 'init', manifestCon
   });
   writeSuperpowersState(targetDir, state);
   upsertManagedAgentsBlock(targetDir, enabled && normalizeIdeFilter(options.ideFilter).includes('codex'));
+  return state;
+}
+
+function applyVisualBridge(targetDir, options, source = 'init', manifestConfig = null) {
+  const normalizedManifest = normalizeVisualBridgeManifest(manifestConfig, null) || {};
+  const enabled = resolveVisualBridgeEnabled(targetDir, options, normalizedManifest);
+  const state = buildVisualBridgeState({
+    targetDir,
+    manifestConfig: {
+      ...normalizedManifest,
+      enabled,
+    },
+    cliVersion: VERSION,
+    source,
+    previousState: readVisualBridgeState(targetDir),
+  });
+  if (state) {
+    writeVisualBridgeState(targetDir, state);
+  }
   return state;
 }
 
@@ -2014,6 +2083,13 @@ async function handleInitWithManifest(options, sourceDir, profilesRegistry, targ
     ...(options.profileExplicit ? { profile: options.profile } : {}),
     ...(options.ideExplicit ? { ide: options.ideFilter } : {}),
     ...(options.superpowersExplicit ? { superpowers: options.superpowers === 'yes' } : {}),
+    ...(options.visualBridgeExplicit
+      ? {
+          visualBridge: {
+            enabled: options.visualBridge === 'yes',
+          },
+        }
+      : {}),
     ...(options.hubOrigin ? { hubOrigin: options.hubOrigin } : {}),
   };
   info('预解析 manifest 与 registry ...');
@@ -2041,6 +2117,7 @@ async function handleInitWithManifest(options, sourceDir, profilesRegistry, targ
   options.profile = prepared.manifest.profile;
   options.ideFilter = prepared.manifest.ides.join(',');
   options.superpowers = prepared.manifest.superpowers?.enabled ? 'yes' : 'no';
+  options.visualBridge = prepared.manifest.visual_bridge?.enabled ? 'yes' : 'no';
   options.installMode = 'init-with-manifest';
   options.manifestSource = prepared.manifestSource;
   options.profileSource = options.profileExplicit && manifestProfile
@@ -2065,6 +2142,12 @@ async function handleInitWithManifest(options, sourceDir, profilesRegistry, targ
     prepared.manifest.superpowers = normalizeSuperpowersManifest({
       ...(prepared.manifest.superpowers || {}),
       enabled: options.superpowers === 'yes',
+    }, null);
+  }
+  if (options.visualBridgeExplicit) {
+    prepared.manifest.visual_bridge = normalizeVisualBridgeManifest({
+      ...(prepared.manifest.visual_bridge || {}),
+      enabled: options.visualBridge === 'yes',
     }, null);
   }
 
@@ -2105,6 +2188,7 @@ async function handleInitWithManifest(options, sourceDir, profilesRegistry, targ
   }
   setupOpenSpec(targetDir, sourceDir, options, pkgManager, pending);
   applySuperpowersBridge(targetDir, options, 'init-with-manifest', prepared.manifest.superpowers || null);
+  applyVisualBridge(targetDir, options, 'init-with-manifest', prepared.manifest.visual_bridge || null);
   writeInstallState(targetDir, sourceDir, previousInstallState, installStateAdditions);
   printTools(options.level, options.uipro);
   printInstallReport(targetDir, options, pending);
@@ -2191,6 +2275,11 @@ async function handleInit(options) {
   if (options.superpowers === 'yes') {
     applySuperpowersBridge(targetDir, options, 'init', null);
   }
+  if (options.visualBridge === 'yes') {
+    applyVisualBridge(targetDir, options, 'init', {
+      enabled: true,
+    });
+  }
   writeInstallState(targetDir, sourceDir, previousInstallState, installStateAdditions);
   printTools(options.level, options.uipro);
   printInstallReport(targetDir, options, pending);
@@ -2260,6 +2349,7 @@ async function handleUpdate(options) {
   console.log(`  OpenSpec: ${options.level === 'L3' && options.updateOpenSpec === 'yes' ? '更新' : '跳过'}`);
   console.log(`  UIPro:    ${options.updateUipro === 'yes' ? '重新安装' : '跳过'}`);
   console.log(`  Superpowers: ${options.refreshSuperpowers || options.superpowersExplicit ? '刷新/更新' : '保持当前状态'}`);
+  console.log(`  VisualBridge: ${options.visualBridgeExplicit || readVisualBridgeState(targetDir) ? '刷新/更新' : '保持当前状态'}`);
   console.log('');
 
   const pending = { failures: [], configs: [] };
@@ -2300,6 +2390,9 @@ async function handleUpdate(options) {
   }
   if (options.refreshSuperpowers || options.superpowersExplicit || readSuperpowersState(targetDir)) {
     applySuperpowersBridge(targetDir, options, 'update', null);
+  }
+  if (options.visualBridgeExplicit || readVisualBridgeState(targetDir)) {
+    applyVisualBridge(targetDir, options, 'update', readInstalledManifestVisualBridge(targetDir));
   }
   writeInstallState(targetDir, sourceDir, previousInstallState, installStateAdditions);
   ok(`更新完成 (profile: ${options.profile}, compatibility level: ${options.level})`);
@@ -2478,6 +2571,7 @@ function printUsage() {
   console.log('  --workspace-root           Monorepo 下显式在根目录安装');
   console.log('  --uipro / --no-uipro       安装或跳过 UI UX Pro Max');
   console.log('  --superpowers / --no-superpowers  启用或关闭 superpowers 平台增强');
+  console.log('  --visual-bridge / --no-visual-bridge  启用或关闭 visual 平台桥接配置');
   console.log('  --refresh-superpowers      update 时仅刷新 superpowers 绑定状态');
   console.log('  --lint / --no-lint         安装或跳过 lint/format');
   console.log('  --husky / --no-husky       安装或跳过提交校验');

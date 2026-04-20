@@ -580,6 +580,27 @@ exit 1
   assert.strictEqual(refreshedSuperpowersState.host.capabilities.claude, true);
   assert.strictEqual(refreshedSuperpowersState.host.capabilities.codex, true);
 
+  const visualBridgeTarget = createWorkspace('ai-spec-visual-bridge-init-');
+  writeJson(path.join(visualBridgeTarget, 'package.json'), {
+    name: 'visual-bridge-init-smoke',
+    version: '1.0.0',
+  });
+  const visualBridgeFakeBin = createFakePackageManagerBin(visualBridgeTarget);
+  result = runCli(
+    ['init', visualBridgeTarget, '--profile', 'vue', '--level', 'L2', '--ide', 'cursor', '--visual-bridge', '--no-lint', '--no-husky', '--no-uipro'],
+    {
+      PATH: `${visualBridgeFakeBin}:${process.env.PATH || ''}`,
+    },
+  );
+  assert.strictEqual(result.status, 0, result.stderr);
+  const visualBridgeStatePath = path.join(visualBridgeTarget, '.ai-spec', 'visual-bridge.json');
+  assert.ok(fs.existsSync(visualBridgeStatePath));
+  const visualBridgeState = JSON.parse(fs.readFileSync(visualBridgeStatePath, 'utf8'));
+  assert.strictEqual(visualBridgeState.enabled, true);
+  assert.strictEqual(visualBridgeState.agent_id, 'ai-spec-auto');
+  assert.strictEqual(visualBridgeState.push_on_runtime_state, true);
+  assert.strictEqual(visualBridgeState.push_on_sync, false);
+
   const legacyUiproUpdateTarget = createWorkspace('ai-spec-uipro-legacy-update-');
   writeJson(path.join(legacyUiproUpdateTarget, 'package.json'), {
     name: 'uipro-legacy-update-smoke',

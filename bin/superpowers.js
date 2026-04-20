@@ -208,6 +208,46 @@ function buildRoleHostEnhancedHints(roleId) {
   return [];
 }
 
+function buildRoleRecommendedSequence(roleId, state) {
+  if (!state?.enabled || state.mode !== 'host-enhanced') {
+    return [];
+  }
+
+  if (roleId === 'requirement-analyst') {
+    return ['brainstorming', 'plan', 'create-proposal'];
+  }
+
+  if (roleId === 'frontend-implementer') {
+    return ['using-superpowers', 'execute-task'];
+  }
+
+  if (roleId === 'code-guardian') {
+    return ['using-superpowers', 'create-test', 'ui-verification'];
+  }
+
+  return [];
+}
+
+function buildRoleUserPrompt(roleId, state) {
+  if (!state?.enabled || state.mode !== 'host-enhanced') {
+    return null;
+  }
+
+  if (roleId === 'requirement-analyst') {
+    return '已启用 Superpowers 增强：先按 brainstorming(头脑风暴设计) / plan(规划) 收敛需求，再执行 create-proposal(创建提案) 产出 proposal/specs/design/tasks。';
+  }
+
+  if (roleId === 'frontend-implementer') {
+    return '已启用 Superpowers 增强：先按 using-superpowers(技能调度核心规范) 选择执行路径，再由 execute-task(任务执行规范) 推进实现。';
+  }
+
+  if (roleId === 'code-guardian') {
+    return '已启用 Superpowers 增强：先按 using-superpowers(技能调度核心规范) 对齐检查路径，再执行 create-test / ui-verification / web-design-guidelines。';
+  }
+
+  return null;
+}
+
 function loadSuperpowersState(targetDir, options = {}) {
   const existing = readSuperpowersState(targetDir);
   if (existing) {
@@ -267,6 +307,8 @@ function buildSuperpowersContract(targetDir, roleId, options = {}) {
     allowed_roles: Array.isArray(state.allowed_roles) ? state.allowed_roles : [...DEFAULT_ALLOWED_ROLES],
     allowed_repo_skills: Array.isArray(state.allowed_repo_skills) ? state.allowed_repo_skills : [...DEFAULT_ALLOWED_REPO_SKILLS],
     host_enhanced_hints: state.enabled && state.mode === 'host-enhanced' ? buildRoleHostEnhancedHints(roleId) : [],
+    recommended_sequence: buildRoleRecommendedSequence(roleId, state),
+    user_prompt: buildRoleUserPrompt(roleId, state),
     fallback_strategy: state.fallback_strategy || 'graceful-degrade',
     fallback_reason: state.last_fallback_reason || null,
   };

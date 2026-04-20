@@ -3900,6 +3900,21 @@ function attachActorPresentation(turn) {
   };
 }
 
+function applySuperpowersPresentation(turn) {
+  const prompt = turn.guidance?.superpowers_contract?.user_prompt;
+  if (!prompt || !turn.announcements?.enter) {
+    return turn;
+  }
+
+  return {
+    ...turn,
+    announcements: {
+      ...turn.announcements,
+      enter: `${turn.announcements.enter}。${prompt}`,
+    },
+  };
+}
+
 function buildStartConfirmTurn(targetDir, userInput, routeDecision) {
   const runtimePaths = resolveRuntimePaths(targetDir);
   const orchestratorGuidance = buildOrchestratorGuidance(targetDir, null, userInput, routeDecision);
@@ -4936,7 +4951,7 @@ function buildExpertTurn(targetDir, status, currentArtifacts, snapshot = null) {
     dedupedWrites.filter((item) => item.rel_path !== runtimePaths.tmpCurrentExecution.relPath),
   );
 
-  return attachProtocolContracts(attachActorPresentation({
+  return attachProtocolContracts(applySuperpowersPresentation(attachActorPresentation({
     kind: 'ai-protocol-turn',
     status: archivePreflightBlocked ? 'blocked' : 'ready',
     mode: 'execute',
@@ -5008,7 +5023,7 @@ function buildExpertTurn(targetDir, status, currentArtifacts, snapshot = null) {
       openspec_rules: buildOpenSpecGuidance(targetDir, dispatch.role?.id, deliveryProfile, flowId),
     },
     handoff_to: nextRole ? [nextRole] : roleDefinition.handoff_to,
-  }), {
+  })), {
     userInput: currentArtifacts.run?.trigger?.latest_user_input || currentArtifacts.run?.trigger?.raw_input || null,
   });
 }

@@ -297,6 +297,14 @@ function main() {
   );
   assert.ok(workflow.turn.guidance.superpowers_contract.host_enhanced_hints.includes('brainstorming'));
   assert.ok(workflow.turn.guidance.superpowers_contract.host_enhanced_hints.includes('plan'));
+  assert.deepStrictEqual(
+    workflow.turn.guidance.superpowers_contract.recommended_sequence,
+    ['brainstorming', 'plan', 'create-proposal'],
+  );
+  assert.ok(workflow.turn.guidance.superpowers_contract.user_prompt.includes('brainstorming'));
+  assert.ok(workflow.turn.guidance.superpowers_contract.user_prompt.includes('create-proposal'));
+  assert.ok(workflow.turn.announcements.enter.includes('brainstorming'));
+  assert.ok(workflow.turn.announcements.enter.includes('create-proposal'));
 
   const futureProfileTarget = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-spec-auto-protocol-future-profile-'));
   writeProjectFile(futureProfileTarget, 'package.json', JSON.stringify({

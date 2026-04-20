@@ -376,6 +376,34 @@ async function main() {
   assert.ok(syncedSources.assets.some((item) => item.kind === 'ide-superpowers-entry' && item.id === 'codex:using-superpowers'));
   assert.ok(syncedSources.assets.some((item) => item.kind === 'codex-agents-bridge'));
 
+  const visualBridgeTarget = createWorkspace('ai-spec-auto-sync-visual-bridge-');
+  const visualBridgeManifestPath = path.join(visualBridgeTarget, 'manifest.json');
+  writeJsonFile(visualBridgeManifestPath, createManifest('vue', ['cursor'], {
+    visual_bridge: {
+      enabled: true,
+      server_url: 'http://127.0.0.1:3200',
+      workspace_id: 'workspace-demo',
+      agent_id: 'ai-spec-auto',
+    },
+  }));
+  writeJsonFile(path.join(visualBridgeTarget, '.ai-spec', 'visual-bridge.json'), {
+    enabled: true,
+    server_url: 'http://127.0.0.1:3100',
+    workspace_id: 'legacy-workspace',
+    agent_id: 'legacy-agent',
+    connect_token: 'keep-me',
+  });
+  result = runCli(['sync', visualBridgeTarget, '--manifest', visualBridgeManifestPath, '--json']);
+  assert.strictEqual(result.status, 0, result.stderr);
+  const syncedVisualBridge = JSON.parse(fs.readFileSync(path.join(visualBridgeTarget, '.ai-spec', 'visual-bridge.json'), 'utf8'));
+  const visualBridgeSources = JSON.parse(fs.readFileSync(path.join(visualBridgeTarget, '.ai-spec', 'sources.json'), 'utf8'));
+  assert.strictEqual(syncedVisualBridge.enabled, true);
+  assert.strictEqual(syncedVisualBridge.server_url, 'http://127.0.0.1:3200');
+  assert.strictEqual(syncedVisualBridge.workspace_id, 'workspace-demo');
+  assert.strictEqual(syncedVisualBridge.agent_id, 'ai-spec-auto');
+  assert.strictEqual(syncedVisualBridge.connect_token, 'keep-me');
+  assert.ok(visualBridgeSources.assets.some((item) => item.kind === 'visual-bridge-config'));
+
   const cleanupTarget = createWorkspace('ai-spec-auto-sync-cleanup-');
   const cleanupManifestPath = path.join(cleanupTarget, 'manifest.json');
   writeJsonFile(cleanupManifestPath, createManifest('vue', ['cursor', 'claude']));
