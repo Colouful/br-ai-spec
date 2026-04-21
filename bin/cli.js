@@ -2,7 +2,7 @@
 const path = require('path');
 
 const pkgRoot = path.join(__dirname, '..');
-const args = process.argv.slice(2);
+let args = process.argv.slice(2);
 const env = { ...process.env, BR_AI_SPEC_LOCAL: pkgRoot };
 const opts = { stdio: 'inherit', cwd: process.cwd(), env };
 const INSTALL_COMMANDS = new Set(['init', 'update', 'check', 'uninstall', 'sync', 'help']);
@@ -15,6 +15,28 @@ const VERSION_FLAGS = new Set(['-v', '-V', '-version', '--version', 'version']);
       const pkg = require(path.join(pkgRoot, 'package.json'));
       console.log(pkg.version);
       process.exit(0);
+    }
+
+    // 自举升级：仅在 update 命令、目标项目已装过 CLI 且 registry 上有更新版时触发。
+    // 任何失败都会静默降级为继续跑当前 CLI，不影响主流程。
+    if (args[0] === 'update') {
+      try {
+        const selfUpgrade = require('./self-upgrade');
+        const result = selfUpgrade.maybeSelfUpgradeForUpdate({
+          pkgRoot,
+          args,
+          env,
+          cwd: opts.cwd,
+        });
+        if (result && Array.isArray(result.args)) {
+          args = result.args;
+        }
+        if (result && result.upgraded) {
+          process.exit(typeof result.status === 'number' ? result.status : 0);
+        }
+      } catch (_error) {
+        // 自举本身永远不能阻塞主流程
+      }
     }
 
     if (env.AI_SPEC_SKIP_LAUNCHER_SYNC !== '1') {

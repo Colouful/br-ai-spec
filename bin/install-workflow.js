@@ -1544,7 +1544,7 @@ function copyConfigs(targetDir, sourceDir, profilesRegistry, options, skipExisti
   return normalizeList(createdPaths);
 }
 
-function installLocalCli(targetDir, sourceDir, pkgManager, pending) {
+function installLocalCli(targetDir, sourceDir, pkgManager, pending, options = {}) {
   const targetPkg = path.join(targetDir, 'package.json');
   if (!fs.existsSync(targetPkg)) {
     warn('未找到 package.json，跳过本地 ai-spec-auto CLI 安装');
@@ -1555,13 +1555,28 @@ function installLocalCli(targetDir, sourceDir, pkgManager, pending) {
     return [];
   }
 
+  const mode = options.mode || 'init';
   const beforeSnapshot = readPackageSnapshot(targetDir);
   const forcedLocal = Boolean(process.env.BR_AI_SPEC_FORCE_LOCAL_CLI);
-  const installSpec = forcedLocal
-    ? sourceDir
-    : (readSourcePackageField(sourceDir, 'ident') || sourceDir);
-  const registry = readSourcePackageField(sourceDir, 'registry');
   const packageName = readSourcePackageField(sourceDir, 'name');
+  const sourceIdent = readSourcePackageField(sourceDir, 'ident');
+  // 解析 install spec：
+  // 1. BR_AI_SPEC_FORCE_LOCAL_CLI=1 -> 用本地 sourceDir 路径（开发场景）
+  // 2. BR_AI_SPEC_LOCAL_CLI_VERSION 显式指定版本/dist-tag -> name@<value>
+  // 3. update 模式：默认 name@latest，确保从 registry 解析到最新版本
+  // 4. init/default-init：沿用 sourceDir 当前 name@version（保持原行为，避免破坏锁版本场景）
+  const explicitVersion = process.env.BR_AI_SPEC_LOCAL_CLI_VERSION;
+  let installSpec;
+  if (forcedLocal) {
+    installSpec = sourceDir;
+  } else if (explicitVersion && packageName) {
+    installSpec = `${packageName}@${explicitVersion}`;
+  } else if (mode === 'update' && packageName) {
+    installSpec = `${packageName}@latest`;
+  } else {
+    installSpec = sourceIdent || sourceDir;
+  }
+  const registry = readSourcePackageField(sourceDir, 'registry');
   const scopeName = packageName && packageName.startsWith('@') ? packageName.split('/')[0] : '';
   const args = pkgManager === 'pnpm' ? ['add', '-D', installSpec] : ['install', '-D', installSpec];
   if (registry) {
@@ -2363,7 +2378,7 @@ async function handleUpdate(options) {
     });
   }
   syncProtocolAssets(targetDir, sourceDir);
-  installStateAdditions.addedDevDependencies.push(...installLocalCli(targetDir, sourceDir, pkgManager, pending));
+  installStateAdditions.addedDevDependencies.push(...installLocalCli(targetDir, sourceDir, pkgManager, pending, { mode: 'update' }));
   if (options.updateConfigs === 'yes') {
     installStateAdditions.createdConfigFiles.push(...copyConfigs(targetDir, sourceDir, profilesRegistry, options, true));
   }
