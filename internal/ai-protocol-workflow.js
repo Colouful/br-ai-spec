@@ -33,7 +33,18 @@ const {
   buildSuperpowersContract,
   loadSuperpowersState,
 } = require('../bin/superpowers');
+const { initVisualHooks } = require('./visual-hooks');
+
 const PACKAGE_ROOT = path.resolve(__dirname, '..');
+
+// 初始化 visual hooks（全局单例）
+let visualHooks = null;
+try {
+  visualHooks = initVisualHooks();
+} catch (err) {
+  // 初始化失败不影响主流程
+  console.warn('[ai-protocol-workflow] visual hooks init failed:', err.message);
+}
 
 const START_INSTRUCTION_FILES = [
   '.agents/orchestration/task-orchestrator-run-plan-template.md',
@@ -5135,7 +5146,7 @@ function advanceProtocolStep(options = {}) {
     });
   }
 
-  return {
+  const result = {
     kind: 'ai-protocol-step',
     target: targetDir,
     advanced,
@@ -5148,6 +5159,26 @@ function advanceProtocolStep(options = {}) {
       flowId: options.flowId || null,
     }),
   };
+
+  // Visual Hook: 推送运行态变更
+  if (visualHooks && result.runner_status?.current) {
+    const runState = result.runner_status.current;
+    visualHooks.onRunStateChange({
+      run_id: runState.run_id,
+      workspace_id: runState.workspace_id || path.basename(targetDir),
+      run_status: runState.run_status,
+      current_role: runState.current_role,
+      pending_gate: runState.pending_gate,
+      flow_id: runState.flow?.id,
+      delivery_profile: runState.delivery_profile,
+      artifact_profile: runState.artifact_profile,
+      timestamps: runState.timestamps
+    }).catch(err => {
+      // 优雅降级：不影响主流程
+    });
+  }
+
+  return result;
 }
 
 function statusProtocolStep(options = {}) {

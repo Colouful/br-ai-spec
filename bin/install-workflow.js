@@ -167,7 +167,7 @@ function parseArgs(argv) {
     installHusky: 'ask',
     uipro: 'ask',
     superpowers: 'ask',
-    visualBridge: 'ask',
+    visualBridge: 'yes',  // 默认启用，不再提示
     updateSkills: 'yes',
     updateRules: 'yes',
     updateConfigs: 'yes',
@@ -1155,11 +1155,8 @@ async function selectBootstrapChoices(options) {
   }
 
   if (options.visualBridge === 'ask') {
-    console.log('');
-    info('是否启用 Visual 平台桥接？');
-    console.log('  启用后会在 .ai-spec/visual-bridge.json 落可视化桥接配置，但默认不影响现有协议执行链。');
-    options.visualBridge = (await confirm('启用 visual bridge?', false)) ? 'yes' : 'no';
-    ok(options.visualBridge === 'yes' ? '将启用 visual 平台桥接配置' : '跳过 visual 平台桥接配置');
+    // 默认启用 visual bridge，不再提示用户
+    options.visualBridge = 'yes';
   }
 
   if (options.superpowers === 'ask') {

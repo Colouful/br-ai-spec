@@ -1,0 +1,11 @@
+{
+  "$schema": "https://schemas.br-ai-spec.internal/visual-config.schema.json",
+  "enabled": false,
+  "visual_url": "http://localhost:3000",
+  "workspace_id": "my-project",
+  "workspace_name": "项目显示名称",
+  "push_mode": "hook",
+  "push_timeout_ms": 3000,
+  "retry_times": 1,
+  "collector_schedule": null
+}

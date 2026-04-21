@@ -6,6 +6,7 @@ const {
   resolveRuntimePaths,
   getCandidatePaths,
 } = require('./runtime-paths');
+const { getVisualHooks } = require('../internal/visual-hooks');
 
 function printUsage() {
   console.log(`Usage:
@@ -418,6 +419,22 @@ function archiveChange(options = {}) {
 
   if (options.completeRun) {
     result.runtime_transition = completeRunAfterArchive(targetDir, result);
+  }
+
+  // Visual Hook: 推送归档完成事件
+  const visualHooks = getVisualHooks();
+  if (visualHooks && result.change_id) {
+    visualHooks.onArchiveComplete({
+      run_id: currentRun?.run_id || `archived_${result.change_id}`,
+      workspace_id: currentRun?.workspace_id || path.basename(targetDir),
+      change_id: result.change_id,
+      archived_to: result.archived_to,
+      merged: result.merged,
+      task_completion: result.task_completion,
+      archived_artifacts: result.archived_artifacts
+    }).catch(err => {
+      // 优雅降级：不影响主流程
+    });
   }
 
   return result;
