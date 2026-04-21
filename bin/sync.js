@@ -47,6 +47,7 @@ Options:
   --no-superpowers        Force disable superpowers（超能力桥接）
   --hub-origin <origin>   Hub origin for supplement fetch when manifest is local
   --no-hub-fetch          Disable Hub supplement fetch for missing assets
+  --out <file>            Write the normalized manifest to a file
   --json                  Print JSON output only
   --dry-run               Resolve only, do not write files
   --force                 Reserved for future conflict handling
@@ -63,6 +64,7 @@ function parseArgs(argv) {
     dryRun: false,
     force: false,
     hubFetch: true,
+    out: '',
   };
 
   while (args.length > 0) {
@@ -97,6 +99,9 @@ function parseArgs(argv) {
         break;
       case '--no-hub-fetch':
         options.hubFetch = false;
+        break;
+      case '--out':
+        options.out = requireArg(arg, args);
         break;
       case '--dry-run':
         options.dryRun = true;

@@ -295,14 +295,17 @@ function main() {
     workflow.turn.guidance.role_skill_contract.primary_skills.slice(0, 3),
     ['using-superpowers', 'create-proposal', 'design-analysis'],
   );
+  assert.ok(workflow.turn.guidance.superpowers_contract.host_enhanced_hints.includes('using-superpowers'));
   assert.ok(workflow.turn.guidance.superpowers_contract.host_enhanced_hints.includes('brainstorming'));
   assert.ok(workflow.turn.guidance.superpowers_contract.host_enhanced_hints.includes('plan'));
   assert.deepStrictEqual(
     workflow.turn.guidance.superpowers_contract.recommended_sequence,
-    ['brainstorming', 'plan', 'create-proposal'],
+    ['using-superpowers', 'brainstorming', 'plan', 'create-proposal'],
   );
+  assert.ok(workflow.turn.guidance.superpowers_contract.user_prompt.includes('using-superpowers'));
   assert.ok(workflow.turn.guidance.superpowers_contract.user_prompt.includes('brainstorming'));
   assert.ok(workflow.turn.guidance.superpowers_contract.user_prompt.includes('create-proposal'));
+  assert.ok(workflow.turn.announcements.enter.includes('using-superpowers'));
   assert.ok(workflow.turn.announcements.enter.includes('brainstorming'));
   assert.ok(workflow.turn.announcements.enter.includes('create-proposal'));
 

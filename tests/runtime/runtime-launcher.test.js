@@ -24,6 +24,7 @@ function main() {
     HOME: homeDir,
     AI_SPEC_HOME: path.join(homeDir, '.ai-spec-auto'),
     BR_AI_SPEC_FORCE_LOCAL_CLI: '1',
+    AI_SPEC_DISABLE_RUNTIME_REFRESH: '1',
   };
   const repoRoot = path.join(__dirname, '..', '..');
   const launcherPaths = runtimeLauncher.ensureGlobalLauncher({

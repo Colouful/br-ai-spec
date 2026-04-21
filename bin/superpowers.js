@@ -197,7 +197,7 @@ function readSuperpowersState(targetDir) {
 
 function buildRoleHostEnhancedHints(roleId) {
   if (roleId === 'requirement-analyst') {
-    return ['brainstorming', 'plan'];
+    return ['using-superpowers', 'brainstorming', 'plan'];
   }
   if (roleId === 'frontend-implementer') {
     return ['test-driven-development', 'systematic-debugging'];
@@ -214,7 +214,7 @@ function buildRoleRecommendedSequence(roleId, state) {
   }
 
   if (roleId === 'requirement-analyst') {
-    return ['brainstorming', 'plan', 'create-proposal'];
+    return ['using-superpowers', 'brainstorming', 'plan', 'create-proposal'];
   }
 
   if (roleId === 'frontend-implementer') {
@@ -234,7 +234,7 @@ function buildRoleUserPrompt(roleId, state) {
   }
 
   if (roleId === 'requirement-analyst') {
-    return '已启用 Superpowers 增强：先按 brainstorming(头脑风暴设计) / plan(规划) 收敛需求，再执行 create-proposal(创建提案) 产出 proposal/specs/design/tasks。';
+    return '已启用 Superpowers 增强：先执行 using-superpowers(超级能力使用) 对齐技能调度，再按 brainstorming(头脑风暴设计) / plan(规划) 收敛需求，最后执行 create-proposal(创建提案) 产出 proposal/specs/design/tasks。';
   }
 
   if (roleId === 'frontend-implementer') {

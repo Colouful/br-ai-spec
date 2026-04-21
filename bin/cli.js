@@ -36,6 +36,11 @@ const INSTALL_COMMANDS = new Set(['init', 'update', 'check', 'uninstall', 'sync'
       process.exit(validateRegistry.main(args.slice(1)));
     }
 
+    if (args[0] === 'manifest-export') {
+      const manifestExport = require('./manifest-export');
+      process.exit(await manifestExport.main(args.slice(1)));
+    }
+
     if (args[0] === 'task-orchestrator-adapter') {
       throw new Error('task-orchestrator-adapter is a legacy internal fallback; use ai-spec-auto protocol-step / protocol-advance / protocol-update instead');
     }
