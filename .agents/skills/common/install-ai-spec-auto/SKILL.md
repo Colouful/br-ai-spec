@@ -1,9 +1,9 @@
 ---
 name: install-ai-spec-auto
 description: 当用户要求给当前项目接入 ai-spec-auto(安装工具)、自动执行 init(初始化安装) 命令、安装规则/技能/OpenSpec(需求规范流程) 或完成首次安装时，使用本技能自动检查前置条件、推断 profile(技术栈) 与安装目标，并在当前项目执行安装和自检。
-compatibility: 需要当前工作区可执行 Node.js(运行时) 与 npm(包管理工具) 或 pnpm(包管理工具)，目标项目通常应包含 package.json，并且能够访问 @ex 内网 registry(包仓库)。
+compatibility: 需要当前工作区可执行 Node.js(运行时) 与 npm(包管理工具) 或 pnpm(包管理工具)，并且能够访问 @ex 内网 registry(包仓库)。前端项目通常包含 package.json；后端项目通常包含 pom.xml 或 build.gradle；Node 工具仓通常包含 package.json + tsconfig.json。
 metadata:
-  version: "1.1.0"
+  version: "1.2.0"
 ---
 
 # ai-spec-auto 安装初始化
@@ -46,7 +46,7 @@ metadata:
 
 ## 安装前核对清单
 
-- [ ] 当前目录或目标目录是要安装的业务项目，通常存在 `package.json`
+- [ ] 当前目录或目标目录是要安装的业务项目
 - [ ] 本机可执行 `node(运行时)` 与 `npm(包管理工具)` 或 `pnpm(包管理工具)`
 - [ ] `~/.npmrc` 已配置 `@ex:registry=http://nodejs.100credit.cn/`
 - [ ] 已判断当前项目是否已安装，避免误把重复安装当成首次接入
@@ -70,16 +70,23 @@ metadata:
 
 按下面顺序判断：
 
-1. `package.json` 中存在 `vue`、`@vitejs/plugin-vue`、`nuxt` 等依赖，判定为 `vue`
-2. `package.json` 中存在 `react`、`next`、`@vitejs/plugin-react` 等依赖，判定为 `react`
-3. 无法可靠判断时，默认按 `vue` 执行，并在执行前用一句话说明该假设
-4. 若同时明显命中 `vue` 与 `react`，且用户未指明目标子项目，先确认，不要擅自选择
+1. 已存在 `.ai-spec/manifest.json` 且包含 `profile` 字段 → 直接使用已记录的 profile
+2. `package.json` 中存在 `vue`、`@vitejs/plugin-vue`、`nuxt` 等依赖 → 判定为 `vue`
+3. `package.json` 中存在 `react`、`next`、`@vitejs/plugin-react` 等依赖 → 判定为 `react`
+4. 存在 `pom.xml` 或 `build.gradle`（且无 `package.json`）→ 提示用户确认是否为 `springboot`
+5. 存在 `package.json` + 主要依赖为工具链相关（commander、yargs、zod 等），且无 UI 框架 → 提示用户确认是否为 `node-tooling`
+6. 无法可靠判断时：**不得默认为 `vue`**，必须让用户从以下选项中明确选择：
+   - `1. vue` - Frontend / Vue
+   - `2. react` - Frontend / React
+   - `3. springboot` - Backend / Spring Boot
+   - `4. node-tooling` - Tooling / Node.js Tooling
+7. 若同时明显命中 `vue` 与 `react`，且用户未指明目标子项目，先确认，不要擅自选择
 
 ### 3. 判断安装目标
 
 - 当前目录本身就是业务包：直接对 `.(当前目录)` 安装
 - `Monorepo(多包仓库)` 根目录且用户明确给出子包路径：使用 `--package <path>`
-- `Monorepo` 根目录下存在多个前端子包且用户未说明：先确认目标子包
+- `Monorepo` 根目录下存在多个子包且用户未说明：先确认目标子包
 - 单包仓库：直接执行 `init .`
 
 ### 4. 选择命令入口
@@ -87,19 +94,21 @@ metadata:
 优先使用下面命令：
 
 ```bash
-npx @ex/ai-spec-auto@latest init . --profile <vue|react> --custom-rules
+npx @ex/ai-spec-auto@latest init . --profile <profile> --custom-rules
 ```
+
+其中 `<profile>` 为 `vue`、`react`、`springboot` 或 `node-tooling`。
 
 如命中 `Monorepo(多包仓库)` 子包，则使用：
 
 ```bash
-npx @ex/ai-spec-auto@latest init . --profile <vue|react> --custom-rules --package <subpath>
+npx @ex/ai-spec-auto@latest init . --profile <profile> --custom-rules --package <subpath>
 ```
 
-仅在“当前工作区就是 `ai-spec-auto(安装工具)` 源码仓库，且用户明确要走本地源码调试安装”时，才改用：
+仅在"当前工作区就是 `ai-spec-auto(安装工具)` 源码仓库，且用户明确要走本地源码调试安装"时，才改用：
 
 ```bash
-node ./bin/cli.js init <target> --profile <vue|react> --custom-rules
+node ./bin/cli.js init <target> --profile <profile> --custom-rules
 ```
 
 ### 5. 自定义规则选择策略
@@ -110,25 +119,17 @@ node ./bin/cli.js init <target> --profile <vue|react> --custom-rules
 
 - 底层 `install-workflow(安装主链)` 已支持在非交互模式下把全部可自定义规则自动选中
 - 这样安装完成后，`project-init(项目规范初始化)` 会按项目事实补齐和刷新这些规则，而不是沿用固定模板
-- 这符合“自动初始化安装”的目标，不需要用户再手动进入交互界面逐条勾选
+- 这符合"自动初始化安装"的目标，不需要用户再手动进入交互界面逐条勾选
 
-当前底层支持自动全选的规则是：
+各 profile 支持自动全选的规则集由 `profiles.json` 中的 `project_init_rule_ids` 字段决定。
 
-- `01-项目概述.md`
-- `03-项目结构.md`
-- `04-组件规范.md`
-- `05-API规范.md`
-- `06-路由规范.md`
-- `07-状态管理.md`
-- `09-样式规范.md`
-
-如果用户明确要求“沿用标准模板，不要自定义规则”，才改用 `--standard-rules(标准规则)`，不要同时传两者。
+如果用户明确要求"沿用标准模板，不要自定义规则"，才改用 `--standard-rules(标准规则)`，不要同时传两者。
 
 ## 标准工作流
 
 Progress:
-- [ ] 1. 读取 `package.json`、目录结构、`.npmrc`
-- [ ] 2. 判断是否已安装、是否 `Monorepo(多包仓库)`、是否能推断 `profile(技术栈)`
+- [ ] 1. 读取项目标记文件（`package.json` / `pom.xml` / `build.gradle`）、目录结构、`.npmrc`
+- [ ] 2. 判断是否已安装、是否 `Monorepo(多包仓库)`、确定或推断 `profile(技术栈)`
 - [ ] 3. 组装并实际执行 `init(初始化安装)` 命令
 - [ ] 4. 安装完成后执行 `check(自检)` 或核对关键安装产物
 - [ ] 5. 输出简短安装摘要，并提示下一步执行 `project-init(项目规范初始化)`
@@ -139,7 +140,7 @@ Progress:
 
 至少检查以下事实：
 
-- `package.json` 是否存在
+- 项目标记文件是否存在（`package.json` / `pom.xml` / `build.gradle`）
 - `node -v`、`npm -v` 是否可用
 - `~/.npmrc` 是否包含 `@ex:registry=http://nodejs.100credit.cn/`
 - 是否已存在 `.ai-spec/install-state.json`、`.agents/`、`openspec/`
@@ -158,27 +159,20 @@ Progress:
 默认安装命令：
 
 ```bash
-npx @ex/ai-spec-auto@latest init . --profile <vue|react> --custom-rules
+npx @ex/ai-spec-auto@latest init . --profile <profile> --custom-rules
 ```
 
 如用户提供 `manifest(安装清单)`，命令改为：
 
 ```bash
-npx @ex/ai-spec-auto@latest init . --profile <vue|react> --custom-rules --manifest <file-or-url>
+npx @ex/ai-spec-auto@latest init . --profile <profile> --custom-rules --manifest <file-or-url>
 ```
 
 如是 `Monorepo(多包仓库)` 子包：
 
 ```bash
-npx @ex/ai-spec-auto@latest init . --profile <vue|react> --custom-rules --package <subpath>
+npx @ex/ai-spec-auto@latest init . --profile <profile> --custom-rules --package <subpath>
 ```
-
-说明：
-
-- 非交互模式下，若传入 `--custom-rules(自定义规则)`，安装流程会自动把当前支持的可自定义规则全部选中
-- 这些规则当前是 `01/03/04/05/06/07/09`
-- 若未传 `--custom-rules`，非交互模式会退回标准规则，这不是本技能的默认策略
-- 不要省略 `--profile`，否则容易进入错误技术栈或交互式选择
 
 ### 第三步：执行安装
 
@@ -210,23 +204,24 @@ npx @ex/ai-spec-auto@latest check .
 - 判定出的 `profile(技术栈)`
 - 是否首次安装 / 已安装改走 `check(自检)`
 - 验证结果
-- 下一步建议：`project-init(项目规范初始化)` 或“初始化项目规范”
+- 下一步建议：`project-init(项目规范初始化)` 或"初始化项目规范"
 
 ## Gotchas(易错点)
 
 - 不要把 `project-init(项目规范初始化)` 当成首次安装命令
 - 不要忘记追加 `--custom-rules(自定义规则)`，否则非交互模式会回退到标准规则
-- 不要声称“支持全部规则自定义”；当前只支持 `01/03/04/05/06/07/09`
+- **无法推断 profile 时，不得默认为 `vue`**，必须让用户明确选择
 - 不要在 `Monorepo(多包仓库)` 根目录存在多个子包时擅自安装到根目录
 - 不要漏掉 `@ex:registry(内网包仓库)` 检查，否则 `npx(包执行命令)` 很可能失败
 - 不要只输出命令，不实际执行
 - 已安装项目如果只需要检查状态，优先走 `check(自检)`，不要机械重复 `init(初始化安装)`
+- Spring Boot 项目不一定存在 `package.json`，不要因为缺少 `package.json` 就直接报错或跳过
 
 ## 验证标准
 
 1. 已成功执行 `init(初始化安装)` 或在已安装场景下正确改走 `check(自检)`
 2. 用户能从摘要里看到安装目标、命令、技术栈和验证结果
-3. 输出明确区分“安装完成”与“下一步执行 `project-init(项目规范初始化)`”
+3. 输出明确区分"安装完成"与"下一步执行 `project-init(项目规范初始化)`"
 
 ## 资源导航
 

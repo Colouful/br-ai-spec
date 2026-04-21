@@ -8,6 +8,13 @@ description: 定义 task-orchestrator 在首次识别任务时必须输出的最
 
 # 主代理首轮运行计划模板
 
+> **Profile 驱动说明（V1）**：本模板中的示例以 `frontend-implementer` 作为实现角色。实际编排时，`required_roles` 中的实现角色应根据当前项目 profile 动态决定：
+> - `vue` / `react` → `frontend-implementer`
+> - `springboot` → `backend-implementer`
+> - `node-tooling` → `tooling-implementer`
+>
+> 实现角色可从 `.agents/registry/profiles.json` 中当前 profile 的 `implementation_role` 字段读取。
+
 ## 1. 目的
 
 这份模板用于统一 `task-orchestrator（任务主代理）` 在首次接收任务时的输出格式。

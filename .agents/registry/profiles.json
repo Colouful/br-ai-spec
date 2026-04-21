@@ -4,17 +4,77 @@
     "vue": {
       "status": "active",
       "label": "Vue",
+      "project_type": "frontend",
+      "implementation_role": "frontend-implementer",
       "rules_dir": ".agents/rules/profiles/vue",
       "skills_dir": ".agents/skills/profiles/vue",
       "configs_dir": "configs/profiles/vue",
+      "project_init_rule_ids": [
+        "component-standard",
+        "api-standard",
+        "route-standard",
+        "store-standard",
+        "style-standard",
+        "test-standard-web",
+        "format-check-standard-web"
+      ],
       "aliases": []
     },
     "react": {
       "status": "active",
       "label": "React",
+      "project_type": "frontend",
+      "implementation_role": "frontend-implementer",
       "rules_dir": ".agents/rules/profiles/react",
       "skills_dir": ".agents/skills/profiles/react",
       "configs_dir": "configs/profiles/react",
+      "project_init_rule_ids": [
+        "component-standard",
+        "api-standard",
+        "route-standard",
+        "store-standard",
+        "style-standard",
+        "test-standard-web",
+        "format-check-standard-web"
+      ],
+      "aliases": []
+    },
+    "springboot": {
+      "status": "active",
+      "label": "Spring Boot",
+      "project_type": "backend",
+      "implementation_role": "backend-implementer",
+      "rules_dir": ".agents/rules/profiles/springboot",
+      "skills_dir": ".agents/skills/profiles/springboot",
+      "configs_dir": "configs/profiles/springboot",
+      "project_init_rule_ids": [
+        "layering-standard",
+        "api-contract-standard",
+        "persistence-standard",
+        "runtime-config-standard",
+        "exception-standard",
+        "test-standard-jvm",
+        "format-check-standard-jvm"
+      ],
+      "aliases": []
+    },
+    "node-tooling": {
+      "status": "active",
+      "label": "Node.js Tooling",
+      "project_type": "tooling",
+      "implementation_role": "tooling-implementer",
+      "rules_dir": ".agents/rules/profiles/node-tooling",
+      "skills_dir": ".agents/skills/profiles/node-tooling",
+      "configs_dir": "configs/profiles/node-tooling",
+      "project_init_rule_ids": [
+        "cli-standard",
+        "contract-standard",
+        "runtime-files-standard",
+        "logging-standard",
+        "script-entry-standard",
+        "test-standard-node",
+        "format-check-standard-node"
+      ],
       "aliases": []
     }
   }

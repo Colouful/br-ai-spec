@@ -8,6 +8,11 @@ description: 定义专家交接以及审批、恢复、状态查询时如何更�
 
 # 运行状态交接与控制规范
 
+> **Profile 驱动说明（V1）**：本规范中的示例以 `frontend-implementer` 作为实现角色。实际运行时，应根据当前项目的 `.ai-spec/manifest.json` 中的 `profile`，查询 `.agents/registry/profiles.json` 的 `implementation_role` 字段，动态决定实现角色：
+> - `vue` / `react` → `frontend-implementer`
+> - `springboot` → `backend-implementer`
+> - `node-tooling` → `tooling-implementer`
+
 ## 1. 目的
 
 这份规范用于约束一件很具体的事情：

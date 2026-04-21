@@ -8,6 +8,8 @@ description: 定义当前运行态如何生成并更新当前专家执行载荷�
 
 # 专家派发载荷规范
 
+> **Profile 驱动说明（V1）**：本规范中的示例以 `frontend-implementer` 作为实现角色。实际派发时，`expert.id` 应根据当前 profile 的 `implementation_role` 动态填入（`frontend-implementer` / `backend-implementer` / `tooling-implementer`）。
+
 ## 1. 目的
 
 这份规范解决的问题是：

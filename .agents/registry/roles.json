@@ -18,25 +18,69 @@
     "task-orchestrator": {
       "name": "任务主代理",
       "status": "active",
-      "profiles": ["vue", "react"],
-      "domains": ["orchestration"],
+      "profiles": [
+        "vue",
+        "react",
+        "springboot",
+        "node-tooling"
+      ],
+      "domains": [
+        "orchestration"
+      ],
       "source": ".agents/roles/common/task-orchestrator.md",
-      "rule_ids": ["project-overview", "project-structure", "api-standard", "route-standard", "style-standard"],
+      "rule_ids": [
+        "project-overview",
+        "project-structure"
+      ],
+      "rule_ids_by_profile": {
+        "vue": [
+          "api-standard",
+          "route-standard",
+          "style-standard"
+        ],
+        "react": [
+          "api-standard",
+          "route-standard",
+          "style-standard"
+        ],
+        "springboot": [
+          "api-contract-standard",
+          "layering-standard"
+        ],
+        "node-tooling": [
+          "contract-standard",
+          "cli-standard"
+        ]
+      },
       "rule_contract_profiles": {
         "default": {
           "must_follow": [
             "首轮编排必须优先吸收仓库现状与规则，再决定 flow、delivery_profile 和人工确认点。",
-            "能从仓库结构、项目规则推断的路由/API/mock/样式事实，优先转成 assumptions 或 routing constraints。"
+            "能从仓库结构、项目规则推断的落点事实，优先转成 assumptions 或 routing constraints。"
           ],
           "blocked_when": [
-            "高风险领域的流程、安全、合规、风控或权限边界仍未确认时，不得放行到 frontend-implementer。"
+            "高风险领域的流程、安全、合规、风控或权限边界仍未确认时，不得放行到实现角色。"
           ]
         },
         "vue": {
           "must_follow": [
             "Vue 页面类任务优先以 src/views、src/router/modules、src/api、src/api/types、src/style.css 等当前仓库落点编排。",
-            "若仓库缺少 vue-router 或请求层骨架，要先把“补骨架还是保持占位入口”写进编排约束。",
+            "若仓库缺少 vue-router 或请求层骨架，要先把补骨架还是保持占位入口写进编排约束。",
             "mock-first、真实接口、Pinia/store 与主题变量策略需要在首轮编排时明确，不留到实现阶段临时猜。"
+          ]
+        },
+        "springboot": {
+          "must_follow": [
+            "Spring Boot 任务优先以 Controller / Service / Repository 分层落点编排。",
+            "若仓库缺少统一响应体或全局异常处理，要先把是否补基础设施写进编排约束。",
+            "接口契约（路径、请求/响应 DTO）需要在首轮编排时明确，不留到实现阶段临时猜。"
+          ]
+        },
+        "node-tooling": {
+          "must_follow": [
+            "Node 工具仓任务优先以 CLI 命令 / Contract / Worker 模块落点编排。",
+            "若仓库缺少统一 Contract Schema 或错误类型定义，要先把是否补基础设施写进编排约束。",
+            "Contract 输入/输出 Schema 需要在首轮编排时明确，不留到实现阶段临时猜。"
           ]
         }
       }
@@ -44,17 +88,69 @@
     "requirement-analyst": {
       "name": "需求解析专家",
       "status": "active",
-      "profiles": ["vue", "react"],
-      "domains": ["demand-design"],
+      "profiles": [
+        "vue",
+        "react",
+        "springboot",
+        "node-tooling"
+      ],
+      "domains": [
+        "demand-design"
+      ],
       "source": ".agents/roles/common/requirement-analyst.md",
-      "rule_ids": ["project-overview", "project-structure", "api-standard", "route-standard", "style-standard"],
-      "skill_priority": ["create-proposal", "design-analysis"],
-      "micro_skill_allowlist": ["create-proposal", "design-analysis"],
+      "rule_ids": [
+        "project-overview",
+        "project-structure"
+      ],
+      "rule_ids_by_profile": {
+        "vue": [
+          "api-standard",
+          "route-standard",
+          "style-standard"
+        ],
+        "react": [
+          "api-standard",
+          "route-standard",
+          "style-standard"
+        ],
+        "springboot": [
+          "api-contract-standard",
+          "layering-standard"
+        ],
+        "node-tooling": [
+          "contract-standard",
+          "cli-standard"
+        ]
+      },
+      "skill_priority": [
+        "create-proposal",
+        "design-analysis"
+      ],
+      "micro_skill_allowlist": [
+        "create-proposal",
+        "design-analysis"
+      ],
+      "skill_priority_by_profile": {
+        "vue": [
+          "create-proposal",
+          "design-analysis"
+        ],
+        "react": [
+          "create-proposal",
+          "design-analysis"
+        ],
+        "springboot": [
+          "create-proposal"
+        ],
+        "node-tooling": [
+          "create-proposal"
+        ]
+      },
       "rule_contract_profiles": {
         "default": {
           "must_follow": [
-            "先把项目定位、目录落点、路由/API/样式约定吸收到 proposal/specs/design/tasks，不要把规范已明确的信息重复写成 missing_inputs。",
-            "需求收敛必须落到当前仓库可实施的页面、路由、接口或 mock 落点，而不是抽象方案。"
+            "先把项目定位、目录落点、规范约定吸收到 proposal/specs/design/tasks，不要把规范已明确的信息重复写成 missing_inputs。",
+            "需求收敛必须落到当前仓库可实施的具体落点，而不是抽象方案。"
           ],
           "blocked_when": [
             "高风险领域的流程、安全、合规、风控或权限边界仍未确认时，必须维持 before-implementation 门禁。"
@@ -63,31 +159,91 @@
         "vue": {
           "must_follow": [
             "页面任务优先对齐 src/views/<page>/index.vue 与 src/router/modules/<module>.ts 的落点约定。",
-            "若为 mock 或占位页，明确写清 src/mock 或本地 mock 方案，以及“不接真实 API”的边界。",
+            "若为 mock 或占位页，明确写清 src/mock 或本地 mock 方案，以及不接真实 API 的边界。",
             "样式和视觉约束需对齐主题 CSS 变量，不要把硬编码颜色或自由样式当默认方案。"
+          ]
+        },
+        "springboot": {
+          "must_follow": [
+            "接口需求优先对齐 Controller / Service / Repository 的分层落点约定。",
+            "明确 API 路径、请求/响应 DTO 结构和分页策略，不留到实现阶段临时猜。",
+            "涉及数据库 Schema 变更时，需明确迁移策略和兼容性边界。"
+          ]
+        },
+        "node-tooling": {
+          "must_follow": [
+            "功能需求优先对齐 CLI 命令 / Contract Schema / Worker 模块的落点约定。",
+            "明确 Contract 输入/输出 Schema 和错误处理策略，不留到实现阶段临时猜。",
+            "涉及 CLI 参数或模块导出变更时，需明确兼容性边界和版本策略。"
           ]
         }
       },
-      "openspec_actions": ["propose"],
-      "openspec_rule_sections": ["proposal", "specs", "design", "tasks"],
-      "required_outputs": ["proposal", "specs", "design", "tasks"],
+      "openspec_actions": [
+        "propose"
+      ],
+      "openspec_rule_sections": [
+        "proposal",
+        "specs",
+        "design",
+        "tasks"
+      ],
+      "required_outputs": [
+        "proposal",
+        "specs",
+        "design",
+        "tasks"
+      ],
       "runtime_transition": {
         "action": "handoff",
-        "to_role": "frontend-implementer",
+        "to_role": "resolve-from-profile",
+        "to_role_by_profile": {
+          "vue": "frontend-implementer",
+          "react": "frontend-implementer",
+          "springboot": "backend-implementer",
+          "node-tooling": "tooling-implementer"
+        },
         "next_role": "code-guardian",
         "status": "running",
-        "message": "handoff to frontend-implementer after requirement convergence"
+        "message": "handoff to implementer after requirement convergence"
       }
     },
     "frontend-implementer": {
       "name": "前端实现专家",
       "status": "active",
-      "profiles": ["vue", "react"],
-      "domains": ["engineering", "delivery"],
+      "profiles": [
+        "vue",
+        "react"
+      ],
+      "domains": [
+        "engineering",
+        "delivery"
+      ],
       "source": ".agents/roles/common/frontend-implementer.md",
-      "rule_ids": ["project-structure", "component-standard", "route-standard", "api-standard", "store-standard", "style-standard"],
-      "skill_priority": ["create-view", "create-route", "create-api", "theme-variables", "create-component", "create-store", "execute-task"],
-      "micro_skill_allowlist": ["create-view", "create-route", "create-api", "theme-variables", "create-component", "create-store"],
+      "rule_ids": [
+        "project-structure",
+        "component-standard",
+        "route-standard",
+        "api-standard",
+        "store-standard",
+        "style-standard"
+      ],
+      "skill_priority": [
+        "create-view",
+        "create-route",
+        "create-api",
+        "theme-variables",
+        "create-component",
+        "create-store",
+        "execute-task"
+      ],
+      "micro_skill_allowlist": [
+        "create-view",
+        "create-route",
+        "create-api",
+        "theme-variables",
+        "create-component",
+        "create-store"
+      ],
       "rule_contract_profiles": {
         "default": {
           "must_follow": [
@@ -109,9 +265,146 @@
           ]
         }
       },
-      "openspec_actions": ["apply"],
-      "openspec_rule_sections": ["specs", "tasks", "design"],
-      "required_inputs": ["proposal", "specs", "design", "tasks"],
+      "openspec_actions": [
+        "apply"
+      ],
+      "openspec_rule_sections": [
+        "specs",
+        "tasks",
+        "design"
+      ],
+      "required_inputs": [
+        "proposal",
+        "specs",
+        "design",
+        "tasks"
+      ],
+      "runtime_transition": {
+        "action": "handoff",
+        "to_role": "code-guardian",
+        "next_role": null,
+        "status": "running",
+        "message": "handoff to code-guardian after implementation delivery"
+      }
+    },
+    "backend-implementer": {
+      "name": "后端实现专家",
+      "status": "active",
+      "profiles": [
+        "springboot"
+      ],
+      "domains": [
+        "engineering",
+        "delivery"
+      ],
+      "source": ".agents/roles/common/backend-implementer.md",
+      "rule_ids": [
+        "layering-standard",
+        "api-contract-standard",
+        "persistence-standard",
+        "exception-standard"
+      ],
+      "skill_priority": [
+        "execute-task"
+      ],
+      "micro_skill_allowlist": [],
+      "rule_contract_profiles": {
+        "default": {
+          "must_follow": [
+            "优先复用现有 Service、Repository 和工具类，不重复建设。",
+            "实现前先对齐 proposal/specs/design/tasks 的范围与落点，不要自行扩 scope。",
+            "若 verification 失败触发 auto-fix，只修失败步骤对应的问题，不新增功能、不顺手重构。"
+          ],
+          "blocked_when": [
+            "proposal/specs/design/tasks 未落盘或仍处于 before-implementation 审批门禁时，禁止改业务代码。"
+          ]
+        },
+        "springboot": {
+          "must_follow": [
+            "Controller 只调 Service，Service 调 Repository，禁止跨层直接调用。",
+            "所有接口返回统一响应体 Result<T>，禁止返回裸数据。",
+            "业务异常使用 BusinessException 子类，不抛裸 RuntimeException。",
+            "敏感配置通过 @ConfigurationProperties 或环境变量注入，不硬编码。"
+          ]
+        }
+      },
+      "openspec_actions": [
+        "apply"
+      ],
+      "openspec_rule_sections": [
+        "specs",
+        "tasks",
+        "design"
+      ],
+      "required_inputs": [
+        "proposal",
+        "specs",
+        "design",
+        "tasks"
+      ],
+      "runtime_transition": {
+        "action": "handoff",
+        "to_role": "code-guardian",
+        "next_role": null,
+        "status": "running",
+        "message": "handoff to code-guardian after implementation delivery"
+      }
+    },
+    "tooling-implementer": {
+      "name": "工具仓实现专家",
+      "status": "active",
+      "profiles": [
+        "node-tooling"
+      ],
+      "domains": [
+        "engineering",
+        "delivery"
+      ],
+      "source": ".agents/roles/common/tooling-implementer.md",
+      "rule_ids": [
+        "cli-standard",
+        "contract-standard",
+        "runtime-files-standard",
+        "logging-standard"
+      ],
+      "skill_priority": [
+        "execute-task"
+      ],
+      "micro_skill_allowlist": [],
+      "rule_contract_profiles": {
+        "default": {
+          "must_follow": [
+            "优先复用现有工具函数、Contract 定义和模块导出，不重复建设。",
+            "实现前先对齐 proposal/specs/design/tasks 的范围与落点，不要自行扩 scope。",
+            "若 verification 失败触发 auto-fix，只修失败步骤对应的问题，不新增功能、不顺手重构。"
+          ],
+          "blocked_when": [
+            "proposal/specs/design/tasks 未落盘或仍处于 before-implementation 审批门禁时，禁止改业务代码。"
+          ]
+        },
+        "node-tooling": {
+          "must_follow": [
+            "所有外部输入在入口处通过 Contract Schema 校验，不跳过校验直接使用。",
+            "错误处理使用类型化错误类，不抛裸 new Error()。",
+            "日志通过项目统一日志库输出，不用 console.log。",
+            "模块只通过 index.ts 导出公共接口，内部实现不对外暴露。"
+          ]
+        }
+      },
+      "openspec_actions": [
+        "apply"
+      ],
+      "openspec_rule_sections": [
+        "specs",
+        "tasks",
+        "design"
+      ],
+      "required_inputs": [
+        "proposal",
+        "specs",
+        "design",
+        "tasks"
+      ],
       "runtime_transition": {
         "action": "handoff",
         "to_role": "code-guardian",
@@ -123,21 +416,96 @@
     "code-guardian": {
       "name": "规范守护者",
       "status": "active",
-      "profiles": ["vue", "react"],
-      "domains": ["governance", "testing"],
+      "profiles": [
+        "vue",
+        "react",
+        "springboot",
+        "node-tooling"
+      ],
+      "domains": [
+        "governance",
+        "testing"
+      ],
       "source": ".agents/roles/common/code-guardian.md",
-      "rule_ids": ["coding-standard", "api-standard", "route-standard", "style-standard", "test-standard", "format-check-standard", "audit-report-standard"],
-      "skill_priority": ["ui-verification", "web-design-guidelines", "create-test"],
-      "micro_skill_allowlist": ["ui-verification", "web-design-guidelines"],
+      "rule_ids": [
+        "coding-standard",
+        "audit-report-standard"
+      ],
+      "rule_ids_by_profile": {
+        "vue": [
+          "api-standard",
+          "route-standard",
+          "style-standard",
+          "test-standard-web",
+          "format-check-standard-web"
+        ],
+        "react": [
+          "api-standard",
+          "route-standard",
+          "style-standard",
+          "test-standard-web",
+          "format-check-standard-web"
+        ],
+        "springboot": [
+          "api-contract-standard",
+          "layering-standard",
+          "persistence-standard",
+          "exception-standard",
+          "test-standard-jvm",
+          "format-check-standard-jvm"
+        ],
+        "node-tooling": [
+          "contract-standard",
+          "cli-standard",
+          "runtime-files-standard",
+          "logging-standard",
+          "test-standard-node",
+          "format-check-standard-node"
+        ]
+      },
+      "skill_priority": [
+        "create-test"
+      ],
+      "micro_skill_allowlist": [],
+      "skill_priority_by_profile": {
+        "vue": [
+          "ui-verification",
+          "web-design-guidelines",
+          "create-test"
+        ],
+        "react": [
+          "ui-verification",
+          "web-design-guidelines",
+          "create-test"
+        ],
+        "springboot": [
+          "create-test"
+        ],
+        "node-tooling": [
+          "create-test"
+        ]
+      },
+      "micro_skill_allowlist_by_profile": {
+        "vue": [
+          "ui-verification",
+          "web-design-guidelines"
+        ],
+        "react": [
+          "ui-verification",
+          "web-design-guidelines"
+        ],
+        "springboot": [],
+        "node-tooling": []
+      },
       "rule_contract_profiles": {
         "default": {
           "must_follow": [
             "以 proposal/specs/design/tasks 和项目规则为准检查实现，而不是只做泛化 lint。",
             "必须给出阻断项、非阻断项和交付建议，不能写成模糊建议列表。",
-            "若实现阶段经历过 auto-fix 仍未通过 verification，必须按阻断项处理，不能以“后续再看”放行。"
+            "若实现阶段经历过 auto-fix 仍未通过 verification，必须按阻断项处理，不能以后续再看放行。"
           ],
           "blocked_when": [
-            "存在与项目规范冲突的目录、路由、API、样式或测试问题时，不得给 complete 结论。"
+            "存在与项目规范冲突的目录、接口、测试或格式问题时，不得给 complete 结论。"
           ]
         },
         "vue": {
@@ -145,14 +513,46 @@
             "核查页面是否落在 src/views、路由是否落在 src/router/modules，并保持动态导入。",
             "核查 API 是否通过 src/api 封装、类型是否放在 src/api/types，页面中未直接调 request。",
             "核查样式是否使用主题变量、scoped 或 CSS Modules，而不是硬编码全局样式。",
-            "核查 Pinia/store、mock 与 proposal/specs/design/tasks 的边界是否一致，避免“演示页写成生产页”。"
+            "核查 Pinia/store、mock 与 proposal/specs/design/tasks 的边界是否一致，避免演示页写成生产页。"
+          ]
+        },
+        "springboot": {
+          "must_follow": [
+            "核查分层是否合规（Controller 不直接调 Repository，Service 持有事务逻辑）。",
+            "核查所有接口是否返回统一响应体 Result<T>，无裸数据返回。",
+            "核查异常处理是否通过全局处理器，无裸 RuntimeException 抛出。",
+            "核查敏感配置是否通过 @ConfigurationProperties 或环境变量管理，无硬编码。"
+          ]
+        },
+        "node-tooling": {
+          "must_follow": [
+            "核查所有外部输入是否在入口处通过 Contract Schema 校验。",
+            "核查错误处理是否使用类型化错误类，无裸 new Error() 抛出。",
+            "核查日志是否通过项目统一日志库输出，无 console.log 残留。",
+            "核查模块导出是否仅通过 index.ts，无内部实现被外部直接引用。"
           ]
         }
       },
-      "openspec_actions": ["verify"],
-      "openspec_rule_sections": ["tasks", "specs", "design", "checklist", "iterations"],
-      "required_inputs": ["proposal", "specs", "design", "tasks"],
-      "required_outputs": ["checklist", "iterations"],
+      "openspec_actions": [
+        "verify"
+      ],
+      "openspec_rule_sections": [
+        "tasks",
+        "specs",
+        "design",
+        "checklist",
+        "iterations"
+      ],
+      "required_inputs": [
+        "proposal",
+        "specs",
+        "design",
+        "tasks"
+      ],
+      "required_outputs": [
+        "checklist",
+        "iterations"
+      ],
       "runtime_transition": {
         "action": "gate-blocked",
         "to_role": "code-guardian",
@@ -165,11 +565,20 @@
     "archive-change": {
       "name": "归档专家",
       "status": "active",
-      "domains": ["delivery", "documentation"],
+      "domains": [
+        "delivery",
+        "documentation"
+      ],
       "source": ".agents/roles/common/archive-change.md",
-      "rule_ids": ["audit-report-standard"],
-      "skill_priority": ["archive-change"],
-      "micro_skill_allowlist": ["archive-change"],
+      "rule_ids": [
+        "audit-report-standard"
+      ],
+      "skill_priority": [
+        "archive-change"
+      ],
+      "micro_skill_allowlist": [
+        "archive-change"
+      ],
       "rule_contract_profiles": {
         "default": {
           "must_follow": [
@@ -181,9 +590,22 @@
           ]
         }
       },
-      "openspec_actions": ["archive"],
-      "openspec_rule_sections": ["specs", "checklist", "iterations"],
-      "required_inputs": ["proposal", "specs", "design", "tasks", "checklist", "iterations"],
+      "openspec_actions": [
+        "archive"
+      ],
+      "openspec_rule_sections": [
+        "specs",
+        "checklist",
+        "iterations"
+      ],
+      "required_inputs": [
+        "proposal",
+        "specs",
+        "design",
+        "tasks",
+        "checklist",
+        "iterations"
+      ],
       "runtime_transition": {
         "action": "complete",
         "to_role": "archive-change",
@@ -195,42 +617,78 @@
     "design-collaborator": {
       "name": "设计协作专家",
       "status": "active",
-      "domains": ["demand-design"],
-      "skill_priority": ["ui-ux-pro-max", "design-analysis"],
+      "domains": [
+        "demand-design"
+      ],
+      "skill_priority": [
+        "ui-ux-pro-max",
+        "design-analysis"
+      ],
       "source": ".agents/roles/domains/demand-design/design-collaborator.md"
     },
     "api-contract-specialist": {
       "name": "API 契约专家",
       "status": "active",
-      "domains": ["demand-design"],
+      "domains": [
+        "demand-design"
+      ],
       "source": ".agents/roles/domains/demand-design/api-contract-specialist.md"
     },
     "lint-policy-specialist": {
       "name": "Lint 规则专家",
       "status": "planned",
-      "domains": ["governance"],
+      "domains": [
+        "governance"
+      ],
       "source": ".agents/roles/domains/governance/lint-policy-specialist.md"
     },
     "api-governance-specialist": {
       "name": "API 规范专家",
       "status": "planned",
-      "domains": ["governance"],
+      "domains": [
+        "governance"
+      ],
       "source": ".agents/roles/domains/governance/api-governance-specialist.md"
     },
     "route-governance-specialist": {
       "name": "路由规范专家",
       "status": "planned",
-      "domains": ["governance"],
+      "domains": [
+        "governance"
+      ],
       "source": ".agents/roles/domains/governance/route-governance-specialist.md"
     },
     "build-specialist": {
       "name": "构建专家",
       "status": "active",
-      "domains": ["engineering"],
+      "domains": [
+        "engineering"
+      ],
       "source": ".agents/roles/domains/engineering/build-specialist.md",
-      "rule_ids": ["coding-standard", "format-check-standard", "audit-report-standard"],
-      "skill_priority": ["config-and-secret-scan"],
-      "micro_skill_allowlist": ["config-and-secret-scan"],
+      "rule_ids": [
+        "coding-standard",
+        "audit-report-standard"
+      ],
+      "rule_ids_by_profile": {
+        "vue": [
+          "format-check-standard-web"
+        ],
+        "react": [
+          "format-check-standard-web"
+        ],
+        "springboot": [
+          "format-check-standard-jvm"
+        ],
+        "node-tooling": [
+          "format-check-standard-node"
+        ]
+      },
+      "skill_priority": [
+        "config-and-secret-scan"
+      ],
+      "micro_skill_allowlist": [
+        "config-and-secret-scan"
+      ],
       "rule_contract_profiles": {
         "default": {
           "must_follow": [
@@ -247,11 +705,22 @@
     "dependency-governor": {
       "name": "依赖治理专家",
       "status": "active",
-      "domains": ["engineering"],
+      "domains": [
+        "engineering"
+      ],
       "source": ".agents/roles/domains/engineering/dependency-governor.md",
-      "rule_ids": ["coding-standard", "format-check-standard", "audit-report-standard"],
-      "skill_priority": ["dependency-impact-graph", "config-and-secret-scan"],
-      "micro_skill_allowlist": ["dependency-impact-graph", "config-and-secret-scan"],
+      "rule_ids": [
+        "coding-standard",
+        "audit-report-standard"
+      ],
+      "skill_priority": [
+        "dependency-impact-graph",
+        "config-and-secret-scan"
+      ],
+      "micro_skill_allowlist": [
+        "dependency-impact-graph",
+        "config-and-secret-scan"
+      ],
       "rule_contract_profiles": {
         "default": {
           "must_follow": [
@@ -268,11 +737,42 @@
     "architecture-advisor": {
       "name": "架构顾问专家",
       "status": "active",
-      "domains": ["engineering"],
+      "domains": [
+        "engineering"
+      ],
       "source": ".agents/roles/domains/engineering/architecture-advisor.md",
-      "rule_ids": ["project-overview", "project-structure", "api-standard", "route-standard", "style-standard"],
-      "skill_priority": ["create-proposal", "dependency-impact-graph"],
-      "micro_skill_allowlist": ["create-proposal", "dependency-impact-graph"],
+      "rule_ids": [
+        "project-overview",
+        "project-structure"
+      ],
+      "rule_ids_by_profile": {
+        "vue": [
+          "api-standard",
+          "route-standard",
+          "style-standard"
+        ],
+        "react": [
+          "api-standard",
+          "route-standard",
+          "style-standard"
+        ],
+        "springboot": [
+          "api-contract-standard",
+          "layering-standard"
+        ],
+        "node-tooling": [
+          "contract-standard",
+          "cli-standard"
+        ]
+      },
+      "skill_priority": [
+        "create-proposal",
+        "dependency-impact-graph"
+      ],
+      "micro_skill_allowlist": [
+        "create-proposal",
+        "dependency-impact-graph"
+      ],
       "rule_contract_profiles": {
         "default": {
           "must_follow": [
@@ -289,11 +789,34 @@
     "unit-test-specialist": {
       "name": "单元测试专家",
       "status": "active",
-      "domains": ["testing"],
+      "domains": [
+        "testing"
+      ],
       "source": ".agents/roles/domains/testing/unit-test-specialist.md",
-      "rule_ids": ["coding-standard", "test-standard", "audit-report-standard"],
-      "skill_priority": ["create-test"],
-      "micro_skill_allowlist": ["create-test"],
+      "rule_ids": [
+        "coding-standard",
+        "audit-report-standard"
+      ],
+      "rule_ids_by_profile": {
+        "vue": [
+          "test-standard-web"
+        ],
+        "react": [
+          "test-standard-web"
+        ],
+        "springboot": [
+          "test-standard-jvm"
+        ],
+        "node-tooling": [
+          "test-standard-node"
+        ]
+      },
+      "skill_priority": [
+        "create-test"
+      ],
+      "micro_skill_allowlist": [
+        "create-test"
+      ],
       "rule_contract_profiles": {
         "default": {
           "must_follow": [
@@ -301,25 +824,71 @@
             "quick-fix 下优先读取 bugfix 与实现说明，不把轻量修复默认升级成完整测试改造。"
           ],
           "blocked_when": [
-            "若关键回归路径已经受损但仍拒绝补测或给出测试建议，不得给出“风险可忽略”的判断。"
+            "若关键回归路径已经受损但仍拒绝补测或给出测试建议，不得给出风险可忽略的判断。"
           ]
         }
       },
-      "required_inputs": ["proposal", "specs", "design", "tasks"],
+      "required_inputs": [
+        "proposal",
+        "specs",
+        "design",
+        "tasks"
+      ],
       "required_outputs": []
     },
     "e2e-test-specialist": {
       "name": "E2E 测试专家",
       "status": "active",
-      "domains": ["testing"],
+      "domains": [
+        "testing"
+      ],
       "source": ".agents/roles/domains/testing/e2e-test-specialist.md",
-      "rule_ids": ["test-standard", "audit-report-standard"],
-      "skill_priority": ["ui-verification", "web-design-guidelines"],
-      "micro_skill_allowlist": ["ui-verification", "web-design-guidelines"],
+      "rule_ids": [
+        "audit-report-standard"
+      ],
+      "rule_ids_by_profile": {
+        "vue": [
+          "test-standard-web"
+        ],
+        "react": [
+          "test-standard-web"
+        ],
+        "springboot": [
+          "test-standard-jvm"
+        ],
+        "node-tooling": [
+          "test-standard-node"
+        ]
+      },
+      "skill_priority": [],
+      "skill_priority_by_profile": {
+        "vue": [
+          "ui-verification",
+          "web-design-guidelines"
+        ],
+        "react": [
+          "ui-verification",
+          "web-design-guidelines"
+        ],
+        "springboot": [],
+        "node-tooling": []
+      },
+      "micro_skill_allowlist_by_profile": {
+        "vue": [
+          "ui-verification",
+          "web-design-guidelines"
+        ],
+        "react": [
+          "ui-verification",
+          "web-design-guidelines"
+        ],
+        "springboot": [],
+        "node-tooling": []
+      },
       "rule_contract_profiles": {
         "default": {
           "must_follow": [
-            "优先围绕关键发布路径设计验证，不穷举所有页面动作。",
+            "优先围绕关键发布路径设计验证，不穷举所有操作。",
             "验证步骤应能直接服务发布前回归，而不是只做理想化脚本清单。"
           ],
           "blocked_when": [
@@ -332,17 +901,64 @@
     "coverage-analyst": {
       "name": "覆盖率分析专家",
       "status": "planned",
-      "domains": ["testing"],
+      "domains": [
+        "testing"
+      ],
       "source": ".agents/roles/domains/testing/coverage-analyst.md"
     },
     "verification-reviewer": {
       "name": "验证评审专家",
       "status": "active",
-      "domains": ["testing"],
+      "domains": [
+        "testing"
+      ],
       "source": ".agents/roles/domains/testing/verification-reviewer.md",
-      "rule_ids": ["style-standard", "test-standard", "audit-report-standard"],
-      "skill_priority": ["ui-verification", "web-design-guidelines"],
-      "micro_skill_allowlist": ["ui-verification", "web-design-guidelines"],
+      "rule_ids": [
+        "audit-report-standard"
+      ],
+      "rule_ids_by_profile": {
+        "vue": [
+          "style-standard",
+          "test-standard-web"
+        ],
+        "react": [
+          "style-standard",
+          "test-standard-web"
+        ],
+        "springboot": [
+          "exception-standard",
+          "test-standard-jvm"
+        ],
+        "node-tooling": [
+          "contract-standard",
+          "test-standard-node"
+        ]
+      },
+      "skill_priority": [],
+      "skill_priority_by_profile": {
+        "vue": [
+          "ui-verification",
+          "web-design-guidelines"
+        ],
+        "react": [
+          "ui-verification",
+          "web-design-guidelines"
+        ],
+        "springboot": [],
+        "node-tooling": []
+      },
+      "micro_skill_allowlist_by_profile": {
+        "vue": [
+          "ui-verification",
+          "web-design-guidelines"
+        ],
+        "react": [
+          "ui-verification",
+          "web-design-guidelines"
+        ],
+        "springboot": [],
+        "node-tooling": []
+      },
       "rule_contract_profiles": {
         "default": {
           "must_follow": [
@@ -354,17 +970,31 @@
           ]
         }
       },
-      "required_inputs": ["proposal", "specs", "design", "tasks"],
+      "required_inputs": [
+        "proposal",
+        "specs",
+        "design",
+        "tasks"
+      ],
       "required_outputs": []
     },
     "pipeline-specialist": {
       "name": "流水线专家",
       "status": "active",
-      "domains": ["delivery"],
+      "domains": [
+        "delivery"
+      ],
       "source": ".agents/roles/domains/delivery/pipeline-specialist.md",
-      "rule_ids": ["coding-standard", "format-check-standard", "audit-report-standard"],
-      "skill_priority": ["config-and-secret-scan"],
-      "micro_skill_allowlist": ["config-and-secret-scan"],
+      "rule_ids": [
+        "coding-standard",
+        "audit-report-standard"
+      ],
+      "skill_priority": [
+        "config-and-secret-scan"
+      ],
+      "micro_skill_allowlist": [
+        "config-and-secret-scan"
+      ],
       "rule_contract_profiles": {
         "default": {
           "must_follow": [
@@ -381,17 +1011,28 @@
     "container-specialist": {
       "name": "容器专家",
       "status": "planned",
-      "domains": ["delivery"],
+      "domains": [
+        "delivery"
+      ],
       "source": ".agents/roles/domains/delivery/container-specialist.md"
     },
     "deployment-specialist": {
       "name": "部署专家",
       "status": "active",
-      "domains": ["delivery"],
+      "domains": [
+        "delivery"
+      ],
       "source": ".agents/roles/domains/delivery/deployment-specialist.md",
-      "rule_ids": ["coding-standard", "format-check-standard", "audit-report-standard"],
-      "skill_priority": ["config-and-secret-scan"],
-      "micro_skill_allowlist": ["config-and-secret-scan"],
+      "rule_ids": [
+        "coding-standard",
+        "audit-report-standard"
+      ],
+      "skill_priority": [
+        "config-and-secret-scan"
+      ],
+      "micro_skill_allowlist": [
+        "config-and-secret-scan"
+      ],
       "rule_contract_profiles": {
         "default": {
           "must_follow": [
@@ -408,27 +1049,48 @@
     "component-doc-specialist": {
       "name": "组件文档专家",
       "status": "planned",
-      "domains": ["documentation"],
+      "domains": [
+        "documentation"
+      ],
       "source": ".agents/roles/domains/documentation/component-doc-specialist.md"
     },
     "api-doc-specialist": {
       "name": "API 文档专家",
       "status": "planned",
-      "domains": ["documentation"],
+      "domains": [
+        "documentation"
+      ],
       "source": ".agents/roles/domains/documentation/api-doc-specialist.md"
     },
     "technical-writing-specialist": {
       "name": "技术文档专家",
       "status": "planned",
-      "domains": ["documentation"],
+      "domains": [
+        "documentation"
+      ],
       "source": ".agents/roles/domains/documentation/technical-writing-specialist.md"
     },
     "performance-auditor": {
       "name": "性能审计专家",
       "status": "active",
-      "domains": ["performance"],
+      "domains": [
+        "performance"
+      ],
       "source": ".agents/roles/domains/performance/performance-auditor.md",
-      "rule_ids": ["coding-standard", "style-standard", "audit-report-standard"],
+      "rule_ids": [
+        "coding-standard",
+        "audit-report-standard"
+      ],
+      "rule_ids_by_profile": {
+        "vue": [
+          "style-standard"
+        ],
+        "react": [
+          "style-standard"
+        ],
+        "springboot": [],
+        "node-tooling": []
+      },
       "skill_priority": [],
       "micro_skill_allowlist": [],
       "rule_contract_profiles": {
@@ -442,27 +1104,40 @@
           ]
         }
       },
-      "required_inputs": ["proposal", "specs", "design", "tasks"],
+      "required_inputs": [
+        "proposal",
+        "specs",
+        "design",
+        "tasks"
+      ],
       "required_outputs": []
     },
     "vitals-analyst": {
       "name": "性能指标专家",
       "status": "planned",
-      "domains": ["performance"],
+      "domains": [
+        "performance"
+      ],
       "source": ".agents/roles/domains/performance/vitals-analyst.md"
     },
     "asset-optimizer": {
       "name": "资源优化专家",
       "status": "planned",
-      "domains": ["performance"],
+      "domains": [
+        "performance"
+      ],
       "source": ".agents/roles/domains/performance/asset-optimizer.md"
     },
     "error-tracker": {
       "name": "错误追踪专家",
       "status": "active",
-      "domains": ["observability"],
+      "domains": [
+        "observability"
+      ],
       "source": ".agents/roles/domains/observability/error-tracker.md",
-      "rule_ids": ["audit-report-standard"],
+      "rule_ids": [
+        "audit-report-standard"
+      ],
       "skill_priority": [],
       "micro_skill_allowlist": [],
       "rule_contract_profiles": {
@@ -480,9 +1155,13 @@
     "rum-analyst": {
       "name": "RUM 分析专家",
       "status": "active",
-      "domains": ["observability"],
+      "domains": [
+        "observability"
+      ],
       "source": ".agents/roles/domains/observability/rum-analyst.md",
-      "rule_ids": ["audit-report-standard"],
+      "rule_ids": [
+        "audit-report-standard"
+      ],
       "skill_priority": [],
       "micro_skill_allowlist": [],
       "rule_contract_profiles": {
@@ -500,11 +1179,52 @@
     "event-instrumentation-specialist": {
       "name": "埋点方案专家",
       "status": "active",
-      "domains": ["observability"],
+      "domains": [
+        "observability"
+      ],
       "source": ".agents/roles/domains/observability/event-instrumentation-specialist.md",
-      "rule_ids": ["api-standard", "doc-standard", "audit-report-standard"],
-      "skill_priority": ["design-analysis"],
-      "micro_skill_allowlist": ["design-analysis"],
+      "rule_ids": [
+        "doc-standard",
+        "audit-report-standard"
+      ],
+      "rule_ids_by_profile": {
+        "vue": [
+          "api-standard"
+        ],
+        "react": [
+          "api-standard"
+        ],
+        "springboot": [
+          "api-contract-standard"
+        ],
+        "node-tooling": [
+          "contract-standard"
+        ]
+      },
+      "skill_priority": [
+        "design-analysis"
+      ],
+      "skill_priority_by_profile": {
+        "vue": [
+          "design-analysis"
+        ],
+        "react": [
+          "design-analysis"
+        ],
+        "springboot": [],
+        "node-tooling": []
+      },
+      "micro_skill_allowlist": [],
+      "micro_skill_allowlist_by_profile": {
+        "vue": [
+          "design-analysis"
+        ],
+        "react": [
+          "design-analysis"
+        ],
+        "springboot": [],
+        "node-tooling": []
+      },
       "rule_contract_profiles": {
         "default": {
           "must_follow": [
@@ -521,19 +1241,25 @@
     "security-reviewer": {
       "name": "安全审查专家",
       "status": "planned",
-      "domains": ["security-a11y"],
+      "domains": [
+        "security-a11y"
+      ],
       "source": ".agents/roles/domains/security-a11y/security-reviewer.md"
     },
     "a11y-auditor": {
       "name": "可访问性审计专家",
       "status": "planned",
-      "domains": ["security-a11y"],
+      "domains": [
+        "security-a11y"
+      ],
       "source": ".agents/roles/domains/security-a11y/a11y-auditor.md"
     },
     "aria-specialist": {
       "name": "ARIA 专家",
       "status": "planned",
-      "domains": ["security-a11y"],
+      "domains": [
+        "security-a11y"
+      ],
       "source": ".agents/roles/domains/security-a11y/aria-specialist.md"
     }
   }

@@ -11,7 +11,7 @@ description: 供插件页面读取的角色展示索引。优先解析下方的 
 
 当前统计：
 
-- `active` 角色：19 个
+- `active` 角色：21 个
 - `planned` 候选角色：13 个
 
 插件页面建议优先解析下面的 `yaml` 数据块。
@@ -86,6 +86,22 @@ roles:
     visibility: public
     domains: [engineering, delivery]
     source: .agents/roles/common/frontend-implementer.md
+
+  - id: backend-implementer
+    name: 后端实现专家
+    status: active
+    bucket: common
+    visibility: public
+    domains: [engineering, delivery]
+    source: .agents/roles/common/backend-implementer.md
+
+  - id: tooling-implementer
+    name: 工具仓实现专家
+    status: active
+    bucket: common
+    visibility: public
+    domains: [engineering, delivery]
+    source: .agents/roles/common/tooling-implementer.md
 
   - id: code-guardian
     name: 规范守护者

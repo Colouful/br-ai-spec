@@ -21,10 +21,6 @@
       "source": ".agents/skills/common/dependency-impact-graph/SKILL.md",
       "domains": ["engineering"]
     },
-    "design-analysis": {
-      "source": ".agents/skills/common/design-analysis/SKILL.md",
-      "domains": ["demand-design"]
-    },
     "execute-task": {
       "source": ".agents/skills/common/execute-task/SKILL.md",
       "domains": ["governance"]
@@ -41,14 +37,6 @@
       "source": ".agents/skills/common/project-init/SKILL.md",
       "domains": ["documentation"]
     },
-    "ui-ux-pro-max": {
-      "source": ".agents/skills/domains/ui-ux-pro-max/SKILL.md",
-      "domains": ["demand-design"]
-    },
-    "route-permission-map": {
-      "source": ".agents/skills/common/route-permission-map/SKILL.md",
-      "domains": ["governance"]
-    },
     "skill-creator": {
       "source": ".agents/skills/common/skill-creator/SKILL.md",
       "domains": ["documentation"]
@@ -57,17 +45,33 @@
       "source": ".agents/skills/common/skill-optimizer/SKILL.md",
       "domains": ["documentation"]
     },
-    "ui-verification": {
-      "source": ".agents/skills/common/ui-verification/SKILL.md",
-      "domains": ["testing"]
-    },
     "using-superpowers": {
       "source": ".agents/skills/common/using-superpowers/SKILL.md",
       "domains": ["orchestration"]
     },
+    "ui-ux-pro-max": {
+      "source": ".agents/skills/domains/ui-ux-pro-max/SKILL.md",
+      "domains": ["demand-design"]
+    },
+    "design-analysis": {
+      "source": ".agents/skills/domains/web/design-analysis/SKILL.md",
+      "domains": ["demand-design"],
+      "project_types": ["frontend"]
+    },
+    "route-permission-map": {
+      "source": ".agents/skills/domains/web/route-permission-map/SKILL.md",
+      "domains": ["governance"],
+      "project_types": ["frontend"]
+    },
+    "ui-verification": {
+      "source": ".agents/skills/domains/web/ui-verification/SKILL.md",
+      "domains": ["testing"],
+      "project_types": ["frontend"]
+    },
     "web-design-guidelines": {
-      "source": ".agents/skills/common/web-design-guidelines/SKILL.md",
-      "domains": ["testing"]
+      "source": ".agents/skills/domains/web/web-design-guidelines/SKILL.md",
+      "domains": ["testing"],
+      "project_types": ["frontend"]
     },
     "create-api": {
       "sourceByProfile": {

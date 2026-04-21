@@ -8,6 +8,8 @@ description: 定义 task-orchestrator 在首轮规划、审批阻断、审批放
 
 # 主代理运行态钩子规范
 
+> **Profile 驱动说明（V1）**：本规范中的示例以 `frontend-implementer` 作为实现角色。实际运行时，应从 `.ai-spec/manifest.json` 读取 `profile`，再从 `.agents/registry/profiles.json` 查询 `implementation_role`，动态决定交接的实现角色（`frontend-implementer` / `backend-implementer` / `tooling-implementer`）。
+
 ## 1. 目的
 
 这份规范不直接替代真正的运行器代码，它解决的是：

@@ -21,6 +21,7 @@ npx @ex/ai-spec-auto@latest init .
 - [Skill 官方审计基线](./Skill官方审计基线.md)
 - [项目介绍与运行机制说明](./项目介绍与运行机制说明.md)
 - [架构设计与治理说明](./架构设计与治理说明.md)
+- [多项目类型与 Profile 扩展改造方案](./多项目类型与Profile扩展改造方案.md)
 
 ## 推荐阅读路径
 
@@ -43,10 +44,11 @@ npx @ex/ai-spec-auto@latest init .
 
 1. [项目介绍与运行机制说明](./项目介绍与运行机制说明.md)
 2. [架构设计与治理说明](./架构设计与治理说明.md)
-3. [OpenSpec / 协议流说明](../openspec-guide.md)
-4. [Hub 资产同步脚本说明](./Hub资产同步脚本说明.md)
-5. [Skill 官方标准与创建规范](./Skill官方标准与创建规范.md)
-6. [Skill 官方审计基线](./Skill官方审计基线.md)
+3. [多项目类型与 Profile 扩展改造方案](./多项目类型与Profile扩展改造方案.md)
+4. [OpenSpec / 协议流说明](../openspec-guide.md)
+5. [Hub 资产同步脚本说明](./Hub资产同步脚本说明.md)
+6. [Skill 官方标准与创建规范](./Skill官方标准与创建规范.md)
+7. [Skill 官方审计基线](./Skill官方审计基线.md)
 
 适合需要理解协议链路、运行状态、故障定位和后续治理规划的维护者与评审人员。
 
