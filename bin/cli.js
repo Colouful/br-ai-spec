@@ -7,8 +7,16 @@ const env = { ...process.env, BR_AI_SPEC_LOCAL: pkgRoot };
 const opts = { stdio: 'inherit', cwd: process.cwd(), env };
 const INSTALL_COMMANDS = new Set(['init', 'update', 'check', 'uninstall', 'sync', 'help']);
 
+const VERSION_FLAGS = new Set(['-v', '-V', '-version', '--version', 'version']);
+
 (async () => {
   try {
+    if (args.length > 0 && VERSION_FLAGS.has(args[0])) {
+      const pkg = require(path.join(pkgRoot, 'package.json'));
+      console.log(pkg.version);
+      process.exit(0);
+    }
+
     if (env.AI_SPEC_SKIP_LAUNCHER_SYNC !== '1') {
       try {
         const runtimeLauncher = require('./runtime-launcher');
