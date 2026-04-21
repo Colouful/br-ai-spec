@@ -96,16 +96,19 @@ const VERSION_FLAGS = new Set(['-v', '-V', '-version', '--version', 'version']);
     }
 
     if (args[0] === 'protocol-step') {
+      await require('../internal/visual-hooks/inbox-consumer').consumeInbox({ targetDir: opts.cwd, timeoutMs: 50 }).catch(() => {});
       const protocolWorkflow = require('./protocol-workflow');
       process.exit(protocolWorkflow.main('step', args.slice(1)));
     }
 
     if (args[0] === 'protocol-advance') {
+      await require('../internal/visual-hooks/inbox-consumer').consumeInbox({ targetDir: opts.cwd, timeoutMs: 50 }).catch(() => {});
       const protocolWorkflow = require('./protocol-workflow');
       process.exit(protocolWorkflow.main('advance', args.slice(1)));
     }
 
     if (args[0] === 'protocol-update') {
+      await require('../internal/visual-hooks/inbox-consumer').consumeInbox({ targetDir: opts.cwd, timeoutMs: 50 }).catch(() => {});
       const protocolWorkflow = require('./protocol-workflow');
       process.exit(protocolWorkflow.main('update', args.slice(1)));
     }
@@ -116,6 +119,7 @@ const VERSION_FLAGS = new Set(['-v', '-V', '-version', '--version', 'version']);
     }
 
     if (args[0] === 'protocol-status') {
+      await require('../internal/visual-hooks/inbox-consumer').consumeInbox({ targetDir: opts.cwd, timeoutMs: 50 }).catch(() => {});
       const protocolWorkflow = require('./protocol-workflow');
       process.exit(protocolWorkflow.main('status', args.slice(1)));
     }
@@ -143,6 +147,11 @@ const VERSION_FLAGS = new Set(['-v', '-V', '-version', '--version', 'version']);
     if (args[0] === 'visual-bridge') {
       const visualBridge = require('./visual-bridge');
       process.exit(await visualBridge.main(args.slice(1)));
+    }
+
+    if (args[0] === 'visual') {
+      const visualCommand = require('./visual-command');
+      process.exit(await visualCommand.main(args.slice(1)));
     }
 
     throw new Error(`Unknown command: ${args[0]}`);

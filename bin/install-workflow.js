@@ -174,6 +174,7 @@ function parseArgs(argv) {
     visualBridge: 'yes',  // 默认启用，不再提示
     updateSkills: 'yes',
     updateRules: 'yes',
+    forceUpdateRules: 'ask',
     updateConfigs: 'yes',
     updateCommands: 'yes',
     updateIdeLinks: 'yes',
@@ -286,6 +287,12 @@ function parseArgs(argv) {
         break;
       case '--no-update-rules':
         options.updateRules = 'no';
+        break;
+      case '--force-update-rules':
+        options.forceUpdateRules = 'yes';
+        break;
+      case '--no-force-update-rules':
+        options.forceUpdateRules = 'no';
         break;
       case '--skip-skills':
         options.updateSkills = 'no';
@@ -1455,6 +1462,10 @@ function copyAgents(targetDir, sourceDir, profilesRegistry, options, copyMode = 
           warn(`跳过项目特有规则: ${fileName}（已存在）`);
           continue;
         }
+        if (copyMode.skipExistingRules && fs.existsSync(destPath)) {
+          info(`  跳过已存在规则: ${fileName}（如需强制覆盖请使用 --force-update-rules）`);
+          continue;
+        }
         copyFile(sourcePath, destPath);
         if (PROJECT_SPECIFIC_RULES.has(fileName)) {
           info(`已生成模板: ${fileName} → 请根据项目实际情况修改`);
@@ -2399,10 +2410,27 @@ async function handleUpdate(options) {
     }
   }
 
+  if (options.updateRules === 'yes' && options.forceUpdateRules === 'ask') {
+    if (isInteractive()) {
+      options.forceUpdateRules = await selectFromList(
+        '是否强制更新已有规则？（默认否，已存在的规则文件将被保留）',
+        [
+          { value: 'no', label: '否（默认）', desc: '保留已存在的规则文件，仅补充缺失规则' },
+          { value: 'yes', label: '是', desc: '覆盖所有已存在的规则文件（项目特有规则 01/03 仍保留）' },
+        ],
+        0,
+      );
+      ok(options.forceUpdateRules === 'yes' ? '将强制覆盖已有规则' : '保留已有规则，仅补充缺失项');
+    } else {
+      options.forceUpdateRules = 'no';
+    }
+  }
+  if (options.forceUpdateRules === 'ask') options.forceUpdateRules = 'no';
+
   console.log('');
   console.log(color('── 变更摘要 ──', 'bold'));
   console.log(`  Skills:   ${options.updateSkills === 'yes' ? '更新' : '跳过'}`);
-  console.log(`  Rules:    ${options.updateRules === 'yes' ? '更新（保留项目特有/自定义）' : '跳过'}`);
+  console.log(`  Rules:    ${options.updateRules === 'yes' ? (options.forceUpdateRules === 'yes' ? '强制覆盖（保留项目特有 01/03 与自定义）' : '仅补充缺失（保留已有规则）') : '跳过'}`);
   console.log(`  Configs:  ${options.updateConfigs === 'yes' ? '同步（已存在的不覆盖）' : '跳过'}`);
   console.log(`  Commands: ${options.updateCommands === 'yes' ? '同步（覆盖已有命令）' : '同步（仅补新增）'}`);
   console.log(`  IDE Links:${options.updateIdeLinks === 'yes' ? ' 重建' : ' 跳过'}`);
@@ -2423,6 +2451,7 @@ async function handleUpdate(options) {
     copyAgents(targetDir, sourceDir, profilesRegistry, options, {
       skipRules: options.updateRules !== 'yes',
       skipSkills: options.updateSkills !== 'yes',
+      skipExistingRules: options.updateRules === 'yes' && options.forceUpdateRules !== 'yes',
     });
   }
   syncProtocolAssets(targetDir, sourceDir);
@@ -2640,6 +2669,8 @@ function printUsage() {
   console.log('  --hub-origin <origin>      本地 manifest 缺失资产时指定 Hub 补充来源');
   console.log('  --no-hub-fetch             禁止通过 Hub 补充下载缺失资产');
   console.log('  --skip-skills              update 时跳过 skills');
+  console.log('  --force-update-rules       update 时强制覆盖已有规则（默认保留）');
+  console.log('  --no-force-update-rules    update 时保留已有规则（默认行为）');
   console.log('  --skip-configs             update 时跳过 configs');
   console.log('  --skip-commands            update 时仅补新增命令模板');
   console.log('  --skip-ide-links           update 时跳过 IDE 链接');
