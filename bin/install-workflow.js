@@ -58,8 +58,11 @@ const CUSTOMIZABLE_RULES = [
   ['09-样式规范.md', 'CSS Modules/Scoped、主题变量、全局样式'],
 ];
 const PROFILE_SUMMARIES = {
-  vue: 'Vue',
-  react: 'React',
+  vue: 'Frontend / Vue',
+  react: 'Frontend / React',
+  nestjs: 'Backend / NestJS',
+  springboot: 'Backend / Spring Boot',
+  'node-tooling': 'Tooling / Node.js',
 };
 const DEFAULT_CUSTOM_RULE_SELECTION = CUSTOMIZABLE_RULES.map(([name]) => name);
 const INSTALL_STATE_FILE = '.ai-spec/install-state.json';
@@ -159,6 +162,7 @@ function parseArgs(argv) {
     target: '.',
     manifest: '',
     profile: DEFAULT_PROFILE,
+    profiles: [],
     level: DEFAULT_LEVEL,
     ideFilter: DEFAULT_IDE_FILTER,
     rulesStrategy: 'ask',
@@ -206,6 +210,13 @@ function parseArgs(argv) {
         break;
       case '--profile':
         options.profile = requireArg(arg, args);
+        options.profileExplicit = true;
+        break;
+      case '--profiles':
+        options.profiles = requireArg(arg, args)
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean);
         options.profileExplicit = true;
         break;
       case '--level':
@@ -674,6 +685,23 @@ function writeInstallState(targetDir, sourceDir, previousState, additions = {}) 
   writeJson(getInstallStatePath(targetDir), nextState);
 }
 
+function writeProfileManifest(targetDir, options) {
+  const manifestPath = path.join(targetDir, '.ai-spec', 'manifest.json');
+  const existing = fs.existsSync(manifestPath) ? readJson(manifestPath, 'manifest') : {};
+  const profiles = options.profiles && options.profiles.length > 0 ? options.profiles : [options.profile];
+  const next = {
+    ...existing,
+    profiles,
+    profile: profiles[0],
+    generated_at: new Date().toISOString(),
+  };
+  if (options.packages && options.packages.length > 0) {
+    next.packages = options.packages;
+  }
+  ensureDir(path.dirname(manifestPath));
+  writeJson(manifestPath, next);
+}
+
 function sortPathsForRemoval(paths) {
   return [...new Set(paths)].sort((left, right) => {
     const leftDepth = left.split('/').length;
@@ -782,6 +810,10 @@ function detectInstalledProfile(targetDir, profilesRegistry) {
   const manifestPath = path.join(targetDir, '.ai-spec', 'manifest.json');
   if (fs.existsSync(manifestPath)) {
     const manifest = readJson(manifestPath, 'existing manifest');
+    // profiles 数组优先
+    if (Array.isArray(manifest.profiles) && manifest.profiles.length > 0) {
+      return manifest.profiles[0];
+    }
     const resolved = resolveProfileId(profilesRegistry, manifest.profile);
     if (resolved) {
       return resolved;
@@ -1195,8 +1227,12 @@ async function selectInitChoices(options, profilesRegistry) {
       label: id,
       desc: PROFILE_SUMMARIES[id] || entry.label || id,
     }));
-    options.profile = await selectFromList('选择技术栈 Profile：', profileItems, Math.max(0, profileItems.findIndex((item) => item.value === DEFAULT_PROFILE)));
-    ok(`已选择 Profile: ${options.profile}`);
+    options.profiles = await selectMultipleFromList('选择技术栈 Profile（可多选，空格选中，回车确认）：', profileItems, {
+      minSelection: 1,
+      defaultValues: options.profiles.length ? options.profiles : [],
+    });
+    options.profile = options.profiles[0] || DEFAULT_PROFILE;
+    ok(`已选择 Profile: ${options.profiles.join(', ')}`);
   }
 
   await selectRulesStrategy(options);
@@ -1399,13 +1435,14 @@ function copyAgents(targetDir, sourceDir, profilesRegistry, options, copyMode = 
   ensureDir(rulesOut);
   ensureDir(skillsOut);
 
-  const { rulesDir, skillsDir } = getProfileDirs(sourceDir, options.profile, profilesRegistry);
+  const profileList = options.profiles && options.profiles.length > 0 ? options.profiles : [options.profile];
   const commonRulesDir = path.join(sourceDir, '.agents', 'rules', 'common');
   const commonSkillsDir = path.join(sourceDir, '.agents', 'skills', 'common');
 
   if (!copyMode.skipRules) {
-    info(`同步 rules (common + ${path.relative(sourceDir, rulesDir).split(path.sep).join('/')}) ...`);
-    for (const sourceRuleDir of [commonRulesDir, rulesDir]) {
+    const profileRulesDirs = profileList.map((profileId) => getProfileDirs(sourceDir, profileId, profilesRegistry).rulesDir);
+    info(`同步 rules (common + ${profileList.join(', ')}) ...`);
+    for (const sourceRuleDir of [commonRulesDir, ...profileRulesDirs]) {
       if (!fs.existsSync(sourceRuleDir)) continue;
       for (const fileName of fs.readdirSync(sourceRuleDir).filter((name) => name.endsWith('.md'))) {
         const sourcePath = path.join(sourceRuleDir, fileName);
@@ -1430,8 +1467,9 @@ function copyAgents(targetDir, sourceDir, profilesRegistry, options, copyMode = 
   }
 
   if (!copyMode.skipSkills) {
-    info(`同步 skills (common + ${path.relative(sourceDir, skillsDir).split(path.sep).join('/')}) ...`);
-    for (const sourceSkillsDir of [commonSkillsDir, skillsDir]) {
+    const profileSkillsDirs = profileList.map((profileId) => getProfileDirs(sourceDir, profileId, profilesRegistry).skillsDir);
+    info(`同步 skills (common + ${profileList.join(', ')}) ...`);
+    for (const sourceSkillsDir of [commonSkillsDir, ...profileSkillsDirs]) {
       if (!fs.existsSync(sourceSkillsDir)) continue;
       for (const entry of fs.readdirSync(sourceSkillsDir, { withFileTypes: true })) {
         if (!entry.isDirectory()) continue;
@@ -1443,7 +1481,7 @@ function copyAgents(targetDir, sourceDir, profilesRegistry, options, copyMode = 
     info('跳过 skills 同步（用户选择不更新技能）');
   }
 
-  ok(`.agents/ 同步完成 (profile: ${options.profile})`);
+  ok(`.agents/ 同步完成 (profiles: ${profileList.join(', ')})`);
 }
 
 function readInstallRegistry(sourceDir, fileName, objectKey) {
@@ -1607,7 +1645,8 @@ function installLintDeps(targetDir, pkgManager, options, pending) {
     return { addedPackages: [], prepareScript: '' };
   }
   const deps = [...LINT_DEP_SPECS];
-  if (options.profile === 'vue') {
+  const profileList = options.profiles && options.profiles.length > 0 ? options.profiles : [options.profile];
+  if (profileList.includes('vue')) {
     deps.push(...VUE_LINT_DEP_SPECS);
   }
   const beforeSnapshot = readPackageSnapshot(targetDir);
@@ -1996,7 +2035,7 @@ function printInstallReport(targetDir, options, pending) {
   console.log(color('════════════════════════════════════════', 'bold'));
   console.log('');
   info('安装配置：');
-  console.log(`  Profile:  ${color(options.profile, 'bold')}`);
+  console.log(`  Profile:  ${color((options.profiles && options.profiles.length > 0 ? options.profiles : [options.profile]).join(', '), 'bold')}`);
   console.log(`  安装模式: ${color(installMode, 'bold')}`);
   console.log(`  安装模型: ${color(options.level === DEFAULT_LEVEL ? 'default (full)' : 'compatibility override', 'bold')}`);
   if (options.level !== DEFAULT_LEVEL) {
@@ -2018,7 +2057,7 @@ function printInstallReport(targetDir, options, pending) {
   }
   console.log('');
   info('已部署内容：');
-  console.log(`  ${color('✔', 'green')} .agents/rules + skills + roles + flows + orchestration (profile: ${options.profile})`);
+  console.log(`  ${color('✔', 'green')} .agents/rules + skills + roles + flows + orchestration (profiles: ${(options.profiles && options.profiles.length > 0 ? options.profiles : [options.profile]).join(', ')})`);
   console.log(`  ${options.installLint === 'yes' ? color('✔', 'green') : color('—', 'yellow')} lint/format 配置${options.installLint === 'yes' ? ' (.prettierrc, .eslintrc, .stylelintrc)' : '（已跳过）'}`);
   console.log(`  ${options.installHusky === 'yes' ? color('✔', 'green') : color('—', 'yellow')} 提交校验${options.installHusky === 'yes' ? ' (.husky, .lintstagedrc, commitlint.config.js)' : '（已跳过）'}`);
   if (hasInstalledUiproData(targetDir)) {
@@ -2215,7 +2254,15 @@ async function handleInit(options) {
     addedDevDependencies: [],
     prepareScript: '',
   };
-  options.profile = resolveProfileId(profilesRegistry, options.profile) || DEFAULT_PROFILE;
+
+  // 规范化 profiles：--profiles 优先，其次 --profile，最后 DEFAULT_PROFILE
+  if (options.profiles && options.profiles.length > 0) {
+    options.profiles = options.profiles.map((p) => resolveProfileId(profilesRegistry, p)).filter(Boolean);
+  } else {
+    const resolved = resolveProfileId(profilesRegistry, options.profile) || DEFAULT_PROFILE;
+    options.profiles = [resolved];
+  }
+  options.profile = options.profiles[0];
 
   testNodeEnv();
   const targetDir = await resolveMonorepoTarget(options.target, options);
@@ -2293,6 +2340,7 @@ async function handleInit(options) {
     });
   }
   writeInstallState(targetDir, sourceDir, previousInstallState, installStateAdditions);
+  writeProfileManifest(targetDir, options);
   printTools(options.level, options.uipro);
   printInstallReport(targetDir, options, pending);
   return pending.failures.length > 0 ? 1 : 0;
@@ -2575,7 +2623,8 @@ function printUsage() {
   console.log('  uninstall [dir]   卸载规范库');
   console.log('');
   console.log('常用选项：');
-  console.log('  --profile <name>           技术栈（vue | react）');
+  console.log('  --profile <name>           技术栈（vue | react | nestjs | springboot | node-tooling）');
+  console.log('  --profiles <a,b,...>       多技术栈（逗号分隔，如 vue,nestjs）');
   console.log('  --level <L1|L2|L3>         兼容参数，默认仍等价完整安装');
   console.log('  --standard-rules           使用标准规则集（manifest 模式下表示沿用安装模板）');
   console.log('  --custom-rules             启用自定义规则模式（manifest 模式下表示 /project-init 刷新偏好）');

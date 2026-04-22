@@ -71,38 +71,45 @@ metadata:
 按下面顺序判断：
 
 1. 已存在 `.ai-spec/manifest.json` 且包含 `profile` / `profiles` 字段 → 直接使用已记录的值
-2. `package.json` 中存在 `vue`、`@vitejs/plugin-vue`、`nuxt` 等依赖 → 判定为 `vue`
-3. `package.json` 中存在 `react`、`next`、`@vitejs/plugin-react` 等依赖 → 判定为 `react`
-4. `package.json` 中存在 `@nestjs/core`、`@nestjs/common` 等依赖 → 判定为 `nestjs`
-5. 存在 `pom.xml` 或 `build.gradle`（且无 `package.json`）→ 提示用户确认是否为 `springboot`
-6. 存在 `package.json` + 主要依赖为工具链相关（commander、yargs、zod 等），且无 UI/服务端框架 → 提示用户确认是否为 `node-tooling`
-7. **同一仓库同时命中多个技术栈**（如根目录有 `packages/front`（Vue）和 `packages/server`（NestJS））→ 判定为**多 profile 场景**，见下方「多 profile 处理」
-8. 无法可靠判断时：**不得默认为 `vue`**，必须让用户从以下选项中明确选择：
-   - `1. vue` - Frontend / Vue
-   - `2. react` - Frontend / React
-   - `3. nestjs` - Backend / NestJS
-   - `4. springboot` - Backend / Spring Boot
-   - `5. node-tooling` - Tooling / Node.js Tooling
+2. `package.json` 中存在 `vue`、`@vitejs/plugin-vue`、`nuxt` 等依赖 → 命中 `vue`
+3. `package.json` 中存在 `react`、`next`、`@vitejs/plugin-react` 等依赖 → 命中 `react`
+4. `package.json` 中存在 `@nestjs/core`、`@nestjs/common` 等依赖 → 命中 `nestjs`
+5. 存在 `pom.xml` 或 `build.gradle`（且无 `package.json`）→ 命中 `springboot`（待确认）
+6. 存在 `package.json` + 主要依赖为工具链相关（commander、yargs、zod 等），且无 UI/服务端框架 → 命中 `node-tooling`（待确认）
+7. 命中结果处理：
+   - 命中 **1 个** profile 且置信度高 → 直接使用，执行前说明推断结果
+   - 命中 **多个** profile（如 `vue` + `nestjs`）→ 进入"多 profile 确认"流程（见下方）
+   - 命中 **0 个** 或置信度低 → 进入"用户手动选择"流程（见下方）
 
-#### 多 profile 处理
+#### 多 profile 确认（自动命中多个时）
 
-当同一仓库根目录下检测到多个不同技术栈的子包（如 `packages/front` + `packages/server`），执行以下逻辑：
+展示推断结果，让用户确认或补充：
 
-- 对每个子包分别推断 profile（参照步骤 2-6）
-- 在根目录写入单个 `.ai-spec/manifest.json`，使用 `profiles` 数组：
+```
+检测到以下技术栈：
+  [x] vue      packages/front/
+  [x] nestjs   packages/server/
 
-```json
-{
-  "profiles": ["vue", "nestjs"],
-  "packages": [
-    { "name": "front",  "path": "packages/front",  "profile": "vue" },
-    { "name": "server", "path": "packages/server", "profile": "nestjs" }
-  ]
-}
+请确认或修改，然后继续。
 ```
 
-- 规则统一安装到根目录 `.agents/rules/`，不在子包内创建独立 `.agents/`
-- 若用户未说明，先简要展示推断结果再确认，不要擅自写入
+#### 用户手动选择（无法自动推断时）
+
+展示多选提示，**允许选择多个**：
+
+```
+请选择当前项目的技术栈（可多选，空格选中，回车确认）：
+
+  [ ] vue          Frontend / Vue
+  [ ] react        Frontend / React
+  [ ] nestjs       Backend / NestJS
+  [ ] springboot   Backend / Spring Boot
+  [ ] node-tooling Tooling / Node.js
+
+> 选择后按回车继续
+```
+
+**不得默认勾选任何项，不得在用户未确认时擅自写入。**
 
 ### 3. 判断安装目标
 
@@ -231,7 +238,8 @@ npx @ex/ai-spec-auto@latest check .
 
 - 不要把 `project-init(项目规范初始化)` 当成首次安装命令
 - 不要忘记追加 `--custom-rules(自定义规则)`，否则非交互模式会回退到标准规则
-- **无法推断 profile 时，不得默认为 `vue`**，必须让用户明确选择
+- **无法推断 profile 时，不得默认为 `vue`**，必须展示多选提示让用户明确选择
+- 兜底提示必须是**多选**，不能是单选数字列表——用户可能同时需要 vue + nestjs
 - 同一仓库含多技术栈子包时，**在根目录安装**，写多 profile manifest；不要分别进入子包目录各自安装一套 `.agents/`
 - NestJS 项目依据 `@nestjs/core` 依赖识别，**不要把它归为 `node-tooling`**
 - 不要漏掉 `@ex:registry(内网包仓库)` 检查，否则 `npx(包执行命令)` 很可能失败
