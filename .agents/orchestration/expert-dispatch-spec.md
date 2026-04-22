@@ -9,6 +9,8 @@ description: 定义当前运行态如何生成并更新当前专家执行载荷�
 # 专家派发载荷规范
 
 > **Profile 驱动说明（V1）**：本规范中的示例以 `frontend-implementer` 作为实现角色。实际派发时，`expert.id` 应根据当前 profile 的 `implementation_role` 动态填入（`frontend-implementer` / `backend-implementer` / `tooling-implementer`）。
+>
+> **多 profile 说明**：当 manifest 使用 `profiles` 数组时（如 `["vue", "nestjs"]`），`task-orchestrator` 须先通过"路径前缀匹配"确定本次变更属于哪个子包，再取对应 profile 的 `implementation_role` 作为 `expert.id`。
 
 ## 1. 目的
 
@@ -124,3 +126,30 @@ cat ./.ai-spec/internal/tmp/current-dispatch.json | ai-spec-auto expert-dispatch
 补充：
 
 - 若当前流程是 `prd-to-delivery（需求到交付）` 且目标角色是 `requirement-analyst / frontend-implementer / code-guardian`，则 `task.change_id` 缺失应视为非法派发
+
+## 6. 多 profile 下的角色选择规则
+
+当 `.ai-spec/manifest.json` 的 `profiles` 为数组时，`task-orchestrator` 按以下逻辑确定 `expert.id`：
+
+1. 检查本次任务涉及的文件路径列表
+2. 将路径与 `manifest.packages[].path` 逐一做**前缀匹配**
+3. 命中某子包 → 取该子包对应 profile 的 `implementation_role`（从 `profiles.json` 查询）
+4. 多个文件跨多个子包 → 按主体变更量所在子包决定，或拆成多轮派发
+5. 无法匹配任何子包（如根目录配置文件修改）→ 优先使用 `code-guardian` 角色处理，不要猜测技术栈
+
+**示例（vue + nestjs）**：
+
+```
+packages/front/src/components/Foo.vue  → profile: vue  → implementation_role: frontend-implementer
+packages/server/src/user/user.service.ts → profile: nestjs → implementation_role: backend-implementer
+```
+
+`execution.profile` 字段应填写本次实际生效的 profile（非数组，填具体值）：
+
+```json
+"execution": {
+  "profile": "nestjs",
+  "current_role": "backend-implementer",
+  ...
+}
+```
