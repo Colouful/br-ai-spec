@@ -439,20 +439,44 @@ async function main() {
   result = runCli(['init', cursorProtocolTarget, '--profile', 'vue', '--level', 'L2', '--ide', 'cursor', '--skip-commands', '--no-lint', '--no-husky', '--no-uipro']);
   assert.strictEqual(result.status, 0, result.stderr);
   const cursorSpecStart = readText(path.join(cursorProtocolTarget, '.cursor', 'commands', 'spec-start.md'));
+  const cursorSpecStartReview = readText(path.join(cursorProtocolTarget, '.cursor', 'commands', 'spec-start-review.md'));
   const cursorSpecContinue = readText(path.join(cursorProtocolTarget, '.cursor', 'commands', 'spec-continue.md'));
   const cursorSpecUpdate = readText(path.join(cursorProtocolTarget, '.cursor', 'commands', 'spec-update.md'));
   assert.ok(cursorSpecStart.startsWith('---\n'));
   assert.ok(cursorSpecStart.includes('name: /spec-start'));
-  assert.ok(cursorSpecStart.includes('$HOME/.ai-spec-auto/bin/ai-spec-auto'));
+  assert.ok(cursorSpecStart.includes('BR_AI_SPEC_FORCE_LOCAL_PROTOCOL=1 ./node_modules/.bin/ai-spec-auto'));
   assert.ok(cursorSpecStart.includes('protocol-step --target . --user-input'));
+  assert.ok(cursorSpecStartReview.startsWith('---\n'));
+  assert.ok(cursorSpecStartReview.includes('name: /spec-start-review'));
+  assert.ok(cursorSpecStartReview.includes('BR_AI_SPEC_FORCE_LOCAL_PROTOCOL=1 ./node_modules/.bin/ai-spec-auto'));
+  assert.ok(cursorSpecStartReview.includes('main-flow-blocking'));
+  assert.ok(cursorSpecStartReview.includes('--mode'));
+  assert.ok(cursorSpecStartReview.includes('--flow'));
+  assert.ok(cursorSpecStartReview.includes('--review-policy'));
+  assert.ok(cursorSpecStartReview.includes('/spec-start-review 创建订单列表 mock 页面'));
+  assert.ok(cursorSpecStartReview.includes('/spec-start-review --mode suggest 创建订单列表 mock 页面'));
+  assert.ok(cursorSpecStartReview.includes('/spec-start-review --mode manual --flow prd-to-delivery 创建订单列表 mock 页面'));
   assert.ok(cursorSpecContinue.startsWith('---\n'));
-  assert.ok(cursorSpecContinue.includes('$HOME/.ai-spec-auto/bin/ai-spec-auto'));
+  assert.ok(cursorSpecContinue.includes('BR_AI_SPEC_FORCE_LOCAL_PROTOCOL=1 ./node_modules/.bin/ai-spec-auto'));
   assert.ok(cursorSpecContinue.includes('protocol-advance --target . --json'));
   assert.ok(cursorSpecContinue.includes('protocol-update --target . --user-input'));
   assert.ok(cursorSpecUpdate.startsWith('---\n'));
-  assert.ok(cursorSpecUpdate.includes('$HOME/.ai-spec-auto/bin/ai-spec-auto'));
+  assert.ok(cursorSpecUpdate.includes('BR_AI_SPEC_FORCE_LOCAL_PROTOCOL=1 ./node_modules/.bin/ai-spec-auto'));
   assert.ok(cursorSpecUpdate.includes('protocol-update --target . --user-input'));
   assert.ok(!fs.existsSync(path.join(cursorProtocolTarget, '.claude')));
+
+  const reviewCommandInitTarget = createWorkspace('ai-spec-init-review-command-');
+  writeJson(path.join(reviewCommandInitTarget, 'package.json'), {
+    name: 'review-command-init-smoke',
+    version: '1.0.0',
+  });
+  result = runCli(['init', reviewCommandInitTarget, '--profile', 'vue', '--level', 'L2', '--ide', 'cursor,claude,codex', '--no-lint', '--no-husky', '--no-uipro']);
+  assert.strictEqual(result.status, 0, result.stderr);
+  assert.ok(fs.existsSync(path.join(reviewCommandInitTarget, '.cursor', 'commands', 'spec-start-review.md')));
+  assert.ok(fs.existsSync(path.join(reviewCommandInitTarget, '.claude', 'commands', 'spec-start-review.md')));
+  assert.ok(fs.existsSync(path.join(reviewCommandInitTarget, '.codex', 'commands', 'spec-start-review.md')));
+  assert.ok(readText(path.join(reviewCommandInitTarget, '.claude', 'commands', 'spec-start-review.md')).includes('$ARGUMENTS'));
+  assert.ok(readText(path.join(reviewCommandInitTarget, '.codex', 'commands', 'spec-start-review.md')).includes('$ARGUMENTS'));
 
   const uiproTarget = createWorkspace('ai-spec-uipro-install-');
   writeJson(path.join(uiproTarget, 'package.json'), {
@@ -638,9 +662,15 @@ exit 1
   assert.ok(fs.existsSync(path.join(updateScopeTarget, '.cursor', 'commands', 'opsx-propose.md')));
   assert.ok(!fs.existsSync(path.join(updateScopeTarget, '.claude', 'commands', 'spec-start.md')));
 
-  result = runCli(['update', updateScopeTarget, '--ide', 'claude', '--skip-skills', '--skip-configs', '--skip-openspec', '--skip-uipro']);
+  fs.rmSync(path.join(updateScopeTarget, '.cursor', 'commands', 'spec-start-review.md'));
+  result = runCli(['update', updateScopeTarget, '--update-commands', '--skip-skills', '--skip-configs', '--skip-openspec', '--skip-uipro']);
+  assert.strictEqual(result.status, 0, result.stderr);
+  assert.ok(fs.existsSync(path.join(updateScopeTarget, '.cursor', 'commands', 'spec-start-review.md')));
+
+  result = runCli(['update', updateScopeTarget, '--ide', 'claude', '--update-commands', '--skip-skills', '--skip-configs', '--skip-openspec', '--skip-uipro']);
   assert.strictEqual(result.status, 0, result.stderr);
   assert.ok(fs.existsSync(path.join(updateScopeTarget, '.claude', 'commands', 'spec-start.md')));
+  assert.ok(fs.existsSync(path.join(updateScopeTarget, '.claude', 'commands', 'spec-start-review.md')));
 
   const superpowersTarget = createWorkspace('ai-spec-superpowers-init-');
   writeJson(path.join(superpowersTarget, 'package.json'), {

@@ -676,13 +676,54 @@ openspec update            # 应用配置
 | Cursor | `/opsx-propose`、`/opsx-apply` | 连字符分隔 |
 | Windsurf | `/opsx-propose`、`/opsx-apply` | 连字符分隔 |
 | Copilot (IDE) | `/opsx-propose`、`/opsx-apply` | 连字符分隔，仅 IDE 扩展支持 |
+| Trae | `/openspec-propose`、`/openspec-apply` | 技能调用方式，无 `opsx-*` 命令文件 |
 
 说明：
 - Cursor 的 `/opsx-*` 连字符命令由 ai-spec-auto 安装时直接同步到 `.cursor/commands/`
 - 不依赖 OpenSpec 额外“碰巧生成”这些命令文件
-| Trae | `/openspec-propose`、`/openspec-apply` | 技能调用方式，无 `opsx-*` 命令文件 |
 
 > **注意**：GitHub Copilot 的 prompt 文件仅在 IDE 扩展（VS Code、JetBrains、Visual Studio）中可用，Copilot CLI 暂不支持。
+
+### 7.4.1 `ai-spec-auto` 协议命令补充
+
+如果项目安装了 `ai-spec-auto` 的协议命令模板，除了 `opsx（OpenSpec 斜杠命令）` 之外，还会拿到一组项目级协议入口。需要人工审核时，推荐使用：
+
+#### `/spec-start-review`
+
+默认用 `main-flow-blocking（主流程阻塞审核）` 启动完整需求主流程，并允许在命令尾部追加 `CLI flags（命令行标志位）`。
+
+```text
+语法：/spec-start-review [--mode <auto|suggest|manual>] [--flow <flow-id>] [--review-policy <policy>] <需求描述>
+```
+
+| 参数 | 必填 | 说明 |
+|------|------|------|
+| `--mode` | 否 | `auto（自动） / suggest（建议） / manual（手动）`，默认 `auto（自动）` |
+| `--flow` | 否 | 仅在 `manual（手动）` 时需要，手动锁定 `flow（流程模板）` |
+| `--review-policy` | 否 | 默认 `main-flow-blocking（主流程阻塞审核）`，如显式传入则按传入值执行 |
+| `需求描述` | 是 | 除 `flags（标志位）` 之外的剩余文本，全部作为 `--user-input` 透传 |
+
+常见示例：
+
+```text
+/spec-start-review 创建订单列表 mock 页面
+/spec-start-review --mode suggest 创建订单列表 mock 页面
+/spec-start-review --mode manual --flow prd-to-delivery 创建订单列表 mock 页面
+```
+
+跨 IDE（开发工具）使用时，命令名保持一致，但底层模板来源不同：
+
+| 工具 | 命令路径 | 说明 |
+|------|----------|------|
+| Cursor（开发工具） | `.cursor/commands/spec-start-review.md` | 由提示词解析命令尾部参数 |
+| Claude Code（代码代理） | `.claude/commands/spec-start-review.md` | 使用 `$ARGUMENTS（全部参数占位符）` 承接整段参数 |
+| Codex（代码代理） | `.codex/commands/spec-start-review.md` | 使用 `$ARGUMENTS（全部参数占位符）` 承接整段参数 |
+
+如果项目安装时间较早，还没有同步到这个命令，可执行：
+
+```bash
+npx @ex/ai-spec-auto@latest update . --update-commands
+```
 
 ### 7.5 旧版命令迁移对照
 
