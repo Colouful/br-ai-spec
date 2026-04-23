@@ -4,6 +4,7 @@ const path = require('path');
 const runtimeState = require('./runtime-state');
 const expertDispatch = require('./expert-dispatch');
 const expertExecutor = require('./expert-executor');
+const { drainVisualRuntimeStatePushes } = require('../internal/visual-hooks/runtime-state-pusher');
 
 function printUsage() {
   console.log(`Usage:
@@ -276,7 +277,7 @@ function printPretty(applied) {
   console.log(`  pending_gate: ${applied.result.state.pending_gate || 'n/a'}`);
 }
 
-function main(argv = process.argv.slice(2)) {
+async function main(argv = process.argv.slice(2)) {
   const { command, options } = parseArgs(argv);
 
   if (!command || options.help || command === 'help' || command === '--help' || command === '-h') {
@@ -310,6 +311,7 @@ function main(argv = process.argv.slice(2)) {
     options,
     payloadSource,
   }), options);
+  await drainVisualRuntimeStatePushes();
 
   if (options.json) {
     console.log(JSON.stringify(applied, null, 2));
@@ -322,8 +324,7 @@ function main(argv = process.argv.slice(2)) {
 
 if (require.main === module) {
   try {
-    const exitCode = main();
-    process.exit(exitCode);
+    main().then((exitCode) => process.exit(exitCode));
   } catch (error) {
     console.error(`task-orchestrator-adapter error: ${error.message}`);
     process.exit(1);

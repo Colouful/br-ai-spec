@@ -17,6 +17,7 @@ const {
   getExistingPath,
   shouldPersistHistory,
 } = require('./runtime-paths');
+const { drainVisualRuntimeStatePushes } = require('../internal/visual-hooks/runtime-state-pusher');
 
 function printUsage() {
   console.log(`Usage:
@@ -1068,7 +1069,7 @@ function printPretty(result, command) {
   }
 }
 
-function main(argv = process.argv.slice(2)) {
+async function main(argv = process.argv.slice(2)) {
   const { command, options } = parseArgs(argv);
 
   if (!command || options.help || command === 'help' || command === '--help' || command === '-h') {
@@ -1078,6 +1079,7 @@ function main(argv = process.argv.slice(2)) {
 
   if (command === 'apply' || command === 'run') {
     const result = applyExecution(options);
+    await drainVisualRuntimeStatePushes();
     if (options.json) {
       console.log(JSON.stringify(result, null, 2));
     } else {
@@ -1088,6 +1090,7 @@ function main(argv = process.argv.slice(2)) {
 
   if (command === 'apply-action' || command === 'finish') {
     const result = applyRuntimeAction(options);
+    await drainVisualRuntimeStatePushes();
     if (options.json) {
       console.log(JSON.stringify(result, null, 2));
     } else {
@@ -1135,7 +1138,7 @@ module.exports = {
 
 if (require.main === module) {
   try {
-    process.exit(main());
+    main().then((code) => process.exit(code));
   } catch (error) {
     console.error(`expert-executor error: ${error.message}`);
     process.exit(1);

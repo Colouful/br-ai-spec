@@ -53,7 +53,17 @@ const VERSION_FLAGS = new Set(['-v', '-V', '-version', '--version', 'version']);
 
     if (args.length === 0 || INSTALL_COMMANDS.has(args[0])) {
       const installWorkflow = require('./install-workflow');
-      process.exit(await installWorkflow.main(args));
+      // 切面：遥测仅观测，不改变 main(args) 的返回值/副作用/异常。
+      // 模块加载/运行失败均自动降级为透明 wrap，主流程零影响。
+      let telemetry = { wrap: function (_c, fn) { return fn(); } };
+      try {
+        telemetry = require('./telemetry');
+      } catch (_error) {
+        // 整个 telemetry 目录被移除或加载失败时，保持透明 wrap。
+      }
+      process.exit(await telemetry.wrap(args[0] || 'help', function () {
+        return installWorkflow.main(args);
+      }));
     }
 
     if (args[0] === 'runtime-state') {
@@ -98,30 +108,30 @@ const VERSION_FLAGS = new Set(['-v', '-V', '-version', '--version', 'version']);
     if (args[0] === 'protocol-step') {
       await require('../internal/visual-hooks/inbox-consumer').consumeInbox({ targetDir: opts.cwd, timeoutMs: 50 }).catch(() => {});
       const protocolWorkflow = require('./protocol-workflow');
-      process.exit(protocolWorkflow.main('step', args.slice(1)));
+      process.exit(await protocolWorkflow.main('step', args.slice(1)));
     }
 
     if (args[0] === 'protocol-advance') {
       await require('../internal/visual-hooks/inbox-consumer').consumeInbox({ targetDir: opts.cwd, timeoutMs: 50 }).catch(() => {});
       const protocolWorkflow = require('./protocol-workflow');
-      process.exit(protocolWorkflow.main('advance', args.slice(1)));
+      process.exit(await protocolWorkflow.main('advance', args.slice(1)));
     }
 
     if (args[0] === 'protocol-update') {
       await require('../internal/visual-hooks/inbox-consumer').consumeInbox({ targetDir: opts.cwd, timeoutMs: 50 }).catch(() => {});
       const protocolWorkflow = require('./protocol-workflow');
-      process.exit(protocolWorkflow.main('update', args.slice(1)));
+      process.exit(await protocolWorkflow.main('update', args.slice(1)));
     }
 
     if (args[0] === 'protocol-stop') {
       const protocolWorkflow = require('./protocol-workflow');
-      process.exit(protocolWorkflow.main('stop', args.slice(1)));
+      process.exit(await protocolWorkflow.main('stop', args.slice(1)));
     }
 
     if (args[0] === 'protocol-status') {
       await require('../internal/visual-hooks/inbox-consumer').consumeInbox({ targetDir: opts.cwd, timeoutMs: 50 }).catch(() => {});
       const protocolWorkflow = require('./protocol-workflow');
-      process.exit(protocolWorkflow.main('status', args.slice(1)));
+      process.exit(await protocolWorkflow.main('status', args.slice(1)));
     }
 
     if (args[0] === 'expert-dispatch') {
@@ -131,7 +141,7 @@ const VERSION_FLAGS = new Set(['-v', '-V', '-version', '--version', 'version']);
 
     if (args[0] === 'expert-executor') {
       const expertExecutor = require('./expert-executor');
-      process.exit(expertExecutor.main(args.slice(1)));
+      process.exit(await expertExecutor.main(args.slice(1)));
     }
 
     if (args[0] === 'demo-runtime-smoke') {
@@ -141,7 +151,7 @@ const VERSION_FLAGS = new Set(['-v', '-V', '-version', '--version', 'version']);
 
     if (args[0] === 'archive-change') {
       const archiveChange = require('./archive-change');
-      process.exit(archiveChange.main(args.slice(1)));
+      process.exit(await archiveChange.main(args.slice(1)));
     }
 
     if (args[0] === 'visual-bridge') {

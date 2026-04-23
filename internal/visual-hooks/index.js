@@ -18,22 +18,23 @@ let initError = null;
  * 初始化 visual hooks
  * @returns {VisualHooks | null} hooks 对象，如果未启用则返回 null
  */
-function initVisualHooks() {
+function initVisualHooks(options = {}) {
   // 避免重复初始化
-  if (visualHooks !== null) {
+  const targetDir = options.targetDir ? require('path').resolve(options.targetDir) : null;
+  if (visualHooks !== null && (!targetDir || visualHooks.config.target_dir === targetDir)) {
     return visualHooks;
   }
 
   try {
-    const config = loadVisualConfig();
+    const config = loadVisualConfig({ targetDir });
     
     if (!config?.enabled || !config?.visual_url) {
-      console.log('[visual-hooks] disabled or not configured');
+      console.warn('[visual-hooks] disabled or not configured');
       visualHooks = null;
       return null;
     }
 
-    console.log('[visual-hooks] initializing with config:', {
+    console.warn('[visual-hooks] initializing with config:', {
       visual_url: config.visual_url,
       workspace_id: config.workspace_id,
       push_mode: config.push_mode
@@ -59,9 +60,22 @@ function initVisualHooks() {
               started_at: new Date().toISOString()
             }
           });
-          console.log(`[visual-hooks] onRunStart pushed: ${runId}`);
+          console.warn(`[visual-hooks] onRunStart pushed: ${runId}`);
+          return {
+            ok: true,
+            eventType: 'run.started',
+            runId,
+            workspaceId,
+          };
         } catch (err) {
           console.warn('[visual-hooks] onRunStart failed:', err.message);
+          return {
+            ok: false,
+            eventType: 'run.started',
+            runId,
+            workspaceId,
+            error: err.message,
+          };
         }
       },
 
@@ -77,9 +91,22 @@ function initVisualHooks() {
             workspaceId: runState.workspace_id,
             payload: runState
           });
-          console.log(`[visual-hooks] onRunStateChange pushed: ${runState.run_id}`);
+          console.warn(`[visual-hooks] onRunStateChange pushed: ${runState.run_id}`);
+          return {
+            ok: true,
+            eventType: 'run.state_changed',
+            runId: runState.run_id,
+            workspaceId: runState.workspace_id,
+          };
         } catch (err) {
           console.warn('[visual-hooks] onRunStateChange failed:', err.message);
+          return {
+            ok: false,
+            eventType: 'run.state_changed',
+            runId: runState.run_id,
+            workspaceId: runState.workspace_id,
+            error: err.message,
+          };
         }
       },
 
@@ -98,9 +125,22 @@ function initVisualHooks() {
               archived_at: new Date().toISOString()
             }
           });
-          console.log(`[visual-hooks] onArchiveComplete pushed: ${archiveResult.run_id}`);
+          console.warn(`[visual-hooks] onArchiveComplete pushed: ${archiveResult.run_id}`);
+          return {
+            ok: true,
+            eventType: 'run.archived',
+            runId: archiveResult.run_id,
+            workspaceId: archiveResult.workspace_id,
+          };
         } catch (err) {
           console.warn('[visual-hooks] onArchiveComplete failed:', err.message);
+          return {
+            ok: false,
+            eventType: 'run.archived',
+            runId: archiveResult.run_id,
+            workspaceId: archiveResult.workspace_id,
+            error: err.message,
+          };
         }
       },
 
@@ -110,7 +150,9 @@ function initVisualHooks() {
       config: {
         visual_url: config.visual_url,
         workspace_id: config.workspace_id,
-        enabled: config.enabled
+        enabled: config.enabled,
+        target_dir: config.target_dir,
+        config_source: config.config_source || null,
       }
     };
 

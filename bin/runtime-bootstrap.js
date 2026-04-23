@@ -110,6 +110,14 @@ function getRefreshTtlMinutes(env = process.env) {
   return DEFAULT_RUNTIME_REFRESH_TTL_MINUTES;
 }
 
+function shouldForceLocalProtocol(command, env = process.env) {
+  try {
+    return env.BR_AI_SPEC_FORCE_LOCAL_PROTOCOL === '1' && PROTOCOL_COMMANDS.has(command);
+  } catch (_error) {
+    return false;
+  }
+}
+
 function hasActiveRuntime(state) {
   return Boolean(state && typeof state.active_release === 'string' && state.active_release.trim());
 }
@@ -338,6 +346,13 @@ async function maybeHandOffToRuntime({
   if (!manageAllCommands && !PROTOCOL_COMMANDS.has(command)) {
     return { handedOff: false, state: normalizeRuntimeState(readRuntimeState(env)) };
   }
+  if (shouldForceLocalProtocol(command, env)) {
+    return {
+      handedOff: false,
+      state: normalizeRuntimeState(readRuntimeState(env)),
+      reason: 'force-local-protocol',
+    };
+  }
   if (env.AI_SPEC_SKIP_RUNTIME_REFRESH === '1') {
     return { handedOff: false, state: normalizeRuntimeState(readRuntimeState(env)) };
   }
@@ -408,5 +423,6 @@ module.exports = {
     buildInstallArgs,
     refreshRuntime,
     normalizeRuntimeState,
+    shouldForceLocalProtocol,
   },
 };

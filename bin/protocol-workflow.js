@@ -373,7 +373,7 @@ function buildStepPreview(options) {
   };
 }
 
-function main(mode, argv) {
+async function main(mode, argv) {
   const options = parseArgs(argv);
   if (options.help) {
     printUsage(mode);
@@ -402,6 +402,27 @@ function main(mode, argv) {
       target: options.target,
     })
     : buildStepPreview(options);
+
+  // [visual-sync-aspect] 切面兜底：在 drain 之前无条件触发一次"当前 run 推送"。
+  // 解决场景：某些协议分支不会经过 finalizeProtocolResult，典型如：
+  //   - protocol-step（mode='step' / preview 分支）——只生成 turn 指令，不改 state，不推
+  //   - protocol-advance 在门禁期无状态变化，pusher 可能 short-circuit
+  //   - /spec-start 首轮由 IDE AI 间接走 advance，但某些提前返回的路径漏推
+  // 本切面对所有外层模式无差别补推一次（幂等：推送模块读 current-run.json 快照；如 run 已
+  // 存在则只是让 Visual 数据保持最新，无副作用；如不存在则 trace 记录 'missing-current-run'）。
+  // 不改任何协议分支逻辑，失败完全吞掉。
+  try {
+    const {
+      pushVisualRuntimeStateSnapshot,
+    } = require('../internal/visual-hooks/runtime-state-pusher');
+    pushVisualRuntimeStateSnapshot(options.target);
+  } catch {
+    // 静默兜底：任何加载/调用异常都不影响协议主流程
+  }
+
+  if (typeof workflow.drainVisualPushes === 'function') {
+    await workflow.drainVisualPushes();
+  }
 
   if (options.json) {
     process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);

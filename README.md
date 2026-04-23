@@ -231,3 +231,76 @@ npx @ex/ai-spec-auto@latest update . --skip-skills --skip-configs --skip-openspe
 - registry 说明集中、统一
 
 协议主链、专家链和运行时状态机没有因为这轮入口收口而改变。
+
+## 匿名使用统计
+
+`bin/telemetry/` 是一个 **隔离的切面模块**，用于向私有部署的
+[`br-ai-spec-visual`](../br-ai-spec-visual) 上报 CLI 安装与使用情况（`init/update/sync/check/help`）。
+
+### 默认行为（零配置）
+
+从当前版本起，仓库内置默认上报地址 `bin/telemetry/defaults.json`，**装包即启用**，首次运行会打印一次性提示：
+
+```text
+[ai-spec-auto] 已开启匿名使用统计（可通过 AI_SPEC_TELEMETRY_DISABLED=1 关闭）
+```
+
+上报是 **fire-and-forget**，带 500ms 健康探测 + 2s 请求超时，服务端不可达时自动跳过且主流程零感知。
+
+### 如果你不想参与上报
+
+任选其一：
+
+```bash
+# 方式 A：环境变量（临时/会话级）
+export AI_SPEC_TELEMETRY_DISABLED=1
+
+# 方式 B：用户配置（永久，跨 shell 会话）
+mkdir -p ~/.ai-spec-auto
+echo '{"disabled": true}' > ~/.ai-spec-auto/config.json
+```
+
+### 配置优先级（高 → 低）
+
+1. **环境变量**
+2. **`~/.ai-spec-auto/config.json`**（用户主目录，含 secret 请 `chmod 600`）
+3. **`bin/telemetry/defaults.json`**（仓库默认，**禁止写入 secret**）
+
+### 可配置字段
+
+| 字段 | 环境变量 | 用户配置 key | 仓库默认 | 说明 |
+| --- | --- | --- | --- | --- |
+| Visual 地址 | `AI_SPEC_VISUAL_URL` | `visualUrl` | `visualUrl` | 空值则不发送 |
+| 总开关 | `AI_SPEC_TELEMETRY_DISABLED=1` | `disabled: true` | `disabled` | 任一源为真即关闭 |
+| 鉴权密钥 | `AI_SPEC_TELEMETRY_SECRET` | `secret` | **不支持** | 与服务端 `.env` 一致，作为 `X-Telemetry-Secret` 头携带 |
+| 调试输出 | `AI_SPEC_TELEMETRY_DEBUG=1` | — | — | 仅环境变量，平时保持静默 |
+
+### 典型场景
+
+| 场景 | 做法 |
+| --- | --- |
+| 使用官方默认 Visual，无 secret | **什么都不配**，装包即用 |
+| 使用官方默认 Visual，服务端开了 secret | 设置 `AI_SPEC_TELEMETRY_SECRET=<值>` 或写入用户配置 |
+| 本地联调指向本机 Visual | `export AI_SPEC_VISUAL_URL=http://127.0.0.1:3000` |
+| 个人不想参与匿名统计 | `export AI_SPEC_TELEMETRY_DISABLED=1` |
+| 排查上报链路问题 | `export AI_SPEC_TELEMETRY_DEBUG=1` 后再跑命令 |
+
+### 用户配置文件示例
+
+```jsonc
+// ~/.ai-spec-auto/config.json —— 所有字段都是可选的
+{
+  "visualUrl": "http://127.0.0.1:3000",
+  "secret": "与服务端 AI_SPEC_TELEMETRY_SECRET 一致",
+  "disabled": false
+}
+```
+
+文件缺失、权限不足或 JSON 非法时，遥测会静默回退到仓库默认，**不会让 CLI 报错**。
+
+### 隐私与健壮性保证
+
+- **唯一标识**：来自 `node-machine-id`（`optionalDependencies`，缺失时用 `sha256(mac+user+host)` 兜底）。
+- **项目路径**：以 SHA256 哈希形式上报，不包含源码、绝对路径、用户名密钥。
+- **健康探测**：上报前 `HEAD /api/health`（500ms 超时）；失败写入本地缓存，60 秒冷却窗口内后续 CLI 调用直接跳过探测。
+- **删除即失效**：整个 `bin/telemetry/` 目录被移除、`node-machine-id` 缺失、`defaults.json` 损坏，任一情况下 CLI 都正常工作。

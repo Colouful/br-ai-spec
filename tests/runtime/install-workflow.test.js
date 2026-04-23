@@ -7,7 +7,7 @@ const { spawnSync } = require('child_process');
 const { __test__ } = require('../../bin/install-workflow');
 
 const repoRoot = path.join(__dirname, '..', '..');
-const { selectCustomRuleList, selectFromList, selectBootstrapChoices } = __test__;
+const { selectCustomRuleList, selectFromList, selectBootstrapChoices, buildDevDependencyInstallArgs } = __test__;
 
 function createWorkspace(prefix) {
   return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -115,6 +115,67 @@ exit 1
 `,
   );
   return fakeBinDir;
+}
+
+function createFakeUiproSkillLayoutBin(targetDir) {
+  const fakeBinDir = path.join(targetDir, 'fake-uipro-skill-layout-bin');
+  writeExecutable(
+    path.join(fakeBinDir, 'uipro'),
+    `#!/bin/sh
+if [ "$1" = "--version" ]; then
+  echo "2.0.0"
+  exit 0
+fi
+if [ "$1" = "init" ]; then
+  mkdir -p "$PWD/.cursor/skills/ui-ux-pro-max/data"
+  printf '{"palettes":161,"layout":"cursor-skill"}\\n' > "$PWD/.cursor/skills/ui-ux-pro-max/data/catalog.json"
+  cat > "$PWD/.cursor/skills/ui-ux-pro-max/SKILL.md" <<'EOF'
+---
+name: ui-ux-pro-max
+description: fake cursor skill layout
+---
+
+# UI UX Pro Max
+
+优先读取 .cursor/skills/ui-ux-pro-max/data/catalog.json
+EOF
+  exit 0
+fi
+echo "unexpected uipro invocation: $@" >&2
+exit 1
+`,
+  );
+  return fakeBinDir;
+}
+
+function createWorkspaceRootAwarePnpmBin(targetDir) {
+  const fakeBinDir = path.join(targetDir, 'fake-workspace-pnpm-bin');
+  const commandLog = path.join(targetDir, 'pnpm-commands.log');
+  writeExecutable(
+    path.join(fakeBinDir, 'pnpm'),
+    `#!/usr/bin/env node
+const fs = require('fs');
+const path = require('path');
+const args = process.argv.slice(2);
+if (args[0] === '--version') {
+  console.log('10.26.2');
+  process.exit(0);
+}
+fs.appendFileSync(${JSON.stringify(commandLog)}, args.join(' ') + '\\n', 'utf8');
+if (args[0] === 'add') {
+  if (!args.includes('-w')) {
+    console.error('missing -w for workspace-root install');
+    process.exit(42);
+  }
+  const binDir = path.join(process.cwd(), 'node_modules', '.bin');
+  fs.mkdirSync(binDir, { recursive: true });
+  fs.writeFileSync(path.join(binDir, process.platform === 'win32' ? 'ai-spec-auto.cmd' : 'ai-spec-auto'), '#!/bin/sh\\n', 'utf8');
+  process.exit(0);
+}
+process.exit(0);
+`,
+  );
+  return { fakeBinDir, commandLog };
 }
 
 function runCli(args, extraEnv = {}) {
@@ -304,12 +365,46 @@ async function verifyInteractiveSuperpowersDefaultsToEnabled() {
   assert.strictEqual(options.superpowers, 'yes');
 }
 
+function verifyPnpmWorkspaceRootInstallUsesWorkspaceFlag() {
+  const workspaceRoot = createWorkspace('ai-spec-pnpm-workspace-root-');
+  writeJson(path.join(workspaceRoot, 'package.json'), {
+    name: 'pnpm-workspace-root-smoke',
+    version: '1.0.0',
+    workspaces: ['packages/*'],
+  });
+  writeText(path.join(workspaceRoot, 'pnpm-workspace.yaml'), 'packages:\n  - packages/*\n');
+
+  assert.deepStrictEqual(
+    buildDevDependencyInstallArgs(workspaceRoot, 'pnpm', ['eslint']),
+    ['add', '-w', '-D', 'eslint'],
+  );
+
+  const childPackage = path.join(workspaceRoot, 'packages', 'web');
+  writeJson(path.join(childPackage, 'package.json'), {
+    name: 'web',
+    version: '1.0.0',
+  });
+  assert.deepStrictEqual(
+    buildDevDependencyInstallArgs(childPackage, 'pnpm', ['eslint']),
+    ['add', '-D', 'eslint'],
+  );
+
+  const { fakeBinDir, commandLog } = createWorkspaceRootAwarePnpmBin(workspaceRoot);
+  const result = runCli(
+    ['init', workspaceRoot, '--profile', 'react', '--level', 'L1', '--workspace-root', '--no-lint', '--no-husky', '--no-uipro'],
+    { PATH: `${fakeBinDir}:${process.env.PATH || ''}` },
+  );
+  assert.strictEqual(result.status, 0, result.stderr || result.stdout);
+  assert.ok(readText(commandLog).includes('add -w -D '), readText(commandLog));
+}
+
 async function main() {
   await verifyInteractiveSingleSelectionUsesArrowSpaceEnter();
   await verifyInteractiveSingleSelectionEnterConfirmsDefault();
   await verifyInteractiveSuperpowersDefaultsToEnabled();
   await verifyInteractiveCustomRuleSelectionUsesSpaceToggle();
   await verifyInteractiveEmptySelectionFallsBackToStandard();
+  verifyPnpmWorkspaceRootInstallUsesWorkspaceFlag();
 
   const target = createWorkspace('ai-spec-install-workflow-');
   writeJson(path.join(target, 'package.json'), {
@@ -374,6 +469,20 @@ async function main() {
   assert.ok(fs.existsSync(path.join(uiproTarget, '.agents', 'skills', 'domains', 'ui-ux-pro-max', 'data', 'catalog.json')));
   assert.ok(!fs.existsSync(path.join(uiproTarget, '.agents', 'skills', 'ui-ux-pro-max')));
   assert.ok(result.stdout.includes('UI UX Pro Max 设计智能技能'));
+
+  const uiproSkillLayoutTarget = createWorkspace('ai-spec-uipro-skill-layout-');
+  writeJson(path.join(uiproSkillLayoutTarget, 'package.json'), {
+    name: 'uipro-skill-layout-smoke',
+    version: '1.0.0',
+  });
+  const fakeUiproSkillLayoutBin = createFakeUiproSkillLayoutBin(uiproSkillLayoutTarget);
+  result = runCli(
+    ['init', uiproSkillLayoutTarget, '--profile', 'vue', '--level', 'L1', '--no-lint', '--no-husky', '--uipro'],
+    { PATH: `${fakeUiproSkillLayoutBin}:${process.env.PATH || ''}` },
+  );
+  assert.strictEqual(result.status, 0, result.stderr);
+  assert.ok(fs.existsSync(path.join(uiproSkillLayoutTarget, '.agents', 'skills', 'domains', 'ui-ux-pro-max', 'data', 'catalog.json')));
+  assert.ok(readText(path.join(uiproSkillLayoutTarget, '.agents', 'skills', 'domains', 'ui-ux-pro-max', 'SKILL.md')).includes('data/catalog.json'));
 
   const syncOnlyTarget = createWorkspace('ai-spec-sync-check-');
   writeJson(path.join(syncOnlyTarget, 'package.json'), {

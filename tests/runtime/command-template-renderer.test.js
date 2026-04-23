@@ -14,13 +14,31 @@ function main() {
     './node_modules/.bin/ai-spec-auto protocol-step --target . --json',
     { platform: 'darwin' },
   );
-  assert.strictEqual(renderedUnix, '"$HOME/.ai-spec-auto/bin/ai-spec-auto" protocol-step --target . --json');
+  assert.strictEqual(renderedUnix, './node_modules/.bin/ai-spec-auto protocol-step --target . --json');
 
   const renderedWindows = renderCommandTemplateContent(
     './node_modules/.bin/ai-spec-auto protocol-status --target . --json',
     { platform: 'win32' },
   );
-  assert.strictEqual(renderedWindows, '"%USERPROFILE%\\.ai-spec-auto\\bin\\ai-spec-auto.cmd" protocol-status --target . --json');
+  assert.strictEqual(renderedWindows, './node_modules/.bin/ai-spec-auto protocol-status --target . --json');
+
+  const renderedForcedLocal = renderCommandTemplateContent(
+    './node_modules/.bin/ai-spec-auto protocol-advance --target . --json',
+    { forceLocalProtocol: true },
+  );
+  assert.strictEqual(
+    renderedForcedLocal,
+    'BR_AI_SPEC_FORCE_LOCAL_PROTOCOL=1 ./node_modules/.bin/ai-spec-auto protocol-advance --target . --json',
+  );
+
+  const renderedForcedLocalWindows = renderCommandTemplateContent(
+    './node_modules/.bin/ai-spec-auto protocol-status --target . --json',
+    { platform: 'win32', forceLocalProtocol: true },
+  );
+  assert.strictEqual(
+    renderedForcedLocalWindows,
+    'set BR_AI_SPEC_FORCE_LOCAL_PROTOCOL=1 && ./node_modules/.bin/ai-spec-auto protocol-status --target . --json',
+  );
 
   console.log('command template renderer test passed: launcher command rendering works');
 }

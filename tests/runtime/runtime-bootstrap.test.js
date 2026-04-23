@@ -108,6 +108,39 @@ function main() {
     assert.ok(handoffCalls[0].command.includes(path.join('release_mock_001', 'node_modules')));
     assert.strictEqual(handoffCalls[0].options.env.AI_SPEC_SKIP_RUNTIME_REFRESH, '1');
 
+    const forcedLocalCalls = [];
+    return runtimeBootstrap.maybeHandOffToRuntime({
+      pkgRoot,
+      args: ['protocol-step', '--target', '.', '--json'],
+      env: {
+        ...env,
+        BR_AI_SPEC_FORCE_LOCAL_PROTOCOL: '1',
+      },
+      now,
+      spawnFn(command, commandArgs, options) {
+        forcedLocalCalls.push({ command, commandArgs, options });
+        throw new Error('should not spawn when local protocol is forced');
+      },
+    }).then((forcedResult) => {
+      assert.strictEqual(forcedResult.handedOff, false);
+      assert.strictEqual(forcedLocalCalls.length, 0);
+    });
+  }).then(() => {
+    return runtimeBootstrap.maybeHandOffToRuntime({
+      pkgRoot,
+      args: ['init', '.'],
+      env: {
+        ...env,
+        BR_AI_SPEC_FORCE_LOCAL_PROTOCOL: '1',
+      },
+      now,
+      spawnFn() {
+        throw new Error('should not spawn for install commands');
+      },
+    });
+  }).then((result) => {
+    assert.strictEqual(result.handedOff, false);
+
     return runtimeBootstrap.maybeHandOffToRuntime({
       pkgRoot,
       args: ['init', '.'],

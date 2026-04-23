@@ -6,7 +6,7 @@ const {
   resolveRuntimePaths,
   getCandidatePaths,
 } = require('./runtime-paths');
-const { getVisualHooks } = require('../internal/visual-hooks');
+const { pushVisualRuntimeStateSnapshot, drainVisualRuntimeStatePushes } = require('../internal/visual-hooks/runtime-state-pusher');
 
 function printUsage() {
   console.log(`Usage:
@@ -421,21 +421,7 @@ function archiveChange(options = {}) {
     result.runtime_transition = completeRunAfterArchive(targetDir, result);
   }
 
-  // Visual Hook: 推送归档完成事件
-  const visualHooks = getVisualHooks();
-  if (visualHooks && result.change_id) {
-    visualHooks.onArchiveComplete({
-      run_id: currentRun?.run_id || `archived_${result.change_id}`,
-      workspace_id: currentRun?.workspace_id || path.basename(targetDir),
-      change_id: result.change_id,
-      archived_to: result.archived_to,
-      merged: result.merged,
-      task_completion: result.task_completion,
-      archived_artifacts: result.archived_artifacts
-    }).catch(err => {
-      // 优雅降级：不影响主流程
-    });
-  }
+  pushVisualRuntimeStateSnapshot(targetDir);
 
   return result;
 }
@@ -455,7 +441,7 @@ function printPretty(result) {
   }
 }
 
-function main(argv = process.argv.slice(2)) {
+async function main(argv = process.argv.slice(2)) {
   const options = parseArgs(argv);
   if (options.help) {
     printUsage();
@@ -463,6 +449,7 @@ function main(argv = process.argv.slice(2)) {
   }
 
   const result = archiveChange(options);
+  await drainVisualRuntimeStatePushes();
   if (options.json) {
     console.log(JSON.stringify(result, null, 2));
   } else {
@@ -473,7 +460,7 @@ function main(argv = process.argv.slice(2)) {
 
 if (require.main === module) {
   try {
-    process.exit(main());
+    main().then((code) => process.exit(code));
   } catch (error) {
     console.error(error.message);
     process.exit(1);

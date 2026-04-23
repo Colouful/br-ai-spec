@@ -71,12 +71,19 @@ function buildVisualBridgeState({
     return null;
   }
 
+  // 关键：update / sync 走到这里时，如果调用方（CLI 参数 / manifest）没有显式给出
+  // server_url / workspace_id / agent_id，应该保留历史 state 里的值，而不是清成 null。
+  // 否则一次普通 `auto update` 就会把用户在 init 时配好的桥接参数全部抹掉。
+  const previousServerUrl = normalizeOptionalString(previousState?.server_url);
+  const previousWorkspaceId = normalizeOptionalString(previousState?.workspace_id);
+  const previousAgentId = normalizeOptionalString(previousState?.agent_id);
+
   const state = {
     schema_version: 1,
     enabled: normalizedManifest.enabled,
-    server_url: normalizedManifest.server_url,
-    workspace_id: normalizedManifest.workspace_id,
-    agent_id: normalizedManifest.agent_id,
+    server_url: normalizedManifest.server_url ?? previousServerUrl,
+    workspace_id: normalizedManifest.workspace_id ?? previousWorkspaceId,
+    agent_id: normalizedManifest.agent_id || previousAgentId || 'ai-spec-auto',
     connect_token: normalizeOptionalString(previousState?.connect_token),
     push_on_runtime_state: normalizedManifest.push_on_runtime_state,
     push_on_sync: normalizedManifest.push_on_sync,

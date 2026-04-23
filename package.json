@@ -38,5 +38,8 @@
     "cursor",
     "claude"
   ],
-  "license": "UNLICENSED"
+  "license": "UNLICENSED",
+  "optionalDependencies": {
+    "node-machine-id": "^1.1.12"
+  }
 }

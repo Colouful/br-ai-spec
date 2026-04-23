@@ -89,6 +89,87 @@ function loadRuntimeState(targetDir) {
   }
 }
 
+/**
+ * 切面式写入：当 Visual 侧审批被成功应用后，往项目根 .ai-spec/next-step.md
+ * 追加一条人类可读的提示，供 IDE 里的 AI / 用户感知"已批准、请继续"。
+ *
+ * 设计原则：
+ * - 纯 additive，失败 silent 吞，绝不影响主 apply 链路
+ * - 只追加，不清空；保留审批历史
+ * - 通过结构化 marker 方便 AGENTS.md / Cursor slash 读取
+ */
+function appendNextStepHint(targetDir, command, payload, snapshot) {
+  try {
+    const file = path.join(targetDir, '.ai-spec', 'next-step.md');
+    ensureDir(path.dirname(file));
+    const ts = new Date().toISOString();
+    const gate = payload?.gate || snapshot?.pending_gate || 'unknown';
+    const runId = payload?.run_id || snapshot?.run_id || 'unknown';
+    const nextRole = snapshot?.current_role || payload?.next_role || 'unknown';
+    const recommend =
+      command === 'approve_gate' || command === 'resume_run'
+        ? '请在 IDE (Cursor / Claude Code) 执行 `/spec-continue` 继续下一步开发。'
+        : '请查看 visual 审批结果并在 IDE 按提示操作。';
+    const block = [
+      '',
+      `## [${ts}] ${command} applied`,
+      '',
+      `- run_id: \`${runId}\``,
+      `- gate: \`${gate}\``,
+      `- next_role: \`${nextRole}\``,
+      `- action: ${recommend}`,
+      '',
+      '<!-- visual-next-step:end -->',
+      '',
+    ].join('\n');
+
+    const header = fs.existsSync(file)
+      ? ''
+      : [
+          '# Visual 审批 → 下一步提示',
+          '',
+          '> 本文件由 `br-ai-spec` 的 visual-hooks 自动追加写入。',
+          '> 每当 visual 侧审批（approve_gate / resume_run）被成功应用到本地',
+          '> runtime-state 后，会在下方 append 一条记录。IDE 中的 AI 可读取',
+          '> 该文件作为"继续开发"的信号。本地手动推进或清理可直接删除此文件。',
+          '',
+        ].join('\n');
+
+    fs.appendFileSync(file, `${header}${block}`, 'utf-8');
+  } catch (_err) {
+    // silent — 这条提示是增值能力，失败绝不影响主链路
+  }
+}
+
+/**
+ * 切面式写入 gate-signal.json：为 IDE 侧 AI 轮询提供"审批已到达"的结构化信号。
+ * 所有失败静默吞掉，绝不影响 apply 主链路。
+ */
+function emitGateSignal(targetDir, command, payload, snapshot) {
+  try {
+    const decision =
+      command === 'approve_gate'
+        ? 'approved'
+        : command === 'resume_run'
+          ? 'resumed'
+          : command === 'reject_gate'
+            ? 'rejected'
+            : null;
+    if (!decision) return;
+    const { writeGateSignal } = require('./gate-signal');
+    writeGateSignal({
+      targetDir,
+      runId: payload?.run_id || snapshot?.run_id || null,
+      gate: payload?.gate || snapshot?.pending_gate || 'unknown',
+      decision,
+      reason: payload?.reason || payload?.decision || null,
+      actorId: payload?.requested_by || payload?.actor_id || null,
+    });
+  } catch (_err) {
+    // silent — 切面能力，任何异常都不允许冒泡影响 receipt 结果
+  }
+}
+
 function applyControl(targetDir, command, payload) {
   const runtimeState = loadRuntimeState(targetDir);
   if (!runtimeState) {
@@ -104,21 +185,59 @@ function applyControl(targetDir, command, payload) {
         nextRole: payload?.next_role || null,
         status: payload?.status || 'running',
       });
-      return {
-        result: 'applied',
-        snapshot: {
-          status: result?.state?.status,
-          current_role: result?.state?.current_role,
-          run_id: result?.state?.run_id,
-        },
+      const snapshot = {
+        status: result?.state?.status,
+        current_role: result?.state?.current_role,
+        run_id: result?.state?.run_id,
       };
+      appendNextStepHint(targetDir, 'approve_gate', payload, snapshot);
+      emitGateSignal(targetDir, 'approve_gate', payload, snapshot);
+      return { result: 'applied', snapshot };
     }
 
     if (command === 'reject_gate') {
-      // 拒绝当前 gate 不修改本地状态，仅作为决策回执；具体策略（如停 run）由用户在 CLI 中执行。
+      const state = safeReadJson(path.join(targetDir, '.ai-spec', 'current-run.json'));
+      if (!state?.run_id) {
+        return { result: 'conflict', reason: 'current run-state unavailable' };
+      }
+      const activeGate = state.pending_gate || null;
+      const requestedGate = payload?.gate || activeGate;
+      if (!activeGate) {
+        return { result: 'conflict', reason: 'No pending approval gate found' };
+      }
+      if (requestedGate && activeGate !== requestedGate) {
+        return {
+          result: 'conflict',
+          reason: `Pending gate mismatch: current is "${activeGate}", requested "${requestedGate}"`,
+        };
+      }
+      const reason = payload?.reason || payload?.decision || 'rejected by visual gate';
+      const result = runtimeState.gateBlockedRunState({
+        target: targetDir,
+        runId: payload?.run_id || state.run_id,
+        gate: activeGate,
+        pendingGate: activeGate,
+        status: 'waiting-approval',
+        fromRole: state.current_role || null,
+        toRole: state.current_role || null,
+        blockedByRole: state.current_role || state.gate_context?.blocked_by_role || null,
+        resumeToRole: state.gate_context?.resume_to_role || null,
+        requiredUserAction: state.gate_context?.required_user_action || '当前门禁已被拒绝，请修正后重新请求审批。',
+        blockedReason: `gate rejected: ${reason}`,
+        message: `gate rejected: ${reason}`,
+        eventType: 'gate-rejected',
+      });
+      const rejectSnapshot = {
+        status: result?.state?.status,
+        current_role: result?.state?.current_role,
+        pending_gate: result?.state?.pending_gate,
+        run_id: result?.state?.run_id,
+      };
+      emitGateSignal(targetDir, 'reject_gate', payload, rejectSnapshot);
       return {
-        result: 'applied',
-        snapshot: { decision: 'rejected', reason: payload?.reason || null },
+        result: 'rejected',
+        reason,
+        snapshot: rejectSnapshot,
       };
     }
 
@@ -130,14 +249,14 @@ function applyControl(targetDir, command, payload) {
         nextRole: payload?.next_role || payload?.resume_to_role || null,
         status: 'running',
       });
-      return {
-        result: 'applied',
-        snapshot: {
-          status: result?.state?.status,
-          current_role: result?.state?.current_role,
-          run_id: result?.state?.run_id,
-        },
+      const snapshot = {
+        status: result?.state?.status,
+        current_role: result?.state?.current_role,
+        run_id: result?.state?.run_id,
       };
+      appendNextStepHint(targetDir, 'resume_run', payload, snapshot);
+      emitGateSignal(targetDir, 'resume_run', payload, snapshot);
+      return { result: 'applied', snapshot };
     }
 
     if (command === 'cancel_run') {
@@ -207,7 +326,11 @@ async function consumeInbox(opts = {}) {
   const startedAt = Date.now();
 
   const bridge = loadBridgeConfig(targetDir);
-  const secret = opts.secret || bridge?.data?.connect_token || bridge?.data?.connectToken || null;
+  const secret =
+    opts.secret ||
+    bridge?.data?.control_secret ||
+    bridge?.data?.controlSecret ||
+    null;
 
   let pulled = 0;
   if (!opts.skipPull && bridge?.data?.enabled !== false) {
@@ -235,6 +358,7 @@ async function consumeInbox(opts = {}) {
 
   const receipts = [];
   let processed = 0;
+  const seenOutboxIds = new Set();
 
   for (const file of files) {
     if (Date.now() - startedAt > timeoutMs) {
@@ -253,10 +377,17 @@ async function consumeInbox(opts = {}) {
       payload,
       signature,
     } = envelope;
+    const receiptKey = outboxId || path.basename(file);
+
+    if (seenOutboxIds.has(receiptKey)) {
+      moveFile(file, path.join(inboxDir, PROCESSED_SUBDIR));
+      continue;
+    }
+    seenOutboxIds.add(receiptKey);
 
     let receipt = {
       eventType: 'control.receipt',
-      outbox_id: outboxId || path.basename(file),
+      outbox_id: receiptKey,
       command: command || null,
       result: 'rejected',
       reason: null,

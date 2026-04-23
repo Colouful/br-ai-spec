@@ -10,6 +10,8 @@
 
 const https = require('https');
 const http = require('http');
+const fs = require('fs');
+const path = require('path');
 const { URL } = require('url');
 
 /**
@@ -21,9 +23,20 @@ function createPushClient(config) {
   const {
     visual_url,
     workspace_id,
+    target_dir,
     push_timeout_ms = 3000,
     retry_times = 1
   } = config;
+
+  // 在 hook 上下文里 process.cwd() 通常就是项目根目录；带上以便 visual 自动落 Workspace.rootPath，
+  // 让控制下行的文件兜底通道（.ai-spec/inbox/）能正确解析到本地路径。
+  const rootPath = (() => {
+    try {
+      return fs.realpathSync(path.resolve(target_dir || process.cwd()));
+    } catch (_err) {
+      return null;
+    }
+  })();
 
   return {
     /**
@@ -44,6 +57,7 @@ function createPushClient(config) {
       const payload = {
         sourceKind: 'hook-push',
         workspaceId: workspace_id,
+        root_path: rootPath,
         rawEvents: [{
           sourceKind: 'hook-event',
           sourcePath: 'internal/visual-hooks',
@@ -62,7 +76,7 @@ function createPushClient(config) {
 
       for (let attempt = 0; attempt <= retry_times; attempt++) {
         try {
-          await sendRequest(protocol, url, workspace_id, payload, push_timeout_ms);
+          await sendRequest(protocol, url, payload, push_timeout_ms);
           return; // 成功，直接返回
         } catch (err) {
           lastError = err;
@@ -83,23 +97,23 @@ function createPushClient(config) {
  * 发送 HTTP 请求
  * @param {typeof http | typeof https} protocol
  * @param {URL} url
- * @param {string} workspaceId
  * @param {object} payload
  * @param {number} timeoutMs
  * @returns {Promise<void>}
  */
-function sendRequest(protocol, url, workspaceId, payload, timeoutMs) {
+function sendRequest(protocol, url, payload, timeoutMs) {
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
       req.destroy();
       reject(new Error(`push timeout after ${timeoutMs}ms`));
     }, timeoutMs);
 
+    // 勿把 workspaceId 放进 X-Workspace-ID：Node 的 HTTP 头值必须是单字节字符，
+    // 中文等非 ASCII 会抛 Invalid character in header content。ingest 已从 JSON body 读取 workspaceId。
     const req = protocol.request(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Workspace-ID': workspaceId,
         'User-Agent': 'ai-spec-auto-visual-hooks/1.0'
       }
     }, (res) => {

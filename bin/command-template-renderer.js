@@ -1,5 +1,4 @@
 const fs = require('fs');
-const path = require('path');
 
 const LOCAL_CLI_PATTERN = /\.\/node_modules\/\.bin\/ai-spec-auto/g;
 
@@ -11,9 +10,22 @@ function resolveGlobalLauncherCommand(platform = process.platform) {
 }
 
 function renderCommandTemplateContent(content, options = {}) {
-  const platform = options.platform || process.platform;
-  const launcherCommand = options.launcherCommand || resolveGlobalLauncherCommand(platform);
-  return String(content).replace(LOCAL_CLI_PATTERN, launcherCommand);
+  const launcherCommand = options.launcherCommand;
+  let rendered = launcherCommand
+    ? String(content).replace(LOCAL_CLI_PATTERN, launcherCommand)
+    : String(content);
+
+  if (options.forceLocalProtocol) {
+    const prefix = options.platform === 'win32'
+      ? 'set BR_AI_SPEC_FORCE_LOCAL_PROTOCOL=1 && '
+      : 'BR_AI_SPEC_FORCE_LOCAL_PROTOCOL=1 ';
+    rendered = rendered.replace(
+      /^(\s*)(\.\/node_modules\/\.bin\/ai-spec-auto\s+protocol-(?:step|update|advance|stop|status)\b)/gm,
+      (_match, indent, command) => `${indent}${prefix}${command}`,
+    );
+  }
+
+  return rendered;
 }
 
 function readRenderedCommandTemplate(sourcePath, options = {}) {

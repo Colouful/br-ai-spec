@@ -427,6 +427,40 @@ curl http://localhost:3000/api/workspaces
 2. 移除代码中的 hook 调用（搜索 `visualHooks`）
 3. 移除配置文件 `.ai-spec/visual-config.json`
 
+## Gate Signal（审批 → IDE 原对话自动继续）
+
+`gate-signal.js` 是切面能力：当 `inbox-consumer.js` 成功应用 `approve_gate` /
+`reject_gate` / `resume_run` 后，会额外写一份 `.ai-spec/gate-signal.json`，
+供 IDE 中的 AI（Cursor / Claude Code）通过规则/技能轮询，实现 Visual 页面点
+批准后原对话自动继续。
+
+**契约（`schema_version: 1`）**：
+
+```json
+{
+  "schema_version": 1,
+  "run_id": "run_2026xxxx",
+  "gate": "before-implementation",
+  "decision": "approved | rejected | resumed",
+  "reason": "可选",
+  "actor_id": "可选",
+  "ts_ms": 1714000000000,
+  "ts_iso": "2026-04-23T..."
+}
+```
+
+**AI 读侧判定**：`signal.run_id === currentRunId && signal.gate === currentGate
+&& signal.ts_ms > waitStartedAt`，四项校验全部通过才视为命中；其余情况忽略。
+
+**解耦保证**：
+
+- 所有 IO 失败静默写 `.ai-spec/logs/gate-signal.log`，**绝不**影响 `inbox-consumer`
+  返回的 `applied | rejected | conflict` 结果。
+- 原子写（`.tmp` → rename），避免读侧读到半写文件。
+- 对应 IDE 侧规则/技能：
+  - `.agents/rules/common/15-visual-gate-wait.md`
+  - `.agents/skills/common/wait-for-gate-signal/SKILL.md`
+
 ## 相关文档
 
 - [需求说明-visual补充.md](../../docs/five/需求说明-visual补充.md) - Visual 完整需求说明

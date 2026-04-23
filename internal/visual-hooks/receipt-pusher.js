@@ -156,11 +156,11 @@ async function pushReceipts(opts = {}) {
   };
 
   try {
+    // workspaceId 只在 JSON body 中传递；不要写入 X-Workspace-ID（非 ASCII 目录名会导致 Node 抛错）。
     await sendRequest({
       url: endpoint,
       payload,
       headers: {
-        'X-Workspace-ID': workspaceId,
         ...(bridge.connect_token ? { 'X-Connect-Token': bridge.connect_token } : {}),
       },
       timeoutMs,

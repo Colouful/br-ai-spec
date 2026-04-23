@@ -1040,7 +1040,9 @@ function copyFileTracked(sourceDir, targetDir, sourceRel, destRel, changes) {
 function copyRenderedCommandTracked(sourceDir, targetDir, sourceRel, destRel, changes) {
   const sourcePath = path.join(sourceDir, sourceRel);
   const destPath = path.join(targetDir, destRel);
-  const content = readRenderedCommandTemplate(sourcePath);
+  const content = readRenderedCommandTemplate(sourcePath, {
+    forceLocalProtocol: process.env.BR_AI_SPEC_FORCE_LOCAL_CLI === '1',
+  });
   ensureDir(path.dirname(destPath));
   const rel = targetRel(targetDir, destPath);
 

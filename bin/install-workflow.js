@@ -1349,14 +1349,26 @@ function readSourcePackageField(sourceDir, field) {
   return null;
 }
 
+function isWorkspaceRootInstallTarget(targetDir) {
+  const resolvedTarget = path.resolve(targetDir);
+  return findMonorepoWorkspaceRoot(resolvedTarget) === resolvedTarget;
+}
+
+function buildDevDependencyInstallArgs(targetDir, pkgManager, packages) {
+  if (pkgManager === 'pnpm') {
+    const args = ['add'];
+    if (isWorkspaceRootInstallTarget(targetDir)) {
+      args.push('-w');
+    }
+    args.push('-D', ...packages);
+    return args;
+  }
+  return ['install', '-D', ...packages];
+}
+
 function installDevDependencies(targetDir, pkgManager, packages) {
   if (!pkgManager) return { status: 1 };
-  const args = pkgManager === 'pnpm'
-    ? ['add', '-D', ...packages]
-    : ['install', '-D', ...packages];
-  const withWorkspace = pkgManager === 'pnpm' && fs.existsSync(path.join(targetDir, 'pnpm-workspace.yaml'));
-  const finalArgs = withWorkspace ? ['add', '-w', '-D', ...packages] : args;
-  return runCommand(pkgManager, finalArgs, { cwd: targetDir, stdio: 'inherit' });
+  return runCommand(pkgManager, buildDevDependencyInstallArgs(targetDir, pkgManager, packages), { cwd: targetDir, stdio: 'inherit' });
 }
 
 function syncCommands(targetDir, sourceDir, ideName, overwrite) {
@@ -1376,7 +1388,9 @@ function syncCommands(targetDir, sourceDir, ideName, overwrite) {
         info(`  跳过已存在命令: ${entry}`);
         continue;
       }
-      const rendered = readRenderedCommandTemplate(sourcePath);
+      const rendered = readRenderedCommandTemplate(sourcePath, {
+        forceLocalProtocol: process.env.BR_AI_SPEC_FORCE_LOCAL_CLI === '1',
+      });
       ensureDir(path.dirname(destPath));
       fs.writeFileSync(destPath, rendered, 'utf8');
       copiedInThisRun.add(destPath);
@@ -1627,7 +1641,7 @@ function installLocalCli(targetDir, sourceDir, pkgManager, pending, options = {}
   }
   const registry = readSourcePackageField(sourceDir, 'registry');
   const scopeName = packageName && packageName.startsWith('@') ? packageName.split('/')[0] : '';
-  const args = pkgManager === 'pnpm' ? ['add', '-D', installSpec] : ['install', '-D', installSpec];
+  const args = buildDevDependencyInstallArgs(targetDir, pkgManager, [installSpec]);
   if (registry) {
     args.push('--registry', registry);
     if (scopeName) {
@@ -1918,6 +1932,55 @@ function hasAnyUiproAssets(targetDir) {
   return fs.existsSync(skillDir) || fs.existsSync(legacySkillDir);
 }
 
+function resolveUiproInstallOutput(tmpDir) {
+  const sharedDataDir = path.join(tmpDir, '.shared', 'ui-ux-pro-max');
+  const commandPromptFile = path.join(tmpDir, '.cursor', 'commands', 'ui-ux-pro-max.md');
+  if (fs.existsSync(sharedDataDir)) {
+    return {
+      dataDir: sharedDataDir,
+      promptFile: commandPromptFile,
+    };
+  }
+
+  const cursorSkillDir = path.join(tmpDir, '.cursor', 'skills', 'ui-ux-pro-max');
+  const cursorSkillDataDir = path.join(cursorSkillDir, 'data');
+  const cursorSkillFile = path.join(cursorSkillDir, 'SKILL.md');
+  if (fs.existsSync(cursorSkillDataDir)) {
+    return {
+      dataDir: cursorSkillDataDir,
+      promptFile: cursorSkillFile,
+    };
+  }
+  if (fs.existsSync(cursorSkillDir)) {
+    return {
+      dataDir: cursorSkillDir,
+      promptFile: cursorSkillFile,
+    };
+  }
+
+  return {
+    dataDir: '',
+    promptFile: commandPromptFile,
+  };
+}
+
+function writeUiproSkillFile(skillDir, promptFile) {
+  const defaultContent = `---\nname: ui-ux-pro-max\ndescription: AI 设计智能技能，提供 67 种 UI 风格、161 套配色方案、57 组字体搭配、99 条 UX 准则。当需要 AI 自主做出 UI/UX 设计决策时使用本技能。\n---\n\n# UI UX Pro Max\n\n本技能为 AI 注入专业 UI/UX 设计决策能力。\n`;
+  if (!fs.existsSync(promptFile)) {
+    fs.writeFileSync(path.join(skillDir, 'SKILL.md'), defaultContent, 'utf8');
+    return;
+  }
+
+  const prompt = fs.readFileSync(promptFile, 'utf8')
+    .replace(/\.shared\/ui-ux-pro-max\//g, 'data/')
+    .replace(/\.cursor\/skills\/ui-ux-pro-max\/data\//g, 'data/')
+    .replace(/\.cursor\/skills\/ui-ux-pro-max\//g, 'data/');
+  const content = hasYamlFrontmatter(prompt)
+    ? prompt
+    : `---\nname: ui-ux-pro-max\ndescription: AI 设计智能技能，提供 67 种 UI 风格、161 套配色方案、57 组字体搭配、99 条 UX 准则。当需要 AI 自主做出 UI/UX 设计决策时使用本技能。\n---\n\n${prompt}`;
+  fs.writeFileSync(path.join(skillDir, 'SKILL.md'), content, 'utf8');
+}
+
 function setupUipro(targetDir, pkgManager, pending) {
   const { legacySkillDir, skillDir, skillDataDir } = getUiproSkillPaths(targetDir);
   if (fs.existsSync(skillDataDir)) {
@@ -1953,21 +2016,15 @@ function setupUipro(targetDir, pkgManager, pending) {
     removePath(tmpDir);
     return;
   }
-  const sourceDir = path.join(tmpDir, '.shared', 'ui-ux-pro-max');
-  if (!fs.existsSync(sourceDir)) {
+  const output = resolveUiproInstallOutput(tmpDir);
+  if (!output.dataDir || !fs.existsSync(output.dataDir)) {
     pending.failures.push('UI UX Pro Max 资源目录缺失，可能是 uipro-cli 版本或网络问题。');
     removePath(tmpDir);
     return;
   }
   ensureDir(skillDataDir);
-  fs.cpSync(sourceDir, skillDataDir, { recursive: true });
-  const promptFile = path.join(tmpDir, '.cursor', 'commands', 'ui-ux-pro-max.md');
-  if (fs.existsSync(promptFile)) {
-    const prompt = fs.readFileSync(promptFile, 'utf8').replace(/\.shared\/ui-ux-pro-max\//g, 'data/');
-    fs.writeFileSync(path.join(skillDir, 'SKILL.md'), `---\nname: ui-ux-pro-max\ndescription: AI 设计智能技能，提供 67 种 UI 风格、161 套配色方案、57 组字体搭配、99 条 UX 准则。当需要 AI 自主做出 UI/UX 设计决策时使用本技能。\n---\n\n${prompt}`, 'utf8');
-  } else {
-    fs.writeFileSync(path.join(skillDir, 'SKILL.md'), `---\nname: ui-ux-pro-max\ndescription: AI 设计智能技能，提供 67 种 UI 风格、161 套配色方案、57 组字体搭配、99 条 UX 准则。当需要 AI 自主做出 UI/UX 设计决策时使用本技能。\n---\n\n# UI UX Pro Max\n\n本技能为 AI 注入专业 UI/UX 设计决策能力。\n`, 'utf8');
-  }
+  fs.cpSync(output.dataDir, skillDataDir, { recursive: true });
+  writeUiproSkillFile(skillDir, output.promptFile);
   removePath(tmpDir);
   ok('UI UX Pro Max 安装完成');
 }
@@ -2720,6 +2777,7 @@ module.exports = {
     selectCustomRuleList,
     selectMultipleFromList,
     selectBootstrapChoices,
+    buildDevDependencyInstallArgs,
   },
 };
 

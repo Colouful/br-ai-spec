@@ -33,19 +33,13 @@ const {
   buildSuperpowersContract,
   loadSuperpowersState,
 } = require('../bin/superpowers');
-const { initVisualHooks } = require('./visual-hooks');
+const {
+  pushVisualRuntimeStateSnapshot,
+  pushVisualRuntimeStateSnapshotNow,
+  drainVisualRuntimeStatePushes,
+} = require('./visual-hooks/runtime-state-pusher');
 
 const PACKAGE_ROOT = path.resolve(__dirname, '..');
-
-// 初始化 visual hooks（全局单例）
-let visualHooks = null;
-try {
-  visualHooks = initVisualHooks();
-} catch (err) {
-  // 初始化失败不影响主流程
-  console.warn('[ai-protocol-workflow] visual hooks init failed:', err.message);
-}
-
 const START_INSTRUCTION_FILES = [
   '.agents/orchestration/task-orchestrator-run-plan-template.md',
 ];
@@ -584,6 +578,11 @@ function readJsonIfExists(filePath) {
     return null;
   }
   return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+}
+
+function finalizeProtocolResult(targetDir, result) {
+  pushVisualRuntimeStateSnapshot(targetDir);
+  return result;
 }
 
 function buildFileTarget(targetDir, relPath, options = {}) {
@@ -5160,25 +5159,7 @@ function advanceProtocolStep(options = {}) {
     }),
   };
 
-  // Visual Hook: 推送运行态变更
-  if (visualHooks && result.runner_status?.current) {
-    const runState = result.runner_status.current;
-    visualHooks.onRunStateChange({
-      run_id: runState.run_id,
-      workspace_id: runState.workspace_id || path.basename(targetDir),
-      run_status: runState.run_status,
-      current_role: runState.current_role,
-      pending_gate: runState.pending_gate,
-      flow_id: runState.flow?.id,
-      delivery_profile: runState.delivery_profile,
-      artifact_profile: runState.artifact_profile,
-      timestamps: runState.timestamps
-    }).catch(err => {
-      // 优雅降级：不影响主流程
-    });
-  }
-
-  return result;
+  return finalizeProtocolResult(targetDir, result);
 }
 
 function statusProtocolStep(options = {}) {
@@ -5450,7 +5431,7 @@ function updateProtocolInput(options = {}) {
       clearPendingGate: false,
       message: '用户通过补充输入恢复当前运行。',
     });
-    return {
+    return finalizeProtocolResult(targetDir, {
       kind: 'ai-protocol-input-update',
       target: targetDir,
       updated: null,
@@ -5467,7 +5448,7 @@ function updateProtocolInput(options = {}) {
         target: targetDir,
         userInput: null,
       }),
-    };
+    });
   }
 
   if (
@@ -5479,7 +5460,7 @@ function updateProtocolInput(options = {}) {
       clearPendingGate: true,
       message: '用户确认当前方案，恢复继续推进。',
     });
-    return {
+    return finalizeProtocolResult(targetDir, {
       kind: 'ai-protocol-input-update',
       target: targetDir,
       updated: null,
@@ -5496,12 +5477,12 @@ function updateProtocolInput(options = {}) {
         target: targetDir,
         userInput: null,
       }),
-    };
+    });
   }
 
   const approvalGateFastPath = tryApplyApprovalGateFastPath(targetDir, userInput);
   if (approvalGateFastPath) {
-    return {
+    return finalizeProtocolResult(targetDir, {
       kind: 'ai-protocol-input-update',
       target: targetDir,
       updated: approvalGateFastPath.updated,
@@ -5518,12 +5499,12 @@ function updateProtocolInput(options = {}) {
         target: targetDir,
         userInput: null,
       }),
-    };
+    });
   }
 
   const fastPath = tryApplyBeforeArchiveFastPath(targetDir, userInput);
   if (fastPath) {
-    return {
+    return finalizeProtocolResult(targetDir, {
       kind: 'ai-protocol-input-update',
       target: targetDir,
       updated: fastPath.updated,
@@ -5540,12 +5521,12 @@ function updateProtocolInput(options = {}) {
         target: targetDir,
         userInput: null,
       }),
-    };
+    });
   }
 
   const followupPatch = tryOpenFollowupPatchFastPath(targetDir, userInput);
   if (followupPatch) {
-    return {
+    return finalizeProtocolResult(targetDir, {
       kind: 'ai-protocol-input-update',
       target: targetDir,
       updated: null,
@@ -5562,7 +5543,7 @@ function updateProtocolInput(options = {}) {
         target: targetDir,
         userInput: null,
       }),
-    };
+    });
   }
 
   const changeDecision = classifyChangeImpact(currentArtifacts.run, userInput);
@@ -5583,7 +5564,7 @@ function updateProtocolInput(options = {}) {
     handoffGate: changeDecision.handoff_gate,
   });
 
-  return {
+  return finalizeProtocolResult(targetDir, {
     kind: 'ai-protocol-input-update',
     target: targetDir,
     updated,
@@ -5600,7 +5581,7 @@ function updateProtocolInput(options = {}) {
       target: targetDir,
       userInput,
     }),
-  };
+  });
 }
 
 module.exports = {
@@ -5611,4 +5592,9 @@ module.exports = {
   updateProtocolInput,
   loadRoleDefinition,
   parseFrontmatter,
+  __test__: {
+    pushCurrentRuntimeStateToVisual: pushVisualRuntimeStateSnapshotNow,
+    drainVisualPushes: drainVisualRuntimeStatePushes,
+  },
+  drainVisualPushes: drainVisualRuntimeStatePushes,
 };

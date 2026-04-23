@@ -71,12 +71,39 @@ function generateConnectToken() {
   return crypto.randomBytes(24).toString('hex');
 }
 
+/** 读取 `--flag value`（value 不能是另一个以 `--` 开头的开关） */
+function readArgValue(argv, flag) {
+  const idx = argv.indexOf(flag);
+  if (idx === -1) return null;
+  const v = argv[idx + 1];
+  if (v == null || String(v).startsWith('--')) return null;
+  return String(v).trim();
+}
+
+/**
+ * `visual test` 里拉 pending / 推 receipt 的 HTTP 超时（毫秒）。
+ * 默认 15s：本地 Next dev 首次打 /api/internal/ingest/raw 时编译 + DB 往往超过 1.5s。
+ * 与 internal/visual-hooks/config-loader 相同环境变量名。
+ */
+function resolveVisualTestHttpTimeoutMs() {
+  const raw = process.env.AI_SPEC_VISUAL_PUSH_TIMEOUT_MS;
+  const n = raw ? parseInt(raw, 10) : NaN;
+  if (Number.isFinite(n) && n >= 500 && n <= 120000) {
+    return n;
+  }
+  return 15000;
+}
+
 async function runInit(targetDir, args) {
   const yes = args.includes('--yes') || args.includes('-y');
   const existing = loadBridge(targetDir) || {};
 
-  let serverUrl = existing.server_url || 'http://localhost:3000';
-  let workspaceId = existing.workspace_id || path.basename(targetDir);
+  const fromCliServer = readArgValue(args, '--server');
+  const fromCliWorkspaceId =
+    readArgValue(args, '--workspace-id') || readArgValue(args, '--workspace_id');
+
+  let serverUrl = fromCliServer || existing.server_url || 'http://localhost:3000';
+  let workspaceId = fromCliWorkspaceId || existing.workspace_id || path.basename(targetDir);
   let agentId = existing.agent_id || 'ai-spec-auto';
   let pushMode = existing.push_mode || 'hook';
   let inboxTransport = existing.inbox_transport || 'http-pull';
@@ -213,10 +240,12 @@ async function runTest(targetDir) {
   const ping = await httpPing(serverUrl);
   console.log(`[visual] ping ${serverUrl} → ${ping.ok ? 'ok' : 'fail'}${ping.statusCode ? ` (status ${ping.statusCode})` : ''}${ping.error ? ` (${ping.error})` : ''}`);
 
+  const testHttpMs = resolveVisualTestHttpTimeoutMs();
+
   let pulled = 0;
   try {
     const { pullPendingControls } = require('../internal/visual-hooks/control-puller');
-    const result = await pullPendingControls({ targetDir, timeoutMs: 1500 });
+    const result = await pullPendingControls({ targetDir, timeoutMs: testHttpMs });
     pulled = result.written || 0;
     console.log(`[visual] pull pending → ${pulled} written (transport=${result.transport})`);
   } catch (err) {
@@ -234,7 +263,7 @@ async function runTest(targetDir) {
       applied_state_snapshot: null,
       received_at: new Date().toISOString(),
     }];
-    const pushResult = await pushReceipts({ targetDir, receipts: probe, timeoutMs: 1500 });
+    const pushResult = await pushReceipts({ targetDir, receipts: probe, timeoutMs: testHttpMs });
     console.log(`[visual] push probe receipt → ${pushResult.pushed ? 'ok' : 'fail'}${pushResult.error ? ` (${pushResult.error})` : ''}`);
   } catch (err) {
     console.log(`[visual] push probe failed: ${err.message}`);
@@ -243,8 +272,121 @@ async function runTest(targetDir) {
   return 0;
 }
 
+/**
+ * `visual watch`：长驻守护，周期性消费 `.ai-spec/inbox/` 并拉取 visual 侧 outbox。
+ *
+ * 完全复用 `internal/visual-hooks/inbox-consumer.js` 的 `consumeInbox` 实现，
+ * 不引入新状态机。任何异常都只写日志，不退出；连续失败指数退避到上限。
+ *
+ * 严格与 init / update / protocol-* 主链解耦：本子命令只在用户手动启动时运行。
+ */
+async function runWatch(targetDir, args) {
+  const bridge = loadBridge(targetDir);
+  if (!bridge) {
+    console.error(
+      '[visual watch] bridge 未配置（.ai-spec/visual-bridge.json 缺失）。请先运行 `visual init`。',
+    );
+    return 1;
+  }
+  if (bridge.enabled === false) {
+    console.error('[visual watch] bridge enabled=false；请先 `visual init` 或手动改 enabled=true。');
+    return 1;
+  }
+
+  const intervalRaw = readArgValue(args, '--interval');
+  let intervalMs = Number.parseInt(intervalRaw || '2000', 10);
+  if (!Number.isFinite(intervalMs) || intervalMs < 500) intervalMs = 2000;
+  if (intervalMs > 60000) intervalMs = 60000;
+
+  const maxBackoffMs = 30000;
+  const logDir = path.join(targetDir, '.ai-spec', 'logs');
+  const logFile = path.join(logDir, 'visual-watch.log');
+  ensureDir(logDir);
+
+  const writeLog = (level, message, extra) => {
+    const line = JSON.stringify({
+      ts: new Date().toISOString(),
+      level,
+      message,
+      ...(extra && typeof extra === 'object' ? extra : {}),
+    });
+    try {
+      fs.appendFileSync(logFile, `${line}\n`, 'utf-8');
+    } catch (_err) {
+      /* silent */
+    }
+    // stdout 方便 tmux / launchd 里直接观察
+    const prefix = level === 'error' ? '[visual watch][ERR]' : '[visual watch]';
+    console.log(`${prefix} ${message}${extra ? ` ${JSON.stringify(extra)}` : ''}`);
+  };
+
+  writeLog('info', 'start', {
+    target: targetDir,
+    server_url: bridge.server_url || null,
+    workspace_id: bridge.workspace_id || null,
+    interval_ms: intervalMs,
+  });
+
+  let running = true;
+  let failureStreak = 0;
+  const stop = (signal) => {
+    if (!running) return;
+    running = false;
+    writeLog('info', 'stop', { signal: signal || 'manual' });
+  };
+  process.on('SIGINT', () => {
+    stop('SIGINT');
+    process.exit(0);
+  });
+  process.on('SIGTERM', () => {
+    stop('SIGTERM');
+    process.exit(0);
+  });
+
+  const { consumeInbox } = require('../internal/visual-hooks/inbox-consumer');
+
+  const tickTimeoutMs = Math.max(1000, Math.floor(intervalMs * 2));
+
+  while (running) {
+    try {
+      const result = await consumeInbox({
+        targetDir,
+        timeoutMs: tickTimeoutMs,
+      });
+      const processed = result?.processed || 0;
+      const pulled = result?.pulled || 0;
+      if (processed > 0 || pulled > 0) {
+        writeLog('info', 'tick', {
+          processed,
+          pulled,
+          receipts: Array.isArray(result?.receipts)
+            ? result.receipts.map((r) => ({ outbox_id: r.outbox_id, result: r.result }))
+            : [],
+        });
+      }
+      failureStreak = 0;
+    } catch (err) {
+      failureStreak += 1;
+      writeLog('error', 'tick_failed', {
+        error: String(err?.message || err),
+        streak: failureStreak,
+      });
+    }
+
+    const backoff = failureStreak === 0
+      ? intervalMs
+      : Math.min(maxBackoffMs, intervalMs * Math.pow(2, Math.min(failureStreak, 5)));
+
+    await new Promise((resolve) => setTimeout(resolve, backoff));
+  }
+
+  return 0;
+}
+
 function printUsage() {
-  console.log('Usage: ai-spec-auto visual <init|disable|status|test> [--target <dir>]');
+  console.log(
+    'Usage: ai-spec-auto visual <init|disable|status|test|watch> [--target <dir>] [init: --server <url> --workspace-id <id> --yes] [watch: --interval <ms>]',
+  );
 }
 
 async function main(argv) {
@@ -275,6 +417,8 @@ async function main(argv) {
       return runStatus(target);
     case 'test':
       return runTest(target);
+    case 'watch':
+      return runWatch(target, remaining);
     default:
       printUsage();
       return 1;
