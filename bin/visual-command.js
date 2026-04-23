@@ -101,14 +101,18 @@ async function runInit(targetDir, args) {
   const fromCliServer = readArgValue(args, '--server');
   const fromCliWorkspaceId =
     readArgValue(args, '--workspace-id') || readArgValue(args, '--workspace_id');
+  const fromCliAgentId =
+    readArgValue(args, '--agent-id') || readArgValue(args, '--agent_id');
+  const fromCliConnectToken =
+    readArgValue(args, '--connect-token') || readArgValue(args, '--connect_token');
 
   let serverUrl = fromCliServer || existing.server_url || 'http://localhost:3000';
   let workspaceId = fromCliWorkspaceId || existing.workspace_id || path.basename(targetDir);
-  let agentId = existing.agent_id || 'ai-spec-auto';
+  let agentId = fromCliAgentId || existing.agent_id || 'ai-spec-auto';
   let pushMode = existing.push_mode || 'hook';
   let inboxTransport = existing.inbox_transport || 'http-pull';
   let pollHint = existing.poll_interval_hint || 'on-cli-tick';
-  let connectToken = existing.connect_token || generateConnectToken();
+  let connectToken = fromCliConnectToken || existing.connect_token || generateConnectToken();
 
   if (!yes) {
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
@@ -385,7 +389,7 @@ async function runWatch(targetDir, args) {
 
 function printUsage() {
   console.log(
-    'Usage: ai-spec-auto visual <init|disable|status|test|watch> [--target <dir>] [init: --server <url> --workspace-id <id> --yes] [watch: --interval <ms>]',
+    'Usage: ai-spec-auto visual <init|disable|status|test|watch> [--target <dir>] [init: --server <url> --workspace-id <id> --agent-id <id> --connect-token <token> --yes] [watch: --interval <ms>]',
   );
 }
 
