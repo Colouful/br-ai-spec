@@ -16,7 +16,7 @@
  *   "schema_version": 1,
  *   "run_id": "run_2026xxxx",
  *   "gate": "before-implementation",
- *   "decision": "approved" | "rejected" | "resumed",
+ *   "decision": "approved" | "rejected" | "resumed" | "request_changes",
  *   "reason": "...optional...",
  *   "actor_id": "...optional...",
  *   "ts_ms": 1714000000000,
@@ -64,7 +64,7 @@ function logError(targetDir, phase, err) {
  * @param {string} opts.targetDir 项目根
  * @param {string} opts.runId
  * @param {string} opts.gate
- * @param {'approved'|'rejected'|'resumed'} opts.decision
+ * @param {'approved'|'rejected'|'resumed'|'request_changes'} opts.decision
  * @param {string} [opts.reason]
  * @param {string} [opts.actorId]
  * @returns {{ ok: boolean, path?: string }}

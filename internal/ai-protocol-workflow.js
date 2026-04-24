@@ -24,6 +24,8 @@ const {
   getFlowRuntimeConfig,
   getRuleRuntimeConfig,
   getSkillRuntimeConfig,
+  getRoleRuleIds,
+  getRoleSkillPriority,
   resolveRuntimeProfileId,
 } = require('../bin/runtime-registry');
 const {
@@ -2225,9 +2227,8 @@ function getSourceCandidates(entry, projectProfile, fallbackConfig = null) {
   return config[projectProfile] || config.default || [];
 }
 
-function resolveRoleRuleIds(targetDir, roleId) {
-  const registryEntry = getRoleRuntimeConfig(targetDir, roleId);
-  const configured = normalizeStringArray(registryEntry?.rule_ids);
+function resolveRoleRuleIds(targetDir, roleId, projectProfile) {
+  const configured = getRoleRuleIds(targetDir, roleId, projectProfile);
   if (configured.length > 0) {
     return configured;
   }
@@ -2271,7 +2272,7 @@ function resolveRoleRuleConstraintProfiles(targetDir, roleId, projectProfile) {
 }
 
 function buildRoleRuleContract(targetDir, roleId, deliveryProfile, projectProfile, repoConventions) {
-  const ruleIds = resolveRoleRuleIds(targetDir, roleId);
+  const ruleIds = resolveRoleRuleIds(targetDir, roleId, projectProfile);
   const sourceRules = ruleIds
     .map((ruleId) => {
       const target = buildReadableTargetFromCandidates(
@@ -2355,9 +2356,8 @@ function normalizeSkillIds(skills) {
     .filter(Boolean);
 }
 
-function resolveRoleSkillPriority(targetDir, roleId, selectedSkills) {
-  const registryEntry = getRoleRuntimeConfig(targetDir, roleId);
-  const configured = normalizeStringArray(registryEntry?.skill_priority || registryEntry?.preferred_skills);
+function resolveRoleSkillPriority(targetDir, roleId, projectProfile, selectedSkills) {
+  const configured = getRoleSkillPriority(targetDir, roleId, projectProfile);
   const normalizedSelected = normalizeSkillIds(selectedSkills);
   if (configured.length > 0) {
     if (normalizedSelected.includes('using-superpowers') && !configured.includes('using-superpowers')) {
@@ -2437,8 +2437,8 @@ function collectChangeArtifactIntentText(targetDir, changeId, currentRun) {
     .join('\n');
 }
 
-function choosePrimarySkillIds(targetDir, roleId, selectedSkills, repoConventions, userRequest = null, currentRun = null, changeId = null) {
-  const ordered = resolveRoleSkillPriority(targetDir, roleId, selectedSkills);
+function choosePrimarySkillIds(targetDir, roleId, projectProfile, selectedSkills, repoConventions, userRequest = null, currentRun = null, changeId = null) {
+  const ordered = resolveRoleSkillPriority(targetDir, roleId, projectProfile, selectedSkills);
   const selected = new Set(normalizeSkillIds(selectedSkills));
   const requestSignals = detectTaskIntentSignals(userRequest);
   const artifactSignals = roleId === 'frontend-implementer'
@@ -2505,7 +2505,7 @@ function choosePrimarySkillIds(targetDir, roleId, selectedSkills, repoConvention
 
 function buildRoleSkillContract(targetDir, roleId, selectedSkills, deliveryProfile, projectProfile, repoConventions, userRequest = null, currentRun = null, changeId = null) {
   const normalized = normalizeSkillIds(selectedSkills);
-  const primaryIds = choosePrimarySkillIds(targetDir, roleId, selectedSkills, repoConventions, userRequest, currentRun, changeId);
+  const primaryIds = choosePrimarySkillIds(targetDir, roleId, projectProfile, selectedSkills, repoConventions, userRequest, currentRun, changeId);
   const targetIds = primaryIds.length > 0 ? primaryIds : normalized.slice(0, roleId === 'frontend-implementer' ? 4 : 3);
   const readTargets = targetIds
     .map((id) => buildSkillTarget(targetDir, id, projectProfile))

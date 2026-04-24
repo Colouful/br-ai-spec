@@ -8,6 +8,14 @@
 
 `br-ai-spec-visual` 是 `ai-spec-auto` 的可选增强组件，为 AI 规范驱动开发提供实时运行监控和可视化控制台能力。
 
+补充一个关键边界：
+
+- registry（注册表）主数据由 `skill-q-platform（Hub 平台）` 维护
+- `br-ai-spec` 负责把 Hub 导出的 registry / manifest 同步到项目本地
+- `br-ai-spec-visual` 只消费“已同步 / 已上报”的 registry 结果
+
+也就是说，visual 负责展示，不负责定义规则与专家。
+
 它是一个基于 **Next.js 16 + Prisma + MariaDB + WebSocket** 的实时监控平台，用于：
 
 - 实时追踪项目中每个 run 的执行阶段、专家流转和门禁状态

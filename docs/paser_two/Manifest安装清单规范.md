@@ -8,6 +8,13 @@
 - CLI（命令行工具）负责解析和安装
 - 插件 / OpenClaw 负责传递或触发，不自行发明安装结构
 
+补充边界：
+
+- Hub 负责维护 registry 主数据（角色、规则、技能、场景）
+- manifest 负责把“本次安装要什么”传给 CLI
+- CLI 在安装 / 同步时把 registry snapshot 展开为项目本地 `.agents/registry`
+- Visual 只消费 CLI 已同步、已上报的结果
+
 这份规范当前只定义：
 
 - 最小可用字段
@@ -128,6 +135,21 @@
 | `flows（流程模板）` | string[] | 可选安装提示字段；当前更建议由当前项目内置维护，不要求 Hub 显式输出 |
 | `constraints（约束）` | object | 技术栈、IDE、版本限制 |
 | `notes（备注）` | string[] | 给 CLI 或插件的非阻断说明 |
+
+### 4.3 与 registry（注册表）的关系
+
+manifest 不等于 registry，但两者必须协同：
+
+- `manifest（安装清单）` 解决“本次安装选了哪些角色 / 规则 / 技能 / 场景”
+- `registry snapshot（注册表快照）` 解决“这些资产的来源路径、profile 维度和运行时补充元数据是什么”
+
+如果 Hub 侧有 profile（技术栈）差异，推荐在 registry snapshot 中显式输出：
+
+- `sourceByProfile`
+- `rule_ids_by_profile`
+- `skill_priority_by_profile`
+
+CLI 消费时按“通用字段 + profile 字段”合并，不要只看通用字段。
 
 ### 4.3 当前阶段的字段边界
 

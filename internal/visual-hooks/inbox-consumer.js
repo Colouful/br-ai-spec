@@ -109,7 +109,9 @@ function appendNextStepHint(targetDir, command, payload, snapshot) {
     const recommend =
       command === 'approve_gate' || command === 'resume_run'
         ? '请在 IDE (Cursor / Claude Code) 执行 `/spec-continue` 继续下一步开发。'
-        : '请查看 visual 审批结果并在 IDE 按提示操作。';
+        : command === 'request_changes'
+          ? '请补齐资产后重新提交审批。'
+          : '请查看 visual 审批结果并在 IDE 按提示操作。';
     const block = [
       '',
       `## [${ts}] ${command} applied`,
@@ -147,13 +149,16 @@ function appendNextStepHint(targetDir, command, payload, snapshot) {
  */
 function emitGateSignal(targetDir, command, payload, snapshot) {
   try {
+    const normalizedDecision = String(payload?.decision || '').trim().toLowerCase();
     const decision =
       command === 'approve_gate'
         ? 'approved'
         : command === 'resume_run'
           ? 'resumed'
           : command === 'reject_gate'
-            ? 'rejected'
+            ? normalizedDecision === 'request_changes' || normalizedDecision === 'request-changes'
+              ? 'request_changes'
+              : 'rejected'
             : null;
     if (!decision) return;
     const { writeGateSignal } = require('./gate-signal');
@@ -211,6 +216,9 @@ function applyControl(targetDir, command, payload) {
           reason: `Pending gate mismatch: current is "${activeGate}", requested "${requestedGate}"`,
         };
       }
+      const decision = String(payload?.decision || '').trim().toLowerCase();
+      const isRequestChanges =
+        decision === 'request_changes' || decision === 'request-changes';
       const reason = payload?.reason || payload?.decision || 'rejected by visual gate';
       const result = runtimeState.gateBlockedRunState({
         target: targetDir,
@@ -222,10 +230,16 @@ function applyControl(targetDir, command, payload) {
         toRole: state.current_role || null,
         blockedByRole: state.current_role || state.gate_context?.blocked_by_role || null,
         resumeToRole: state.gate_context?.resume_to_role || null,
-        requiredUserAction: state.gate_context?.required_user_action || '当前门禁已被拒绝，请修正后重新请求审批。',
-        blockedReason: `gate rejected: ${reason}`,
-        message: `gate rejected: ${reason}`,
-        eventType: 'gate-rejected',
+        requiredUserAction: isRequestChanges
+          ? `请先补齐资产或说明后重新提交审批。${reason ? ` 当前要求：${reason}` : ''}`.trim()
+          : state.gate_context?.required_user_action || '当前门禁已被拒绝，请修正后重新请求审批。',
+        blockedReason: isRequestChanges
+          ? `gate request_changes: ${reason}`
+          : `gate rejected: ${reason}`,
+        message: isRequestChanges
+          ? `gate request_changes: ${reason}`
+          : `gate rejected: ${reason}`,
+        eventType: isRequestChanges ? 'gate-request-changes' : 'gate-rejected',
       });
       const rejectSnapshot = {
         status: result?.state?.status,
@@ -233,6 +247,9 @@ function applyControl(targetDir, command, payload) {
         pending_gate: result?.state?.pending_gate,
         run_id: result?.state?.run_id,
       };
+      if (isRequestChanges) {
+        appendNextStepHint(targetDir, 'request_changes', payload, rejectSnapshot);
+      }
       emitGateSignal(targetDir, 'reject_gate', payload, rejectSnapshot);
       return {
         result: 'rejected',

@@ -434,6 +434,15 @@ curl http://localhost:3000/api/workspaces
 供 IDE 中的 AI（Cursor / Claude Code）通过规则/技能轮询，实现 Visual 页面点
 批准后原对话自动继续。
 
+当 `reject_gate` 携带 `payload.decision = "request_changes"` 时，会按“要求补充后重审”
+处理：
+
+- 保持 `current-run.json.status = waiting-approval`
+- 保持 `pending_gate` 不清空
+- 事件类型写为 `gate-request-changes`
+- `.ai-spec/gate-signal.json` 写 `decision = "request_changes"`
+- `.ai-spec/next-step.md` 追加“补齐资产后重新提交审批”的提示
+
 **契约（`schema_version: 1`）**：
 
 ```json
@@ -441,7 +450,7 @@ curl http://localhost:3000/api/workspaces
   "schema_version": 1,
   "run_id": "run_2026xxxx",
   "gate": "before-implementation",
-  "decision": "approved | rejected | resumed",
+  "decision": "approved | rejected | resumed | request_changes",
   "reason": "可选",
   "actor_id": "可选",
   "ts_ms": 1714000000000,

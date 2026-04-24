@@ -5,6 +5,7 @@ const { resolveRuntimePaths } = require('./runtime-paths');
 const {
   getRoleRuntimeConfig,
   getFlowRuntimeConfig,
+  resolveRuntimeProfileId,
 } = require('./runtime-registry');
 
 const AUTO_ADVANCE_EXECUTION_STATUSES = new Set(['done', 'success', 'completed']);
@@ -164,6 +165,65 @@ function readCurrentRun(targetDir) {
     return null;
   }
   return readJsonFile(runtimePaths.currentRun.path, 'current run-state');
+}
+
+function loadPackageManifest(targetDir) {
+  const packagePath = path.join(targetDir, 'package.json');
+  if (!fs.existsSync(packagePath)) {
+    return null;
+  }
+  return readJsonFile(packagePath, 'package manifest');
+}
+
+function hasDependency(pkg, names) {
+  if (!pkg) {
+    return false;
+  }
+  const deps = {
+    ...(pkg.dependencies || {}),
+    ...(pkg.devDependencies || {}),
+    ...(pkg.peerDependencies || {}),
+  };
+  return names.some((name) => Object.prototype.hasOwnProperty.call(deps, name));
+}
+
+function detectProjectProfile(targetDir) {
+  const manifestPath = path.join(targetDir, '.ai-spec', 'manifest.json');
+  if (fs.existsSync(manifestPath)) {
+    try {
+      const manifest = readJsonFile(manifestPath, 'runtime manifest');
+      const manifestProfile = resolveRuntimeProfileId(targetDir, manifest?.profile);
+      if (manifestProfile) {
+        return manifestProfile;
+      }
+    } catch (_error) {
+      // ignore invalid manifest and continue with package detection
+    }
+  }
+
+  const pkg = loadPackageManifest(targetDir);
+  if (hasDependency(pkg, ['vue', 'vue-router', 'pinia'])) {
+    return 'vue';
+  }
+  if (hasDependency(pkg, ['react', 'react-dom', 'react-router-dom'])) {
+    return 'react';
+  }
+  return 'default';
+}
+
+function resolveTransitionRoleValue(targetDir, transition, field) {
+  const raw = transition?.[field];
+  if (raw !== 'resolve-from-profile') {
+    return raw || null;
+  }
+
+  const projectProfile = detectProjectProfile(targetDir);
+  const profileMap = transition?.[`${field}_by_profile`];
+  if (profileMap && typeof profileMap === 'object' && !Array.isArray(profileMap)) {
+    return profileMap[projectProfile] || null;
+  }
+
+  return null;
 }
 
 function listMarkdownBullets(content) {
@@ -451,13 +511,21 @@ function getRuntimeTransition(targetDir, flowId, roleId) {
   const flowConfig = getFlowRuntimeConfig(targetDir, flowId);
   const flowTransition = flowConfig?.runtime_transitions?.[roleId];
   if (flowTransition && typeof flowTransition === 'object' && flowTransition.action) {
-    return flowTransition;
+    return {
+      ...flowTransition,
+      to_role: resolveTransitionRoleValue(targetDir, flowTransition, 'to_role'),
+      next_role: resolveTransitionRoleValue(targetDir, flowTransition, 'next_role'),
+    };
   }
 
   const roleConfig = getRoleRuntimeConfig(targetDir, roleId);
   const roleTransition = roleConfig?.runtime_transition;
   if (roleTransition && typeof roleTransition === 'object' && roleTransition.action) {
-    return roleTransition;
+    return {
+      ...roleTransition,
+      to_role: resolveTransitionRoleValue(targetDir, roleTransition, 'to_role'),
+      next_role: resolveTransitionRoleValue(targetDir, roleTransition, 'next_role'),
+    };
   }
 
   return FLOW_RUNTIME_TRANSITIONS[flowId]?.[roleId] || null;

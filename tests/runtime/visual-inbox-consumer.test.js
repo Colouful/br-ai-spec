@@ -174,11 +174,53 @@ async function testRejectGateMismatchReturnsConflict() {
   assert.strictEqual(state.current_role, 'code-guardian');
 }
 
+async function testRequestChangesKeepsGateAndWritesDedicatedSignal() {
+  const targetDir = createWorkspace();
+  const inboxDir = path.join(targetDir, '.ai-spec', 'inbox');
+  writeJson(path.join(inboxDir, 'control-outbox-request-changes.json'), {
+    outbox_id: 'outbox-request-changes-1',
+    command: 'reject_gate',
+    payload: {
+      gate: 'before-archive',
+      run_id: 'run_gate_reject',
+      decision: 'request_changes',
+      reason: '请补齐归档说明与 checklist',
+    },
+  });
+
+  const result = await consumeInbox({
+    targetDir,
+    skipPull: true,
+    skipPush: true,
+    timeoutMs: 500,
+  });
+
+  assert.strictEqual(result.processed, 1);
+  assert.strictEqual(result.receipts[0].result, 'rejected');
+
+  const state = readJson(path.join(targetDir, '.ai-spec', 'current-run.json'));
+  assert.strictEqual(state.status, 'waiting-approval');
+  assert.strictEqual(state.pending_gate, 'before-archive');
+  assert.ok(state.gate_context.blocked_reason.includes('请补齐归档说明与 checklist'));
+  assert.ok(state.gate_context.required_user_action.includes('补齐'));
+  assert.ok(state.events.some((event) => event.type === 'gate-request-changes'));
+
+  const gateSignal = readJson(path.join(targetDir, '.ai-spec', 'gate-signal.json'));
+  assert.strictEqual(gateSignal.decision, 'request_changes');
+
+  const nextStep = fs.readFileSync(
+    path.join(targetDir, '.ai-spec', 'next-step.md'),
+    'utf8',
+  );
+  assert.ok(nextStep.includes('补齐资产后重新提交审批'));
+}
+
 async function main() {
   await testRejectGateKeepsPendingGate();
   await testApproveGateDoesNotUseConnectTokenAsHmacSecret();
   await testDuplicateOutboxIdIsOnlyAppliedOnce();
   await testRejectGateMismatchReturnsConflict();
+  await testRequestChangesKeepsGateAndWritesDedicatedSignal();
   console.log('visual inbox consumer test passed: reject_gate blocks without clearing gate');
 }
 

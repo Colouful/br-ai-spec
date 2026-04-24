@@ -339,7 +339,7 @@ async function main() {
   const claudeSpecStart = readTextFile(path.join(ideOverrideTarget, '.claude', 'commands', 'spec-start.md'));
   const claudeSpecStartReview = readTextFile(path.join(ideOverrideTarget, '.claude', 'commands', 'spec-start-review.md'));
   assert.ok(cursorSpecStart.startsWith('---\n'));
-  assert.ok(cursorSpecStart.includes('$HOME/.ai-spec-auto/bin/ai-spec-auto'));
+  assert.ok(cursorSpecStart.includes('./node_modules/.bin/ai-spec-auto'));
   assert.ok(cursorSpecStart.includes('protocol-step --target . --user-input'));
   assert.ok(cursorSpecStartReview.startsWith('---\n'));
   assert.ok(cursorSpecStartReview.includes('name: /spec-start-review'));
@@ -351,11 +351,11 @@ async function main() {
   assert.ok(cursorSpecStartReview.includes('/spec-start-review --mode suggest 创建订单列表 mock 页面'));
   assert.ok(cursorSpecStartReview.includes('/spec-start-review --mode manual --flow prd-to-delivery 创建订单列表 mock 页面'));
   assert.ok(cursorSpecUpdate.startsWith('---\n'));
-  assert.ok(cursorSpecUpdate.includes('$HOME/.ai-spec-auto/bin/ai-spec-auto'));
+  assert.ok(cursorSpecUpdate.includes('./node_modules/.bin/ai-spec-auto'));
   assert.ok(cursorSpecUpdate.includes('protocol-update --target . --user-input'));
-  assert.ok(claudeSpecStart.includes('$HOME/.ai-spec-auto/bin/ai-spec-auto'));
+  assert.ok(claudeSpecStart.includes('./node_modules/.bin/ai-spec-auto'));
   assert.ok(!claudeSpecStart.startsWith('---\n'));
-  assert.ok(claudeSpecStartReview.includes('$HOME/.ai-spec-auto/bin/ai-spec-auto'));
+  assert.ok(claudeSpecStartReview.includes('./node_modules/.bin/ai-spec-auto'));
   assert.ok(claudeSpecStartReview.includes('$ARGUMENTS'));
   assert.ok(claudeSpecStartReview.includes('main-flow-blocking'));
 

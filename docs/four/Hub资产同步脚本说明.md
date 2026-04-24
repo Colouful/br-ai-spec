@@ -4,6 +4,14 @@
 
 目标只有一个：把当前仓库维护的 `skill / rule / 专家 / 场景方案` 批量同步到本地启动的 Hub 平台，减少在管理弹窗里重复上传文档的成本。
 
+> 主从关系说明：
+>
+> - `skill-q-platform（Hub 平台）` 是 registry（注册表）主维护方
+> - 当前仓库里的 `.agents/registry` 是 **同步结果 + 运行时消费入口**
+> - `br-ai-spec-visual` 只展示已同步 / 已上报的结果，不定义 registry
+>
+> 详见：[Hub-CLI-Visual三仓协同说明](./Hub-CLI-Visual三仓协同说明.md)
+
 ## 适用范围
 
 脚本当前覆盖 4 类资产：
@@ -31,6 +39,7 @@
 - `scenario` 会自动聚合显式绑定的 role/skill/rule
 
 脚本默认不会改主链流程或本项目 runtime，只是把本地 registry 和资产文档同步到 Hub。
+也就是说：它负责“把当前项目里的同步结果回推到 Hub 做治理或对齐”，但不改变 Hub 是主数据源这一事实。
 
 当前脚本分两条通道：
 

@@ -71,6 +71,21 @@ function mergeNamedEntries(baseEntries, overrideEntries) {
       if (Object.prototype.hasOwnProperty.call(entry, 'sourceByProfile')) {
         delete nextEntry.source;
       }
+      if (
+        Object.prototype.hasOwnProperty.call(entry, 'rule_ids') &&
+        !Object.prototype.hasOwnProperty.call(entry, 'rule_ids_by_profile')
+      ) {
+        delete nextEntry.rule_ids_by_profile;
+      }
+      if (
+        (Object.prototype.hasOwnProperty.call(entry, 'skill_priority') ||
+          Object.prototype.hasOwnProperty.call(entry, 'preferred_skills')) &&
+        !Object.prototype.hasOwnProperty.call(entry, 'skill_priority_by_profile') &&
+        !Object.prototype.hasOwnProperty.call(entry, 'preferred_skills_by_profile')
+      ) {
+        delete nextEntry.skill_priority_by_profile;
+        delete nextEntry.preferred_skills_by_profile;
+      }
     }
     merged[id] = {
       ...nextEntry,
@@ -197,6 +212,65 @@ function resolveRuntimeProfileId(targetDir, profileId) {
   return resolveProfileId(loadProfilesRegistry(targetDir), profileId);
 }
 
+function normalizeStringArray(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .map((item) => (typeof item === 'string' ? item.trim() : ''))
+    .filter(Boolean);
+}
+
+function uniqueList(values) {
+  const out = [];
+  const seen = new Set();
+  for (const value of values) {
+    const trimmed = String(value || '').trim();
+    if (!trimmed || seen.has(trimmed)) continue;
+    seen.add(trimmed);
+    out.push(trimmed);
+  }
+  return out;
+}
+
+function getProfileSpecificArray(entry, projectProfile, key, fallbackKey = null) {
+  if (!entry || typeof entry !== 'object' || !projectProfile) {
+    return [];
+  }
+  const byProfile = entry[key];
+  if (byProfile && typeof byProfile === 'object' && !Array.isArray(byProfile)) {
+    return normalizeStringArray(byProfile[projectProfile]);
+  }
+  if (fallbackKey) {
+    const alt = entry[fallbackKey];
+    if (alt && typeof alt === 'object' && !Array.isArray(alt)) {
+      return normalizeStringArray(alt[projectProfile]);
+    }
+  }
+  return [];
+}
+
+function getRoleRuleIds(targetDir, roleId, projectProfile) {
+  const registryEntry = getRoleRuntimeConfig(targetDir, roleId);
+  return uniqueList([
+    ...normalizeStringArray(registryEntry?.rule_ids),
+    ...getProfileSpecificArray(registryEntry, projectProfile, 'rule_ids_by_profile'),
+  ]);
+}
+
+function getRoleSkillPriority(targetDir, roleId, projectProfile) {
+  const registryEntry = getRoleRuntimeConfig(targetDir, roleId);
+  return uniqueList([
+    ...normalizeStringArray(registryEntry?.skill_priority || registryEntry?.preferred_skills),
+    ...getProfileSpecificArray(
+      registryEntry,
+      projectProfile,
+      'skill_priority_by_profile',
+      'preferred_skills_by_profile',
+    ),
+  ]);
+}
+
 module.exports = {
   PACKAGE_ROOT,
   loadProfilesRegistry,
@@ -208,6 +282,8 @@ module.exports = {
   getSkillRuntimeConfig,
   getRoleRuntimeConfig,
   getFlowRuntimeConfig,
+  getRoleRuleIds,
+  getRoleSkillPriority,
   resolveRuntimeProfileId,
   clearRegistryCache,
 };

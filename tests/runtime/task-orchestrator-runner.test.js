@@ -214,6 +214,8 @@ function main() {
   assert.strictEqual(workflow.turn.guidance.repo_conventions.route_modules_dir, 'src/router/modules');
   assert.ok(Array.isArray(workflow.turn.guidance.role_rule_contract.source_rules));
   assert.ok(workflow.turn.guidance.role_rule_contract.source_rules.some((item) => item.path.includes('05-API规范.md')));
+  assert.ok(workflow.turn.guidance.role_rule_contract.source_rules.some((item) => item.path.includes('06-路由规范.md')));
+  assert.ok(workflow.turn.guidance.role_rule_contract.source_rules.some((item) => item.path.includes('09-样式规范.md')));
   assert.ok(Array.isArray(workflow.turn.guidance.role_skill_contract.primary_skills));
   assert.ok(workflow.turn.guidance.role_skill_contract.primary_skills.includes('create-proposal'));
   assert.ok(Array.isArray(workflow.turn.guidance.artifact_contract));
