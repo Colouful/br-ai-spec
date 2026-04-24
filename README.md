@@ -152,6 +152,18 @@ npx @ex/ai-spec-auto@latest init . --custom-rules
 npx @ex/ai-spec-auto@latest update . --skip-skills --skip-configs --skip-openspec
 ```
 
+从 Hub（资产中心）安装 Manifest（方案包清单）：
+
+```bash
+npx @ex/ai-spec-auto@latest hub search react --kind manifest --hub http://localhost:3000
+npx @ex/ai-spec-auto@latest hub install react-standard-delivery . --hub http://localhost:3000 --mode standard --profile react --ide cursor
+npx @ex/ai-spec-auto@latest hub diff .
+npx @ex/ai-spec-auto@latest hub sync . --yes
+npx @ex/ai-spec-auto@latest hub rollback 1.0.0 .
+```
+
+安装成功后会写入 `.agents/registry/hub-lock.json`（Hub 锁文件），Visual（可视化控制台）会基于它展示当前 Manifest、资产版本、本地改动和高风险资产。
+
 ## 后续规划
 
 后续规划建议按三段推进，而不是同时把所有入口和平台能力全部拉开。

@@ -81,6 +81,13 @@ const VERSION_FLAGS = new Set(['-v', '-V', '-version', '--version', 'version']);
       process.exit(await manifestExport.main(args.slice(1)));
     }
 
+    if (args[0] === 'hub') {
+      // 切面接入：Hub 方案包能力独立在 hub-command 内部实现。
+      // 加载或执行失败只影响 hub 子命令，不改变 init/sync/check 等旧主链。
+      const hubCommand = require('./hub-command');
+      process.exit(await hubCommand.main(args.slice(1)));
+    }
+
     if (args[0] === 'task-orchestrator-adapter') {
       throw new Error('task-orchestrator-adapter is a legacy internal fallback; use ai-spec-auto protocol-step / protocol-advance / protocol-update instead');
     }
