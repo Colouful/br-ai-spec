@@ -5,9 +5,20 @@ const path = require('path');
 const { PassThrough, Writable } = require('stream');
 const { spawnSync } = require('child_process');
 const { __test__ } = require('../../bin/install-workflow');
+const { readProfilesRegistry } = require('../../bin/profile-registry');
 
 const repoRoot = path.join(__dirname, '..', '..');
-const { selectCustomRuleList, selectFromList, selectBootstrapChoices, buildDevDependencyInstallArgs } = __test__;
+const {
+  selectCustomRuleList,
+  selectFromList,
+  selectBootstrapChoices,
+  buildDevDependencyInstallArgs,
+  selectUpdateModules,
+  selectUpdateRuleMode,
+  selectUpdateRuleFiles,
+  listSelectableUpdateRules,
+  copyAgents,
+} = __test__;
 
 function createWorkspace(prefix) {
   return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -25,6 +36,10 @@ function writeText(filePath, value) {
 
 function readText(filePath) {
   return fs.readFileSync(filePath, 'utf8');
+}
+
+function stripAnsi(value) {
+  return String(value || '').replace(/\u001b\[[0-9;?]*[A-Za-z]/g, '');
 }
 
 function writeExecutable(filePath, content) {
@@ -365,6 +380,193 @@ async function verifyInteractiveSuperpowersDefaultsToEnabled() {
   assert.strictEqual(options.superpowers, 'yes');
 }
 
+async function verifyInteractiveUpdateModuleSelectionUsesSpaceToggle() {
+  const options = {
+    updateSkills: 'yes',
+    updateRules: 'yes',
+    updateConfigs: 'yes',
+    updateCommands: 'yes',
+    updateIdeLinks: 'yes',
+    updateOpenSpec: 'yes',
+    updateUipro: 'no',
+  };
+
+  await withMockTTY(async ({ input, getOutput }) => {
+    const selection = selectUpdateModules(options);
+
+    setImmediate(() => {
+      input.write('\x1b[B');
+      input.write(' ');
+      input.write('\r');
+    });
+
+    await selection;
+
+    const output = stripAnsi(getOutput());
+    assert.ok(!output.includes('输入要切换的编号'));
+  });
+
+  assert.strictEqual(options.updateRules, 'no');
+  assert.strictEqual(options.updateSkills, 'yes');
+}
+
+async function verifyInteractiveUpdateRuleModeSkipsWhenRulesDisabled() {
+  const options = {
+    updateRules: 'no',
+    updateRuleMode: 'legacy',
+    selectedUpdateRuleFiles: [],
+  };
+  const profilesRegistry = readProfilesRegistry(repoRoot);
+
+  await withMockTTY(async ({ getOutput }) => {
+    await selectUpdateRuleMode(options, repoRoot, profilesRegistry);
+    const output = stripAnsi(getOutput());
+    assert.ok(!output.includes('规则更新方式'));
+  });
+
+  assert.strictEqual(options.updateRuleMode, 'legacy');
+  assert.deepStrictEqual(options.selectedUpdateRuleFiles, []);
+}
+
+function verifySelectableUpdateRulesIncludeCommonAndProfileOnly() {
+  const profilesRegistry = readProfilesRegistry(repoRoot);
+  const items = listSelectableUpdateRules(repoRoot, profilesRegistry, {
+    profile: 'vue',
+    profiles: [],
+  });
+  const values = items.map((item) => item.value);
+
+  assert.ok(values.includes('02-编码规范.md'));
+  assert.ok(values.includes('11-测试规范.md'));
+  assert.ok(!values.includes('README.md'));
+  assert.ok(!values.includes('12-Superpowers执行规范.md'));
+}
+
+async function verifyInteractiveUpdateRuleFileSelectionRequiresChoice() {
+  const options = {
+    profile: 'vue',
+    profiles: [],
+    selectedUpdateRuleFiles: [],
+  };
+  const profilesRegistry = readProfilesRegistry(repoRoot);
+
+  await withMockTTY(async ({ input, getOutput }) => {
+    const selection = selectUpdateRuleFiles(options, repoRoot, profilesRegistry);
+
+    setImmediate(() => {
+      input.write('\r');
+      input.write(' ');
+      input.write('\r');
+    });
+
+    await selection;
+
+    const output = stripAnsi(getOutput());
+    assert.ok(output.includes('至少选择 1 个规则文件'));
+    assert.ok(output.includes('02-编码规范'));
+    assert.ok(!output.includes('README.md'));
+    assert.ok(!output.includes('12-Superpowers执行规范'));
+  });
+
+  assert.deepStrictEqual(options.selectedUpdateRuleFiles, ['02-编码规范.md']);
+}
+
+function verifyUpdateRuleCopyStrategies() {
+  const profilesRegistry = readProfilesRegistry(repoRoot);
+  const profileRuleDir = path.join(repoRoot, '.agents', 'rules', 'profiles', 'vue');
+  const commonRuleDir = path.join(repoRoot, '.agents', 'rules', 'common');
+
+  const standardTarget = createWorkspace('ai-spec-update-rules-standard-');
+  writeText(path.join(standardTarget, '.agents', 'rules', '04-组件规范.md'), 'standard-existing\n');
+  copyAgents(
+    standardTarget,
+    repoRoot,
+    profilesRegistry,
+    {
+      profile: 'vue',
+      profiles: [],
+      rulesStrategy: 'standard',
+      customRules: [],
+    },
+    {
+      skipSkills: true,
+      skipExistingRules: true,
+      updateRuleMode: 'standard',
+    },
+  );
+  assert.strictEqual(readText(path.join(standardTarget, '.agents', 'rules', '04-组件规范.md')), 'standard-existing\n');
+  assert.ok(fs.existsSync(path.join(standardTarget, '.agents', 'rules', 'README.md')));
+
+  const customTarget = createWorkspace('ai-spec-update-rules-custom-');
+  writeText(path.join(customTarget, '.agents', 'rules', '01-项目概述.md'), 'custom-01\n');
+  writeText(path.join(customTarget, '.agents', 'rules', '04-组件规范.md'), 'custom-04\n');
+  writeText(path.join(customTarget, '.agents', 'rules', '05-API规范.md'), 'custom-05\n');
+  writeText(path.join(customTarget, '.agents', 'rules', '12-Superpowers执行规范.md'), 'custom-12\n');
+  writeText(path.join(customTarget, '.agents', 'rules', 'README.md'), 'custom-readme\n');
+  copyAgents(
+    customTarget,
+    repoRoot,
+    profilesRegistry,
+    {
+      profile: 'vue',
+      profiles: [],
+      rulesStrategy: 'custom',
+      customRules: ['04-组件规范.md'],
+    },
+    {
+      skipSkills: true,
+      updateRuleMode: 'selected',
+      selectedRuleFiles: ['01-项目概述.md', '04-组件规范.md'],
+    },
+  );
+  assert.strictEqual(
+    readText(path.join(customTarget, '.agents', 'rules', '01-项目概述.md')),
+    readText(path.join(profileRuleDir, '01-项目概述.md')),
+  );
+  assert.strictEqual(
+    readText(path.join(customTarget, '.agents', 'rules', '04-组件规范.md')),
+    readText(path.join(profileRuleDir, '04-组件规范.md')),
+  );
+  assert.strictEqual(readText(path.join(customTarget, '.agents', 'rules', '05-API规范.md')), 'custom-05\n');
+  assert.strictEqual(readText(path.join(customTarget, '.agents', 'rules', '12-Superpowers执行规范.md')), 'custom-12\n');
+  assert.strictEqual(readText(path.join(customTarget, '.agents', 'rules', 'README.md')), 'custom-readme\n');
+
+  const allTarget = createWorkspace('ai-spec-update-rules-all-');
+  writeText(path.join(allTarget, '.agents', 'rules', '01-项目概述.md'), 'all-01\n');
+  writeText(path.join(allTarget, '.agents', 'rules', '05-API规范.md'), 'all-05\n');
+  writeText(path.join(allTarget, '.agents', 'rules', '12-Superpowers执行规范.md'), 'all-12\n');
+  writeText(path.join(allTarget, '.agents', 'rules', 'README.md'), 'all-readme\n');
+  copyAgents(
+    allTarget,
+    repoRoot,
+    profilesRegistry,
+    {
+      profile: 'vue',
+      profiles: [],
+      rulesStrategy: 'standard',
+      customRules: [],
+    },
+    {
+      skipSkills: true,
+      updateRuleMode: 'all',
+    },
+  );
+  assert.strictEqual(
+    readText(path.join(allTarget, '.agents', 'rules', '01-项目概述.md')),
+    readText(path.join(profileRuleDir, '01-项目概述.md')),
+  );
+  assert.strictEqual(
+    readText(path.join(allTarget, '.agents', 'rules', '05-API规范.md')),
+    readText(path.join(profileRuleDir, '05-API规范.md')),
+  );
+  assert.strictEqual(readText(path.join(allTarget, '.agents', 'rules', '12-Superpowers执行规范.md')), 'all-12\n');
+  assert.strictEqual(readText(path.join(allTarget, '.agents', 'rules', 'README.md')), 'all-readme\n');
+  assert.strictEqual(
+    readText(path.join(allTarget, '.agents', 'rules', '02-编码规范.md')),
+    readText(path.join(commonRuleDir, '02-编码规范.md')),
+  );
+}
+
 function verifyPnpmWorkspaceRootInstallUsesWorkspaceFlag() {
   const workspaceRoot = createWorkspace('ai-spec-pnpm-workspace-root-');
   writeJson(path.join(workspaceRoot, 'package.json'), {
@@ -402,8 +604,13 @@ async function main() {
   await verifyInteractiveSingleSelectionUsesArrowSpaceEnter();
   await verifyInteractiveSingleSelectionEnterConfirmsDefault();
   await verifyInteractiveSuperpowersDefaultsToEnabled();
+  await verifyInteractiveUpdateModuleSelectionUsesSpaceToggle();
+  await verifyInteractiveUpdateRuleModeSkipsWhenRulesDisabled();
+  verifySelectableUpdateRulesIncludeCommonAndProfileOnly();
+  await verifyInteractiveUpdateRuleFileSelectionRequiresChoice();
   await verifyInteractiveCustomRuleSelectionUsesSpaceToggle();
   await verifyInteractiveEmptySelectionFallsBackToStandard();
+  verifyUpdateRuleCopyStrategies();
   verifyPnpmWorkspaceRootInstallUsesWorkspaceFlag();
 
   const target = createWorkspace('ai-spec-install-workflow-');

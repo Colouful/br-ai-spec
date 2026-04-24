@@ -48,6 +48,13 @@ const CURSOR_PROTOCOL_COMMAND_EXPECTATIONS = [
   ]],
 ];
 const PROJECT_SPECIFIC_RULES = new Set(['01-项目概述.md', '03-项目结构.md']);
+const UPDATE_RULE_PROTECTED_FILES = new Set(['README.md', '12-Superpowers执行规范.md']);
+const UPDATE_RULE_MODES = {
+  LEGACY: 'legacy',
+  STANDARD: 'standard',
+  SELECTED: 'selected',
+  ALL: 'all',
+};
 const CUSTOMIZABLE_RULES = [
   ['01-项目概述.md', '项目定位、技术栈、业务边界、关键约束'],
   ['03-项目结构.md', '目录树、分层设计、模块职责、组织约定'],
@@ -65,6 +72,15 @@ const PROFILE_SUMMARIES = {
   'node-tooling': 'Tooling / Node.js',
 };
 const DEFAULT_CUSTOM_RULE_SELECTION = CUSTOMIZABLE_RULES.map(([name]) => name);
+const UPDATE_MODULE_ITEMS = [
+  ['updateSkills', 'Skills（技能）'],
+  ['updateRules', 'Rules（规范规则）'],
+  ['updateConfigs', 'Configs（lint/format）'],
+  ['updateCommands', 'Commands（命令模板）'],
+  ['updateIdeLinks', 'IDE Links（IDE 链接）'],
+  ['updateOpenSpec', 'OpenSpec'],
+  ['updateUipro', 'UI UX Pro Max'],
+];
 const INSTALL_STATE_FILE = '.ai-spec/install-state.json';
 const SHARED_CONFIG_FILES = [
   '.prettierrc.json',
@@ -180,6 +196,8 @@ function parseArgs(argv) {
     updateIdeLinks: 'yes',
     updateOpenSpec: 'yes',
     updateUipro: 'no',
+    updateRuleMode: UPDATE_RULE_MODES.LEGACY,
+    selectedUpdateRuleFiles: [],
     force: false,
     workspacePackageSubpath: '',
     workspaceRoot: false,
@@ -596,7 +614,10 @@ function detectInstalledManifestIdes(targetDir) {
     return [];
   }
   const manifest = readJson(manifestPath, 'existing manifest');
-  return normalizeIdeFilter(manifest.ides || DEFAULT_IDE_FILTER);
+  if (!manifest.ides) {
+    return [];
+  }
+  return normalizeIdeFilter(manifest.ides);
 }
 
 function resolveTargetIdes(targetDir, options) {
@@ -1013,6 +1034,7 @@ async function selectMultipleFromList(title, items, config = {}) {
 
   let cursorIndex = 0;
   let renderedLines = 0;
+  let statusMessage = '';
 
   return await new Promise((resolve, reject) => {
     let finished = false;
@@ -1047,7 +1069,8 @@ async function selectMultipleFromList(title, items, config = {}) {
       items.forEach((item, index) => {
         process.stdout.write(`\x1b[2K\r${formatMultiSelectLine(item, selectedValues, cursorIndex, index)}\n`);
       });
-      renderedLines = items.length;
+      process.stdout.write(`\x1b[2K\r${statusMessage ? color(`⚠ ${statusMessage}`, 'yellow') : ''}\n`);
+      renderedLines = items.length + 1;
     };
 
     const onKeypress = (_str, key = {}) => {
@@ -1058,18 +1081,21 @@ async function selectMultipleFromList(title, items, config = {}) {
       }
 
       if (key.name === 'up') {
+        statusMessage = '';
         cursorIndex = cursorIndex > 0 ? cursorIndex - 1 : cursorIndex;
         render();
         return;
       }
 
       if (key.name === 'down') {
+        statusMessage = '';
         cursorIndex = cursorIndex < items.length - 1 ? cursorIndex + 1 : cursorIndex;
         render();
         return;
       }
 
       if (key.name === 'space') {
+        statusMessage = '';
         const current = items[cursorIndex];
         if (current) {
           if (selectedValues.has(current.value)) {
@@ -1083,7 +1109,13 @@ async function selectMultipleFromList(title, items, config = {}) {
       }
 
       if (key.name === 'return' || key.name === 'enter') {
-        finish(items.filter((item) => selectedValues.has(item.value)).map((item) => item.value));
+        const result = items.filter((item) => selectedValues.has(item.value)).map((item) => item.value);
+        if (config.minSelection && result.length < config.minSelection) {
+          statusMessage = config.minSelectionMessage || `至少选择 ${config.minSelection} 项`;
+          render();
+          return;
+        }
+        finish(result);
       }
     };
 
@@ -1175,6 +1207,113 @@ async function selectRulesStrategy(options, config = {}) {
       ? '未选择任何需要在 /project-init 中自定义的规则，将沿用安装模板。'
       : '未选择任何自定义规则，将使用标准规范。',
   });
+}
+
+function getActiveProfiles(options) {
+  return options.profiles && options.profiles.length > 0 ? options.profiles : [options.profile];
+}
+
+function listSelectableUpdateRules(sourceDir, profilesRegistry, options) {
+  const items = [];
+  const seen = new Set();
+  const ruleSources = [
+    {
+      tag: 'common',
+      label: '公共规则',
+      dir: path.join(sourceDir, '.agents', 'rules', 'common'),
+    },
+    ...getActiveProfiles(options).map((profileId) => ({
+      tag: profileId,
+      label: `${profileId} 规则`,
+      dir: getProfileDirs(sourceDir, profileId, profilesRegistry).rulesDir,
+    })),
+  ];
+
+  for (const source of ruleSources) {
+    if (!fs.existsSync(source.dir)) continue;
+    for (const fileName of fs.readdirSync(source.dir).filter((name) => name.endsWith('.md')).sort()) {
+      if (UPDATE_RULE_PROTECTED_FILES.has(fileName) || seen.has(fileName)) {
+        continue;
+      }
+      seen.add(fileName);
+      items.push({
+        value: fileName,
+        label: fileName.replace('.md', ''),
+        desc: source.label,
+      });
+    }
+  }
+
+  return items;
+}
+
+async function selectUpdateModules(options) {
+  const selected = await selectMultipleFromList(
+    '请选择要更新的模块（空格选中/取消，Enter 确认）：',
+    UPDATE_MODULE_ITEMS.map(([key, label]) => ({
+      value: key,
+      label,
+    })),
+    {
+      defaultValues: UPDATE_MODULE_ITEMS
+        .map(([key]) => (options[key] === 'yes' ? key : ''))
+        .filter(Boolean),
+      hint: '默认已勾选当前会更新的模块，可按空格取消或补选',
+    },
+  );
+
+  const selectedSet = new Set(selected);
+  UPDATE_MODULE_ITEMS.forEach(([key]) => {
+    options[key] = selectedSet.has(key) ? 'yes' : 'no';
+  });
+}
+
+async function selectUpdateRuleFiles(options, sourceDir, profilesRegistry) {
+  const items = listSelectableUpdateRules(sourceDir, profilesRegistry, options);
+  options.selectedUpdateRuleFiles = await selectMultipleFromList(
+    '选择要更新的规则文件（空格选中/取消，Enter 确认）：',
+    items,
+    {
+      defaultValues: options.selectedUpdateRuleFiles,
+      hint: '默认不选，请按空格勾选要更新的规则文件',
+      minSelection: 1,
+      minSelectionMessage: '至少选择 1 个规则文件',
+    },
+  );
+  ok(`以下规则将在 update 时按选择覆盖更新：${options.selectedUpdateRuleFiles.map((name) => `\n  • ${name}`).join('')}`);
+}
+
+async function selectUpdateRuleMode(options, sourceDir, profilesRegistry) {
+  if (!isInteractive() || options.updateRules !== 'yes') {
+    return;
+  }
+
+  const mode = await selectFromList('选择 Rules（规范规则）的更新方式：', [
+    {
+      value: UPDATE_RULE_MODES.STANDARD,
+      label: '标准更新',
+      desc: '仅补缺失规则，保留已有规则文件',
+    },
+    {
+      value: UPDATE_RULE_MODES.SELECTED,
+      label: '自定义选择',
+      desc: '手动勾选要更新的规则文件，仅覆盖选中项',
+    },
+    {
+      value: UPDATE_RULE_MODES.ALL,
+      label: '全部更新',
+      desc: '覆盖全部规则文件，但排除 README.md 和 12-Superpowers执行规范.md',
+    },
+  ], 0);
+
+  options.updateRuleMode = mode;
+  options.rulesStrategy = 'standard';
+  options.forceUpdateRules = 'no';
+  options.selectedUpdateRuleFiles = [];
+
+  if (mode === UPDATE_RULE_MODES.SELECTED) {
+    await selectUpdateRuleFiles(options, sourceDir, profilesRegistry);
+  }
 }
 
 async function selectBootstrapChoices(options) {
@@ -1449,6 +1588,70 @@ function isCustomRule(ruleName, options) {
   return options.rulesStrategy === 'custom' && options.customRules.includes(ruleName);
 }
 
+function syncRulesAssets(targetDir, sourceDir, profilesRegistry, options, copyMode = {}) {
+  const rulesOut = path.join(targetDir, '.agents', 'rules');
+  const profileList = getActiveProfiles(options);
+  const commonRulesDir = path.join(sourceDir, '.agents', 'rules', 'common');
+  const profileRulesDirs = profileList.map((profileId) => getProfileDirs(sourceDir, profileId, profilesRegistry).rulesDir);
+  const sourceRuleDirs = [commonRulesDir, ...profileRulesDirs];
+  const ruleMode = copyMode.updateRuleMode || UPDATE_RULE_MODES.LEGACY;
+  const selectedRuleFiles = new Set(normalizeList(copyMode.selectedRuleFiles));
+
+  info(`同步 rules (common + ${profileList.join(', ')}) ...`);
+
+  if (ruleMode === UPDATE_RULE_MODES.SELECTED) {
+    for (const sourceRuleDir of sourceRuleDirs) {
+      if (!fs.existsSync(sourceRuleDir)) continue;
+      for (const fileName of fs.readdirSync(sourceRuleDir).filter((name) => name.endsWith('.md'))) {
+        if (UPDATE_RULE_PROTECTED_FILES.has(fileName) || !selectedRuleFiles.has(fileName)) {
+          continue;
+        }
+        copyFile(path.join(sourceRuleDir, fileName), path.join(rulesOut, fileName));
+      }
+    }
+    return;
+  }
+
+  if (ruleMode === UPDATE_RULE_MODES.ALL) {
+    for (const sourceRuleDir of sourceRuleDirs) {
+      if (!fs.existsSync(sourceRuleDir)) continue;
+      for (const fileName of fs.readdirSync(sourceRuleDir).filter((name) => name.endsWith('.md'))) {
+        if (UPDATE_RULE_PROTECTED_FILES.has(fileName)) {
+          info(`跳过受保护规则: ${fileName}`);
+          continue;
+        }
+        copyFile(path.join(sourceRuleDir, fileName), path.join(rulesOut, fileName));
+      }
+    }
+    return;
+  }
+
+  for (const sourceRuleDir of sourceRuleDirs) {
+    if (!fs.existsSync(sourceRuleDir)) continue;
+    for (const fileName of fs.readdirSync(sourceRuleDir).filter((name) => name.endsWith('.md'))) {
+      const sourcePath = path.join(sourceRuleDir, fileName);
+      const destPath = path.join(rulesOut, fileName);
+      if (isCustomRule(fileName, options)) {
+        info(`跳过自定义规则: ${fileName}（保留项目自定义）`);
+        continue;
+      }
+      if (PROJECT_SPECIFIC_RULES.has(fileName) && fs.existsSync(destPath)) {
+        warn(`跳过项目特有规则: ${fileName}（已存在）`);
+        continue;
+      }
+      if (copyMode.skipExistingRules && fs.existsSync(destPath)) {
+        info(`  跳过已存在规则: ${fileName}（如需强制覆盖请使用 --force-update-rules）`);
+        continue;
+      }
+      copyFile(sourcePath, destPath);
+      if (PROJECT_SPECIFIC_RULES.has(fileName)) {
+        info(`已生成模板: ${fileName} → 请根据项目实际情况修改`);
+      }
+    }
+  }
+  copyFile(path.join(sourceDir, '.agents', 'rules', 'README.md'), path.join(rulesOut, 'README.md'));
+}
+
 function copyAgents(targetDir, sourceDir, profilesRegistry, options, copyMode = {}) {
   const agentsDir = path.join(targetDir, '.agents');
   const rulesOut = path.join(agentsDir, 'rules');
@@ -1456,37 +1659,11 @@ function copyAgents(targetDir, sourceDir, profilesRegistry, options, copyMode = 
   ensureDir(rulesOut);
   ensureDir(skillsOut);
 
-  const profileList = options.profiles && options.profiles.length > 0 ? options.profiles : [options.profile];
-  const commonRulesDir = path.join(sourceDir, '.agents', 'rules', 'common');
+  const profileList = getActiveProfiles(options);
   const commonSkillsDir = path.join(sourceDir, '.agents', 'skills', 'common');
 
   if (!copyMode.skipRules) {
-    const profileRulesDirs = profileList.map((profileId) => getProfileDirs(sourceDir, profileId, profilesRegistry).rulesDir);
-    info(`同步 rules (common + ${profileList.join(', ')}) ...`);
-    for (const sourceRuleDir of [commonRulesDir, ...profileRulesDirs]) {
-      if (!fs.existsSync(sourceRuleDir)) continue;
-      for (const fileName of fs.readdirSync(sourceRuleDir).filter((name) => name.endsWith('.md'))) {
-        const sourcePath = path.join(sourceRuleDir, fileName);
-        const destPath = path.join(rulesOut, fileName);
-        if (isCustomRule(fileName, options)) {
-          info(`跳过自定义规则: ${fileName}（保留项目自定义）`);
-          continue;
-        }
-        if (PROJECT_SPECIFIC_RULES.has(fileName) && fs.existsSync(destPath)) {
-          warn(`跳过项目特有规则: ${fileName}（已存在）`);
-          continue;
-        }
-        if (copyMode.skipExistingRules && fs.existsSync(destPath)) {
-          info(`  跳过已存在规则: ${fileName}（如需强制覆盖请使用 --force-update-rules）`);
-          continue;
-        }
-        copyFile(sourcePath, destPath);
-        if (PROJECT_SPECIFIC_RULES.has(fileName)) {
-          info(`已生成模板: ${fileName} → 请根据项目实际情况修改`);
-        }
-      }
-    }
-    copyFile(path.join(sourceDir, '.agents', 'rules', 'README.md'), path.join(rulesOut, 'README.md'));
+    syncRulesAssets(targetDir, sourceDir, profilesRegistry, options, copyMode);
   } else {
     info('跳过 rules 同步（用户选择不更新规则）');
   }
@@ -2052,6 +2229,24 @@ function buildManifestLocalPreferences(options, existingPreferences = null) {
   return Object.keys(base).length > 0 ? base : null;
 }
 
+function formatUpdateRulesSummary(options) {
+  if (options.updateRules !== 'yes') {
+    return '跳过';
+  }
+  if (options.updateRuleMode === UPDATE_RULE_MODES.STANDARD) {
+    return '标准更新（仅补缺失，保留已有规则）';
+  }
+  if (options.updateRuleMode === UPDATE_RULE_MODES.SELECTED) {
+    return `自定义选择（${options.selectedUpdateRuleFiles.length} 个文件）`;
+  }
+  if (options.updateRuleMode === UPDATE_RULE_MODES.ALL) {
+    return '全部更新（排除 README.md 与 12-Superpowers执行规范.md）';
+  }
+  return options.forceUpdateRules === 'yes'
+    ? '强制覆盖（保留项目特有 01/03 与自定义）'
+    : '仅补充缺失（保留已有规则）';
+}
+
 function printTools(level, uiproSelected) {
   info('工具环境：');
   if (commandExists('git')) {
@@ -2416,6 +2611,9 @@ async function handleInit(options) {
 
 async function handleUpdate(options) {
   const targetDir = path.resolve(options.target);
+  const interactive = isInteractive();
+  const useInteractiveRuleMode = interactive && options.rulesStrategy === 'ask' && options.forceUpdateRules === 'ask';
+  const needsLegacyRuleStrategyPrompt = interactive && options.rulesStrategy === 'ask' && options.forceUpdateRules !== 'ask';
   if (!fs.existsSync(path.join(targetDir, '.agents'))) {
     throw new Error(`${targetDir} 未找到 .agents/，请先运行 init`);
   }
@@ -2432,7 +2630,7 @@ async function handleUpdate(options) {
   options.ideFilter = resolveTargetIdes(targetDir, options).join(',');
   const pkgManager = detectPkgManager(targetDir);
   info(`更新规范: ${targetDir}`);
-  if (options.rulesStrategy === 'ask') {
+  if (!interactive && options.rulesStrategy === 'ask') {
     await selectRulesStrategy(options);
   }
   if (options.rulesStrategy === 'ask') options.rulesStrategy = 'standard';
@@ -2443,32 +2641,21 @@ async function handleUpdate(options) {
     options.updateUipro = 'yes';
   }
 
-  if (isInteractive()) {
-    console.log('');
-    info('请选择要更新的模块（输入编号切换，回车继续）：');
-    const items = [
-      ['updateSkills', 'Skills（技能）'],
-      ['updateRules', 'Rules（规范规则）'],
-      ['updateConfigs', 'Configs（lint/format）'],
-      ['updateCommands', 'Commands（命令模板）'],
-      ['updateIdeLinks', 'IDE Links（IDE 链接）'],
-      ['updateOpenSpec', 'OpenSpec'],
-      ['updateUipro', 'UI UX Pro Max'],
-    ];
-    items.forEach(([key, label], index) => console.log(`  ${index + 1}) [${options[key] === 'yes' ? 'Y' : 'N'}] ${label}`));
-    const answer = await ask('输入要切换的编号（逗号分隔）', '');
-    if (answer) {
-      for (const token of answer.split(',')) {
-        const idx = Number(token.trim()) - 1;
-        if (!Number.isInteger(idx) || idx < 0 || idx >= items.length) continue;
-        const key = items[idx][0];
-        options[key] = options[key] === 'yes' ? 'no' : 'yes';
+  if (interactive) {
+    await selectUpdateModules(options);
+    if (options.updateRules === 'yes') {
+      if (useInteractiveRuleMode) {
+        options.rulesStrategy = 'ask';
+        await selectUpdateRuleMode(options, sourceDir, profilesRegistry);
+      } else if (needsLegacyRuleStrategyPrompt) {
+        options.rulesStrategy = 'ask';
+        await selectRulesStrategy(options);
       }
     }
   }
 
-  if (options.updateRules === 'yes' && options.forceUpdateRules === 'ask') {
-    if (isInteractive()) {
+  if (options.updateRules === 'yes' && options.updateRuleMode === UPDATE_RULE_MODES.LEGACY && options.forceUpdateRules === 'ask') {
+    if (interactive) {
       options.forceUpdateRules = await selectFromList(
         '是否强制更新已有规则？（默认否，已存在的规则文件将被保留）',
         [
@@ -2487,7 +2674,7 @@ async function handleUpdate(options) {
   console.log('');
   console.log(color('── 变更摘要 ──', 'bold'));
   console.log(`  Skills:   ${options.updateSkills === 'yes' ? '更新' : '跳过'}`);
-  console.log(`  Rules:    ${options.updateRules === 'yes' ? (options.forceUpdateRules === 'yes' ? '强制覆盖（保留项目特有 01/03 与自定义）' : '仅补充缺失（保留已有规则）') : '跳过'}`);
+  console.log(`  Rules:    ${formatUpdateRulesSummary(options)}`);
   console.log(`  Configs:  ${options.updateConfigs === 'yes' ? '同步（已存在的不覆盖）' : '跳过'}`);
   console.log(`  Commands: ${options.updateCommands === 'yes' ? '同步（覆盖已有命令）' : '同步（仅补新增）'}`);
   console.log(`  IDE Links:${options.updateIdeLinks === 'yes' ? ' 重建' : ' 跳过'}`);
@@ -2508,7 +2695,12 @@ async function handleUpdate(options) {
     copyAgents(targetDir, sourceDir, profilesRegistry, options, {
       skipRules: options.updateRules !== 'yes',
       skipSkills: options.updateSkills !== 'yes',
-      skipExistingRules: options.updateRules === 'yes' && options.forceUpdateRules !== 'yes',
+      skipExistingRules: options.updateRules === 'yes'
+        && options.forceUpdateRules !== 'yes'
+        && options.updateRuleMode !== UPDATE_RULE_MODES.SELECTED
+        && options.updateRuleMode !== UPDATE_RULE_MODES.ALL,
+      updateRuleMode: options.updateRuleMode,
+      selectedRuleFiles: options.selectedUpdateRuleFiles,
     });
   }
   syncProtocolAssets(targetDir, sourceDir);
@@ -2776,8 +2968,13 @@ module.exports = {
     selectFromList,
     selectCustomRuleList,
     selectMultipleFromList,
+    selectUpdateModules,
+    selectUpdateRuleMode,
+    selectUpdateRuleFiles,
+    listSelectableUpdateRules,
     selectBootstrapChoices,
     buildDevDependencyInstallArgs,
+    copyAgents,
   },
 };
 
