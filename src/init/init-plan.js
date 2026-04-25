@@ -69,11 +69,15 @@ function hasCliName(name) {
 function detectProjectKind(rootDir, pkg) {
   const packageJson = readPackageJson(rootDir, pkg);
   const packageDir = path.join(rootDir, pkg.path || '.');
-  if (packageJson?.bin || hasCliName(packageJson?.name || pkg.name) || fs.existsSync(path.join(packageDir, 'bin/cli.js'))) {
+  if (packageJson?.bin || fs.existsSync(path.join(packageDir, 'bin/cli.js'))) {
     return PROJECT_KINDS.CLI_TOOL;
   }
 
   const primary = pkg.primary || null;
+  if (hasCliName(packageJson?.name || pkg.name) && (!primary || !hasFrontendBusinessEntry(rootDir, pkg))) {
+    return PROJECT_KINDS.CLI_TOOL;
+  }
+
   if (!primary) {
     if (packageJson?.main || packageJson?.module || packageJson?.exports || packageJson?.types) {
       return PROJECT_KINDS.LIBRARY;

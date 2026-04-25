@@ -43,6 +43,15 @@ function createNextProject(prefix) {
   return root;
 }
 
+function createSpecNamedNextProject(prefix) {
+  const root = createNextProject(prefix);
+  const packageJsonPath = path.join(root, 'package.json');
+  const packageJson = readJson(packageJsonPath);
+  packageJson.name = 'ai-spec-v1-1-smoke';
+  writeJson(packageJsonPath, packageJson);
+  return root;
+}
+
 function createCliToolProject(prefix) {
   const root = createWorkspace(prefix);
   writeJson(path.join(root, 'package.json'), {
@@ -180,6 +189,19 @@ async function testCliToolDryRunExplainsNoRecommendation() {
   assert(result.stdout.includes('未自动推荐 Manifest'), result.stdout);
   assert(result.stdout.includes('当前项目被识别为 cli-tool'), result.stdout);
   assert(result.stdout.includes('dry-run 不会写入文件'), result.stdout);
+  assertNoInitFiles(root);
+}
+
+async function testSpecNamedApplicationKeepsApplicationKind() {
+  const root = createSpecNamedNextProject('ai-spec-init-spec-named-app-');
+  const result = runCli(['init', root, '--recommend', '--dry-run', '--json']);
+
+  assert.strictEqual(result.status, 0, result.stderr || result.stdout);
+  const payload = JSON.parse(result.stdout);
+  const pkg = payload.packages[0];
+  assert.strictEqual(pkg.projectKind, 'application');
+  assert.strictEqual(pkg.recommendedManifest.slug, 'frontend-react-nextjs-standard');
+  assert(!pkg.warnings.some((warning) => warning.includes('cli-tool')));
   assertNoInitFiles(root);
 }
 
@@ -410,6 +432,7 @@ async function main() {
   await testDryRunDoesNotWriteFilesAndPrintsPlan();
   await testCliToolProjectDoesNotAutoRecommendNextManifest();
   await testCliToolDryRunExplainsNoRecommendation();
+  await testSpecNamedApplicationKeepsApplicationKind();
   await testUnknownProjectDoesNotRecommendManifest();
   await testConfidenceGateRules();
   await testDryRunJsonOutputsInitPlan();
