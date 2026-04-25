@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 const path = require('path');
+const fs = require('fs');
 
 const pkgRoot = path.join(__dirname, '..');
 let args = process.argv.slice(2);
@@ -8,6 +9,44 @@ const opts = { stdio: 'inherit', cwd: process.cwd(), env };
 const INSTALL_COMMANDS = new Set(['init', 'update', 'check', 'uninstall', 'sync', 'help']);
 
 const VERSION_FLAGS = new Set(['-v', '-V', '-version', '--version', 'version']);
+const RECOMMEND_INIT_FLAGS = new Set(['--recommend', '--dry-run', '--yes', '-y', '--json', '--help', '-h', '--manifest', '--hub-url', '--visual-url', '--no-hub-fallback']);
+
+function shouldUseRecommendInit(args, cwd) {
+  if (args[0] !== 'init') return false;
+  if (args.includes('--recommend')) return true;
+  const manifestIndex = args.indexOf('--manifest');
+  if (manifestIndex < 0) return false;
+  const manifestValue = args[manifestIndex + 1];
+  if (!manifestValue || manifestValue.startsWith('-')) return false;
+  const manifestPath = path.resolve(cwd, manifestValue);
+  if (manifestValue.endsWith('.json') || fs.existsSync(manifestPath)) return false;
+
+  for (let index = 1; index < args.length; index += 1) {
+    const arg = args[index];
+    if (index === manifestIndex + 1) continue;
+    if (arg.startsWith('-') && !RECOMMEND_INIT_FLAGS.has(arg)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function getCommandTarget(args, cwd, startIndex = 1) {
+  for (let index = startIndex; index < args.length; index += 1) {
+    const arg = args[index];
+    if (!arg.startsWith('-')) {
+      return path.resolve(cwd, arg);
+    }
+  }
+  return cwd;
+}
+
+function shouldUseIntegrityCommand(args, cwd) {
+  if (args[0] !== 'sync' && args[0] !== 'check') return false;
+  const targetDir = getCommandTarget(args, cwd);
+  return fs.existsSync(path.join(targetDir, '.ai-spec', 'ai-spec.lock.json')) ||
+    fs.existsSync(path.join(targetDir, '.agents', 'registry.index.json'));
+}
 
 (async () => {
   try {
@@ -49,6 +88,56 @@ const VERSION_FLAGS = new Set(['-v', '-V', '-version', '--version', 'version']);
       } catch (_error) {
         // launcher sync is best-effort and must not block local execution
       }
+    }
+
+    if (args[0] === 'scan') {
+      const scanCommand = require('./scan');
+      process.exit(await scanCommand.main(args.slice(1)));
+    }
+
+    if (shouldUseRecommendInit(args, opts.cwd)) {
+      const initCommand = require('./init-command');
+      process.exit(await initCommand.main(args.slice(1)));
+    }
+
+    if (shouldUseIntegrityCommand(args, opts.cwd)) {
+      const command = args[0] === 'sync' ? require('./sync-command') : require('./check-command');
+      process.exit(await command.main(args.slice(1)));
+    }
+
+    if (args[0] === 'guard') {
+      const guardCommand = require('./guard-command');
+      process.exit(await guardCommand.main(args.slice(1)));
+    }
+
+    if (args[0] === 'context') {
+      const contextCommand = require('./context-command');
+      process.exit(await contextCommand.main(args.slice(1)));
+    }
+
+    if (args[0] === 'worktree') {
+      const worktreeCommand = require('./worktree-command');
+      process.exit(await worktreeCommand.main(args.slice(1)));
+    }
+
+    if (args[0] === 'executor') {
+      const executorCommand = require('./executor-command');
+      process.exit(await executorCommand.main(args.slice(1)));
+    }
+
+    if (args[0] === 'spec-start') {
+      const specCommand = require('./spec-command');
+      process.exit(await specCommand.mainStart(args.slice(1)));
+    }
+
+    if (args[0] === 'spec-status') {
+      const specCommand = require('./spec-command');
+      process.exit(await specCommand.mainStatus(args.slice(1)));
+    }
+
+    if (args[0] === 'spec-continue') {
+      const specCommand = require('./spec-command');
+      process.exit(await specCommand.mainContinue(args.slice(1)));
     }
 
     if (args.length === 0 || INSTALL_COMMANDS.has(args[0])) {
