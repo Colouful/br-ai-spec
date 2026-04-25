@@ -5,6 +5,7 @@ const {
   fetchManifestExport,
   normalizeOrigin,
   postInstallReport,
+  postRuntimeReport,
   requestJson,
   writeHubToken,
 } = require('../internal/hub-client');
@@ -53,6 +54,12 @@ function parseArgs(argv) {
     mode: 'standard',
     profile: '',
     ide: '',
+    runId: '',
+    stage: 'review',
+    status: 'success',
+    durationMs: 0,
+    failedReason: '',
+    repoUrl: '',
   };
 
   if (command === '--help' || command === '-h') {
@@ -89,6 +96,24 @@ function parseArgs(argv) {
         break;
       case '--ide':
         options.ide = requireArg(arg, args);
+        break;
+      case '--run-id':
+        options.runId = requireArg(arg, args);
+        break;
+      case '--stage':
+        options.stage = requireArg(arg, args);
+        break;
+      case '--status':
+        options.status = requireArg(arg, args);
+        break;
+      case '--duration-ms':
+        options.durationMs = Number(requireArg(arg, args));
+        break;
+      case '--failed-reason':
+        options.failedReason = requireArg(arg, args);
+        break;
+      case '--repo-url':
+        options.repoUrl = requireArg(arg, args);
         break;
       case '--dry-run':
         options.dryRun = true;
@@ -134,7 +159,7 @@ function assignPositional(options, arg) {
     return;
   }
 
-  if (['diff', 'sync', 'upgrade'].includes(options.command) && options.target === '.') {
+  if (['diff', 'sync', 'upgrade', 'runtime-report'].includes(options.command) && options.target === '.') {
     options.target = arg;
     return;
   }
@@ -721,6 +746,52 @@ async function search(options) {
   return requestJson(`${normalizeOrigin(origin)}/api/hub/search?${params.toString()}`);
 }
 
+async function runtimeReport(options) {
+  const targetDir = path.resolve(options.target);
+  const previous = readLockRecord(targetDir);
+  if (!previous?.lock) throw new Error('未找到 .agents/registry/hub-lock.json，请先执行 hub install。');
+
+  const allowedStages = new Set(['requirement', 'design', 'implement', 'test', 'review', 'archive']);
+  const allowedStatuses = new Set(['success', 'failed', 'partial']);
+  if (!allowedStages.has(options.stage)) {
+    throw new Error(`不支持的 stage：${options.stage}`);
+  }
+  if (!allowedStatuses.has(options.status)) {
+    throw new Error(`不支持的 status：${options.status}`);
+  }
+  if (!Number.isFinite(options.durationMs) || options.durationMs < 0) {
+    throw new Error('--duration-ms 必须是非负数字');
+  }
+
+  const origin = resolveOrigin(options, targetDir);
+  const report = {
+    projectName: path.basename(targetDir),
+    repoUrl: options.repoUrl || undefined,
+    manifestId: previous.lock.manifestId || previous.lock.manifestSlug || undefined,
+    manifestVersion: previous.lock.manifestVersion || undefined,
+    runId: options.runId || `manual-${Date.now()}`,
+    stage: options.stage,
+    status: options.status,
+    usedAssets: (previous.lock.assets || []).map((asset) => ({
+      kind: asset.kind,
+      assetId: asset.assetId || asset.slug,
+      version: asset.version,
+    })),
+    durationMs: Math.round(options.durationMs),
+    failedReason: options.failedReason || undefined,
+  };
+
+  const response = await postRuntimeReport({ origin, report });
+  return {
+    reported: true,
+    manifestId: report.manifestId,
+    manifestVersion: report.manifestVersion,
+    runId: report.runId,
+    usedAssetCount: report.usedAssets.length,
+    response,
+  };
+}
+
 function login(options) {
   const targetDir = path.resolve(options.target);
   const origin = resolveOrigin(options, targetDir);
@@ -743,6 +814,7 @@ function printUsage() {
   ai-spec-auto hub diff [target]
   ai-spec-auto hub upgrade [target] [--version <version>] [--yes]
   ai-spec-auto hub rollback [version] [target]
+  ai-spec-auto hub runtime-report [target] [--run-id <id>] [--stage review] [--status success] [--duration-ms 0] [--failed-reason <reason>]
 `);
 }
 
@@ -781,6 +853,9 @@ async function main(argv) {
       case 'rollback':
         result = await rollback(options);
         break;
+      case 'runtime-report':
+        result = await runtimeReport(options);
+        break;
       default:
         throw new Error(`未知 hub 命令：${options.command}`);
     }
@@ -794,7 +869,7 @@ async function main(argv) {
   }
 }
 
-module.exports = { parseArgs, install, diff, sync, upgrade, rollback, main };
+module.exports = { parseArgs, install, diff, sync, upgrade, rollback, runtimeReport, main };
 
 if (require.main === module) {
   process.exit(main(process.argv.slice(2)));

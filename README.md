@@ -160,9 +160,10 @@ npx @ex/ai-spec-auto@latest hub install react-standard-delivery . --hub http://l
 npx @ex/ai-spec-auto@latest hub diff .
 npx @ex/ai-spec-auto@latest hub sync . --yes
 npx @ex/ai-spec-auto@latest hub rollback 1.0.0 .
+npx @ex/ai-spec-auto@latest hub runtime-report . --run-id run-100 --stage test --status success --duration-ms 1200
 ```
 
-安装成功后会写入 `.agents/registry/hub-lock.json`（Hub 锁文件），Visual（可视化控制台）会基于它展示当前 Manifest、资产版本、本地改动和高风险资产。
+安装成功后会写入 `.agents/registry/hub-lock.json`（Hub 锁文件），Visual（可视化控制台）会基于它展示当前 Manifest、资产版本、本地改动和高风险资产。`hub runtime-report`（运行上报）会读取锁文件中的资产清单，把本次 run（运行）的阶段、状态、耗时和失败原因回传到 Hub，用于成功率、失败原因和推荐等级分析。
 
 ## 后续规划
 
