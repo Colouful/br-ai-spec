@@ -28,7 +28,7 @@ function createInitializedProject(prefix) {
     assets: [],
   });
   writeJson(path.join(root, '.ai-spec/context-index.json'), { schemaVersion: '1.0.0' });
-  writeJson(path.join(root, '.agents/registry/registry.index.json'), {
+  writeJson(path.join(root, '.agents/registry.index.json'), {
     schemaVersion: '1.0.0',
     assets: { rules: [], skills: [] },
   });

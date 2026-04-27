@@ -13,7 +13,7 @@ class IdeRegistryBuilder {
     const projectConfig = readJsonIfExists(path.join(rootDir, '.ai-spec', 'project.json'));
     const workspaceConfig = readJsonIfExists(path.join(rootDir, '.ai-spec', 'workspace.json'));
     const lockFile = readJsonIfExists(path.join(rootDir, '.ai-spec', 'ai-spec.lock.json'));
-    const assetRegistry = readJsonIfExists(path.join(rootDir, '.agents', 'registry', 'registry.index.json'));
+    const assetRegistry = readJsonIfExists(path.join(rootDir, '.agents', 'registry.index.json'));
 
     const warnings = [];
     if (!projectConfig) {
@@ -23,7 +23,7 @@ class IdeRegistryBuilder {
       warnings.push('未找到 .ai-spec/ai-spec.lock.json');
     }
     if (!assetRegistry) {
-      warnings.push('未找到 .agents/registry/registry.index.json');
+      warnings.push('未找到 .agents/registry.index.json');
     }
 
     // 推断 profile
@@ -58,7 +58,7 @@ class IdeRegistryBuilder {
         },
       },
       indexes: {
-        assetRegistry: '.agents/registry/registry.index.json',
+        assetRegistry: '.agents/registry.index.json',
         lockFile: '.ai-spec/ai-spec.lock.json',
         contextIndex: '.ai-spec/context-index.json',
         projectConfig: '.ai-spec/project.json',

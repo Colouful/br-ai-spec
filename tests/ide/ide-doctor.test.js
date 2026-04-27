@@ -40,7 +40,7 @@ async function testDoctorAllFilesPresent() {
   writeJson(path.join(root, '.ai-spec/project.json'), { schemaVersion: '1.0.0', projectId: 'test' });
   writeJson(path.join(root, '.ai-spec/ai-spec.lock.json'), { schemaVersion: '1.0.0' });
   writeJson(path.join(root, '.ai-spec/context-index.json'), { schemaVersion: '1.0.0' });
-  writeJson(path.join(root, '.agents/registry/registry.index.json'), { schemaVersion: '1.0.0' });
+  writeJson(path.join(root, '.agents/registry.index.json'), { schemaVersion: '1.0.0' });
   writeJson(path.join(root, '.agents/registry/ide-registry.json'), { schemaVersion: '1.0.0' });
   writeJson(path.join(root, '.ai-spec/ide-integration.json'), { schemaVersion: '1.0.0' });
 
@@ -71,7 +71,7 @@ async function testDoctorDetectsMissingAnchor() {
   writeJson(path.join(root, '.ai-spec/project.json'), { schemaVersion: '1.0.0', projectId: 'test' });
   writeJson(path.join(root, '.ai-spec/ai-spec.lock.json'), { schemaVersion: '1.0.0' });
   writeJson(path.join(root, '.ai-spec/context-index.json'), { schemaVersion: '1.0.0' });
-  writeJson(path.join(root, '.agents/registry/registry.index.json'), { schemaVersion: '1.0.0' });
+  writeJson(path.join(root, '.agents/registry.index.json'), { schemaVersion: '1.0.0' });
   writeJson(path.join(root, '.agents/registry/ide-registry.json'), { schemaVersion: '1.0.0' });
   writeJson(path.join(root, '.ai-spec/ide-integration.json'), { schemaVersion: '1.0.0' });
 
@@ -91,7 +91,7 @@ async function testDoctorDetectsOptionalFilesMissing() {
   writeJson(path.join(root, '.ai-spec/project.json'), { schemaVersion: '1.0.0', projectId: 'test' });
   writeJson(path.join(root, '.ai-spec/ai-spec.lock.json'), { schemaVersion: '1.0.0' });
   writeJson(path.join(root, '.ai-spec/context-index.json'), { schemaVersion: '1.0.0' });
-  writeJson(path.join(root, '.agents/registry/registry.index.json'), { schemaVersion: '1.0.0' });
+  writeJson(path.join(root, '.agents/registry.index.json'), { schemaVersion: '1.0.0' });
   writeJson(path.join(root, '.agents/registry/ide-registry.json'), { schemaVersion: '1.0.0' });
   writeJson(path.join(root, '.ai-spec/ide-integration.json'), { schemaVersion: '1.0.0' });
 

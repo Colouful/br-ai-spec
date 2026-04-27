@@ -32,7 +32,7 @@ async function testBuildGeneratesCorrectSchema() {
   });
 
   // 写入 registry index
-  writeJson(path.join(root, '.agents/registry/registry.index.json'), {
+  writeJson(path.join(root, '.agents/registry.index.json'), {
     assets: { rules: [], skills: [], agentProfiles: [] },
   });
 
@@ -45,7 +45,7 @@ async function testBuildGeneratesCorrectSchema() {
   assert.strictEqual(registry.project.profile, PROFILES.REACT);
   assert.strictEqual(registry.project.framework, 'React');
   assert(registry.project.language.includes('TypeScript'));
-  assert.strictEqual(registry.indexes.assetRegistry, '.agents/registry/registry.index.json');
+  assert.strictEqual(registry.indexes.assetRegistry, '.agents/registry.index.json');
   assert.strictEqual(registry.indexes.contextIndex, '.ai-spec/context-index.json');
   assert.strictEqual(registry.privacy.sourceCodeIncluded, false);
   assert.strictEqual(registry.privacy.absolutePathIncluded, false);
@@ -62,7 +62,7 @@ async function testBuildDetectsProfileFromManifest() {
   });
 
   writeJson(path.join(root, '.ai-spec/ai-spec.lock.json'), {});
-  writeJson(path.join(root, '.agents/registry/registry.index.json'), {});
+  writeJson(path.join(root, '.agents/registry.index.json'), {});
 
   const builder = new IdeRegistryBuilder();
   const { registry } = builder.build(root);
@@ -82,7 +82,7 @@ async function testBuildDetectsReactFromManifest() {
   });
 
   writeJson(path.join(root, '.ai-spec/ai-spec.lock.json'), {});
-  writeJson(path.join(root, '.agents/registry/registry.index.json'), {});
+  writeJson(path.join(root, '.agents/registry.index.json'), {});
 
   const builder = new IdeRegistryBuilder();
   const { registry } = builder.build(root);
@@ -101,7 +101,7 @@ async function testBuildVuePriorityAssets() {
   });
 
   writeJson(path.join(root, '.ai-spec/ai-spec.lock.json'), {});
-  writeJson(path.join(root, '.agents/registry/registry.index.json'), {});
+  writeJson(path.join(root, '.agents/registry.index.json'), {});
 
   const builder = new IdeRegistryBuilder();
   const { registry } = builder.build(root, { profile: PROFILES.VUE });
@@ -120,7 +120,7 @@ async function testBuildReactPriorityAssets() {
   });
 
   writeJson(path.join(root, '.ai-spec/ai-spec.lock.json'), {});
-  writeJson(path.join(root, '.agents/registry/registry.index.json'), {});
+  writeJson(path.join(root, '.agents/registry.index.json'), {});
 
   const builder = new IdeRegistryBuilder();
   const { registry } = builder.build(root, { profile: PROFILES.REACT });
@@ -140,7 +140,7 @@ async function testBuildExplicitProfileWins() {
   });
 
   writeJson(path.join(root, '.ai-spec/ai-spec.lock.json'), {});
-  writeJson(path.join(root, '.agents/registry/registry.index.json'), {});
+  writeJson(path.join(root, '.agents/registry.index.json'), {});
 
   const builder = new IdeRegistryBuilder();
   const { registry } = builder.build(root, { profile: PROFILES.VUE });
@@ -159,7 +159,7 @@ async function testWriteRegistryFile() {
   });
 
   writeJson(path.join(root, '.ai-spec/ai-spec.lock.json'), {});
-  writeJson(path.join(root, '.agents/registry/registry.index.json'), {});
+  writeJson(path.join(root, '.agents/registry.index.json'), {});
 
   const builder = new IdeRegistryBuilder();
   const result = builder.write(root, { profile: PROFILES.REACT });
@@ -210,7 +210,7 @@ async function testDryRunDoesNotWrite() {
   });
 
   writeJson(path.join(root, '.ai-spec/ai-spec.lock.json'), {});
-  writeJson(path.join(root, '.agents/registry/registry.index.json'), {});
+  writeJson(path.join(root, '.agents/registry.index.json'), {});
 
   const builder = new IdeRegistryBuilder();
   const result = builder.write(root, { profile: PROFILES.REACT, dryRun: true });

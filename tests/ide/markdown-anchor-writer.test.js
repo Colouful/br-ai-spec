@@ -13,7 +13,7 @@ async function testBuildBlocks() {
   assert(agentsBlock.includes('<!-- AI-SPEC-AUTO:START -->'));
   assert(agentsBlock.includes('<!-- AI-SPEC-AUTO:END -->'));
   assert(agentsBlock.includes('.ai-spec/project.json'));
-  assert(agentsBlock.includes('.agents/registry/registry.index.json'));
+  assert(agentsBlock.includes('.agents/registry.index.json'));
   assert(agentsBlock.includes('.ai-spec/context-index.json'));
 
   const claudeBlock = buildClaudeMdBlock();

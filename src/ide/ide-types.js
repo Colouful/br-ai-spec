@@ -29,7 +29,7 @@ const DOCTOR_CHECKLIST = [
   { path: '.ai-spec/project.json', category: '项目配置', required: true },
   { path: '.ai-spec/ai-spec.lock.json', category: '锁定文件', required: true },
   { path: '.ai-spec/context-index.json', category: '上下文索引', required: true },
-  { path: '.agents/registry/registry.index.json', category: '资产注册表', required: true },
+  { path: '.agents/registry.index.json', category: '资产注册表', required: true },
   { path: '.agents/registry/ide-registry.json', category: 'IDE 注册表', required: true },
   { path: '.ai-spec/ide-integration.json', category: 'IDE 集成状态', required: true },
   { path: '.cursor/rules/ai-spec-auto.mdc', category: 'Cursor 指针', required: false },
