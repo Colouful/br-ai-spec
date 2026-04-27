@@ -26,8 +26,15 @@ class InitApplier {
   }
 
   async apply(rootDir, plan, options = {}) {
-    this.manifestInstaller.install(plan);
     const writtenFiles = [];
+    const installResult = this.manifestInstaller.install(plan);
+    for (const asset of installResult.assets || []) {
+      writtenFiles.push({
+        path: asset,
+        action: 'create',
+        description: '安装本地资产文件',
+      });
+    }
     const now = options.now || new Date().toISOString();
 
     const projectResult = this.projectConfigWriter.write(rootDir, plan, { now });
