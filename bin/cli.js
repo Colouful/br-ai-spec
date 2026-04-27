@@ -170,6 +170,11 @@ function shouldUseIntegrityCommand(args, cwd) {
       process.exit(await manifestExport.main(args.slice(1)));
     }
 
+    if (args[0] === 'ide') {
+      const ideCommand = require('./ide-command');
+      process.exit(await ideCommand.main(args.slice(1)));
+    }
+
     if (args[0] === 'hub') {
       // 切面接入：Hub 方案包能力独立在 hub-command 内部实现。
       // 加载或执行失败只影响 hub 子命令，不改变 init/sync/check 等旧主链。
