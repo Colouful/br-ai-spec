@@ -217,7 +217,89 @@ AI_SPEC_SKIP_LAUNCHER_SYNC=1 node bin/cli.js ide repair /path/to/your-project --
 
 ---
 
-## 六、验证项目生成的文件
+## 六、对接 Visual 可视化平台（可选）
+
+> 如果你有本地运行的 Visual 服务（如 `http://localhost:18780`），可以让 br-ai-spec 自动上报项目状态和运行事件。
+
+### 6.1 什么是 Visual 上报
+
+br-ai-spec 在 init、spec-start、spec-continue 等关键节点会自动向 Visual 服务发送以下数据：
+
+| 时机 | 上报类型 | 内容 |
+|------|----------|------|
+| init 完成 | project-state | 项目 ID、技术栈、Manifest |
+| spec 阶段切换 | run-event | 当前阶段、执行器、状态 |
+| spec 执行完成 | history | 变更文件列表、验证摘要、耗时 |
+| 异常发生 | incident | 错误信息、建议修复方案 |
+
+> **隐私保证**：源码、绝对路径、密钥、AI 提示词**绝对不上传**（由 PrivacyFilter 双重过滤）。
+
+### 6.2 方式一：init 时直接指定（最简单）
+
+```bash
+# 在 init 时加上 --visual-url
+$CLI init $PROJECT --recommend --yes --visual-url http://localhost:18780
+```
+
+### 6.3 方式二：编辑 policy.json（推荐，持久生效）
+
+在业务项目的 `.ai-spec/policy.json` 中添加：
+
+```json
+{
+  "visual": {
+    "url": "http://localhost:18780",
+    "enabled": true,
+    "nonBlocking": true
+  }
+}
+```
+
+配置后所有命令自动上报，无需每次传 `--visual-url`。
+
+### 6.4 验证 Visual 上报
+
+```bash
+# 1. 确保 Visual 服务正在运行
+curl http://localhost:18780/api/health
+
+# 2. 执行 init（带 visual-url）
+$CLI init $PROJECT --recommend --yes --visual-url http://localhost:18780
+
+# 3. 观察输出 —— 如果看到"已跳过运行态上报"说明 Visual 不可达
+#    正常情况不会出现此警告
+```
+
+### 6.5 环境变量方式
+
+```bash
+export AI_SPEC_VISUAL_URL=http://localhost:18780
+$CLI init $PROJECT --recommend --yes
+```
+
+### 6.6 配置优先级
+
+```
+CLI --visual-url  >  policy.json visual.url  >  环境变量 $AI_SPEC_VISUAL_URL
+```
+
+### 6.7 Visual 服务需要的 API
+
+你的 Visual 服务需要实现以下接口才能接收数据：
+
+```
+GET  /api/health                              → 健康检查
+POST /api/collector/project-state             → 接收项目状态
+POST /api/collector/run-event                 → 接收运行事件
+POST /api/collector/history                   → 接收历史记录
+POST /api/collector/incident                  → 接收异常事件
+```
+
+详细数据格式和对接文档见：[对接 Visual 文档](./对接visul.md)
+
+---
+
+## 七、验证项目生成的文件
 
 初始化完成后，你的业务项目应该新增以下文件和目录：
 
@@ -265,7 +347,7 @@ your-project/
 
 ---
 
-## 七、在 Cursor 中使用 /spec-start
+## 八、在 Cursor 中使用 /spec-start
 
 ### 7.1 打开项目
 
@@ -300,7 +382,7 @@ AI 会自动：
 
 ---
 
-## 八、完整流程速查
+## 九、完整流程速查
 
 ```bash
 # === 一次性设置 ===
@@ -314,8 +396,11 @@ $CLI scan $PROJECT --json
 # Step 2: 预览
 $CLI init $PROJECT --recommend --dry-run
 
-# Step 3: 初始化
+# Step 3: 初始化（不带 Visual 的纯净版本）
 $CLI init $PROJECT --recommend --yes
+
+# Step 3-Alt: 初始化（带 Visual 上报）
+$CLI init $PROJECT --recommend --yes --visual-url http://localhost:18780
 
 # Step 4: IDE 同步（Vue 项目）
 $CLI ide sync $PROJECT --ide cursor,claude --profile vue --link-mode copy --yes
@@ -323,12 +408,15 @@ $CLI ide sync $PROJECT --ide cursor,claude --profile vue --link-mode copy --yes
 # Step 5: 完整性检查
 $CLI ide doctor $PROJECT
 
-# Step 6: 在 Cursor 中使用 /spec-start
+# Step 6（可选）: 配置 Visual 持久化 —— 编辑 .ai-spec/policy.json
+# 添加 "visual": { "url": "http://localhost:18780", "enabled": true, "nonBlocking": true }
+
+# Step 7: 在 Cursor 中打开项目 → 输入 /spec-start <需求描述>
 ```
 
 ---
 
-## 九、常见问题
+## 十、常见问题
 
 ### Q1: "目标项目尚未初始化" 错误
 
@@ -366,4 +454,23 @@ $CLI ide doctor $PROJECT  # 返回非 0 表示有缺失
 ```bash
 # 重新 sync 即可（幂等）
 $CLI ide sync $PROJECT --ide cursor,claude --profile vue --link-mode copy --yes
+```
+
+### Q7: Visual 上报失败怎么办
+
+```
+- 确认 Visual 服务正在运行: curl http://localhost:18780/api/health
+- 检查 policy.json 中 visual.enabled 是否为 true
+- 上报是异步非阻塞的，失败不影响主流程
+- 如果出现 "已跳过运行态上报" 说明 URL 未配置或不可达
+```
+
+### Q8: 如何关闭 Visual 上报
+
+```bash
+# 方式1: 环境变量
+export AI_SPEC_VISUAL_URL=""
+
+# 方式2: 编辑 policy.json
+# 设置 "visual": { "enabled": false }
 ```
