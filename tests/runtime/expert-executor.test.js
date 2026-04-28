@@ -410,6 +410,129 @@ function main() {
   assert.strictEqual(currentRun.status, 'success');
   assert.strictEqual(currentRun.current_role, 'archive-change');
 
+  const partialRuntimeActionTarget = createWorkspace();
+  bootstrapRun(partialRuntimeActionTarget);
+  writeRequirementArtifacts(partialRuntimeActionTarget);
+  expertExecutor.applyExecution({
+    target: partialRuntimeActionTarget,
+    payload: path.join(fixturesDir, 'current-execution-requirement-analyst.json'),
+    advanceRuntime: true,
+  });
+  expertExecutor.applyRuntimeActionData({
+    target: partialRuntimeActionTarget,
+    advanceRuntime: true,
+    payloadData: {
+      schema_version: 1,
+      kind: 'task-orchestrator-runtime-action',
+      action: 'approve',
+      gate: 'before-implementation',
+      to_role: 'frontend-implementer',
+      message: 'implementation approved',
+    },
+  });
+  expertDispatch.applyDispatch({
+    target: partialRuntimeActionTarget,
+    payload: path.join(fixturesDir, 'current-dispatch-frontend-implementer.json'),
+  });
+  result = expertExecutor.applyExecutionData({
+    target: partialRuntimeActionTarget,
+    payloadData: {
+      schema_version: 1,
+      kind: 'expert-execution',
+      run_id: 'run_20260331_160700_smoke',
+      status: 'partial',
+      role: {
+        id: 'frontend-implementer',
+        name: '前端实现专家',
+      },
+      flow: {
+        id: 'prd-to-delivery',
+      },
+      summary: '仅完成部分页面，剩余页面待继续处理。',
+    },
+  });
+  assert.strictEqual(result.payload.status, 'partial');
+  result = expertExecutor.applyRuntimeActionData({
+    target: partialRuntimeActionTarget,
+    advanceRuntime: true,
+    payloadData: {
+      schema_version: 1,
+      kind: 'task-orchestrator-runtime-action',
+      action: 'handoff',
+      run_id: 'run_20260331_160700_smoke',
+      from_role: 'frontend-implementer',
+      to_role: 'code-guardian',
+      next_role: null,
+      status: 'running',
+      message: 'frontend-implementer 已部分交付，交给 code-guardian',
+    },
+  });
+  currentRun = readCurrentRun(partialRuntimeActionTarget);
+  assert.strictEqual(result.runtime_transition.applied.current_role, 'frontend-implementer');
+  assert.strictEqual(currentRun.current_role, 'frontend-implementer');
+  assert.ok(currentRun.events.some((event) => String(event.message || '').includes('当前专家状态为 partial')));
+
+  const partialCompleteActionTarget = createWorkspace();
+  bootstrapRun(partialCompleteActionTarget);
+  writeRequirementArtifacts(partialCompleteActionTarget);
+  expertExecutor.applyExecution({
+    target: partialCompleteActionTarget,
+    payload: path.join(fixturesDir, 'current-execution-requirement-analyst.json'),
+    advanceRuntime: true,
+  });
+  expertExecutor.applyRuntimeActionData({
+    target: partialCompleteActionTarget,
+    advanceRuntime: true,
+    payloadData: {
+      schema_version: 1,
+      kind: 'task-orchestrator-runtime-action',
+      action: 'approve',
+      gate: 'before-implementation',
+      to_role: 'frontend-implementer',
+      message: 'implementation approved',
+    },
+  });
+  expertDispatch.applyDispatch({
+    target: partialCompleteActionTarget,
+    payload: path.join(fixturesDir, 'current-dispatch-frontend-implementer.json'),
+  });
+  expertExecutor.applyExecutionData({
+    target: partialCompleteActionTarget,
+    payloadData: {
+      schema_version: 1,
+      kind: 'expert-execution',
+      run_id: 'run_20260331_160700_smoke',
+      status: 'partial',
+      role: {
+        id: 'frontend-implementer',
+        name: '前端实现专家',
+      },
+      flow: {
+        id: 'prd-to-delivery',
+      },
+      summary: '仅完成部分页面，不能完成运行。',
+    },
+  });
+  result = expertExecutor.applyRuntimeActionData({
+    target: partialCompleteActionTarget,
+    advanceRuntime: true,
+    payloadData: {
+      schema_version: 1,
+      kind: 'task-orchestrator-runtime-action',
+      action: 'complete',
+      run_id: 'run_20260331_160700_smoke',
+      from_role: 'frontend-implementer',
+      to_role: 'archive-change',
+      status: 'success',
+      message: '错误地尝试完成运行',
+    },
+  });
+  currentRun = readCurrentRun(partialCompleteActionTarget);
+  assert.strictEqual(result.runtime_transition.applied.current_role, 'frontend-implementer');
+  assert.strictEqual(currentRun.status, 'running');
+  assert.strictEqual(currentRun.current_role, 'frontend-implementer');
+  assert.ok(currentRun.events.some((event) => String(event.message || '').includes('当前专家状态为 partial')));
+
   const examplePayloadTarget = createWorkspace();
   bootstrapRun(examplePayloadTarget);
   writeRequirementArtifacts(examplePayloadTarget);

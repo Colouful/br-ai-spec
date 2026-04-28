@@ -8,6 +8,7 @@ const expertDispatch = require('./expert-dispatch');
 const expertExecutor = require('./expert-executor');
 const {
   buildAutoRuntimeAction,
+  guardRuntimeActionForIncompleteExecution,
   getRuntimeTransition,
 } = require('./execution-semantics');
 const {
@@ -628,16 +629,17 @@ function clearCurrentExpertArtifacts(targetDir) {
 }
 
 function applyRuntimeMutation({ targetDir, action, payload, payloadSource }) {
-  const normalizedAction = String(action || '').toLowerCase();
+  const guardedPayload = guardRuntimeActionForIncompleteExecution(targetDir, payload);
+  const normalizedAction = String(guardedPayload.action || action || '').toLowerCase();
   let result = null;
 
   if (normalizedAction === 'bootstrap') {
     result = runtimeState.bootstrapRunState({
       target: targetDir,
-      payloadData: payload,
+      payloadData: guardedPayload,
     });
   } else {
-    const runtimeOptions = buildRuntimeOptionsFromPayload(payload, targetDir);
+    const runtimeOptions = buildRuntimeOptionsFromPayload(guardedPayload, targetDir);
     switch (normalizedAction) {
       case 'handoff':
         result = runtimeState.handoffRunState(runtimeOptions);

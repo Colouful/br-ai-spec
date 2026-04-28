@@ -46,11 +46,12 @@ description: Cursor 兼容入口：按运行态优先执行 protocol-update 或 
 2. 原样向用户播报 `turn.announcements.enter`
 3. 只读取 `turn.reads`，只写 `turn.writes`
 4. 若存在 `turn.guidance`、`turn.execution_contract`、`turn.commands`、`turn.finalize_contract`，以它们为最终执行契约，不要自行拼命令
-5. 若 `turn.enforcement.current_command_finalizes_run = true`，不要再执行 `protocol-advance`
-6. 若 `turn.requires_advance = true`，立即执行 `turn.finalize_contract.advance_command`
-7. 若用户中途补充新要求，或当前这条输入本身就是审批/放行意见，或是归档确认门禁下的“归档 / 不归档”决定，优先执行 `turn.finalize_contract.update_command` 或 `turn.commands.update`
-8. `advance` 返回后，直接读取返回结果里的下一个 `turn` 并继续；不要 `sleep`、`tail`、`timeout`、`cat` 日志，也不要额外重跑 `protocol-step`
-9. 重复直到 `turn.status = terminal | blocked`
+5. 若当前专家执行结果为 `partial（部分完成）` 或任何非 `done / success / completed` 状态，不得写“交付完成”，不得交给下一位专家；必须继续停留在当前专家补齐后再推进
+6. 若 `turn.enforcement.current_command_finalizes_run = true`，不要再执行 `protocol-advance`
+7. 若 `turn.requires_advance = true`，立即执行 `turn.finalize_contract.advance_command`
+8. 若用户中途补充新要求，或当前这条输入本身就是审批/放行意见，或是归档确认门禁下的“归档 / 不归档”决定，优先执行 `turn.finalize_contract.update_command` 或 `turn.commands.update`
+9. `advance` 返回后，直接读取返回结果里的下一个 `turn` 并继续；不要 `sleep`、`tail`、`timeout`、`cat` 日志，也不要额外重跑 `protocol-step`
+10. 重复直到 `turn.status = terminal | blocked`
 
 若 `turn.status = blocked` 且存在 `turn.summary.pending_gate`：
 

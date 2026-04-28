@@ -19,6 +19,7 @@ class InitService {
         manualManifestSlug: options.manualManifestSlug,
         recommendationSource: 'manual',
         hubConfig,
+        workspaceRoot: options.workspaceRoot,
       });
     }
 
@@ -26,6 +27,7 @@ class InitService {
       const plan = this.planBuilder.build(scanResult, {
         recommendationSource: 'local',
         hubConfig,
+        workspaceRoot: options.workspaceRoot,
       });
       plan.warnings.push('未配置 Hub URL，已使用本地模式');
       return plan;
@@ -41,12 +43,14 @@ class InitService {
         hubRecommendations: hubRecommendations.recommendations || [],
         recommendationSource: 'hub',
         hubConfig,
+        workspaceRoot: options.workspaceRoot,
       });
     } catch (error) {
       if (hubConfig.fallbackToLocal) {
         const plan = this.planBuilder.build(scanResult, {
           recommendationSource: 'local',
           hubConfig,
+          workspaceRoot: options.workspaceRoot,
         });
         plan.warnings.push(`Hub 推荐失败，已降级本地推荐：${error.message}`);
         return plan;

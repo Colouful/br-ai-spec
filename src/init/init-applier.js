@@ -1,3 +1,5 @@
+const fs = require('fs');
+const path = require('path');
 const { ContextIndexWriter } = require('../project/context-index-writer');
 const { LockFileWriter } = require('../project/lock-file-writer');
 const { PolicyConfigWriter } = require('../project/policy-config-writer');
@@ -5,7 +7,8 @@ const { ProjectConfigWriter } = require('../project/project-config-writer');
 const { RegistryIndexWriter } = require('../project/registry-index-writer');
 const { WorkspaceConfigWriter } = require('../project/workspace-config-writer');
 const { IdePointerInjector } = require('./ide-pointer-injector');
-const { ManifestInstaller } = require('./manifest-installer');
+const { IdeLinker } = require('./ide-linker');
+const { ManifestInstaller, MANIFEST_TO_PROFILE } = require('./manifest-installer');
 const { HubClient } = require('../hub/hub-client');
 const { resolveHubConfig } = require('../hub/hub-config');
 const { VisualReporter } = require('../visual/visual-reporter');
@@ -21,6 +24,7 @@ class InitApplier {
     this.registryIndexWriter = options.registryIndexWriter || new RegistryIndexWriter();
     this.contextIndexWriter = options.contextIndexWriter || new ContextIndexWriter();
     this.idePointerInjector = options.idePointerInjector || new IdePointerInjector();
+    this.ideLinker = options.ideLinker || new IdeLinker();
     this.hubClient = options.hubClient || new HubClient();
     this.visualReporter = options.visualReporter || new VisualReporter();
   }
@@ -35,12 +39,19 @@ class InitApplier {
         description: '安装本地资产文件',
       });
     }
+    // 在写入 IDE 指针文件之前先创建符号链接，防止 IdePointerInjector
+    // 把 .cursor/rules/ 创建为普通目录
+    this.ideLinker.link(rootDir);
+
     const now = options.now || new Date().toISOString();
 
     const projectResult = this.projectConfigWriter.write(rootDir, plan, { now });
     writtenFiles.push(projectResult);
 
-    const policyResult = this.policyConfigWriter.write(rootDir, plan, { now });
+    // 写入 manifest.json，供 project-init 等技能读取 profile 信息
+    this._writeManifest(rootDir, plan, now);
+
+    const policyResult = this.policyConfigWriter.write(rootDir, plan, { now, visualUrl: options.visualUrl });
     writtenFiles.push(policyResult);
 
     const workspaceResult = this.workspaceConfigWriter.write(rootDir, plan, { now });
@@ -70,6 +81,35 @@ class InitApplier {
     await this.reportInstallRecord(rootDir, plan, context, result, options);
     await this.reportProjectState(rootDir, result, options);
     return result;
+  }
+
+  _writeManifest(rootDir, plan, now) {
+    const manifestPath = path.join(rootDir, '.ai-spec', 'manifest.json');
+    const existing = fs.existsSync(manifestPath)
+      ? JSON.parse(fs.readFileSync(manifestPath, 'utf8'))
+      : {};
+
+    const manifestSlug = plan.packages[0]?.recommendedManifest?.slug || null;
+    const profile = MANIFEST_TO_PROFILE[manifestSlug] || null;
+    const profiles = profile ? [profile] : [];
+
+    const next = {
+      ...existing,
+      profiles,
+      profile: profiles[0] || null,
+      generated_at: now,
+    };
+
+    if (plan.packages && plan.packages.length > 0) {
+      next.packages = plan.packages.map((pkg) => ({
+        name: pkg.name,
+        path: pkg.path,
+        manifest: pkg.recommendedManifest?.slug || null,
+      }));
+    }
+
+    fs.mkdirSync(path.dirname(manifestPath), { recursive: true });
+    fs.writeFileSync(manifestPath, JSON.stringify(next, null, 2) + '\n', 'utf8');
   }
 
   async reportInstallRecord(rootDir, plan, context, result, options = {}) {

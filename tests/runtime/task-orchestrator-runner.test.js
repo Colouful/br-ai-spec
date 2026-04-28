@@ -69,6 +69,10 @@ function readCurrentRun(targetDir) {
   return JSON.parse(fs.readFileSync(path.join(targetDir, '.ai-spec', 'current-run.json'), 'utf8'));
 }
 
+function readCurrentDispatch(targetDir) {
+  return JSON.parse(fs.readFileSync(path.join(targetDir, '.ai-spec', 'internal', 'current-dispatch.json'), 'utf8'));
+}
+
 function rewriteRunGoal(targetDir, rawGoal) {
   const currentRunPath = path.join(targetDir, '.ai-spec', 'current-run.json');
   const currentRun = JSON.parse(fs.readFileSync(currentRunPath, 'utf8'));
@@ -552,6 +556,51 @@ function main() {
   assert.strictEqual(blockedArchiveWorkflow.turn.status, 'blocked');
   assert.ok(blockedArchiveWorkflow.turn.guidance.archive_preflight.missing_artifacts.includes('checklist.md'));
   assert.strictEqual(blockedArchiveWorkflow.turn.enforcement.execute_current_command_first, false);
+
+  const partialHandoffTarget = createWorkspace('ai-spec-auto-partial-handoff-');
+  step(partialHandoffTarget, '创建一个商品组件');
+  copyFixture(partialHandoffTarget, 'task-orchestrator-bootstrap-reply.md', 'task-orchestrator-turn.json');
+  advance(partialHandoffTarget);
+  writeRequirementArtifacts(partialHandoffTarget);
+  copyFixture(partialHandoffTarget, 'current-execution-requirement-analyst.json', 'current-execution.json');
+  advance(partialHandoffTarget);
+  approveGate(partialHandoffTarget, 'before-implementation', 'frontend-implementer', 'implementation approved');
+  writeExecutionInbox(partialHandoffTarget, {
+    schema_version: 1,
+    kind: 'expert-execution',
+    run_id: 'run_20260331_160700_smoke',
+    status: 'partial',
+    role: {
+      id: 'frontend-implementer',
+      name: '前端实现专家',
+    },
+    flow: {
+      id: 'prd-to-delivery',
+    },
+    summary: '仅完成部分页面，剩余页面待继续处理。',
+  });
+  let partialReport = advance(partialHandoffTarget);
+  assert.strictEqual(partialReport.consumed.kind, 'expert-execution');
+  assert.strictEqual(partialReport.applied, null);
+  writeRuntimeActionInbox(partialHandoffTarget, {
+    schema_version: 1,
+    kind: 'task-orchestrator-runtime-action',
+    action: 'handoff',
+    run_id: 'run_20260331_160700_smoke',
+    from_role: 'frontend-implementer',
+    to_role: 'code-guardian',
+    next_role: null,
+    status: 'running',
+    message: 'frontend-implementer 已部分交付，交给 code-guardian',
+  });
+  partialReport = advance(partialHandoffTarget);
+  const partialRun = readCurrentRun(partialHandoffTarget);
+  assert.strictEqual(partialReport.applied.adapter_action, 'handoff');
+  assert.strictEqual(partialRun.current_role, 'frontend-implementer');
+  assert.strictEqual(readCurrentDispatch(partialHandoffTarget).role.id, 'frontend-implementer');
+  assert.strictEqual(partialReport.recorded.dispatch.role, 'frontend-implementer');
+  assert.deepStrictEqual(partialReport.next_expected.files, ['.ai-spec/internal/tmp/current-execution.json']);
+  assert.ok(partialRun.events.some((event) => String(event.message || '').includes('当前专家状态为 partial')));
 
   const runnerStatus = status(targetDir);
   assert.strictEqual(runnerStatus.kind, 'task-orchestrator-runner-status');

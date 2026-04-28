@@ -60,7 +60,7 @@ function createDefaultPolicy() {
 }
 
 class PolicyConfigWriter {
-  write(rootDir) {
+  write(rootDir, _plan, options = {}) {
     const filePath = path.join(rootDir, '.ai-spec/policy.json');
     const existing = readJsonIfExists(filePath);
     const nextDoc = mergeMissing(createDefaultPolicy(), existing || {});
@@ -68,6 +68,11 @@ class PolicyConfigWriter {
     nextDoc.privacyPolicy = nextDoc.privacyPolicy || {};
     for (const field of FORCED_PRIVACY_FALSE_FIELDS) {
       nextDoc.privacyPolicy[field] = false;
+    }
+    if (options.visualUrl) {
+      nextDoc.visual = nextDoc.visual || {};
+      nextDoc.visual.url = options.visualUrl;
+      nextDoc.visual.enabled = true;
     }
     writeJson(filePath, nextDoc);
     return {

@@ -36,6 +36,7 @@
 7. `frontend-implementer` 才允许改业务代码
 8. `code-guardian` 只产出 `checklist.md`、`iterations.md`
 9. 完成当前轮次后：
+   - 若当前专家执行结果为 `partial（部分完成）` 或任何非 `done / success / completed` 状态，不得写“交付完成”，不得交给下一位专家；必须继续停留在当前专家补齐后再推进
    - 若不存在 `turn.finalize_contract.user_report_contract`，可简短播报 `turn.announcements.exit`
    - 若存在最终摘要契约，直接输出符合契约的最终摘要，不再额外播报内部阶段完成语
    - 若 `turn.enforcement.current_command_finalizes_run = true`，则 `current_command` 已完成归档与运行收尾；不要再写 `expert-execution` JSON，不要再执行 `protocol-advance`，直接读取当前运行态并输出最终摘要

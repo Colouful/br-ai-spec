@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const runtimeState = require('./runtime-state');
-const { resolveRuntimePaths } = require('./runtime-paths');
+const { resolveRuntimePaths, getCandidatePaths } = require('./runtime-paths');
 const {
   getRoleRuntimeConfig,
   getFlowRuntimeConfig,
@@ -165,6 +165,82 @@ function readCurrentRun(targetDir) {
     return null;
   }
   return readJsonFile(runtimePaths.currentRun.path, 'current run-state');
+}
+
+function readCurrentExecution(targetDir) {
+  const runtimePaths = resolveRuntimePaths(targetDir);
+  for (const candidatePath of getCandidatePaths(runtimePaths.currentExecutionJson)) {
+    if (fs.existsSync(candidatePath)) {
+      return readJsonFile(candidatePath, 'current expert execution');
+    }
+  }
+  return null;
+}
+
+function normalizeExecutionStatus(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function isCompletedExecutionStatus(value) {
+  return AUTO_ADVANCE_EXECUTION_STATUSES.has(normalizeExecutionStatus(value));
+}
+
+function normalizeRuntimeAction(value) {
+  const action = String(value || '').trim().toLowerCase();
+  if (action === 'archive' || action === 'completed') {
+    return 'complete';
+  }
+  if (action === 'blocked') {
+    return 'gate-blocked';
+  }
+  return action;
+}
+
+function guardRuntimeActionForIncompleteExecution(targetDir, payload) {
+  const runtimeAction = normalizeRuntimeAction(payload?.action || payload?.event);
+  if (runtimeAction !== 'handoff' && runtimeAction !== 'complete') {
+    return payload;
+  }
+
+  const currentExecution = readCurrentExecution(targetDir);
+  if (!currentExecution) {
+    return payload;
+  }
+
+  const status = normalizeExecutionStatus(currentExecution.status);
+  if (isCompletedExecutionStatus(status)) {
+    return payload;
+  }
+
+  const roleId = currentExecution.role?.id || payload?.from_role || payload?.to_role || null;
+  if (!roleId) {
+    return payload;
+  }
+
+  const originalToRole = payload?.to_role || payload?.toRole || null;
+  const originalNextRole = payload?.next_role || payload?.nextRole || null;
+  const nextRole = originalToRole && originalToRole !== roleId
+    ? originalToRole
+    : originalNextRole;
+  const message = `当前专家状态为 ${status || 'unknown'}，尚未达到 done / success / completed，已留在 ${roleId} 继续补齐后再交接。`;
+
+  return {
+    ...(payload || {}),
+    schema_version: payload?.schema_version || 1,
+    kind: 'task-orchestrator-runtime-action',
+    action: 'handoff',
+    run_id: payload?.run_id || currentExecution.run_id || null,
+    from_role: payload?.from_role || currentExecution.role?.id || roleId,
+    to_role: roleId,
+    next_role: nextRole || null,
+    status: 'running',
+    clear_pending_gate: true,
+    message,
+    blocked_reason: payload?.blocked_reason || message,
+    source: payload?.source || 'incomplete-execution-guard',
+    verification: payload?.verification || currentExecution.verification || null,
+    auto_fix: payload?.auto_fix || null,
+  };
 }
 
 function loadPackageManifest(targetDir) {
@@ -739,6 +815,7 @@ module.exports = {
   inferExecutionOpenSpecAction,
   inferRuntimeActionOpenSpecAction,
   validatePreImplementationGate,
+  guardRuntimeActionForIncompleteExecution,
   buildAutoRuntimeAction,
   readCurrentRun,
 };

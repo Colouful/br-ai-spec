@@ -41,11 +41,12 @@ description: Cursor 兼容入口：先执行 protocol-step，再按 turn 契约�
 6. `requirement-analyst` 只产出 `proposal.md`、`spec.md`、`tasks.md`
 7. `frontend-implementer` 才允许改业务代码
 8. `code-guardian` 只产出 `checklist.md`、`iterations.md`
-9. 若 `turn.enforcement.current_command_finalizes_run = true`，说明当前命令已完成归档与运行收尾；不要再写 `expert-execution` JSON，不要再执行 `protocol-advance`
-10. 若 `turn.requires_advance = true`，立即执行 `turn.finalize_contract.advance_command`
-11. 若用户中途补充新要求，优先执行 `turn.finalize_contract.update_command` 或 `turn.commands.update`
-12. `advance` 返回后，直接读取返回结果里的下一个 `turn` 并继续；不要 `sleep`、`tail`、`timeout`、`cat` 日志，也不要额外重跑 `protocol-step`
-13. 重复直到 `turn.status = terminal | blocked`
+9. 若当前专家执行结果为 `partial（部分完成）` 或任何非 `done / success / completed` 状态，不得写“交付完成”，不得交给下一位专家；必须继续停留在当前专家补齐后再推进
+10. 若 `turn.enforcement.current_command_finalizes_run = true`，说明当前命令已完成归档与运行收尾；不要再写 `expert-execution` JSON，不要再执行 `protocol-advance`
+11. 若 `turn.requires_advance = true`，立即执行 `turn.finalize_contract.advance_command`
+12. 若用户中途补充新要求，优先执行 `turn.finalize_contract.update_command` 或 `turn.commands.update`
+13. `advance` 返回后，直接读取返回结果里的下一个 `turn` 并继续；不要 `sleep`、`tail`、`timeout`、`cat` 日志，也不要额外重跑 `protocol-step`
+14. 重复直到 `turn.status = terminal | blocked`
 
 若 `turn.status = blocked` 且存在 `turn.summary.pending_gate`：
 

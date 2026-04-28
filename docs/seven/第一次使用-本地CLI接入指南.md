@@ -1,6 +1,6 @@
 # br-ai-spec v0.1.11 第一次使用 — 本地 CLI 接入指南
 
-> **目标项目**：`/Users/lizhenwei/workspace/test/test-ai-spec/prd-to-delivery-local-first-060/test_副本20`（Vue 3 + TypeScript + Vite）
+> **目标项目**：`/Users/lizhenwei/workspace/vueworkspace/bairong/asset-cube-html`（Vue 3 + TypeScript + Vite）
 > **CLI 路径**：`/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/bin/cli.js`
 > **Visual 服务**：`http://localhost:18780`（需提前启动）
 > **预计耗时**：3 分钟
@@ -11,7 +11,7 @@
 
 ```bash
 CLI=/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/bin/cli.js
-PROJECT=/Users/lizhenwei/workspace/test/test-ai-spec/prd-to-delivery-local-first-060/test_副本20
+PROJECT=/Users/lizhenwei/workspace/vueworkspace/bairong/asset-cube-html
 ```
 
 **预期**：无输出，变量设置成功。
@@ -21,7 +21,7 @@ PROJECT=/Users/lizhenwei/workspace/test/test-ai-spec/prd-to-delivery-local-first
 ## 二、扫描项目技术栈
 
 ```bash
-node $CLI scan $PROJECT --json 2>&1 | head -20
+node /Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/bin/cli.js scan /Users/lizhenwei/workspace/vueworkspace/bairong/asset-cube-html --json 2>&1 | head -20
 ```
 
 **预期输出（关键字段）**：
@@ -51,14 +51,14 @@ node $CLI scan $PROJECT --json 2>&1 | head -20
 ## 三、预览初始化计划（空跑，不写文件）
 
 ```bash
-node $CLI init $PROJECT --recommend --dry-run
+node /Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/bin/cli.js init /Users/lizhenwei/workspace/vueworkspace/bairong/asset-cube-html --recommend --dry-run
 ```
 
 **预期输出**：
 
 ```
 InitPlan 生成完成
-目标目录：/Users/lizhenwei/workspace/test/test-ai-spec/prd-to-delivery-local-first-060/test_副本20
+目标目录：/Users/lizhenwei/workspace/vueworkspace/bairong/asset-cube-html
 工作区类型：single-project
 包数量：1
 
@@ -91,7 +91,7 @@ dry-run 不会写入文件。
 ## 四、执行初始化（写入文件，含 Visual 上报）
 
 ```bash
-node $CLI init $PROJECT --recommend --yes --visual-url http://localhost:18780
+node /Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/bin/cli.js init /Users/lizhenwei/workspace/vueworkspace/bairong/asset-cube-html --recommend --yes --visual-url http://localhost:18780
 ```
 
 **预期输出**：
@@ -127,7 +127,7 @@ node $CLI init $PROJECT --recommend --yes --visual-url http://localhost:18780
 ## 五、IDE 同步（补齐 Pointer-only 指针层）
 
 ```bash
-node $CLI ide sync $PROJECT \
+node /Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/bin/cli.js ide sync /Users/lizhenwei/workspace/vueworkspace/bairong/asset-cube-html \
   --ide cursor,claude \
   --profile vue \
   --link-mode copy \
@@ -166,7 +166,7 @@ IDE 同步完成
 ## 六、完整性检查
 
 ```bash
-node $CLI ide doctor $PROJECT
+node /Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/bin/cli.js ide doctor /Users/lizhenwei/workspace/vueworkspace/bairong/asset-cube-html
 ```
 
 **预期输出**：
@@ -181,10 +181,10 @@ IDE 指针文件检查通过，所有文件完整
 
 ## 七、配置 Visual 持久化（可选，推荐）
 
-编辑 `$PROJECT/.ai-spec/policy.json`，确认或添加 `visual` 配置块：
+编辑 `/Users/lizhenwei/workspace/vueworkspace/bairong/asset-cube-html/.ai-spec/policy.json`，确认或添加 `visual` 配置块：
 
 ```bash
-cat >> $PROJECT/.ai-spec/policy.json.tmp << 'POLICY'
+cat >> /Users/lizhenwei/workspace/vueworkspace/bairong/asset-cube-html/.ai-spec/policy.json.tmp << 'POLICY'
 {
   "visual": {
     "url": "http://localhost:18780",
@@ -195,7 +195,7 @@ cat >> $PROJECT/.ai-spec/policy.json.tmp << 'POLICY'
 POLICY
 ```
 
-> 更简单的方式：在 IDE 中直接编辑 `$PROJECT/.ai-spec/policy.json`，找到或添加 `"visual"` 字段。
+> 更简单的方式：在 IDE 中直接编辑 `/Users/lizhenwei/workspace/vueworkspace/bairong/asset-cube-html/.ai-spec/policy.json`，找到或添加 `"visual"` 字段。
 
 **验证点**：后续所有命令自动上报，无需每次传 `--visual-url`。
 
@@ -214,7 +214,7 @@ curl -s http://localhost:18780/api/health
 ### 8.2 发送一条测试上报
 
 ```bash
-node $CLI init $PROJECT --recommend --yes --visual-url http://localhost:18780
+node /Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/bin/cli.js init /Users/lizhenwei/workspace/vueworkspace/bairong/asset-cube-html --recommend --yes --visual-url http://localhost:18780
 ```
 
 **预期输出**：无 "已跳过运行态上报" 警告。
@@ -225,7 +225,7 @@ node $CLI init $PROJECT --recommend --yes --visual-url http://localhost:18780
 
 1. 用 Cursor 打开项目目录：
    ```
-   /Users/lizhenwei/workspace/test/test-ai-spec/prd-to-delivery-local-first-060/test_副本20
+   /Users/lizhenwei/workspace/vueworkspace/bairong/asset-cube-html
    ```
 
 2. 打开 AI Chat（`Cmd+I`），确认 Cursor 加载了 `.cursor/rules/ai-spec-auto.mdc`
@@ -241,7 +241,7 @@ node $CLI init $PROJECT --recommend --yes --visual-url http://localhost:18780
 
 ## 十、生成文件清单
 
-初始化完成后，`$PROJECT` 下新增以下文件和目录：
+初始化完成后，`/Users/lizhenwei/workspace/vueworkspace/bairong/asset-cube-html` 下新增以下文件和目录：
 
 ```
 .ai-spec/                         # 项目配置
@@ -281,22 +281,22 @@ memory.md                         # 跨会话记忆锚点
 # ============================================
 
 CLI=/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/bin/cli.js
-PROJECT=/Users/lizhenwei/workspace/test/test-ai-spec/prd-to-delivery-local-first-060/test_副本20
+PROJECT=/Users/lizhenwei/workspace/vueworkspace/bairong/asset-cube-html
 
 # Step 1: 扫描技术栈
-node $CLI scan $PROJECT --json 2>&1 | head -10
+node /Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/bin/cli.js scan /Users/lizhenwei/workspace/vueworkspace/bairong/asset-cube-html --json 2>&1 | head -10
 
 # Step 2: 预览初始化计划
-node $CLI init $PROJECT --recommend --dry-run
+node /Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/bin/cli.js init /Users/lizhenwei/workspace/vueworkspace/bairong/asset-cube-html --recommend --dry-run
 
 # Step 3: 执行初始化 + Visual 上报
-node $CLI init $PROJECT --recommend --yes --visual-url http://localhost:18780
+node /Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/bin/cli.js init /Users/lizhenwei/workspace/vueworkspace/bairong/asset-cube-html --recommend --yes --visual-url http://localhost:18780
 
 # Step 4: IDE 同步
-node $CLI ide sync $PROJECT --ide cursor,claude --profile vue --link-mode copy --yes
+node /Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/bin/cli.js ide sync /Users/lizhenwei/workspace/vueworkspace/bairong/asset-cube-html --ide cursor,claude --profile vue --link-mode copy --yes
 
 # Step 5: 完整性检查
-node $CLI ide doctor $PROJECT
+node /Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/bin/cli.js ide doctor /Users/lizhenwei/workspace/vueworkspace/bairong/asset-cube-html
 
 # Step 6: 验证 Visual 上报
 curl -s http://localhost:18780/api/health && echo "Visual 服务正常"
@@ -328,15 +328,15 @@ Visual 服务未启动或不可达。确认 `curl http://localhost:18780/api/hea
 
 手动指定 Manifest：
 ```bash
-node $CLI init $PROJECT --manifest frontend-vue-vite-standard --yes
+node /Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/bin/cli.js init /Users/lizhenwei/workspace/vueworkspace/bairong/asset-cube-html --manifest frontend-vue-vite-standard --yes
 ```
 
 ### Q5: 如何更新已有项目
 
 ```bash
-node $CLI ide sync $PROJECT --ide cursor,claude --profile vue --link-mode copy --yes
+node /Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/bin/cli.js ide sync /Users/lizhenwei/workspace/vueworkspace/bairong/asset-cube-html --ide cursor,claude --profile vue --link-mode copy --yes
 ```
 
 ### Q6: 如何关闭 Visual 上报
 
-编辑 `$PROJECT/.ai-spec/policy.json`，将 `visual.enabled` 设为 `false`。
+编辑 `/Users/lizhenwei/workspace/vueworkspace/bairong/asset-cube-html/.ai-spec/policy.json`，将 `visual.enabled` 设为 `false`。

@@ -1,0 +1,455 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1777268958616,
+  "projectRoot": "/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec",
+  "techStack": {
+    "languages": [
+      {
+        "name": "JavaScript/TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "package.json"
+        ]
+      }
+    ],
+    "frameworks": [],
+    "packageManager": "npm",
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": null,
+    "testCommand": null,
+    "lintCommand": null,
+    "devCommand": null,
+    "scripts": {
+      "demo:runtime": "node ./bin/cli.js demo-runtime-smoke",
+      "hub:sync-assets": "node ./scripts/hub-sync-assets.js",
+      "test:registry": "node ./tests/registry/validate-registry.test.js",
+      "test:runtime": "node ./tests/runtime/command-template-renderer.test.js && node ./tests/runtime/runtime-bootstrap.test.js && node ./tests/runtime/runtime-launcher.test.js && node ./tests/runtime/runtime-state-checkpoints.test.js && node ./tests/runtime/archive-change.test.js && node ./tests/runtime/task-orchestrator-runner.test.js && node ./tests/runtime/expert-executor.test.js && node ./tests/runtime/auto-fix-runtime.test.js && node ./tests/runtime/protocol-workflow-registry.test.js && node ./tests/runtime/protocol-update-fast-path.test.js && node ./tests/runtime/protocol-interaction-enhancements.test.js && node ./tests/runtime/spec-start-replay.test.js && node ./tests/runtime/demo-runtime-smoke.test.js && node ./tests/runtime/expert-delivery-template-content.test.js && node ./tests/runtime/sync.test.js && node ./tests/runtime/visual-command.test.js && node ./tests/runtime/hub-install.test.js && node ./tests/runtime/hub-diff.test.js && node ./tests/runtime/hub-upgrade-rollback.test.js && node ./tests/runtime/hub-runtime-report.test.js",
+      "verify:install-ps1-bom": "node ./scripts/verify-install-ps1-bom.js",
+      "prepack": "npm run verify:install-ps1-bom"
+    }
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [
+      "bin",
+      "docs",
+      "scripts",
+      "src",
+      "tests"
+    ],
+    "gitBranches": null
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "bin": {
+      "path": "bin",
+      "purpose": "Executable scripts",
+      "fileCount": 40,
+      "lastAccessed": 1777268958473,
+      "keyFiles": [
+        "archive-change.js",
+        "check-command.js",
+        "cli.js",
+        "command-template-renderer.js",
+        "context-command.js"
+      ]
+    },
+    "configs": {
+      "path": "configs",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1777268958478,
+      "keyFiles": []
+    },
+    "docs": {
+      "path": "docs",
+      "purpose": "Documentation",
+      "fileCount": 21,
+      "lastAccessed": 1777268958574,
+      "keyFiles": [
+        "AI Coding时代，我们处在什么位置？.md",
+        "README.md",
+        "e2e-integration-report.md",
+        "implementation-gap-analysis.md",
+        "install-guide.md"
+      ]
+    },
+    "internal": {
+      "path": "internal",
+      "purpose": null,
+      "fileCount": 3,
+      "lastAccessed": 1777268958577,
+      "keyFiles": [
+        "ai-protocol-workflow.js",
+        "hub-client.js",
+        "hub-sync-selection.js"
+      ]
+    },
+    "openspec": {
+      "path": "openspec",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1777268958578,
+      "keyFiles": [
+        "config.yaml.template"
+      ]
+    },
+    "scripts": {
+      "path": "scripts",
+      "purpose": "Build/utility scripts",
+      "fileCount": 13,
+      "lastAccessed": 1777268958582,
+      "keyFiles": [
+        "acceptance-zero-intrusion.sh",
+        "hub-sync-assets.config.example.json",
+        "hub-sync-assets.js",
+        "local-verify.sh",
+        "post-publish-auto-fix-check.js"
+      ]
+    },
+    "src": {
+      "path": "src",
+      "purpose": "Source code",
+      "fileCount": 0,
+      "lastAccessed": 1777268958587,
+      "keyFiles": []
+    },
+    "tests": {
+      "path": "tests",
+      "purpose": "Test files",
+      "fileCount": 0,
+      "lastAccessed": 1777268958595,
+      "keyFiles": []
+    },
+    "openspec/schemas": {
+      "path": "openspec/schemas",
+      "purpose": "Schema definitions",
+      "fileCount": 0,
+      "lastAccessed": 1777268958606,
+      "keyFiles": []
+    },
+    "src/config": {
+      "path": "src/config",
+      "purpose": "Configuration files",
+      "fileCount": 2,
+      "lastAccessed": 1777268958607,
+      "keyFiles": [
+        "config-loader.js",
+        "defaults.js"
+      ]
+    }
+  },
+  "hotPaths": [
+    {
+      "path": "src/init/init-applier.js",
+      "accessCount": 26,
+      "lastAccessed": 1777300690525,
+      "type": "file"
+    },
+    {
+      "path": "src/init/manifest-installer.js",
+      "accessCount": 16,
+      "lastAccessed": 1777300602134,
+      "type": "file"
+    },
+    {
+      "path": "src/init/init-plan.js",
+      "accessCount": 15,
+      "lastAccessed": 1777292997575,
+      "type": "file"
+    },
+    {
+      "path": "bin/init-command.js",
+      "accessCount": 14,
+      "lastAccessed": 1777291060446,
+      "type": "file"
+    },
+    {
+      "path": "",
+      "accessCount": 13,
+      "lastAccessed": 1777278297502,
+      "type": "directory"
+    },
+    {
+      "path": "src/init/init-service.js",
+      "accessCount": 11,
+      "lastAccessed": 1777291054884,
+      "type": "file"
+    },
+    {
+      "path": "bin/cli.js",
+      "accessCount": 7,
+      "lastAccessed": 1777291052446,
+      "type": "file"
+    },
+    {
+      "path": "src/project/policy-config-writer.js",
+      "accessCount": 6,
+      "lastAccessed": 1777293311208,
+      "type": "file"
+    },
+    {
+      "path": "src/init/types.js",
+      "accessCount": 5,
+      "lastAccessed": 1777288738200,
+      "type": "file"
+    },
+    {
+      "path": "bin/ide-command.js",
+      "accessCount": 4,
+      "lastAccessed": 1777274757566,
+      "type": "file"
+    },
+    {
+      "path": "src/scanner/engine.js",
+      "accessCount": 4,
+      "lastAccessed": 1777289830191,
+      "type": "file"
+    },
+    {
+      "path": "src/init/ide-pointer-injector.js",
+      "accessCount": 4,
+      "lastAccessed": 1777292262529,
+      "type": "file"
+    },
+    {
+      "path": "tests/init/init-recommend.test.js",
+      "accessCount": 3,
+      "lastAccessed": 1777288626559,
+      "type": "file"
+    },
+    {
+      "path": "package.json",
+      "accessCount": 3,
+      "lastAccessed": 1777288714402,
+      "type": "file"
+    },
+    {
+      "path": "AGENTS.md",
+      "accessCount": 2,
+      "lastAccessed": 1777272140350,
+      "type": "file"
+    },
+    {
+      "path": "tests/ide/cursor-adapter.test.js",
+      "accessCount": 2,
+      "lastAccessed": 1777274118478,
+      "type": "file"
+    },
+    {
+      "path": "tests/ide/claude-adapter.test.js",
+      "accessCount": 2,
+      "lastAccessed": 1777274128216,
+      "type": "file"
+    },
+    {
+      "path": "src/ide/ide-types.js",
+      "accessCount": 2,
+      "lastAccessed": 1777275413540,
+      "type": "file"
+    },
+    {
+      "path": "src/ide/anchors/markdown-anchor-writer.js",
+      "accessCount": 2,
+      "lastAccessed": 1777275461869,
+      "type": "file"
+    },
+    {
+      "path": "src/ide/adapters/cursor-adapter.js",
+      "accessCount": 2,
+      "lastAccessed": 1777275464351,
+      "type": "file"
+    },
+    {
+      "path": "src/ide/adapters/claude-adapter.js",
+      "accessCount": 2,
+      "lastAccessed": 1777275468005,
+      "type": "file"
+    },
+    {
+      "path": "tests/ide/ide-doctor.test.js",
+      "accessCount": 2,
+      "lastAccessed": 1777275476921,
+      "type": "file"
+    },
+    {
+      "path": "tests/ide/ide-sync.test.js",
+      "accessCount": 2,
+      "lastAccessed": 1777275483962,
+      "type": "file"
+    },
+    {
+      "path": "tests/ide/markdown-anchor-writer.test.js",
+      "accessCount": 2,
+      "lastAccessed": 1777275487323,
+      "type": "file"
+    },
+    {
+      "path": ".ai-spec/visual-config.example.json",
+      "accessCount": 2,
+      "lastAccessed": 1777278271580,
+      "type": "file"
+    },
+    {
+      "path": "src/project/project-files.js",
+      "accessCount": 2,
+      "lastAccessed": 1777278307100,
+      "type": "file"
+    },
+    {
+      "path": "manifest.json",
+      "accessCount": 1,
+      "lastAccessed": 1777270750957,
+      "type": "file"
+    },
+    {
+      "path": "README.md",
+      "accessCount": 1,
+      "lastAccessed": 1777270751645,
+      "type": "file"
+    },
+    {
+      "path": "src/sync/sync-service.js",
+      "accessCount": 1,
+      "lastAccessed": 1777271062488,
+      "type": "file"
+    },
+    {
+      "path": "src/check/check-service.js",
+      "accessCount": 1,
+      "lastAccessed": 1777271063306,
+      "type": "file"
+    },
+    {
+      "path": ".cursor/mcp.json",
+      "accessCount": 1,
+      "lastAccessed": 1777271064042,
+      "type": "file"
+    },
+    {
+      "path": ".vscode/settings.json",
+      "accessCount": 1,
+      "lastAccessed": 1777271066245,
+      "type": "file"
+    },
+    {
+      "path": ".agents/registry/flows.json",
+      "accessCount": 1,
+      "lastAccessed": 1777271070431,
+      "type": "file"
+    },
+    {
+      "path": ".agents/registry/profiles.json",
+      "accessCount": 1,
+      "lastAccessed": 1777271071242,
+      "type": "file"
+    },
+    {
+      "path": ".agents/registry/roles.json",
+      "accessCount": 1,
+      "lastAccessed": 1777271072146,
+      "type": "file"
+    },
+    {
+      "path": ".agents/registry/rules.json",
+      "accessCount": 1,
+      "lastAccessed": 1777271072757,
+      "type": "file"
+    },
+    {
+      "path": ".agents/registry/scenario-packages.json",
+      "accessCount": 1,
+      "lastAccessed": 1777271073562,
+      "type": "file"
+    },
+    {
+      "path": ".agents/registry/skills.json",
+      "accessCount": 1,
+      "lastAccessed": 1777271074415,
+      "type": "file"
+    },
+    {
+      "path": "bin/sync-command.js",
+      "accessCount": 1,
+      "lastAccessed": 1777271076678,
+      "type": "file"
+    },
+    {
+      "path": "bin/check-command.js",
+      "accessCount": 1,
+      "lastAccessed": 1777271077426,
+      "type": "file"
+    },
+    {
+      "path": "src/executor/types.js",
+      "accessCount": 1,
+      "lastAccessed": 1777271086570,
+      "type": "file"
+    },
+    {
+      "path": "src/executor/executor-registry.js",
+      "accessCount": 1,
+      "lastAccessed": 1777271087447,
+      "type": "file"
+    },
+    {
+      "path": "src/state-machine/types.js",
+      "accessCount": 1,
+      "lastAccessed": 1777271088309,
+      "type": "file"
+    },
+    {
+      "path": "src/project/lock-file-writer.js",
+      "accessCount": 1,
+      "lastAccessed": 1777271398347,
+      "type": "file"
+    },
+    {
+      "path": "src/project/json-utils.js",
+      "accessCount": 1,
+      "lastAccessed": 1777272132183,
+      "type": "file"
+    },
+    {
+      "path": "src/ide/links/link-mode-resolver.js",
+      "accessCount": 1,
+      "lastAccessed": 1777272837190,
+      "type": "file"
+    },
+    {
+      "path": "src/ide/ide-service.js",
+      "accessCount": 1,
+      "lastAccessed": 1777272964843,
+      "type": "file"
+    },
+    {
+      "path": "tests/ide/ide-types.test.js",
+      "accessCount": 1,
+      "lastAccessed": 1777273685881,
+      "type": "file"
+    },
+    {
+      "path": "tests/ide/link-mode-resolver.test.js",
+      "accessCount": 1,
+      "lastAccessed": 1777274398288,
+      "type": "file"
+    },
+    {
+      "path": "tests/ide/ide-sync-integration.test.js",
+      "accessCount": 1,
+      "lastAccessed": 1777274711147,
+      "type": "file"
+    }
+  ],
+  "userDirectives": []
+}

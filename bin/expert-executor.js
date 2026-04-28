@@ -10,6 +10,7 @@ const {
   inferExecutionOpenSpecAction,
   inferRuntimeActionOpenSpecAction,
   buildAutoRuntimeAction,
+  guardRuntimeActionForIncompleteExecution,
 } = require('./execution-semantics');
 const {
   resolveRuntimePaths,
@@ -703,7 +704,8 @@ function clearCurrentExpertArtifacts(targetDir) {
 }
 
 function applyRuntimeMutation(targetDir, payload, payloadSource) {
-  const requestedAction = String(payload.action || '').trim().toLowerCase();
+  const guardedPayload = guardRuntimeActionForIncompleteExecution(targetDir, payload);
+  const requestedAction = String(guardedPayload.action || '').trim().toLowerCase();
   const runtimeAction = requestedAction === 'archive'
     ? 'complete'
     : requestedAction === 'completed'
@@ -713,42 +715,42 @@ function applyRuntimeMutation(targetDir, payload, payloadSource) {
     : requestedAction;
   const options = {
     target: targetDir,
-    runId: payload.run_id,
-    toRole: payload.to_role,
-    nextRole: payload.next_role,
-    fromRole: payload.from_role,
-    gate: payload.gate,
-    pendingGate: payload.pending_gate,
-    blockedByRole: payload.blocked_by_role,
-    resumeToRole: payload.resume_to_role,
-    requiredUserAction: payload.required_user_action,
-    blockedReason: payload.blocked_reason,
-    message: payload.message,
-    error: payload.error,
-    eventType: payload.event_type || payload.eventType,
-    status: payload.status,
-    artifactsData: payload.artifacts || null,
-    verificationData: payload.verification || null,
-    autoFixData: payload.auto_fix || null,
+    runId: guardedPayload.run_id,
+    toRole: guardedPayload.to_role,
+    nextRole: guardedPayload.next_role,
+    fromRole: guardedPayload.from_role,
+    gate: guardedPayload.gate,
+    pendingGate: guardedPayload.pending_gate,
+    blockedByRole: guardedPayload.blocked_by_role,
+    resumeToRole: guardedPayload.resume_to_role,
+    requiredUserAction: guardedPayload.required_user_action,
+    blockedReason: guardedPayload.blocked_reason,
+    message: guardedPayload.message,
+    error: guardedPayload.error,
+    eventType: guardedPayload.event_type || guardedPayload.eventType,
+    status: guardedPayload.status,
+    artifactsData: guardedPayload.artifacts || null,
+    verificationData: guardedPayload.verification || null,
+    autoFixData: guardedPayload.auto_fix || null,
     skipArtifactCheck:
-      Object.prototype.hasOwnProperty.call(payload, 'skip_artifact_check') ||
-      Object.prototype.hasOwnProperty.call(payload, 'skipArtifactCheck')
+      Object.prototype.hasOwnProperty.call(guardedPayload, 'skip_artifact_check') ||
+      Object.prototype.hasOwnProperty.call(guardedPayload, 'skipArtifactCheck')
         ? Boolean(
-          Object.prototype.hasOwnProperty.call(payload, 'skip_artifact_check')
-            ? payload.skip_artifact_check
-            : payload.skipArtifactCheck
+          Object.prototype.hasOwnProperty.call(guardedPayload, 'skip_artifact_check')
+            ? guardedPayload.skip_artifact_check
+            : guardedPayload.skipArtifactCheck
         )
         : undefined,
     clearPendingGate:
-      Object.prototype.hasOwnProperty.call(payload, 'clear_pending_gate') ||
-      Object.prototype.hasOwnProperty.call(payload, 'clearPendingGate')
+      Object.prototype.hasOwnProperty.call(guardedPayload, 'clear_pending_gate') ||
+      Object.prototype.hasOwnProperty.call(guardedPayload, 'clearPendingGate')
         ? Boolean(
-          Object.prototype.hasOwnProperty.call(payload, 'clear_pending_gate')
-            ? payload.clear_pending_gate
-            : payload.clearPendingGate
+          Object.prototype.hasOwnProperty.call(guardedPayload, 'clear_pending_gate')
+            ? guardedPayload.clear_pending_gate
+            : guardedPayload.clearPendingGate
         )
         : undefined,
-    taskAnchorData: payload.task_anchor || payload.taskAnchor || null,
+    taskAnchorData: guardedPayload.task_anchor || guardedPayload.taskAnchor || null,
   };
 
   let result = null;
@@ -778,7 +780,7 @@ function applyRuntimeMutation(targetDir, payload, payloadSource) {
       result = runtimeState.cancelRunState(options);
       break;
     default:
-      throw new Error(`Unsupported runtime action for expert-executor: ${payload.action}`);
+      throw new Error(`Unsupported runtime action for expert-executor: ${guardedPayload.action}`);
   }
 
   const clearableActions = new Set([

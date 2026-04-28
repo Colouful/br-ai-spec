@@ -13,6 +13,7 @@ function parseArgs(argv) {
     hubUrl: '',
     visualUrl: '',
     fallbackToLocal: undefined,
+    workspaceRoot: false,
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -48,6 +49,8 @@ function parseArgs(argv) {
       index += 1;
     } else if (arg === '--no-hub-fallback') {
       options.fallbackToLocal = false;
+    } else if (arg === '--workspace-root') {
+      options.workspaceRoot = true;
     } else if (arg === '--help' || arg === '-h') {
       options.help = true;
     } else if (!arg.startsWith('-')) {
@@ -61,14 +64,23 @@ function parseArgs(argv) {
 }
 
 function printUsage() {
-  console.log(`ai-spec-auto init <目录> --recommend [--dry-run] [--yes] [--json]
+  console.log(`ai-spec-auto init <目录> --recommend [--dry-run] [--yes] [--json] [--workspace-root]
 
 说明：
   根据扫描结果生成 InitPlan（初始化计划），并在确认后写入 .ai-spec 与索引指针文件。
 
+选项：
+  --workspace-root         Monorepo 下仅在根目录初始化，忽略子包
+  --manifest <slug>        手动指定 Manifest slug
+  --recommend              启用扫描推荐模式
+  --dry-run                仅预览计划，不写入文件
+  --yes / -y               跳过确认，直接执行
+  --json                   以 JSON 格式输出
+
 示例：
   ai-spec-auto init . --recommend --dry-run
   ai-spec-auto init . --recommend --yes
+  ai-spec-auto init . --recommend --yes --workspace-root
   ai-spec-auto init . --recommend --yes --visual-url http://localhost:3001
   ai-spec-auto init . --manifest backend-java-springboot-standard --yes`);
 }
@@ -144,6 +156,7 @@ async function main(argv) {
     manualManifestSlug: options.manifest,
     hubUrl: options.hubUrl,
     fallbackToLocal: options.fallbackToLocal,
+    workspaceRoot: options.workspaceRoot,
   });
 
   if (options.dryRun || !options.yes) {

@@ -16,6 +16,18 @@ const FRAMEWORK_MANIFESTS = Object.freeze({
   go: 'backend-go-standard',
 });
 
+/** Manifest slug → profile 目录名映射，用于选择对应的 profile rules/skills */
+const MANIFEST_TO_PROFILE = Object.freeze({
+  'frontend-vue-vite-standard': 'vue',
+  'frontend-react-vite-standard': 'react',
+  'frontend-react-standard': 'react',
+  'frontend-react-nextjs-standard': 'react',
+  'backend-java-springboot-standard': 'springboot',
+  'backend-java-springmvc-legacy-standard': 'springboot',
+  'backend-java-springcloud-standard': 'springboot',
+  'backend-node-nestjs-standard': 'nestjs',
+});
+
 /** 需要从 br-ai-spec 复制到目标项目的 .agents 子目录 */
 const AGENT_ASSET_DIRS = ['rules', 'skills', 'roles', 'commands', 'flows', 'orchestration', 'templates'];
 
@@ -34,7 +46,6 @@ function copyDirSync(src, dest) {
     if (entry.isDirectory()) {
       copyDirSync(srcPath, destPath);
     } else if (entry.isSymbolicLink()) {
-      // 跳过符号链接，改为复制目标内容
       try {
         const realPath = fs.realpathSync(srcPath);
         if (fs.statSync(realPath).isDirectory()) {
@@ -49,6 +60,100 @@ function copyDirSync(src, dest) {
       fs.copyFileSync(srcPath, destPath);
     }
   }
+}
+
+/** 合并复制：先复制 baseDir 下所有文件到 destDir，再用 overlayDir 覆盖 */
+function mergeCopyDirs(baseDir, overlayDir, destDir) {
+  fs.mkdirSync(destDir, { recursive: true });
+  // 先复制 base
+  if (fs.existsSync(baseDir)) {
+    for (const entry of fs.readdirSync(baseDir, { withFileTypes: true })) {
+      const srcPath = path.join(baseDir, entry.name);
+      const destPath = path.join(destDir, entry.name);
+      if (entry.isDirectory()) {
+        copyDirSync(srcPath, destPath);
+      } else {
+        fs.copyFileSync(srcPath, destPath);
+      }
+    }
+  }
+  // 再覆盖 overlay
+  if (fs.existsSync(overlayDir)) {
+    for (const entry of fs.readdirSync(overlayDir, { withFileTypes: true })) {
+      const srcPath = path.join(overlayDir, entry.name);
+      const destPath = path.join(destDir, entry.name);
+      if (entry.isDirectory()) {
+        copyDirSync(srcPath, destPath);
+      } else {
+        fs.copyFileSync(srcPath, destPath);
+      }
+    }
+  }
+}
+
+/**
+ * 安装扁平化后的 rules：
+ *   只安装 common/ 下的通用规则。profile 专属规则（01/03/04/05/06/07/09/11/13）
+ *   应由 project-init 技能基于实际项目扫描结果生成，不在 init 阶段复制模板。
+ */
+function installRulesFlat(sourceAgentsDir, targetAgentsDir, _profile) {
+  const destDir = path.join(targetAgentsDir, 'rules');
+  if (fs.existsSync(destDir)) {
+    fs.rmSync(destDir, { recursive: true, force: true });
+  }
+
+  const commonDir = path.join(sourceAgentsDir, 'rules', 'common');
+  if (!fs.existsSync(commonDir)) return false;
+  copyDirSync(commonDir, destDir);
+
+  // 保留 rules/ 根目录下的 README.md
+  const readmePath = path.join(sourceAgentsDir, 'rules', 'README.md');
+  if (fs.existsSync(readmePath)) {
+    fs.copyFileSync(readmePath, path.join(destDir, 'README.md'));
+  }
+  return true;
+}
+
+/**
+ * 安装扁平化后的 skills：
+ *   合并 common/ + domains/ + profiles/<profile>/ 下的所有目录
+ */
+function installSkillsFlat(sourceAgentsDir, targetAgentsDir, profile) {
+  const destDir = path.join(targetAgentsDir, 'skills');
+  if (fs.existsSync(destDir)) {
+    fs.rmSync(destDir, { recursive: true, force: true });
+  }
+  fs.mkdirSync(destDir, { recursive: true });
+
+  const sourceSkillsDir = path.join(sourceAgentsDir, 'skills');
+  const dirsToMerge = [];
+  for (const sub of ['common', 'domains']) {
+    const subDir = path.join(sourceSkillsDir, sub);
+    if (fs.existsSync(subDir)) dirsToMerge.push(subDir);
+  }
+  if (profile) {
+    const profileDir = path.join(sourceSkillsDir, 'profiles', profile);
+    if (fs.existsSync(profileDir)) dirsToMerge.push(profileDir);
+  }
+
+  for (const srcDir of dirsToMerge) {
+    for (const entry of fs.readdirSync(srcDir, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      const srcPath = path.join(srcDir, entry.name);
+      const destPath = path.join(destDir, entry.name);
+      if (fs.existsSync(destPath)) {
+        fs.rmSync(destPath, { recursive: true, force: true });
+      }
+      copyDirSync(srcPath, destPath);
+    }
+  }
+
+  // 保留 skills/ 根目录下的 README.md
+  const readmePath = path.join(sourceSkillsDir, 'README.md');
+  if (fs.existsSync(readmePath)) {
+    fs.copyFileSync(readmePath, path.join(destDir, 'README.md'));
+  }
+  return true;
 }
 
 class ManifestInstaller {
@@ -112,9 +217,7 @@ class ManifestInstaller {
   }
 
   /**
-   * 将 br-ai-spec 的 .agents 资产复制到目标项目
-   * @param {{ workspace: { rootDir: string } }} plan
-   * @returns {{ source: string, manifest: object, assets: string[], overlays: string[], sharedContracts: string[] }}
+   * 将 br-ai-spec 的 .agents 资产复制到目标项目，并扁平化 rules 和 skills
    */
   install(plan) {
     const rootDir = plan.workspace?.rootDir;
@@ -142,23 +245,38 @@ class ManifestInstaller {
       };
     }
 
+    // 根据 recommendedManifest 确定 profile
+    const manifestSlug = plan.packages[0]?.recommendedManifest?.slug || null;
+    const profile = MANIFEST_TO_PROFILE[manifestSlug] || null;
+
     const installedAssets = [];
 
+    // rules: 扁平化安装
+    if (installRulesFlat(sourceAgentsDir, targetAgentsDir, profile)) {
+      installedAssets.push('.agents/rules/');
+    }
+
+    // skills: 扁平化安装
+    if (installSkillsFlat(sourceAgentsDir, targetAgentsDir, profile)) {
+      installedAssets.push('.agents/skills/');
+    }
+
+    // 其余目录直接复制
     for (const dir of AGENT_ASSET_DIRS) {
+      if (dir === 'rules' || dir === 'skills') continue;
+
       const srcDir = path.join(sourceAgentsDir, dir);
       const destDir = path.join(targetAgentsDir, dir);
 
       if (!fs.existsSync(srcDir)) continue;
 
       try {
-        // 如果目标已存在，先删除再复制（确保最新）
         if (fs.existsSync(destDir)) {
           fs.rmSync(destDir, { recursive: true, force: true });
         }
         copyDirSync(srcDir, destDir);
         installedAssets.push(`.agents/${dir}/`);
       } catch (error) {
-        // 复制失败的目录不阻断整体流程
         installedAssets.push(`.agents/${dir}/ (失败: ${error.message})`);
       }
     }
@@ -176,7 +294,9 @@ class ManifestInstaller {
 module.exports = {
   AGENT_ASSET_DIRS,
   FRAMEWORK_MANIFESTS,
+  MANIFEST_TO_PROFILE,
   HubClient,
   ManifestInstaller,
   copyDirSync,
+  mergeCopyDirs,
 };

@@ -76,6 +76,7 @@ handoff_to:
 - 当输入不完整时，先暴露缺口并明确假设；只在高风险、不可逆或冲突场景下阻断
 - `prd-to-delivery（需求到交付）` 下，不得跳过 `proposal/specs/design/tasks/checklist/iterations` 这 6 类核心产物
 - `bugfix-to-verification（缺陷修复到验证）` 下，必须保留 `.ai-spec/history/<run-id>/bugfix.md / implementation-notes.md / checklist.md / iterations.md`
+- 看到专家执行结果为 `partial（部分完成）` 或任何非 `done / success / completed` 状态时，不得交给下一位专家或进入完成态，必须让当前专家继续补齐
 
 ## 必做步骤
 
@@ -104,7 +105,7 @@ handoff_to:
     - 若识别出新增 API/路由/状态、需求边界变化或中高风险逻辑，必须升级回 `prd-to-delivery`
     - `frontend-implementer` 结束前必须写出 `bugfix.md / implementation-notes.md`
     - `code-guardian` 结束前必须写出 `checklist.md / iterations.md`
-20. 在每位专家完成后，必须重新接管并产出下一次 handoff / complete；不得让专家阶段直接跨到终态
+20. 在每位专家完成后，必须重新接管并产出下一次 handoff / complete；不得让专家阶段直接跨到终态；若专家状态不是 `done / success / completed`，只能继续派发给当前专家
 21. 仅在需要人工确认时，再显式设立审批点或阻断点
 22. 给每位专家下发项目级执行契约：至少包含 `project_context`、`repo_conventions`、`role_rule_contract`、`role_skill_contract`，并按角色补 `analysis_contract / implementation_contract / review_contract`
 23. 主代理自身必须把项目事实编译成编排契约：至少包含 `routing_constraints`、`risk_contract`、`approval_contract`、`orchestration_contract`、`route_decision`

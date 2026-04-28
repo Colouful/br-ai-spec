@@ -2,6 +2,8 @@ const fs = require('fs');
 const path = require('path');
 const { PROJECT_TYPES } = require('../scanner/types');
 const { ManifestInstaller } = require('./manifest-installer');
+const { FactExtractor } = require('../scanner/facts/fact-extractor');
+const { DetectorRegistry } = require('../scanner/detectors/detector-registry');
 const { INIT_FILE_ACTIONS, MANIFEST_CONFIDENCE, PROJECT_KINDS } = require('./types');
 
 const WORKSPACE_TYPES = new Set([
@@ -118,8 +120,8 @@ function fileAction(rootDir, relativePath, enabled = true) {
   return fs.existsSync(path.join(rootDir, relativePath)) ? INIT_FILE_ACTIONS.UPDATE : INIT_FILE_ACTIONS.CREATE;
 }
 
-function buildFilesToWrite(rootDir, scanResult) {
-  const isWorkspace = WORKSPACE_TYPES.has(scanResult.workspace.type) || scanResult.packages.length > 1;
+function buildFilesToWrite(rootDir, scanResult, workspaceRoot = false) {
+  const isWorkspace = !workspaceRoot && (WORKSPACE_TYPES.has(scanResult.workspace.type) || scanResult.packages.length > 1);
   return [
     {
       path: '.ai-spec/project.json',
@@ -191,7 +193,35 @@ class InitPlanBuilder {
 
   build(scanResult, options = {}) {
     const rootDir = scanResult.workspace.rootDir;
-    const packages = scanResult.packages.map((pkg) => {
+    let scanPackages = scanResult.packages;
+    if (options.workspaceRoot) {
+      const rootPkg = scanPackages.find((pkg) => pkg.path === '.');
+      if (rootPkg) {
+        scanPackages = [rootPkg];
+      } else if (fs.existsSync(path.join(rootDir, 'package.json'))) {
+        const factExtractor = options.factExtractor || new FactExtractor();
+        const detectorRegistry = options.detectorRegistry || new DetectorRegistry();
+        const facts = factExtractor.extract({
+          rootDir,
+          relativePath: '.',
+          workspaceRoot: rootDir,
+        });
+        const detection = detectorRegistry.detect(facts);
+        const primary = detection.primary || null;
+        scanPackages = [{
+          packageId: '.',
+          name: facts.name || path.basename(rootDir),
+          path: '.',
+          primary,
+          tags: detection.tags || [],
+          reasons: primary?.reasons || ['--workspace-root 模式，仅初始化根目录'],
+          candidates: detection.candidates || [],
+        }];
+      } else {
+        scanPackages = [];
+      }
+    }
+    const packages = scanPackages.map((pkg) => {
       const projectKind = detectProjectKind(rootDir, pkg);
       const recommendationInput = {
         ...pkg,
@@ -248,7 +278,7 @@ class InitPlanBuilder {
     return {
       workspace: scanResult.workspace,
       packages,
-      filesToWrite: buildFilesToWrite(rootDir, scanResult),
+      filesToWrite: buildFilesToWrite(rootDir, scanResult, options.workspaceRoot),
       warnings,
       requiresConfirmation: true,
       recommendationSource: options.recommendationSource || 'local',
