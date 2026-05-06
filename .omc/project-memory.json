@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1777572670535,
+  "lastScanned": 1778033011739,
   "projectRoot": "/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec",
   "techStack": {
     "languages": [
@@ -54,8 +54,8 @@
     "bin": {
       "path": "bin",
       "purpose": "Executable scripts",
-      "fileCount": 41,
-      "lastAccessed": 1777572670493,
+      "fileCount": 43,
+      "lastAccessed": 1778033011721,
       "keyFiles": [
         "archive-change.js",
         "check-command.js",
@@ -68,14 +68,14 @@
       "path": "configs",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1777572670493,
+      "lastAccessed": 1778033011721,
       "keyFiles": []
     },
     "docs": {
       "path": "docs",
       "purpose": "Documentation",
       "fileCount": 21,
-      "lastAccessed": 1777572670514,
+      "lastAccessed": 1778033011722,
       "keyFiles": [
         "AI Coding时代，我们处在什么位置？.md",
         "README.md",
@@ -88,7 +88,7 @@
       "path": "internal",
       "purpose": null,
       "fileCount": 3,
-      "lastAccessed": 1777572670515,
+      "lastAccessed": 1778033011723,
       "keyFiles": [
         "ai-protocol-workflow.js",
         "hub-client.js",
@@ -99,7 +99,7 @@
       "path": "openspec",
       "purpose": null,
       "fileCount": 1,
-      "lastAccessed": 1777572670515,
+      "lastAccessed": 1778033011723,
       "keyFiles": [
         "config.yaml.template"
       ]
@@ -108,7 +108,7 @@
       "path": "scripts",
       "purpose": "Build/utility scripts",
       "fileCount": 13,
-      "lastAccessed": 1777572670515,
+      "lastAccessed": 1778033011723,
       "keyFiles": [
         "acceptance-zero-intrusion.sh",
         "hub-sync-assets.config.example.json",
@@ -121,28 +121,28 @@
       "path": "src",
       "purpose": "Source code",
       "fileCount": 0,
-      "lastAccessed": 1777572670516,
+      "lastAccessed": 1778033011723,
       "keyFiles": []
     },
     "tests": {
       "path": "tests",
       "purpose": "Test files",
       "fileCount": 0,
-      "lastAccessed": 1777572670516,
+      "lastAccessed": 1778033011723,
       "keyFiles": []
     },
     "openspec/schemas": {
       "path": "openspec/schemas",
       "purpose": "Schema definitions",
       "fileCount": 0,
-      "lastAccessed": 1777572670518,
+      "lastAccessed": 1778033011724,
       "keyFiles": []
     },
     "src/config": {
       "path": "src/config",
       "purpose": "Configuration files",
       "fileCount": 2,
-      "lastAccessed": 1777572670519,
+      "lastAccessed": 1778033011724,
       "keyFiles": [
         "config-loader.js",
         "defaults.js"
@@ -193,6 +193,12 @@
       "type": "file"
     },
     {
+      "path": "src/project/lock-file-writer.js",
+      "accessCount": 10,
+      "lastAccessed": 1778033382685,
+      "type": "file"
+    },
+    {
       "path": "src/project/policy-config-writer.js",
       "accessCount": 7,
       "lastAccessed": 1777573669676,
@@ -217,9 +223,9 @@
       "type": "file"
     },
     {
-      "path": "src/project/lock-file-writer.js",
+      "path": "package.json",
       "accessCount": 6,
-      "lastAccessed": 1777574756403,
+      "lastAccessed": 1778033154938,
       "type": "file"
     },
     {
@@ -241,21 +247,15 @@
       "type": "file"
     },
     {
-      "path": "package.json",
+      "path": "src/project/json-utils.js",
       "accessCount": 4,
-      "lastAccessed": 1777573464722,
+      "lastAccessed": 1778033066542,
       "type": "file"
     },
     {
       "path": "tests/init/init-recommend.test.js",
       "accessCount": 3,
       "lastAccessed": 1777288626559,
-      "type": "file"
-    },
-    {
-      "path": "src/project/json-utils.js",
-      "accessCount": 3,
-      "lastAccessed": 1777574016565,
       "type": "file"
     },
     {

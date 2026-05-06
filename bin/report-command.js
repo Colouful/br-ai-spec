@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { RunService } = require('../src/run/run-service');
-const { writeJson } = require('../src/run/run-store');
+const { RunStore, writeJson } = require('../src/run/run-store');
 
 function parseArgs(argv) {
   const options = { runId: '', target: '.', format: 'json' };
@@ -32,7 +32,8 @@ function printUsage() {
 }
 
 function loadRunEvents(rootDir, runId) {
-  const eventsPath = path.join(rootDir, '.ai-spec', 'runs', runId, 'events.ndjson');
+  const runsDir = new RunStore().getRunsDir(rootDir);
+  const eventsPath = path.join(runsDir, runId, 'events.ndjson');
   if (!fs.existsSync(eventsPath)) return [];
   try {
     return fs.readFileSync(eventsPath, 'utf8')
@@ -48,7 +49,8 @@ function loadRunEvents(rootDir, runId) {
 }
 
 function loadRepairHistory(rootDir, runId) {
-  const repairPath = path.join(rootDir, '.ai-spec', 'runs', runId, 'repair-history.json');
+  const runsDir = new RunStore().getRunsDir(rootDir);
+  const repairPath = path.join(runsDir, runId, 'repair-history.json');
   if (!fs.existsSync(repairPath)) return { repairs: [] };
   try {
     return JSON.parse(fs.readFileSync(repairPath, 'utf8'));

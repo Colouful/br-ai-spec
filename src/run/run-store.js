@@ -12,8 +12,21 @@ function writeJson(filePath, value) {
 }
 
 class RunStore {
+  resolveLocalStateDir(rootDir) {
+    const configPath = path.join(rootDir, '.ai-spec', 'config.json');
+    const config = readJson(configPath);
+    if (config && config.localStateDir) {
+      return config.localStateDir;
+    }
+    return null;
+  }
+
   getRunsDir(rootDir) {
-    return path.join(rootDir, '.ai-spec/runs');
+    const localStateDir = this.resolveLocalStateDir(rootDir);
+    if (localStateDir) {
+      return path.join(localStateDir, 'runs');
+    }
+    return path.join(rootDir, '.ai-spec', 'runs');
   }
 
   getRunDir(rootDir, runId) {

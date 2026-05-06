@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { RunService } = require('../src/run/run-service');
-const { writeJson } = require('../src/run/run-store');
+const { RunStore, writeJson } = require('../src/run/run-store');
 
 const MAX_REPAIR_ATTEMPTS = 2;
 
@@ -42,7 +42,8 @@ function loadHookConfig(rootDir) {
 }
 
 function getRepairAttemptCount(rootDir, runId) {
-  const runDir = path.join(rootDir, '.ai-spec', 'runs', runId);
+  const runsDir = new RunStore().getRunsDir(rootDir);
+  const runDir = path.join(runsDir, runId);
   const repairPath = path.join(runDir, 'repair-history.json');
   if (!fs.existsSync(repairPath)) return 0;
   try {
@@ -54,7 +55,8 @@ function getRepairAttemptCount(rootDir, runId) {
 }
 
 function appendRepairRecord(rootDir, runId, record) {
-  const runDir = path.join(rootDir, '.ai-spec', 'runs', runId);
+  const runsDir = new RunStore().getRunsDir(rootDir);
+  const runDir = path.join(runsDir, runId);
   if (!fs.existsSync(runDir)) {
     fs.mkdirSync(runDir, { recursive: true });
   }

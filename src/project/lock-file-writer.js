@@ -1,3 +1,4 @@
+const fs = require('fs');
 const path = require('path');
 const { createChecksum, readJsonIfExists, writeJson } = require('./json-utils');
 
@@ -34,7 +35,7 @@ class LockFileWriter {
         assetType: guessAssetType(f.path),
         version: '0.1.0',
         source: 'local',
-        checksum: createChecksum(f.path),
+        checksum: createContentChecksum(rootDir, f.path),
         lockedAt: now,
         generatedFiles: [f.path],
       }));
@@ -69,6 +70,16 @@ class LockFileWriter {
       data: doc,
     };
   }
+}
+
+function createContentChecksum(rootDir, relativePath) {
+  const fullPath = path.join(rootDir, relativePath);
+  if (fs.existsSync(fullPath) && fs.statSync(fullPath).isFile()) {
+    const content = fs.readFileSync(fullPath, 'utf8');
+    return createChecksum(content);
+  }
+  // 目录或不存在的文件回退到路径 hash
+  return createChecksum(relativePath);
 }
 
 function guessAssetType(filePath) {
