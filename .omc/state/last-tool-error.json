@@ -1,7 +1,7 @@
 {
   "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"node tests/agent/file-permission.test.js\",\"description\":\"Run file permission tests\"}",
-  "error": "Exit code 1\n=== file-permission.test.js ===\n  TC01: ** 匹配任意路径\n  TC02: * 匹配单层非斜杠字符\n  TC03: **/*.js 匹配任意深度的 js 文件\n  TC04: ? 匹配单个字符\n  TC05: 特定目录匹配\n  TC06: 路径分隔符正确处理\n  TC07: matchesAnyGlob 匹配任一模式\n  TC08: deniedFileScopes 优先于 allowedFileScopes\n  TC09: 文件匹配 allowedFileScopes 时允许\n  TC10: 文件不匹配 allowedFileScopes 时拒绝\n  TC11: 空 allowedFileScopes 表示全部允许\n  FAIL: testFilePermissionEmptyScopesMeansAll — Expected values to be strictly equal:\n\ntrue !== false\n\n  TC12: 无效 profile 返回拒绝\n  TC13: 无效 filePath 返回拒绝\n  T...",
-  "timestamp": "2026-05-06T06:37:03.710Z",
-  "retry_count": 1
+  "tool_input_preview": "{\"command\":\"node ./tests/governance/rollback.test.js\",\"description\":\"运行 P3.5 版本回滚测试\"}",
+  "error": "Exit code 1\n=== rollback.test.js ===\n  TC01: 回滚常量存在且冻结\n  TC02: 注册资产版本\n  TC03: 注册版本缺少必填字段\n  TC04: 列出资产版本\n  TC05: 注册锁版本\n  TC06: 注册锁版本缺少必填字段\n  TC07: 回滚资产版本\n  TC08: 回滚不存在的版本\n  TC09: 回滚资产缺少必填字段\n  TC10: 回滚不删除旧版本\n  TC11: 回滚项目锁\n  TC12: 回滚不存在的锁版本\n  TC13: 回滚锁缺少必填字段\n  TC14: 重新生成适配器\n  TC15: 适配器回滚缺少必填字段\n  TC16: 验证回滚结果\n  TC17: 验证不存在的回滚\n  TC18: 重复验证被拒绝\n  TC19: 获取回滚历史\n  TC20: 获取单个回滚记录\n  TC21: 审计回调触发\n  TC22: 获取统计\n  TC23: 重置\n  TC24: 完整回滚场景\n  FAIL: testFullRollbackScenario — Expected values to be strictly equal:\n\n...",
+  "timestamp": "2026-05-06T07:41:45.419Z",
+  "retry_count": 2
 }

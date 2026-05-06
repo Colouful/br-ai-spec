@@ -175,6 +175,12 @@
       "type": "file"
     },
     {
+      "path": "package.json",
+      "accessCount": 15,
+      "lastAccessed": 1778053798571,
+      "type": "file"
+    },
+    {
       "path": "bin/cli.js",
       "accessCount": 14,
       "lastAccessed": 1778048039343,
@@ -208,12 +214,6 @@
       "path": "src/ide/adapters/cursor-adapter.js",
       "accessCount": 12,
       "lastAccessed": 1778038453396,
-      "type": "file"
-    },
-    {
-      "path": "package.json",
-      "accessCount": 12,
-      "lastAccessed": 1778049991762,
       "type": "file"
     },
     {
