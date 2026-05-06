@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "kind": "repo-map",
+  "generated_at": "2026-04-30T18:39:30.129Z",
+  "framework": "vue",
+  "language": "TypeScript",
+  "build_tool": "Vite",
+  "package_manager": "pnpm",
+  "paths": {
+    "project_context": "context/PROJECT.md",
+    "app_entry": null,
+    "main_entry": null,
+    "views_dir": "src/views",
+    "route_entry": "src/router/index.ts",
+    "route_modules_dir": "src/router/modules",
+    "api_dir": "src/api",
+    "api_types_dir": "src/api/types",
+    "request_config": null,
+    "mock_dir": "src/mock",
+    "store_modules_dir": "src/store/modules",
+    "style_entry": "src/styles"
+  }
+}

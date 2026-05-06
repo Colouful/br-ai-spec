@@ -140,6 +140,26 @@ function shouldUseIntegrityCommand(args, cwd) {
       process.exit(await specCommand.mainContinue(args.slice(1)));
     }
 
+    if (args[0] === 'spec-list') {
+      const specCommand = require('./spec-command');
+      process.exit(await specCommand.mainList(args.slice(1)));
+    }
+
+    if (args[0] === 'spec-detail') {
+      const specCommand = require('./spec-command');
+      process.exit(await specCommand.mainSpecStatus(args.slice(1)));
+    }
+
+    if (args[0] === 'repair') {
+      const repairCommand = require('./repair-command');
+      process.exit(await repairCommand.main(args.slice(1)));
+    }
+
+    if (args[0] === 'report') {
+      const reportCommand = require('./report-command');
+      process.exit(await reportCommand.main(args.slice(1)));
+    }
+
     if (args.length === 0 || INSTALL_COMMANDS.has(args[0])) {
       const installWorkflow = require('./install-workflow');
       // 切面：遥测仅观测，不改变 main(args) 的返回值/副作用/异常。

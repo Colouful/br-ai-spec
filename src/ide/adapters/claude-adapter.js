@@ -83,7 +83,199 @@ function buildClaudeCommandContent(commandName, profile) {
     ].join('\n');
   }
 
+  if (commandName === 'spec-implement') {
+    return [
+      '# /spec-implement',
+      '',
+      '按 Spec 实现代码。',
+      '',
+      '执行前先读取：',
+      '',
+      '1. `.ai-spec/specs/<specId>/spec.md`',
+      '2. `.ai-spec/specs/<specId>/test-plan.md`',
+      '3. `.ai-spec/specs/<specId>/dod.md`',
+      '4. `.agents/registry.index.json`',
+      '',
+      '要求：',
+      '- 严格按 Spec 实现，不擅自扩展范围。',
+      '- 实现完成后运行测试。',
+      '- 测试通过后更新 Spec 状态为 testing。',
+      '- 所有输出使用中文。',
+    ].join('\n');
+  }
+
+  if (commandName === 'spec-review') {
+    return [
+      '# /spec-review',
+      '',
+      '对当前 Spec 的实现进行代码审查。',
+      '',
+      '执行前先读取：',
+      '',
+      '1. `.ai-spec/specs/<specId>/spec.md`',
+      '2. `.ai-spec/specs/<specId>/dod.md`',
+      '3. `.ai-spec/specs/<specId>/review-checklist.md`',
+      '',
+      '要求：',
+      '- 检查代码是否符合 Spec 要求。',
+      '- 检查是否满足 DoD 标准。',
+      '- 输出审查结论表格。',
+      '- 所有输出使用中文。',
+    ].join('\n');
+  }
+
+  if (commandName === 'spec-repair') {
+    return [
+      '# /spec-repair',
+      '',
+      '修复测试失败或审查不通过的问题。',
+      '',
+      '执行前先读取：',
+      '',
+      '1. `.ai-spec/specs/<specId>/spec.md`',
+      '2. `.ai-spec/specs/<specId>/test-plan.md`',
+      '3. 最近的 Evidence Report',
+      '',
+      '要求：',
+      '- 最大修复次数为 2 次。',
+      '- 超过次数必须中断并记录原因。',
+      '- 修复记录必须进入 Evidence。',
+      '- 所有输出使用中文。',
+    ].join('\n');
+  }
+
   return '';
+}
+
+function buildAgentContent(agentName) {
+  if (agentName === 'architect-reviewer') {
+    return [
+      '# 架构审查 Agent',
+      '',
+      '## 角色',
+      '',
+      '架构审查专家，负责审查代码变更是否符合项目架构规范。',
+      '',
+      '## 职责',
+      '',
+      '- 审查代码变更的架构合理性',
+      '- 检查模块边界是否被破坏',
+      '- 检查是否存在循环依赖',
+      '- 输出架构审查意见',
+      '',
+      '## 工具权限',
+      '',
+      '- Read: 读取代码文件',
+      '- Grep: 搜索代码',
+      '- Glob: 查找文件',
+      '',
+      '## 禁止事项',
+      '',
+      '- 禁止直接修改代码',
+      '- 禁止绕过审查流程',
+    ].join('\n');
+  }
+
+  if (agentName === 'frontend-implementer') {
+    return [
+      '# 前端实现 Agent',
+      '',
+      '## 角色',
+      '',
+      '前端开发专家，负责按 Spec 实现前端代码。',
+      '',
+      '## 职责',
+      '',
+      '- 按 Spec 实现前端组件和页面',
+      '- 遵守项目编码规范',
+      '- 执行自检和测试',
+      '',
+      '## 工具权限',
+      '',
+      '- Read: 读取代码文件',
+      '- Edit: 编辑代码文件',
+      '- Write: 创建新文件',
+      '- Bash: 运行测试命令',
+      '',
+      '## 禁止事项',
+      '',
+      '- 禁止修改后端代码',
+      '- 禁止修改配置文件',
+      '- 禁止跳过测试',
+    ].join('\n');
+  }
+
+  if (agentName === 'test-reviewer') {
+    return [
+      '# 测试审查 Agent',
+      '',
+      '## 角色',
+      '',
+      '测试专家，负责审查测试覆盖率和测试质量。',
+      '',
+      '## 职责',
+      '',
+      '- 审查测试用例是否覆盖核心场景',
+      '- 检查测试质量（是否有脆弱测试）',
+      '- 验证测试结果真实性',
+      '- 输出测试审查意见',
+      '',
+      '## 工具权限',
+      '',
+      '- Read: 读取测试文件',
+      '- Bash: 运行测试命令',
+      '- Grep: 搜索测试用例',
+      '',
+      '## 禁止事项',
+      '',
+      '- 禁止修改测试结果',
+      '- 禁止伪造测试通过',
+    ].join('\n');
+  }
+
+  if (agentName === 'security-reviewer') {
+    return [
+      '# 安全审查 Agent',
+      '',
+      '## 角色',
+      '',
+      '安全专家，负责审查代码安全性。',
+      '',
+      '## 职责',
+      '',
+      '- 检查是否存在硬编码密钥',
+      '- 检查是否存在注入风险',
+      '- 检查输入验证是否完整',
+      '- 输出安全审查意见',
+      '',
+      '## 工具权限',
+      '',
+      '- Read: 读取代码文件',
+      '- Grep: 搜索安全模式',
+      '- Glob: 查找文件',
+      '',
+      '## 禁止事项',
+      '',
+      '- 禁止直接修改代码',
+      '- 禁止绕过安全检查',
+    ].join('\n');
+  }
+
+  return '';
+}
+
+function buildSettingsJson() {
+  return JSON.stringify({
+    hooks: {
+      PreToolUse: [],
+      PostToolUse: [],
+      Stop: [],
+    },
+    permissions: {
+      allow: [],
+      deny: [],
+    },
+  }, null, 2);
 }
 
 class ClaudeAdapter {
@@ -106,14 +298,44 @@ class ClaudeAdapter {
         type: 'command',
       },
       {
-        relativePath: '.claude/commands/spec-update.md',
-        content: buildClaudeCommandContent('spec-update', profile),
+        relativePath: '.claude/commands/spec-implement.md',
+        content: buildClaudeCommandContent('spec-implement', profile),
         type: 'command',
       },
       {
-        relativePath: '.claude/commands/spec-status.md',
-        content: buildClaudeCommandContent('spec-status', profile),
+        relativePath: '.claude/commands/spec-review.md',
+        content: buildClaudeCommandContent('spec-review', profile),
         type: 'command',
+      },
+      {
+        relativePath: '.claude/commands/spec-repair.md',
+        content: buildClaudeCommandContent('spec-repair', profile),
+        type: 'command',
+      },
+      {
+        relativePath: '.claude/agents/architect-reviewer.md',
+        content: buildAgentContent('architect-reviewer'),
+        type: 'agent',
+      },
+      {
+        relativePath: '.claude/agents/frontend-implementer.md',
+        content: buildAgentContent('frontend-implementer'),
+        type: 'agent',
+      },
+      {
+        relativePath: '.claude/agents/test-reviewer.md',
+        content: buildAgentContent('test-reviewer'),
+        type: 'agent',
+      },
+      {
+        relativePath: '.claude/agents/security-reviewer.md',
+        content: buildAgentContent('security-reviewer'),
+        type: 'agent',
+      },
+      {
+        relativePath: '.claude/settings.json',
+        content: buildSettingsJson(),
+        type: 'config',
       },
     ];
   }

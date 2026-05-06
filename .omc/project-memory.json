@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1777268958616,
+  "lastScanned": 1777572670535,
   "projectRoot": "/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec",
   "techStack": {
     "languages": [
@@ -54,8 +54,8 @@
     "bin": {
       "path": "bin",
       "purpose": "Executable scripts",
-      "fileCount": 40,
-      "lastAccessed": 1777268958473,
+      "fileCount": 41,
+      "lastAccessed": 1777572670493,
       "keyFiles": [
         "archive-change.js",
         "check-command.js",
@@ -68,14 +68,14 @@
       "path": "configs",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1777268958478,
+      "lastAccessed": 1777572670493,
       "keyFiles": []
     },
     "docs": {
       "path": "docs",
       "purpose": "Documentation",
       "fileCount": 21,
-      "lastAccessed": 1777268958574,
+      "lastAccessed": 1777572670514,
       "keyFiles": [
         "AI Coding时代，我们处在什么位置？.md",
         "README.md",
@@ -88,7 +88,7 @@
       "path": "internal",
       "purpose": null,
       "fileCount": 3,
-      "lastAccessed": 1777268958577,
+      "lastAccessed": 1777572670515,
       "keyFiles": [
         "ai-protocol-workflow.js",
         "hub-client.js",
@@ -99,7 +99,7 @@
       "path": "openspec",
       "purpose": null,
       "fileCount": 1,
-      "lastAccessed": 1777268958578,
+      "lastAccessed": 1777572670515,
       "keyFiles": [
         "config.yaml.template"
       ]
@@ -108,7 +108,7 @@
       "path": "scripts",
       "purpose": "Build/utility scripts",
       "fileCount": 13,
-      "lastAccessed": 1777268958582,
+      "lastAccessed": 1777572670515,
       "keyFiles": [
         "acceptance-zero-intrusion.sh",
         "hub-sync-assets.config.example.json",
@@ -121,28 +121,28 @@
       "path": "src",
       "purpose": "Source code",
       "fileCount": 0,
-      "lastAccessed": 1777268958587,
+      "lastAccessed": 1777572670516,
       "keyFiles": []
     },
     "tests": {
       "path": "tests",
       "purpose": "Test files",
       "fileCount": 0,
-      "lastAccessed": 1777268958595,
+      "lastAccessed": 1777572670516,
       "keyFiles": []
     },
     "openspec/schemas": {
       "path": "openspec/schemas",
       "purpose": "Schema definitions",
       "fileCount": 0,
-      "lastAccessed": 1777268958606,
+      "lastAccessed": 1777572670518,
       "keyFiles": []
     },
     "src/config": {
       "path": "src/config",
       "purpose": "Configuration files",
       "fileCount": 2,
-      "lastAccessed": 1777268958607,
+      "lastAccessed": 1777572670519,
       "keyFiles": [
         "config-loader.js",
         "defaults.js"
@@ -152,26 +152,26 @@
   "hotPaths": [
     {
       "path": "src/init/init-applier.js",
-      "accessCount": 26,
-      "lastAccessed": 1777300690525,
+      "accessCount": 50,
+      "lastAccessed": 1777575074313,
       "type": "file"
     },
     {
       "path": "src/init/manifest-installer.js",
-      "accessCount": 16,
-      "lastAccessed": 1777300602134,
-      "type": "file"
-    },
-    {
-      "path": "src/init/init-plan.js",
-      "accessCount": 15,
-      "lastAccessed": 1777292997575,
+      "accessCount": 18,
+      "lastAccessed": 1777574022525,
       "type": "file"
     },
     {
       "path": "bin/init-command.js",
-      "accessCount": 14,
-      "lastAccessed": 1777291060446,
+      "accessCount": 18,
+      "lastAccessed": 1777574800166,
+      "type": "file"
+    },
+    {
+      "path": "src/init/init-plan.js",
+      "accessCount": 16,
+      "lastAccessed": 1777573492810,
       "type": "file"
     },
     {
@@ -181,21 +181,45 @@
       "type": "directory"
     },
     {
-      "path": "src/init/init-service.js",
-      "accessCount": 11,
-      "lastAccessed": 1777291054884,
+      "path": "bin/cli.js",
+      "accessCount": 13,
+      "lastAccessed": 1777575079318,
       "type": "file"
     },
     {
-      "path": "bin/cli.js",
-      "accessCount": 7,
-      "lastAccessed": 1777291052446,
+      "path": "src/init/init-service.js",
+      "accessCount": 12,
+      "lastAccessed": 1777573492102,
       "type": "file"
     },
     {
       "path": "src/project/policy-config-writer.js",
+      "accessCount": 7,
+      "lastAccessed": 1777573669676,
+      "type": "file"
+    },
+    {
+      "path": "src/ide/adapters/cursor-adapter.js",
+      "accessCount": 7,
+      "lastAccessed": 1777574271680,
+      "type": "file"
+    },
+    {
+      "path": "src/init/ide-pointer-injector.js",
       "accessCount": 6,
-      "lastAccessed": 1777293311208,
+      "lastAccessed": 1777574290550,
+      "type": "file"
+    },
+    {
+      "path": "src/ide/adapters/claude-adapter.js",
+      "accessCount": 6,
+      "lastAccessed": 1777574424041,
+      "type": "file"
+    },
+    {
+      "path": "src/project/lock-file-writer.js",
+      "accessCount": 6,
+      "lastAccessed": 1777574756403,
       "type": "file"
     },
     {
@@ -217,9 +241,9 @@
       "type": "file"
     },
     {
-      "path": "src/init/ide-pointer-injector.js",
+      "path": "package.json",
       "accessCount": 4,
-      "lastAccessed": 1777292262529,
+      "lastAccessed": 1777573464722,
       "type": "file"
     },
     {
@@ -229,9 +253,15 @@
       "type": "file"
     },
     {
-      "path": "package.json",
+      "path": "src/project/json-utils.js",
       "accessCount": 3,
-      "lastAccessed": 1777288714402,
+      "lastAccessed": 1777574016565,
+      "type": "file"
+    },
+    {
+      "path": "bin/check-command.js",
+      "accessCount": 3,
+      "lastAccessed": 1777574992584,
       "type": "file"
     },
     {
@@ -262,18 +292,6 @@
       "path": "src/ide/anchors/markdown-anchor-writer.js",
       "accessCount": 2,
       "lastAccessed": 1777275461869,
-      "type": "file"
-    },
-    {
-      "path": "src/ide/adapters/cursor-adapter.js",
-      "accessCount": 2,
-      "lastAccessed": 1777275464351,
-      "type": "file"
-    },
-    {
-      "path": "src/ide/adapters/claude-adapter.js",
-      "accessCount": 2,
-      "lastAccessed": 1777275468005,
       "type": "file"
     },
     {
@@ -308,8 +326,14 @@
     },
     {
       "path": "manifest.json",
-      "accessCount": 1,
-      "lastAccessed": 1777270750957,
+      "accessCount": 2,
+      "lastAccessed": 1777573504607,
+      "type": "file"
+    },
+    {
+      "path": "src/check/check-service.js",
+      "accessCount": 2,
+      "lastAccessed": 1777573513295,
       "type": "file"
     },
     {
@@ -322,12 +346,6 @@
       "path": "src/sync/sync-service.js",
       "accessCount": 1,
       "lastAccessed": 1777271062488,
-      "type": "file"
-    },
-    {
-      "path": "src/check/check-service.js",
-      "accessCount": 1,
-      "lastAccessed": 1777271063306,
       "type": "file"
     },
     {
@@ -385,12 +403,6 @@
       "type": "file"
     },
     {
-      "path": "bin/check-command.js",
-      "accessCount": 1,
-      "lastAccessed": 1777271077426,
-      "type": "file"
-    },
-    {
       "path": "src/executor/types.js",
       "accessCount": 1,
       "lastAccessed": 1777271086570,
@@ -406,18 +418,6 @@
       "path": "src/state-machine/types.js",
       "accessCount": 1,
       "lastAccessed": 1777271088309,
-      "type": "file"
-    },
-    {
-      "path": "src/project/lock-file-writer.js",
-      "accessCount": 1,
-      "lastAccessed": 1777271398347,
-      "type": "file"
-    },
-    {
-      "path": "src/project/json-utils.js",
-      "accessCount": 1,
-      "lastAccessed": 1777272132183,
       "type": "file"
     },
     {

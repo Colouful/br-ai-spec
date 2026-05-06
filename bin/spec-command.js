@@ -1,10 +1,10 @@
 const path = require('path');
-const { CheckService } = require('../src/check/check-service');
 const { readProjectState } = require('../src/project/project-files');
 const { RunService } = require('../src/run/run-service');
 const { EscapeHatch } = require('../src/state-machine/escape-hatch');
 const { StageRunner } = require('../src/state-machine/stage-runner');
 const { VisualReporter } = require('../src/visual/visual-reporter');
+const { SpecWriter } = require('../src/spec/spec-writer');
 
 function parseStartArgs(argv) {
   const options = {
@@ -103,12 +103,8 @@ function printStartUsage() {
 
 function assertInitialized(rootDir) {
   const state = readProjectState(rootDir);
-  if (!state.project || !state.policy || !state.lock || !state.registry || !state.contextIndex) {
+  if (!state.project || !state.lock) {
     throw new Error('当前项目尚未完成 init，请先执行 ai-spec-auto init . --recommend --dry-run');
-  }
-  const check = new CheckService().check(rootDir, { strictCache: false });
-  if (check.errors.length > 0) {
-    throw new Error(`项目初始化状态检查失败：${check.errors[0].message}`);
   }
 }
 
@@ -145,6 +141,13 @@ async function mainStart(argv) {
     runId: options.runId,
     worktreeEnabled: !options.noWorktree,
     branchEnabled: !options.noWorktree,
+  });
+
+  // 生成 Spec 目录结构和模板文件
+  const specWriter = new SpecWriter();
+  const specResult = specWriter.write(rootDir, {
+    requirement: options.requirement,
+    specId: run.runId,
   });
 
   if (options.dryRun) {
@@ -285,8 +288,77 @@ async function mainContinue(argv) {
   return 0;
 }
 
+async function mainList(argv) {
+  const options = { target: '.' };
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+    if (arg === '--help' || arg === '-h') {
+      console.log('ai-spec-auto spec-list [目录]\n\n说明：列出当前项目所有 Spec。');
+      return 0;
+    }
+    if (!arg.startsWith('-')) {
+      options.target = arg;
+    }
+  }
+  const rootDir = path.resolve(process.cwd(), options.target);
+  const specWriter = new SpecWriter();
+  const result = specWriter.list(rootDir);
+  if (result.specs.length === 0) {
+    console.log('当前项目无 Spec，请先执行 spec-start 创建。');
+    return 0;
+  }
+  console.log(`共 ${result.specs.length} 个 Spec：`);
+  console.log('');
+  console.log(`${'specId'.padEnd(40)} ${'状态'.padEnd(12)} ${'创建时间'.padEnd(26)} 标题`);
+  console.log('-'.repeat(100));
+  for (const spec of result.specs) {
+    console.log(`${spec.specId.padEnd(40)} ${(spec.status || '-').padEnd(12)} ${(spec.createdAt || '-').slice(0, 19).padEnd(26)} ${spec.title || '-'}`);
+  }
+  return 0;
+}
+
+async function mainSpecStatus(argv) {
+  const options = { specId: '', target: '.' };
+  const positional = [];
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+    if (arg === '--help' || arg === '-h') {
+      console.log('ai-spec-auto spec-detail <specId> [目录]\n\n说明：查看指定 Spec 的详细状态。');
+      return 0;
+    }
+    if (!arg.startsWith('-')) {
+      positional.push(arg);
+    }
+  }
+  options.specId = positional[0] || '';
+  options.target = positional[1] || '.';
+  if (!options.specId) {
+    console.log('错误：缺少 specId 参数。');
+    console.log('用法：ai-spec-auto spec-detail <specId> [目录]');
+    return 1;
+  }
+  const rootDir = path.resolve(process.cwd(), options.target);
+  const specWriter = new SpecWriter();
+  const status = specWriter.getStatus(rootDir, options.specId);
+  if (!status) {
+    console.log(`未找到 Spec：${options.specId}`);
+    return 1;
+  }
+  console.log('Spec 详情：');
+  console.log(`- specId：${status.specId}`);
+  console.log(`- 标题：${status.meta.title || '-'}`);
+  console.log(`- 状态：${status.meta.status || '-'}`);
+  console.log(`- 创建时间：${status.meta.createdAt || '-'}`);
+  console.log(`- 更新时间：${status.meta.updatedAt || '-'}`);
+  console.log(`- 目录：${status.specDir}`);
+  console.log(`- 文件：${status.files.join(', ')}`);
+  return 0;
+}
+
 module.exports = {
   mainContinue,
+  mainList,
+  mainSpecStatus,
   mainStart,
   mainStatus,
   parseRunCommandArgs,

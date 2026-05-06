@@ -1,0 +1,276 @@
+{
+  "schema_version": 1,
+  "kind": "run-state",
+  "run_id": "run_20260501_023929_demo",
+  "mode": "auto",
+  "review_policy": "main-flow-blocking",
+  "delivery_profile": "micro",
+  "artifact_profile": "compact",
+  "complexity": "low",
+  "status": "success",
+  "trigger": {
+    "raw_input": "新增一个商品 mock 页面",
+    "latest_user_input": "新增一个商品 mock 页面",
+    "latest_input_at": "2026-04-30T18:39:29.280Z"
+  },
+  "task": {
+    "change_id": "runtime-smoke-demo",
+    "parent_change_id": null,
+    "input_kind": "natural-language",
+    "risk_level": "low",
+    "type": "page-development",
+    "complexity": "low",
+    "change_context": null,
+    "route_decision": null,
+    "trace_mode": null,
+    "change_impact": null
+  },
+  "flow": {
+    "id": "prd-to-delivery",
+    "name": "需求到交付",
+    "source": "runtime-smoke-demo",
+    "delivery_profile": "micro",
+    "artifact_profile": "compact"
+  },
+  "plan": {
+    "required_roles": [
+      "requirement-analyst",
+      "frontend-implementer",
+      "code-guardian"
+    ],
+    "activated_optional_roles": [],
+    "skipped_optional_roles": [],
+    "approval_gates": [
+      "before-implementation",
+      "before-guardian",
+      "before-archive"
+    ],
+    "first_handoff": "requirement-analyst",
+    "delivery_profile": "micro",
+    "artifact_profile": "compact",
+    "review_policy": "main-flow-blocking"
+  },
+  "current_role": "archive-change",
+  "pending_input_update": false,
+  "pending_gate": null,
+  "gate_context": null,
+  "incremental_update": {
+    "change_context": null,
+    "route_decision": null,
+    "trace_mode": null,
+    "change_impact": null,
+    "reconcile_strategy": null,
+    "artifacts_to_update": [],
+    "reopen_reason": null,
+    "parent_change_id": null,
+    "target_role": "archive-change",
+    "handoff_gate": null,
+    "updated_at": "2026-04-30T18:39:30.128Z"
+  },
+  "artifacts": {
+    "proposal": "openspec/changes/archive/2026-04-30-runtime-smoke-demo/proposal.md",
+    "specs": "openspec/changes/archive/2026-04-30-runtime-smoke-demo/specs",
+    "design": "openspec/changes/archive/2026-04-30-runtime-smoke-demo/design.md",
+    "tasks": "openspec/changes/archive/2026-04-30-runtime-smoke-demo/tasks.md",
+    "bugfix": null,
+    "implementation_notes": null,
+    "checklist": "openspec/changes/archive/2026-04-30-runtime-smoke-demo/checklist.md",
+    "iterations": "openspec/changes/archive/2026-04-30-runtime-smoke-demo/iterations.md",
+    "additional": [
+      "code"
+    ]
+  },
+  "verification": {
+    "schema_version": 1,
+    "kind": "verification",
+    "auto_generated": true,
+    "generated_at": "2026-04-30T18:39:29.989Z",
+    "package_manager": "pnpm",
+    "overall_status": "passed",
+    "steps": [
+      {
+        "name": "build",
+        "command": "pnpm run build",
+        "status": "passed",
+        "exit_code": 0,
+        "stdout_excerpt": "> runtime-smoke-demo@ build /Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/.tmp/runtime-smoke-demo\n> node -e \"process.exit(0)\"",
+        "stderr_excerpt": null
+      },
+      {
+        "name": "lint",
+        "command": "pnpm run lint",
+        "status": "passed",
+        "exit_code": 0,
+        "stdout_excerpt": "> runtime-smoke-demo@ lint /Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/.tmp/runtime-smoke-demo\n> node -e \"process.exit(0)\"",
+        "stderr_excerpt": null
+      },
+      {
+        "name": "test",
+        "command": "pnpm run test",
+        "status": "passed",
+        "exit_code": 0,
+        "stdout_excerpt": "> runtime-smoke-demo@ test /Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/.tmp/runtime-smoke-demo\n> node -e \"process.exit(0)\"",
+        "stderr_excerpt": null
+      }
+    ],
+    "summary": {
+      "passed": 3,
+      "failed": 0,
+      "skipped": 0
+    }
+  },
+  "auto_fix": {
+    "attempts": 0,
+    "max_attempts": 1,
+    "active": false,
+    "last_failed_steps": []
+  },
+  "last_checkpoint": null,
+  "checkpoint_count": 0,
+  "assumptions": [],
+  "missing_inputs": [
+    "组件目录位置未明确，采用最小 mock 页面默认结构"
+  ],
+  "warnings": [],
+  "errors": [],
+  "input_updates": [],
+  "anchor": {
+    "kind": "task-anchor",
+    "task": {
+      "raw_goal": "新增一个商品 mock 页面",
+      "change_id": "runtime-smoke-demo",
+      "input_kind": "natural-language"
+    },
+    "stage": {
+      "flow_id": "prd-to-delivery",
+      "current_role": "archive-change",
+      "next_role": "archive-change"
+    },
+    "constraints": {
+      "rules": [
+        "component-standard"
+      ],
+      "must_not": [
+        "不要跳过规则检查"
+      ]
+    },
+    "artifacts": {
+      "proposal": "openspec/changes/runtime-smoke-demo/proposal.md",
+      "specs": "openspec/changes/runtime-smoke-demo/specs",
+      "design": "openspec/changes/runtime-smoke-demo/design.md",
+      "tasks": "openspec/changes/runtime-smoke-demo/tasks.md",
+      "bugfix": null,
+      "implementation_notes": null,
+      "checklist": "openspec/changes/runtime-smoke-demo/checklist.md",
+      "iterations": "openspec/changes/runtime-smoke-demo/iterations.md"
+    },
+    "expected_output": [
+      "补齐 proposal",
+      "输出 specs",
+      "输出 design",
+      "输出 tasks",
+      "列出缺失输入"
+    ]
+  },
+  "events": [
+    {
+      "at": "2026-04-30T18:39:29.280Z",
+      "type": "run-created",
+      "status": "planned",
+      "message": "runtime-state initialized from task-orchestrator bootstrap payload"
+    },
+    {
+      "at": "2026-04-30T18:39:29.324Z",
+      "type": "gate-blocked",
+      "status": "waiting-approval",
+      "from_role": "requirement-analyst",
+      "to_role": "requirement-analyst",
+      "pending_gate": "before-implementation",
+      "gate_context": {
+        "gate_id": "before-implementation",
+        "blocked_by_role": "requirement-analyst",
+        "resume_to_role": "frontend-implementer",
+        "required_user_action": "明确批准或拒绝当前 proposal / specs / design / tasks 的实现范围与限制条件。",
+        "blocked_reason": "内测阶段启用 main-flow-blocking 审核策略，需求收敛完成后需要先人工审核再进入实现。"
+      },
+      "message": "requirement gate blocked: 内测阶段启用 main-flow-blocking 审核策略，需求收敛完成后需要先人工审核再进入实现。"
+    },
+    {
+      "at": "2026-04-30T18:39:29.356Z",
+      "type": "gate-cleared",
+      "status": "running",
+      "from_role": "requirement-analyst",
+      "to_role": "frontend-implementer",
+      "pending_gate": null,
+      "gate_context": null,
+      "message": "demo implementation approved"
+    },
+    {
+      "at": "2026-04-30T18:39:29.991Z",
+      "type": "gate-blocked",
+      "status": "waiting-approval",
+      "from_role": "frontend-implementer",
+      "to_role": "frontend-implementer",
+      "pending_gate": "before-guardian",
+      "gate_context": {
+        "gate_id": "before-guardian",
+        "blocked_by_role": "frontend-implementer",
+        "resume_to_role": "code-guardian",
+        "required_user_action": "明确批准当前实现结果进入 code-guardian 守护审查，或说明需要回退修正的方向。",
+        "blocked_reason": "内测阶段启用 main-flow-blocking 审核策略，前端实现完成后需要先人工审核再进入守护阶段。"
+      },
+      "message": "frontend delivery is waiting for manual review before code-guardian"
+    },
+    {
+      "at": "2026-04-30T18:39:30.025Z",
+      "type": "gate-cleared",
+      "status": "running",
+      "from_role": "frontend-implementer",
+      "to_role": "code-guardian",
+      "pending_gate": null,
+      "gate_context": null,
+      "message": "demo guardian approved"
+    },
+    {
+      "at": "2026-04-30T18:39:30.062Z",
+      "type": "gate-blocked",
+      "status": "waiting-approval",
+      "from_role": "code-guardian",
+      "to_role": "code-guardian",
+      "pending_gate": "before-archive",
+      "gate_context": {
+        "gate_id": "before-archive",
+        "blocked_by_role": "code-guardian",
+        "resume_to_role": "archive-change",
+        "required_user_action": "明确告诉系统是否执行归档；同意则进入归档专家，不归档则直接结束本次运行。",
+        "blocked_reason": "wait for archive confirmation after code-guardian final review"
+      },
+      "message": "wait for archive confirmation after code-guardian final review"
+    },
+    {
+      "at": "2026-04-30T18:39:30.094Z",
+      "type": "gate-cleared",
+      "status": "running",
+      "from_role": "code-guardian",
+      "to_role": "archive-change",
+      "pending_gate": null,
+      "gate_context": null,
+      "message": "demo archive approved"
+    },
+    {
+      "at": "2026-04-30T18:39:30.128Z",
+      "type": "run-completed",
+      "status": "success",
+      "from_role": "archive-change",
+      "to_role": "archive-change",
+      "pending_gate": null,
+      "gate_context": null,
+      "message": "归档完成，增量规范已合并并已写入归档目录。"
+    }
+  ],
+  "timestamps": {
+    "created_at": "2026-04-30T18:39:29.280Z",
+    "updated_at": "2026-04-30T18:39:30.128Z",
+    "finished_at": "2026-04-30T18:39:30.128Z"
+  }
+}
