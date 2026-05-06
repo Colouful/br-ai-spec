@@ -15,7 +15,7 @@ const {
   buildAssetIdentity,
 } = require('../../src/asset/asset-package');
 
-const { AssetPackageManager } = require('../../src/asset/asset-package-manager');
+const { AssetPackageManager, computePackageChecksumFromFiles } = require('../../src/asset/asset-package-manager');
 
 function createTempDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'ai-spec-test-asset-'));
@@ -385,14 +385,23 @@ async function testVerifyChecksumHappyPath() {
   const manager = new AssetPackageManager(root);
 
   const content = 'test content';
+  const generatedFiles = ['.agents/rules/test.md'];
+
+  // 先安装文件（用占位 checksum 通过校验）
+  manager.install(
+    createAssetPackage({ assetId: 'test', assetType: ASSET_TYPES.RULE, checksum: 'sha256:placeholder', generatedFiles }),
+    { '.agents/rules/test.md': content },
+  );
+  // 基于文件内容计算真实包级 checksum
+  const checksum = computePackageChecksumFromFiles(root, generatedFiles);
+
   const pkg = createAssetPackage({
     assetId: 'test',
     assetType: ASSET_TYPES.RULE,
-    checksum: computeAssetChecksum(content),
-    generatedFiles: ['.agents/rules/test.md'],
+    checksum,
+    generatedFiles,
   });
 
-  manager.install(pkg, { '.agents/rules/test.md': content });
   const result = manager.verifyChecksum(pkg);
   assert.strictEqual(result.ok, true);
 }
@@ -427,6 +436,141 @@ async function testVerifyFileChecksum() {
 
   const wrongResult = manager.verifyFileChecksum('.agents/rules/test.md', 'sha256:wrong');
   assert.strictEqual(wrongResult.ok, false);
+}
+
+// ============================================================
+// P1.7 — verifyChecksum 包级 checksum 校验
+// ============================================================
+
+async function testVerifyChecksumPackageLevel() {
+  const root = createTempDir();
+  const manager = new AssetPackageManager(root);
+
+  const generatedFiles = ['.agents/rules/a.md', '.agents/rules/b.md'];
+  const fileMap = {
+    '.agents/rules/a.md': 'content a',
+    '.agents/rules/b.md': 'content b',
+  };
+
+  // 安装后计算包级 checksum
+  manager.install(
+    createAssetPackage({ assetId: 'pkg', assetType: ASSET_TYPES.RULE, checksum: 'sha256:placeholder', generatedFiles }),
+    fileMap,
+  );
+  const checksum = computePackageChecksumFromFiles(root, generatedFiles);
+
+  const pkg = createAssetPackage({
+    assetId: 'pkg',
+    assetType: ASSET_TYPES.RULE,
+    checksum,
+    generatedFiles,
+  });
+
+  assert.strictEqual(manager.verifyChecksum(pkg).ok, true);
+}
+
+async function testVerifyChecksumTamperedFile() {
+  const root = createTempDir();
+  const manager = new AssetPackageManager(root);
+
+  const generatedFiles = ['.agents/rules/test.md'];
+  manager.install(
+    createAssetPackage({ assetId: 'tamper', assetType: ASSET_TYPES.RULE, checksum: 'sha256:placeholder', generatedFiles }),
+    { '.agents/rules/test.md': 'original' },
+  );
+  const checksum = computePackageChecksumFromFiles(root, generatedFiles);
+
+  // 篡改文件内容
+  fs.writeFileSync(path.join(root, '.agents/rules/test.md'), 'tampered', 'utf8');
+
+  const pkg = createAssetPackage({
+    assetId: 'tamper',
+    assetType: ASSET_TYPES.RULE,
+    checksum,
+    generatedFiles,
+  });
+
+  const result = manager.verifyChecksum(pkg);
+  assert.strictEqual(result.ok, false);
+  assert.strictEqual(result.expected, checksum);
+  assert.notStrictEqual(result.actual, checksum);
+}
+
+async function testVerifyChecksumMissingGeneratedFile() {
+  const root = createTempDir();
+  const manager = new AssetPackageManager(root);
+
+  const generatedFiles = ['.agents/rules/a.md', '.agents/rules/b.md'];
+  manager.install(
+    createAssetPackage({ assetId: 'miss', assetType: ASSET_TYPES.RULE, checksum: 'sha256:placeholder', generatedFiles }),
+    { '.agents/rules/a.md': 'a', '.agents/rules/b.md': 'b' },
+  );
+  const checksum = computePackageChecksumFromFiles(root, generatedFiles);
+
+  // 删除一个文件
+  fs.unlinkSync(path.join(root, '.agents/rules/b.md'));
+
+  const pkg = createAssetPackage({
+    assetId: 'miss',
+    assetType: ASSET_TYPES.RULE,
+    checksum,
+    generatedFiles,
+  });
+
+  const result = manager.verifyChecksum(pkg);
+  assert.strictEqual(result.ok, false);
+  assert(result.errors.some((e) => e.includes('文件不存在')));
+}
+
+async function testVerifyChecksumMultiFileStability() {
+  const root = createTempDir();
+  const manager = new AssetPackageManager(root);
+
+  // 两个文件内容相同但路径不同，验证排序后 checksum 稳定
+  const generatedFiles = ['.agents/rules/z.md', '.agents/rules/a.md'];
+  const fileMap = {
+    '.agents/rules/z.md': 'same',
+    '.agents/rules/a.md': 'same',
+  };
+
+  manager.install(
+    createAssetPackage({ assetId: 'stable', assetType: ASSET_TYPES.RULE, checksum: 'sha256:placeholder', generatedFiles }),
+    fileMap,
+  );
+
+  // 无论 generatedFiles 数组顺序如何，checksum 应一致
+  const checksum1 = computePackageChecksumFromFiles(root, ['.agents/rules/z.md', '.agents/rules/a.md']);
+  const checksum2 = computePackageChecksumFromFiles(root, ['.agents/rules/a.md', '.agents/rules/z.md']);
+  assert.strictEqual(checksum1, checksum2);
+
+  const pkg = createAssetPackage({
+    assetId: 'stable',
+    assetType: ASSET_TYPES.RULE,
+    checksum: checksum1,
+    generatedFiles,
+  });
+
+  assert.strictEqual(manager.verifyChecksum(pkg).ok, true);
+}
+
+async function testVerifyFileChecksumPreserved() {
+  const root = createTempDir();
+  const manager = new AssetPackageManager(root);
+
+  const content = 'single file content';
+  const checksum = computeAssetChecksum(content);
+  fs.mkdirSync(path.join(root, '.agents/rules'), { recursive: true });
+  fs.writeFileSync(path.join(root, '.agents/rules/single.md'), content, 'utf8');
+
+  // verifyFileChecksum 仍保持单文件校验能力
+  const result = manager.verifyFileChecksum('.agents/rules/single.md', checksum);
+  assert.strictEqual(result.ok, true);
+  assert.strictEqual(result.actual, checksum);
+
+  // 修改后应失败
+  fs.writeFileSync(path.join(root, '.agents/rules/single.md'), 'modified', 'utf8');
+  const result2 = manager.verifyFileChecksum('.agents/rules/single.md', checksum);
+  assert.strictEqual(result2.ok, false);
 }
 
 // ============================================================
@@ -578,6 +722,13 @@ async function main() {
   await testVerifyChecksumHappyPath();
   await testVerifyChecksumMissingFile();
   await testVerifyFileChecksum();
+
+  // P1.7 — 包级 checksum 校验
+  await testVerifyChecksumPackageLevel();
+  await testVerifyChecksumTamperedFile();
+  await testVerifyChecksumMissingGeneratedFile();
+  await testVerifyChecksumMultiFileStability();
+  await testVerifyFileChecksumPreserved();
 
   // P1.3.6 — Generated Files
   await testGetGeneratedFiles();

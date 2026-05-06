@@ -223,6 +223,12 @@
       "type": "file"
     },
     {
+      "path": "package.json",
+      "accessCount": 8,
+      "lastAccessed": 1778047129387,
+      "type": "file"
+    },
+    {
       "path": "src/project/json-utils.js",
       "accessCount": 7,
       "lastAccessed": 1778037662927,
@@ -244,12 +250,6 @@
       "path": "src/init/ide-pointer-injector.js",
       "accessCount": 6,
       "lastAccessed": 1777574290550,
-      "type": "file"
-    },
-    {
-      "path": "package.json",
-      "accessCount": 6,
-      "lastAccessed": 1778033154938,
       "type": "file"
     },
     {

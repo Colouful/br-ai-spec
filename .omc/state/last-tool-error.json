@@ -1,7 +1,7 @@
 {
   "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"node tests/p1/multi-project-validation.test.js 2>&1\",\"description\":\"Run multi-project validation tests\"}",
-  "error": "Exit code 1\nTypeError: Cannot read properties of undefined (reading 'join')\n    at testCrossAdapterConsistency (/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/tests/p1/multi-project-validation.test.js:230:74)\n    at main (/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/tests/p1/multi-project-validation.test.js:326:9)",
-  "timestamp": "2026-05-06T03:39:37.561Z",
+  "tool_input_preview": "{\"command\":\"node tests/asset/asset-package.test.js\",\"description\":\"Run asset-package tests\"}",
+  "error": "Exit code 1\nError: ENOENT: no such file or directory, open '/var/folders/4b/jfnwm38j143796pr23j8sdgh0000gn/T/ai-spec-test-asset-eoG1JD/.agents/rules/test.md'\n    at Object.readFileSync (node:fs:441:20)\n    at computePackageChecksumFromFiles (/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/src/asset/asset-package-manager.js:39:24)\n    at testVerifyChecksumHappyPath (/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/tests/asset/asset-package.test.js:395:20)\n    at main (/Users/...",
+  "timestamp": "2026-05-06T06:01:55.455Z",
   "retry_count": 1
 }

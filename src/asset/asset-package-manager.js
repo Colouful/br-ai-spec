@@ -7,7 +7,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { createChecksum, readJsonIfExists, writeJson, ensureDir } = require('../project/json-utils');
+const { createChecksum, readJsonIfExists, writeJson, ensureDir, toPosixPath } = require('../project/json-utils');
 const {
   ASSET_TYPES,
   ASSET_SOURCES,
@@ -17,6 +17,30 @@ const {
   guessAssetType,
   buildAssetIdentity,
 } = require('./asset-package');
+
+// ============================================================
+// 包级 checksum 计算
+// ============================================================
+
+/**
+ * 基于 generatedFiles 计算包级 checksum
+ * 规则：对文件排序后，拼接 "相对路径 + 分隔符 + 文件内容"，整体计算 sha256
+ * 使用 posix 路径分隔符保证跨平台一致性
+ * @param {string} rootDir
+ * @param {string[]} generatedFiles
+ * @returns {string}
+ */
+function computePackageChecksumFromFiles(rootDir, generatedFiles) {
+  const sorted = [...generatedFiles].sort();
+  const parts = [];
+  for (const filePath of sorted) {
+    const posixPath = toPosixPath(filePath);
+    const fullPath = path.join(rootDir, filePath);
+    const content = fs.readFileSync(fullPath, 'utf8');
+    parts.push(`${posixPath}\n---AI_SPEC_FILE_CONTENT---\n${content}`);
+  }
+  return createChecksum(parts.join('\n'));
+}
 
 // ============================================================
 // AssetPackageManager
@@ -196,38 +220,32 @@ class AssetPackageManager {
   /**
    * 校验资产包的 checksum 是否与文件内容一致
    * @param {AssetPackage} pkg
-   * @returns {{ ok: boolean, mismatches: Array<{ path: string, expected: string, actual: string }>, errors: string[] }}
+   * @returns {{ ok: boolean, expected: string, actual: string, errors: string[] }}
    */
   verifyChecksum(pkg) {
-    const mismatches = [];
     const errors = [];
 
     if (!pkg.generatedFiles || pkg.generatedFiles.length === 0) {
-      return { ok: true, mismatches, errors };
+      return { ok: true, expected: pkg.checksum || '', actual: pkg.checksum || '', errors };
     }
 
+    // 检查所有文件是否存在
     for (const filePath of pkg.generatedFiles) {
       const fullPath = path.join(this.rootDir, filePath);
       if (!fs.existsSync(fullPath)) {
         errors.push(`文件不存在: ${filePath}`);
-        continue;
-      }
-
-      try {
-        const content = fs.readFileSync(fullPath, 'utf8');
-        const actual = computeAssetChecksum(content);
-        // pkg.checksum 是整个资产包的 checksum，单文件校验需比较生成时的值
-        // 这里校验文件是否存在且可读
-      } catch (error) {
-        errors.push(`读取文件失败: ${filePath} - ${error.message}`);
       }
     }
 
-    return {
-      ok: errors.length === 0 && mismatches.length === 0,
-      mismatches,
-      errors,
-    };
+    if (errors.length > 0) {
+      return { ok: false, expected: pkg.checksum, actual: '', errors };
+    }
+
+    // 计算包级 checksum 并与 pkg.checksum 比较
+    const actual = computePackageChecksumFromFiles(this.rootDir, pkg.generatedFiles);
+    const ok = actual === pkg.checksum;
+
+    return { ok, expected: pkg.checksum, actual, errors };
   }
 
   /**
@@ -327,4 +345,5 @@ class AssetPackageManager {
 
 module.exports = {
   AssetPackageManager,
+  computePackageChecksumFromFiles,
 };
