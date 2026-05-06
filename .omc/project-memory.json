@@ -163,6 +163,12 @@
       "type": "file"
     },
     {
+      "path": "package.json",
+      "accessCount": 19,
+      "lastAccessed": 1778065877935,
+      "type": "file"
+    },
+    {
       "path": "bin/init-command.js",
       "accessCount": 18,
       "lastAccessed": 1777574800166,
@@ -172,12 +178,6 @@
       "path": "src/init/init-plan.js",
       "accessCount": 17,
       "lastAccessed": 1778036369954,
-      "type": "file"
-    },
-    {
-      "path": "package.json",
-      "accessCount": 16,
-      "lastAccessed": 1778057263236,
       "type": "file"
     },
     {
@@ -236,8 +236,8 @@
     },
     {
       "path": "src/scanner/engine.js",
-      "accessCount": 7,
-      "lastAccessed": 1778038452879,
+      "accessCount": 8,
+      "lastAccessed": 1778059339563,
       "type": "file"
     },
     {

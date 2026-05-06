@@ -24,6 +24,8 @@
     "verify:p2": "npm run test:registry && npm run test:runtime && npm run test:p1 && npm run test:p2 && npm pack --dry-run",
     "test:p3": "node ./tests/governance/rbac.test.js && node ./tests/governance/asset-review.test.js && node ./tests/governance/audit-log.test.js && node ./tests/governance/gray-release.test.js && node ./tests/governance/rollback.test.js && node ./tests/governance/security-policy.test.js && node ./tests/p3/p3-integration.test.js",
     "verify:p3": "npm run test:registry && npm run test:runtime && npm run test:p1 && npm run test:p2 && npm run test:p3 && npm pack --dry-run",
+    "test:p4": "node ./tests/visual/event-gateway.test.js && node ./tests/visual/timeline.test.js && node ./tests/visual/hook-dashboard.test.js && node ./tests/visual/agent-visual.test.js && node ./tests/visual/metrics.test.js && node ./tests/visual/risk-board.test.js && node ./tests/p4/p4-integration.test.js",
+    "verify:p4": "npm run test:registry && npm run test:runtime && npm run test:p1 && npm run test:p2 && npm run test:p3 && npm run test:p4 && npm pack --dry-run",
     "prepack": "npm run verify:install-ps1-bom"
   },
   "files": [

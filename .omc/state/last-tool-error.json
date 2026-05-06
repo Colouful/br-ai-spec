@@ -1,0 +1,7 @@
+{
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"node ./tests/p4/p4-integration.test.js\",\"description\":\"Run P4 integration tests again\"}",
+  "error": "Exit code 1\n\n=== P4 集成回归测试 ===\n\nTC01: EventGateway 全链路:\n  ✓ ingest → 查询 → 统计 → 导出\n\nTC02: RunTimeline 全链路:\n  ✓ 事件聚合 → 阶段排序 → 分组 → 摘要\n\nTC03: HookDashboard 全链路:\n  ✓ Hook/Test/Repair 分析 → 失败摘要\n\nTC04: AgentVisual 全链路:\n  ✓ Agent 时间线 → Handoff → 门禁\n\nTC05: Metrics 全链路:\n  ✓ 指标计算 → 趋势\n\nTC06: RiskBoard 全链路:\n  ✓ 风险识别 → 摘要 → 过滤\n\nTC07: EventGateway + Timeline 联动:\n  ✓ Gateway 写入 → Timeline 聚合\n\nTC08: Timeline + Dashboard 联动:\n  ✓ Timeline 聚合 → Dashboard 分析同一事件源\n\nTC09: Dashboard + Metrics 联动:\n  ✓ Dashboard 分析 → M...",
+  "timestamp": "2026-05-06T11:10:23.661Z",
+  "retry_count": 2
+}
