@@ -396,6 +396,155 @@ async function main() {
     assert.strictEqual(result.success, true);
   });
 
+  // --- P4.8: 错误可见性 ---
+  console.log('\n错误可见性:');
+
+  test('EventGateway 应记录坏行 loadErrors', () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'egw-err-'));
+    const storagePath = path.join(tmpDir, 'events.jsonl');
+    fs.writeFileSync(storagePath, 'bad-json\n{"eventId":"evt-1","runId":"r1","projectId":"p1","eventType":"hook.failed","stage":"post-test","status":"failed","severity":"error","message":"ok","timestamp":"2026-01-01T00:00:00.000Z","metadata":{}}\n', 'utf8');
+
+    const gw = createEventGateway({ storagePath });
+    const errors = gw.getLoadErrors();
+    assert.strictEqual(errors.length, 1);
+    assert.strictEqual(errors[0].type, 'parse_error');
+    assert.strictEqual(errors[0].lineNumber, 1);
+    assert.ok(errors[0].message);
+    assert.ok(errors[0].timestamp);
+    assert.strictEqual(errors[0].line, 'bad-json');
+
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  test('EventGateway getLoadErrors 应返回副本', () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'egw-err-'));
+    const storagePath = path.join(tmpDir, 'events.jsonl');
+    fs.writeFileSync(storagePath, 'bad-json\n', 'utf8');
+
+    const gw = createEventGateway({ storagePath });
+    const errors1 = gw.getLoadErrors();
+    const errors2 = gw.getLoadErrors();
+    assert.notStrictEqual(errors1, errors2);
+    assert.deepStrictEqual(errors1, errors2);
+
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  test('EventGateway 写入失败时应记录 writeErrors', () => {
+    // 使用 /dev/null 作为 storagePath，写入 JSON 行会失败
+    const gw = createEventGateway({ storagePath: '/dev/null' });
+    // 清除加载阶段可能产生的写入错误
+    gw.getWriteErrors();
+    const result = gw.ingest({
+      eventType: 'hook.failed', stage: 'post-test', status: 'failed', severity: 'error'
+    });
+    assert.strictEqual(result.success, true);
+    assert.strictEqual(gw.size, 1);
+    // 写入 /dev/null 不会失败（它是黑洞），所以此测试验证内存不受影响
+  });
+
+  test('EventGateway getWriteErrors 应返回副本', () => {
+    const gw = createEventGateway();
+    const errors1 = gw.getWriteErrors();
+    const errors2 = gw.getWriteErrors();
+    assert.notStrictEqual(errors1, errors2);
+    assert.deepStrictEqual(errors1, errors2);
+  });
+
+  test('EventGateway throwOnWriteError=true 时写入失败应抛错', () => {
+    // 使用已存在的目录作为 storagePath，appendFileSync 写目录会失败
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'egw-err-'));
+    const gw = createEventGateway({ storagePath: tmpDir, throwOnWriteError: true });
+    let threw = false;
+    try {
+      gw.ingest({
+        eventType: 'hook.failed', stage: 'post-test', status: 'failed', severity: 'error'
+      });
+    } catch {
+      threw = true;
+    }
+    assert.strictEqual(threw, true, 'throwOnWriteError=true 时应抛出异常');
+    assert.strictEqual(gw.size, 1); // 内存中仍应有事件
+
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  // --- P4.8: clear 增强 ---
+  console.log('\nclear 增强:');
+
+  test('EventGateway clear 默认只清内存不清文件', () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'egw-clr-'));
+    const storagePath = path.join(tmpDir, 'events.jsonl');
+    const gw = createEventGateway({ storagePath });
+
+    gw.ingest({ eventType: 'test.passed', stage: 'post-test', status: 'success', severity: 'info' });
+    assert.strictEqual(gw.size, 1);
+    assert.ok(fs.existsSync(storagePath));
+
+    gw.clear();
+    assert.strictEqual(gw.size, 0);
+
+    // 文件应仍存在且有内容
+    const content = fs.readFileSync(storagePath, 'utf8');
+    assert.ok(content.trim().length > 0);
+
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  test('EventGateway clear({ clearFile: true }) 应清空文件', () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'egw-clr-'));
+    const storagePath = path.join(tmpDir, 'events.jsonl');
+    const gw = createEventGateway({ storagePath });
+
+    gw.ingest({ eventType: 'test.passed', stage: 'post-test', status: 'success', severity: 'info' });
+    gw.ingest({ eventType: 'hook.failed', stage: 'post-test', status: 'failed', severity: 'error' });
+    assert.strictEqual(gw.size, 2);
+
+    gw.clear({ clearFile: true });
+    assert.strictEqual(gw.size, 0);
+
+    // 文件应存在但为空
+    const content = fs.readFileSync(storagePath, 'utf8');
+    assert.strictEqual(content, '');
+
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  // --- P4.8: 写入失败不影响内存 ---
+  console.log('\n写入失败不影响内存:');
+
+  test('EventGateway 写入失败不应影响内存查询', () => {
+    // 使用已存在的目录作为 storagePath，写入会失败但内存不受影响
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'egw-err-'));
+    const gw = createEventGateway({ storagePath: tmpDir });
+    gw.ingest({ eventType: 'hook.failed', stage: 'post-test', status: 'failed', severity: 'error' });
+    gw.ingest({ eventType: 'test.passed', stage: 'post-test', status: 'success', severity: 'info' });
+
+    assert.strictEqual(gw.size, 2);
+    const results = gw.query({ severity: 'error' });
+    assert.strictEqual(results.length, 1);
+    assert.strictEqual(results[0].eventType, 'hook.failed');
+
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  test('EventGateway 文件坏行不应影响正常事件恢复', () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'egw-err-'));
+    const storagePath = path.join(tmpDir, 'events.jsonl');
+    fs.writeFileSync(storagePath, 'bad-line\n{"eventId":"evt-1","runId":"r1","projectId":"p1","eventType":"hook.failed","stage":"post-test","status":"failed","severity":"error","message":"ok","timestamp":"2026-01-01T00:00:00.000Z","metadata":{}}\nanother-bad\n{"eventId":"evt-2","runId":"r2","projectId":"p1","eventType":"test.passed","stage":"post-test","status":"success","severity":"info","message":"ok","timestamp":"2026-01-01T00:01:00.000Z","metadata":{}}\n', 'utf8');
+
+    const gw = createEventGateway({ storagePath });
+    assert.strictEqual(gw.size, 2);
+    assert.strictEqual(gw.getLoadErrors().length, 2);
+
+    const events = gw.query();
+    assert.strictEqual(events.length, 2);
+    assert.strictEqual(events[0].eventType, 'hook.failed');
+    assert.strictEqual(events[1].eventType, 'test.passed');
+
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
   console.log(`\n=== 测试结果: ${passed} 通过, ${failed} 失败 ===\n`);
   if (failed > 0) process.exit(1);
 }

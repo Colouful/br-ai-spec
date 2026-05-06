@@ -11,7 +11,7 @@ const { createTimeline } = require('../../src/visual/timeline');
 const { createHookDashboard } = require('../../src/visual/hook-dashboard');
 const { createAgentVisual } = require('../../src/visual/agent-visual');
 const { createMetricsEngine } = require('../../src/visual/metrics');
-const { createRiskBoard } = require('../../src/visual/risk-board');
+const { createRiskBoard, mapSeverityToRiskLevel, getRiskLevelRank } = require('../../src/visual/risk-board');
 
 // barrel 导出验证
 const visualBarrel = require('../../src/visual/index');
@@ -405,6 +405,80 @@ async function main() {
     assert.ok(!r.event.message.includes('mysecret'));
     assert.strictEqual(r.event.metadata.apiKey, '[REDACTED]');
     assert.strictEqual(r.event.metadata.name, 'test');
+  });
+
+  // --- TC16: EventGateway 错误可见性与 RiskBoard 风险语义一致性 ---
+  console.log('\nTC16: EventGateway 错误可见性与 RiskBoard 风险语义一致性:');
+
+  await testAsync('EventGateway 读取含坏行的 NDJSON 应记录 loadErrors', async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'p4-tc16-'));
+    const storagePath = path.join(tmpDir, 'events.jsonl');
+    fs.writeFileSync(storagePath, 'bad-json\n{"eventId":"evt-1","runId":"r1","projectId":"p1","eventType":"hook.failed","stage":"post-test","status":"failed","severity":"error","message":"ok","timestamp":"2026-01-01T00:00:00.000Z","metadata":{}}\nanother-bad\n', 'utf8');
+
+    const gw = createEventGateway({ storagePath });
+    const loadErrors = gw.getLoadErrors();
+    assert.ok(loadErrors.length >= 2, `应记录至少 2 个坏行错误，实际 ${loadErrors.length}`);
+    assert.strictEqual(loadErrors[0].type, 'parse_error');
+    assert.strictEqual(loadErrors[0].lineNumber, 1);
+
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  await testAsync('EventGateway 写入失败时应记录 writeErrors', async () => {
+    // 使用已存在的目录作为 storagePath，写入 JSON 行会失败
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'p4-tc16-'));
+    const gw = createEventGateway({ storagePath: tmpDir });
+    const r = gw.ingest({
+      eventType: 'hook.failed', stage: 'post-test', status: 'failed', severity: 'error'
+    });
+    assert.strictEqual(r.success, true);
+    assert.strictEqual(gw.size, 1);
+
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  test('RiskBoard 能把 blocking 映射为 critical', () => {
+    assert.strictEqual(mapSeverityToRiskLevel('blocking'), 'critical');
+    assert.strictEqual(mapSeverityToRiskLevel('info'), 'low');
+    assert.strictEqual(mapSeverityToRiskLevel('warn'), 'medium');
+    assert.strictEqual(mapSeverityToRiskLevel('error'), 'high');
+  });
+
+  test('RiskBoard topRisks 排序稳定', () => {
+    const rb = createRiskBoard();
+    rb.ingestEvents([
+      makeEvent({ eventType: 'policy_denied', severity: 'warn' }),
+      makeEvent({ eventType: 'security.risk', severity: 'blocking' }),
+      makeEvent({ eventType: 'agent.tool_denied', severity: 'info' })
+    ]);
+    const summary = rb.getRiskSummary();
+    for (let i = 1; i < summary.topRisks.length; i++) {
+      assert.ok(
+        getRiskLevelRank(summary.topRisks[i - 1].riskLevel) >= getRiskLevelRank(summary.topRisks[i].riskLevel),
+        'topRisks 应按 riskLevel 降序排列'
+      );
+    }
+  });
+
+  await testAsync('正常事件不受坏行影响，仍可被 P4 模块消费', async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'p4-tc16-'));
+    const storagePath = path.join(tmpDir, 'events.jsonl');
+    fs.writeFileSync(storagePath, 'bad-line\n{"eventId":"evt-1","runId":"r1","projectId":"p1","eventType":"hook.failed","stage":"post-test","status":"failed","severity":"error","message":"ok","timestamp":"2026-01-01T00:00:00.000Z","metadata":{}}\n', 'utf8');
+
+    const gw = createEventGateway({ storagePath });
+    assert.strictEqual(gw.size, 1);
+    assert.strictEqual(gw.getLoadErrors().length, 1);
+
+    const events = gw.query();
+    const tl = createTimeline();
+    tl.aggregate(events);
+    assert.strictEqual(tl.getSummary().totalEvents, 1);
+
+    const m = createMetricsEngine();
+    m.compute(events);
+    assert.ok(typeof m.getTaskSuccessRate() === 'number');
+
+    fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
   // --- P1+P2+P3 回归 ---

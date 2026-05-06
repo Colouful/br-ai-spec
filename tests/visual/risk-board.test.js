@@ -7,6 +7,10 @@ const {
   PRIVILEGE_ESCALATION_TYPES,
   AUDIT_OPERATION_TYPES,
   RISK_LEVELS,
+  SEVERITY_TO_RISK_LEVEL,
+  RISK_LEVEL_RANK,
+  mapSeverityToRiskLevel,
+  getRiskLevelRank,
   RiskBoard,
   createRiskBoard
 } = require('../../src/visual/risk-board');
@@ -251,6 +255,85 @@ async function main() {
   test('createRiskBoard 应返回 RiskBoard 实例', () => {
     const rb = createRiskBoard();
     assert.ok(rb instanceof RiskBoard);
+  });
+
+  // --- P4.8: severity → riskLevel 映射 ---
+  console.log('\nseverity → riskLevel 映射:');
+
+  test('info 应映射为 low', () => {
+    assert.strictEqual(mapSeverityToRiskLevel('info'), 'low');
+  });
+
+  test('warn 应映射为 medium', () => {
+    assert.strictEqual(mapSeverityToRiskLevel('warn'), 'medium');
+  });
+
+  test('error 应映射为 high', () => {
+    assert.strictEqual(mapSeverityToRiskLevel('error'), 'high');
+  });
+
+  test('blocking 应映射为 critical', () => {
+    assert.strictEqual(mapSeverityToRiskLevel('blocking'), 'critical');
+  });
+
+  test('low / medium / high / critical 应保持原语义', () => {
+    assert.strictEqual(mapSeverityToRiskLevel('low'), 'low');
+    assert.strictEqual(mapSeverityToRiskLevel('medium'), 'medium');
+    assert.strictEqual(mapSeverityToRiskLevel('high'), 'high');
+    assert.strictEqual(mapSeverityToRiskLevel('critical'), 'critical');
+  });
+
+  test('未知 severity 应降级为 low', () => {
+    assert.strictEqual(mapSeverityToRiskLevel('unknown'), 'low');
+    assert.strictEqual(mapSeverityToRiskLevel(''), 'low');
+    assert.strictEqual(mapSeverityToRiskLevel(undefined), 'low');
+  });
+
+  // --- P4.8: getRiskLevelRank ---
+  console.log('\ngetRiskLevelRank:');
+
+  test('getRiskLevelRank 应返回稳定排序权重', () => {
+    assert.strictEqual(getRiskLevelRank('low'), 0);
+    assert.strictEqual(getRiskLevelRank('medium'), 1);
+    assert.strictEqual(getRiskLevelRank('high'), 2);
+    assert.strictEqual(getRiskLevelRank('critical'), 3);
+    assert.strictEqual(getRiskLevelRank('unknown'), 0);
+  });
+
+  // --- P4.8: topRisks 排序 ---
+  console.log('\ntopRisks 排序:');
+
+  test('topRisks 应按 critical / high / medium / low 排序', () => {
+    const rb = createRiskBoard();
+    rb.ingestEvents([
+      makeEvent({ eventType: 'policy_denied', severity: 'warn' }),
+      makeEvent({ eventType: 'security.risk', severity: 'blocking' }),
+      makeEvent({ eventType: 'agent.tool_denied', severity: 'info' })
+    ]);
+    const summary = rb.getRiskSummary();
+    assert.ok(summary.topRisks.length >= 2);
+    // security_risk (blocking→critical) 应排在最前
+    const firstRisk = summary.topRisks[0];
+    assert.strictEqual(firstRisk.riskLevel, 'critical');
+    // 后续 riskLevel rank 应递减或相等
+    for (let i = 1; i < summary.topRisks.length; i++) {
+      assert.ok(
+        getRiskLevelRank(summary.topRisks[i - 1].riskLevel) >= getRiskLevelRank(summary.topRisks[i].riskLevel)
+      );
+    }
+  });
+
+  // --- P4.8: getRiskSummary 统一输出 ---
+  console.log('\ngetRiskSummary 统一输出:');
+
+  test('getRiskSummary 应返回统一 riskLevel', () => {
+    const rb = createRiskBoard();
+    rb.ingestEvents([
+      makeEvent({ eventType: 'security.risk', severity: 'error' })
+    ]);
+    const summary = rb.getRiskSummary();
+    assert.strictEqual(summary.riskLevel, 'high');
+    assert.ok(RISK_LEVELS.includes(summary.riskLevel));
   });
 
   console.log(`\n=== 测试结果: ${passed} 通过, ${failed} 失败 ===\n`);

@@ -12,6 +12,37 @@ const AUDIT_OPERATION_TYPES = ['audit.operation', 'audit.approval', 'audit.rollb
 
 const RISK_LEVELS = ['low', 'medium', 'high', 'critical'];
 
+const SEVERITY_TO_RISK_LEVEL = {
+  info: 'low',
+  warn: 'medium',
+  error: 'high',
+  blocking: 'critical',
+  low: 'low',
+  medium: 'medium',
+  high: 'high',
+  critical: 'critical'
+};
+
+const RISK_LEVEL_RANK = { low: 0, medium: 1, high: 2, critical: 3 };
+
+/**
+ * 将 severity 映射为 riskLevel
+ * @param {string} severity
+ * @returns {string}
+ */
+function mapSeverityToRiskLevel(severity) {
+  return SEVERITY_TO_RISK_LEVEL[severity] || 'low';
+}
+
+/**
+ * 获取 riskLevel 排序权重
+ * @param {string} riskLevel
+ * @returns {number}
+ */
+function getRiskLevelRank(riskLevel) {
+  return RISK_LEVEL_RANK[riskLevel] ?? 0;
+}
+
 class RiskBoard {
   constructor(options = {}) {
     this._events = [];
@@ -156,7 +187,8 @@ class RiskBoard {
 
     const addRisk = (type, count, severity) => {
       if (count > 0) {
-        riskMap.set(type, { type, count, severity });
+        const riskLevel = mapSeverityToRiskLevel(severity);
+        riskMap.set(type, { type, count, severity, riskLevel });
       }
     };
 
@@ -165,9 +197,7 @@ class RiskBoard {
     addRisk('privilege_escalation', escalations.length, escalations.length > 0 ? escalations[0].severity : 'info');
 
     return Array.from(riskMap.values()).sort((a, b) => {
-      const rankA = RISK_LEVELS.indexOf(a.severity);
-      const rankB = RISK_LEVELS.indexOf(b.severity);
-      return rankB - rankA;
+      return getRiskLevelRank(b.riskLevel) - getRiskLevelRank(a.riskLevel);
     });
   }
 
@@ -213,6 +243,10 @@ module.exports = {
   PRIVILEGE_ESCALATION_TYPES,
   AUDIT_OPERATION_TYPES,
   RISK_LEVELS,
+  SEVERITY_TO_RISK_LEVEL,
+  RISK_LEVEL_RANK,
+  mapSeverityToRiskLevel,
+  getRiskLevelRank,
   RiskBoard,
   createRiskBoard
 };

@@ -75,13 +75,17 @@ class EventGateway {
    * @param {string} [options.storagePath] — NDJSON 存储路径
    * @param {number} [options.maxEvents] — 最大事件数（内存）
    * @param {string} [options.projectId] — 项目 ID
+   * @param {boolean} [options.throwOnWriteError] — 写入失败时是否抛出异常
    */
   constructor(options = {}) {
-    const { storagePath, maxEvents = 10000, projectId = 'default' } = options;
+    const { storagePath, maxEvents = 10000, projectId = 'default', throwOnWriteError = false } = options;
     this._projectId = projectId;
     this._maxEvents = maxEvents;
     this._events = [];
     this._nextId = 1;
+    this._loadErrors = [];
+    this._writeErrors = [];
+    this._throwOnWriteError = throwOnWriteError === true;
 
     if (storagePath) {
       this._storagePath = path.resolve(storagePath);
@@ -113,7 +117,7 @@ class EventGateway {
     try {
       const content = fs.readFileSync(this._storagePath, 'utf8');
       const lines = content.split('\n').filter(line => line.trim());
-      for (const line of lines) {
+      lines.forEach((line, index) => {
         try {
           const event = JSON.parse(line);
           this._events.push(event);
@@ -122,12 +126,24 @@ class EventGateway {
           if (!isNaN(idNum) && idNum >= this._nextId) {
             this._nextId = idNum + 1;
           }
-        } catch {
-          // 坏行容错，跳过
+        } catch (err) {
+          this._loadErrors.push({
+            type: 'parse_error',
+            message: err.message || 'JSON 解析失败',
+            timestamp: new Date().toISOString(),
+            lineNumber: index + 1,
+            line: line.length > 200 ? line.slice(0, 200) + '...' : line
+          });
         }
-      }
-    } catch {
-      // 文件读取失败，静默降级
+      });
+    } catch (err) {
+      this._loadErrors.push({
+        type: 'file_read_error',
+        message: err.message || '文件读取失败',
+        timestamp: new Date().toISOString(),
+        lineNumber: 0,
+        line: ''
+      });
     }
   }
 
@@ -140,8 +156,16 @@ class EventGateway {
     try {
       this._ensureStorageDir();
       fs.appendFileSync(this._storagePath, JSON.stringify(event) + '\n', 'utf8');
-    } catch {
-      // 写入失败，静默降级
+    } catch (err) {
+      const writeError = {
+        type: 'write_error',
+        message: err.message || '写入失败',
+        timestamp: new Date().toISOString()
+      };
+      this._writeErrors.push(writeError);
+      if (this._throwOnWriteError) {
+        throw err;
+      }
     }
   }
 
@@ -260,11 +284,44 @@ class EventGateway {
   }
 
   /**
-   * 清空内存事件（不删文件）
+   * 清空事件
+   * @param {object} [options]
+   * @param {boolean} [options.clearFile] — 是否同时清空持久化文件
    */
-  clear() {
+  clear(options = {}) {
     this._events = [];
     this._nextId = 1;
+    if (options.clearFile && this._storagePath) {
+      try {
+        fs.writeFileSync(this._storagePath, '', 'utf8');
+      } catch (err) {
+        const writeError = {
+          type: 'clear_file_error',
+          message: err.message || '清空文件失败',
+          timestamp: new Date().toISOString()
+        };
+        this._writeErrors.push(writeError);
+        if (this._throwOnWriteError) {
+          throw err;
+        }
+      }
+    }
+  }
+
+  /**
+   * 获取加载错误列表（副本）
+   * @returns {object[]}
+   */
+  getLoadErrors() {
+    return [...this._loadErrors];
+  }
+
+  /**
+   * 获取写入错误列表（副本）
+   * @returns {object[]}
+   */
+  getWriteErrors() {
+    return [...this._writeErrors];
   }
 
   /**
