@@ -1,7 +1,7 @@
 {
   "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"node tests/asset/asset-package.test.js\",\"description\":\"Run asset-package tests\"}",
-  "error": "Exit code 1\nError: ENOENT: no such file or directory, open '/var/folders/4b/jfnwm38j143796pr23j8sdgh0000gn/T/ai-spec-test-asset-eoG1JD/.agents/rules/test.md'\n    at Object.readFileSync (node:fs:441:20)\n    at computePackageChecksumFromFiles (/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/src/asset/asset-package-manager.js:39:24)\n    at testVerifyChecksumHappyPath (/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/tests/asset/asset-package.test.js:395:20)\n    at main (/Users/...",
-  "timestamp": "2026-05-06T06:01:55.455Z",
+  "tool_input_preview": "{\"command\":\"node tests/agent/file-permission.test.js\",\"description\":\"Run file permission tests\"}",
+  "error": "Exit code 1\n=== file-permission.test.js ===\n  TC01: ** 匹配任意路径\n  TC02: * 匹配单层非斜杠字符\n  TC03: **/*.js 匹配任意深度的 js 文件\n  TC04: ? 匹配单个字符\n  TC05: 特定目录匹配\n  TC06: 路径分隔符正确处理\n  TC07: matchesAnyGlob 匹配任一模式\n  TC08: deniedFileScopes 优先于 allowedFileScopes\n  TC09: 文件匹配 allowedFileScopes 时允许\n  TC10: 文件不匹配 allowedFileScopes 时拒绝\n  TC11: 空 allowedFileScopes 表示全部允许\n  FAIL: testFilePermissionEmptyScopesMeansAll — Expected values to be strictly equal:\n\ntrue !== false\n\n  TC12: 无效 profile 返回拒绝\n  TC13: 无效 filePath 返回拒绝\n  T...",
+  "timestamp": "2026-05-06T06:37:03.710Z",
   "retry_count": 1
 }

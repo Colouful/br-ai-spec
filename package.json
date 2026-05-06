@@ -20,6 +20,8 @@
     "verify:install-ps1-bom": "node ./scripts/verify-install-ps1-bom.js",
     "test:p1": "node ./tests/ide/adapter-protocol.test.js && node ./tests/ide/cursor-adapter.test.js && node ./tests/ide/claude-adapter.test.js && node ./tests/ide/ide-sync.test.js && node ./tests/scanner/tech-scanner.test.js && node ./tests/asset/asset-package.test.js && node ./tests/config/config-layer.test.js && node ./tests/p1/multi-project-validation.test.js && node ./tests/p1/p1-integration.test.js",
     "verify:p1": "npm run test:registry && npm run test:runtime && npm run test:p1 && npm pack --dry-run",
+    "test:p2": "node ./tests/agent/agent-profile.test.js && node ./tests/agent/tool-permission.test.js && node ./tests/agent/file-permission.test.js && node ./tests/agent/agent-context.test.js && node ./tests/agent/collaboration-protocol.test.js && node ./tests/agent/review-repair-loop.test.js && node ./tests/agent/conflict-handler.test.js && node ./tests/p2/p2-integration.test.js",
+    "verify:p2": "npm run test:registry && npm run test:runtime && npm run test:p1 && npm run test:p2 && npm pack --dry-run",
     "prepack": "npm run verify:install-ps1-bom"
   },
   "files": [

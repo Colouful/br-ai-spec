@@ -175,16 +175,16 @@
       "type": "file"
     },
     {
+      "path": "bin/cli.js",
+      "accessCount": 14,
+      "lastAccessed": 1778048039343,
+      "type": "file"
+    },
+    {
       "path": "",
       "accessCount": 13,
       "lastAccessed": 1777278297502,
       "type": "directory"
-    },
-    {
-      "path": "bin/cli.js",
-      "accessCount": 13,
-      "lastAccessed": 1777575079318,
-      "type": "file"
     },
     {
       "path": "src/init/init-service.js",
@@ -211,6 +211,12 @@
       "type": "file"
     },
     {
+      "path": "package.json",
+      "accessCount": 12,
+      "lastAccessed": 1778049991762,
+      "type": "file"
+    },
+    {
       "path": "src/project/policy-config-writer.js",
       "accessCount": 9,
       "lastAccessed": 1778037665143,
@@ -223,15 +229,9 @@
       "type": "file"
     },
     {
-      "path": "package.json",
-      "accessCount": 8,
-      "lastAccessed": 1778047129387,
-      "type": "file"
-    },
-    {
       "path": "src/project/json-utils.js",
-      "accessCount": 7,
-      "lastAccessed": 1778037662927,
+      "accessCount": 8,
+      "lastAccessed": 1778048343747,
       "type": "file"
     },
     {
@@ -283,6 +283,18 @@
       "type": "file"
     },
     {
+      "path": "AGENTS.md",
+      "accessCount": 4,
+      "lastAccessed": 1778048244909,
+      "type": "file"
+    },
+    {
+      "path": ".agents/registry/roles.json",
+      "accessCount": 4,
+      "lastAccessed": 1778049101079,
+      "type": "file"
+    },
+    {
       "path": "tests/init/init-recommend.test.js",
       "accessCount": 3,
       "lastAccessed": 1777288626559,
@@ -313,9 +325,9 @@
       "type": "file"
     },
     {
-      "path": "AGENTS.md",
-      "accessCount": 2,
-      "lastAccessed": 1777272140350,
+      "path": ".agents/registry/profiles.json",
+      "accessCount": 3,
+      "lastAccessed": 1778048288084,
       "type": "file"
     },
     {
@@ -355,6 +367,24 @@
       "type": "file"
     },
     {
+      "path": ".agents/registry/rules.json",
+      "accessCount": 2,
+      "lastAccessed": 1778048080690,
+      "type": "file"
+    },
+    {
+      "path": ".agents/registry/skills.json",
+      "accessCount": 2,
+      "lastAccessed": 1778048080897,
+      "type": "file"
+    },
+    {
+      "path": "src/state-machine/types.js",
+      "accessCount": 2,
+      "lastAccessed": 1778048260794,
+      "type": "file"
+    },
+    {
       "path": "README.md",
       "accessCount": 1,
       "lastAccessed": 1777270751645,
@@ -379,33 +409,9 @@
       "type": "file"
     },
     {
-      "path": ".agents/registry/profiles.json",
-      "accessCount": 1,
-      "lastAccessed": 1777271071242,
-      "type": "file"
-    },
-    {
-      "path": ".agents/registry/roles.json",
-      "accessCount": 1,
-      "lastAccessed": 1777271072146,
-      "type": "file"
-    },
-    {
-      "path": ".agents/registry/rules.json",
-      "accessCount": 1,
-      "lastAccessed": 1777271072757,
-      "type": "file"
-    },
-    {
       "path": ".agents/registry/scenario-packages.json",
       "accessCount": 1,
       "lastAccessed": 1777271073562,
-      "type": "file"
-    },
-    {
-      "path": ".agents/registry/skills.json",
-      "accessCount": 1,
-      "lastAccessed": 1777271074415,
       "type": "file"
     },
     {
@@ -424,12 +430,6 @@
       "path": "src/executor/executor-registry.js",
       "accessCount": 1,
       "lastAccessed": 1777271087447,
-      "type": "file"
-    },
-    {
-      "path": "src/state-machine/types.js",
-      "accessCount": 1,
-      "lastAccessed": 1777271088309,
       "type": "file"
     },
     {
