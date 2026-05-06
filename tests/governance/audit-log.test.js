@@ -3,6 +3,9 @@
  */
 
 const assert = require('assert');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
 
 const {
   AUDIT_EVENT_TYPES,
@@ -402,6 +405,220 @@ async function testFullAuditScenario() {
 }
 
 // ============================================================
+// 持久化测试
+// ============================================================
+
+async function testPersistenceWriteNdjson() {
+  console.log('  TC25: 应在提供 storagePath 时写入 NDJSON 文件');
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-spec-audit-'));
+  const storagePath = path.join(tmpDir, 'audit.ndjson');
+
+  try {
+    const log = createAuditLog({ storagePath });
+    log.record({ eventType: 'asset_change', actor: 'user-1', message: '测试写入' });
+    log.record({ eventType: 'permission_change', actor: 'admin', message: '权限变更' });
+
+    assert.strictEqual(fs.existsSync(storagePath), true, '文件应存在');
+    const content = fs.readFileSync(storagePath, 'utf-8');
+    const lines = content.trim().split('\n');
+    assert.strictEqual(lines.length, 2, '应有 2 行记录');
+    assert.strictEqual(JSON.parse(lines[0]).eventType, 'asset_change');
+    assert.strictEqual(JSON.parse(lines[1]).eventType, 'permission_change');
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+}
+
+async function testPersistenceRestoreFromFile() {
+  console.log('  TC26: 应在重新创建实例时从 NDJSON 恢复历史记录');
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-spec-audit-'));
+  const storagePath = path.join(tmpDir, 'audit.ndjson');
+
+  try {
+    // 第一次写入
+    const log1 = createAuditLog({ storagePath });
+    log1.record({ eventType: 'asset_change', actor: 'user-1', message: '第一次写入' });
+    log1.record({ eventType: 'rollback', actor: 'admin', message: '回滚操作' });
+    assert.strictEqual(log1.size, 2);
+
+    // 第二次创建，自动恢复
+    const log2 = createAuditLog({ storagePath });
+    assert.strictEqual(log2.size, 2, '应恢复 2 条记录');
+    assert.strictEqual(log2.entries[0].message, '第一次写入');
+    assert.strictEqual(log2.entries[1].eventType, 'rollback');
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+}
+
+async function testPersistenceLoadExistingFalse() {
+  console.log('  TC27: 应在 loadExisting=false 时不加载历史记录');
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-spec-audit-'));
+  const storagePath = path.join(tmpDir, 'audit.ndjson');
+
+  try {
+    const log1 = createAuditLog({ storagePath });
+    log1.record({ eventType: 'asset_change', message: '历史记录' });
+
+    const log2 = createAuditLog({ storagePath, loadExisting: false });
+    assert.strictEqual(log2.size, 0, '不应加载历史记录');
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+}
+
+async function testPersistenceBadLineTolerance() {
+  console.log('  TC28: 应跳过损坏的 NDJSON 行并记录 loadErrors');
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-spec-audit-'));
+  const storagePath = path.join(tmpDir, 'audit.ndjson');
+
+  try {
+    // 写入：1 条正常 + 1 条损坏 + 1 条正常
+    const goodLine = JSON.stringify({ eventId: 'audit-1', eventType: 'asset_change', actor: 'system', timestamp: new Date().toISOString() });
+    const badLine = '{ 这不是合法 JSON }';
+    const goodLine2 = JSON.stringify({ eventId: 'audit-2', eventType: 'rollback', actor: 'admin', timestamp: new Date().toISOString() });
+    fs.writeFileSync(storagePath, goodLine + '\n' + badLine + '\n' + goodLine2 + '\n', 'utf-8');
+
+    const log = createAuditLog({ storagePath });
+    assert.strictEqual(log.size, 2, '应加载 2 条有效记录');
+    assert.strictEqual(log.loadErrors.length, 1, '应记录 1 个坏行错误');
+    assert.strictEqual(log.loadErrors[0].lineNumber, 2, '坏行号应为 2');
+    assert.ok(log.loadErrors[0].message, '应有错误信息');
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+}
+
+async function testPersistenceClearFile() {
+  console.log('  TC29: clear 应同时清空内存和文件');
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-spec-audit-'));
+  const storagePath = path.join(tmpDir, 'audit.ndjson');
+
+  try {
+    const log = createAuditLog({ storagePath });
+    log.record({ eventType: 'asset_change', message: '测试' });
+    assert.strictEqual(log.size, 1);
+    assert.ok(fs.readFileSync(storagePath, 'utf-8').length > 0, '文件应有内容');
+
+    log.clear();
+    assert.strictEqual(log.size, 0, '内存应清空');
+    assert.strictEqual(fs.readFileSync(storagePath, 'utf-8'), '', '文件应清空');
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+}
+
+async function testPersistenceRedactOnDisk() {
+  console.log('  TC30: 持久化文件中不应包含未红脱敏感信息');
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-spec-audit-'));
+  const storagePath = path.join(tmpDir, 'audit.ndjson');
+
+  try {
+    const log = createAuditLog({ storagePath });
+    log.record({
+      eventType: 'security_scan',
+      message: '发现 password=admin123 和 api_key=sk-secret-value',
+      metadata: { token: 'my-secret-token', nested: { secret: 'deep-secret' } },
+    });
+
+    const content = fs.readFileSync(storagePath, 'utf-8');
+    assert.ok(!content.includes('admin123'), '文件中不应包含明文 password');
+    assert.ok(!content.includes('sk-secret-value'), '文件中不应包含明文 api_key');
+    assert.ok(!content.includes('my-secret-token'), '文件中不应包含明文 token');
+    assert.ok(!content.includes('deep-secret'), '文件中不应包含嵌套 secret');
+    assert.ok(content.includes('[REDACTED]'), '文件中应包含红脱标记');
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+}
+
+async function testPersistenceExportNdjsonConsistency() {
+  console.log('  TC31: export("ndjson") 格式应与持久化文件行格式一致');
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-spec-audit-'));
+  const storagePath = path.join(tmpDir, 'audit.ndjson');
+
+  try {
+    const log = createAuditLog({ storagePath });
+    log.record({ eventType: 'asset_change', actor: 'user-1' });
+    log.record({ eventType: 'rollback', actor: 'admin' });
+
+    const fileContent = fs.readFileSync(storagePath, 'utf-8').trim();
+    const exportContent = log.export('ndjson');
+
+    // 文件每行都能 JSON.parse
+    const fileLines = fileContent.split('\n');
+    for (const line of fileLines) {
+      const parsed = JSON.parse(line);
+      assert.ok(parsed.eventId, '每行应有 eventId');
+    }
+
+    // export 格式每行也能 JSON.parse
+    const exportLines = exportContent.split('\n');
+    for (const line of exportLines) {
+      const parsed = JSON.parse(line);
+      assert.ok(parsed.eventId, 'export 每行应有 eventId');
+    }
+
+    // 两者记录数一致
+    assert.strictEqual(fileLines.length, exportLines.length, '文件行数与 export 行数应一致');
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+}
+
+async function testPersistenceNoStoragePathMemoryMode() {
+  console.log('  TC32: 无 storagePath 时应保持原内存模式行为');
+  const log = createAuditLog();
+  log.record({ eventType: 'asset_change', message: '内存模式' });
+  assert.strictEqual(log.size, 1);
+  assert.strictEqual(log.storagePath, null);
+  assert.strictEqual(log.loadErrors.length, 0);
+
+  log.clear();
+  assert.strictEqual(log.size, 0);
+}
+
+async function testPersistenceEventIdContinueAfterRestore() {
+  console.log('  TC33: 从文件恢复后 eventId 应继续递增');
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-spec-audit-'));
+  const storagePath = path.join(tmpDir, 'audit.ndjson');
+
+  try {
+    const log1 = createAuditLog({ storagePath });
+    log1.record({ eventType: 'asset_change' }); // audit-1
+    log1.record({ eventType: 'rollback' });      // audit-2
+    log1.record({ eventType: 'gray_release' });   // audit-3
+
+    const log2 = createAuditLog({ storagePath });
+    const entry = log2.record({ eventType: 'security_scan' }); // 应为 audit-4
+    assert.strictEqual(entry.eventId, 'audit-4', '新记录 eventId 应为 audit-4');
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+}
+
+async function testPersistenceMaxEntriesOnLoad() {
+  console.log('  TC34: maxEntries 应同时约束加载后的内存条数');
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-spec-audit-'));
+  const storagePath = path.join(tmpDir, 'audit.ndjson');
+
+  try {
+    const log1 = createAuditLog({ storagePath });
+    for (let i = 0; i < 5; i++) {
+      log1.record({ eventType: 'asset_change', message: `记录-${i}` });
+    }
+
+    // maxEntries=3，应只保留最后 3 条
+    const log2 = createAuditLog({ storagePath, maxEntries: 3 });
+    assert.strictEqual(log2.size, 3, '应只保留 3 条');
+    assert.strictEqual(log2.entries[0].message, '记录-2');
+    assert.strictEqual(log2.entries[2].message, '记录-4');
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+}
+
+// ============================================================
 // 主测试入口
 // ============================================================
 
@@ -433,6 +650,16 @@ async function main() {
     testToJSON,
     testQueryReturnsCopy,
     testFullAuditScenario,
+    testPersistenceWriteNdjson,
+    testPersistenceRestoreFromFile,
+    testPersistenceLoadExistingFalse,
+    testPersistenceBadLineTolerance,
+    testPersistenceClearFile,
+    testPersistenceRedactOnDisk,
+    testPersistenceExportNdjsonConsistency,
+    testPersistenceNoStoragePathMemoryMode,
+    testPersistenceEventIdContinueAfterRestore,
+    testPersistenceMaxEntriesOnLoad,
   ];
 
   let passed = 0;

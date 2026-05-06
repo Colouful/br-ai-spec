@@ -5,6 +5,9 @@
  */
 
 const assert = require('assert');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
 
 const {
   // RBAC
@@ -480,6 +483,94 @@ async function testP1P2Regression() {
 }
 
 // ============================================================
+// TC14: 审计日志持久化可作为 P4 初始事件数据源
+// ============================================================
+
+async function testAuditPersistenceAsP4DataSource() {
+  console.log('  TC14: 审计日志持久化可作为 P4 初始事件数据源');
+
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-spec-p3-integ-'));
+  const storagePath = path.join(tmpDir, 'audit.ndjson');
+
+  try {
+    // 创建带 storagePath 的 AuditLog
+    const log = createAuditLog({ storagePath });
+
+    // 写入各类事件
+    log.record({
+      eventType: 'asset_change',
+      actor: 'dev-1',
+      target: 'login-module',
+      action: 'publish',
+      message: '发布资产',
+    });
+    log.record({
+      eventType: 'security_scan',
+      actor: 'system',
+      target: 'content',
+      action: 'scan',
+      result: 'denied',
+      severity: 'error',
+      message: '发现 password="secret123"',
+      metadata: { token: 'my-api-token', nested: { api_key: 'sk-123' } },
+    });
+    log.record({
+      eventType: 'rollback',
+      actor: 'admin',
+      target: 'asset-1',
+      action: 'rollback',
+      message: '回滚到 1.0.0',
+    });
+
+    // 确认 NDJSON 文件存在
+    assert.strictEqual(fs.existsSync(storagePath), true, 'NDJSON 文件应存在');
+
+    // 确认每行都能 JSON.parse
+    const content = fs.readFileSync(storagePath, 'utf-8');
+    const lines = content.trim().split('\n');
+    assert.strictEqual(lines.length, 3, '应有 3 行记录');
+    for (const line of lines) {
+      const parsed = JSON.parse(line);
+      assert.ok(parsed.eventId, '每行应有 eventId');
+      assert.ok(parsed.timestamp, '每行应有 timestamp');
+    }
+
+    // 重新创建 AuditLog，恢复历史
+    const log2 = createAuditLog({ storagePath });
+    assert.strictEqual(log2.size, 3, '应恢复 3 条记录');
+
+    // 查询各类事件
+    const assetChanges = log2.query({ eventType: 'asset_change' });
+    assert.strictEqual(assetChanges.length, 1, '应有 1 条 asset_change');
+
+    const securityScans = log2.query({ eventType: 'security_scan' });
+    assert.strictEqual(securityScans.length, 1, '应有 1 条 security_scan');
+
+    const rollbacks = log2.query({ eventType: 'rollback' });
+    assert.strictEqual(rollbacks.length, 1, '应有 1 条 rollback');
+
+    // metadata 中敏感信息已红脱
+    const scanEntry = securityScans[0];
+    assert.ok(scanEntry.message.includes('[REDACTED]'), 'message 应已红脱');
+    assert.ok(!scanEntry.message.includes('secret123'), '不应包含明文密码');
+    assert.strictEqual(scanEntry.metadata.token, '[REDACTED]', 'token 应已红脱');
+    assert.strictEqual(scanEntry.metadata.nested.api_key, '[REDACTED]', '嵌套 api_key 应已红脱');
+
+    // export("ndjson") 可作为 P4 Event Gateway 初始输入
+    const ndjsonExport = log2.export('ndjson');
+    const exportLines = ndjsonExport.split('\n');
+    assert.strictEqual(exportLines.length, 3, 'export 应有 3 行');
+    for (const line of exportLines) {
+      const parsed = JSON.parse(line);
+      assert.ok(parsed.eventId, 'export 每行应有 eventId');
+      assert.ok(parsed.eventType, 'export 每行应有 eventType');
+    }
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+}
+
+// ============================================================
 // 主测试入口
 // ============================================================
 
@@ -500,6 +591,7 @@ async function main() {
     testInterfaceStability,
     testIdempotency,
     testP1P2Regression,
+    testAuditPersistenceAsP4DataSource,
   ];
 
   let passed = 0;

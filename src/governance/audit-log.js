@@ -1,8 +1,11 @@
 /**
- * P3.3 审计日志持久化
+ * P3.3 审计日志 — 内存模型 + NDJSON 最小文件持久化
  *
- * 审计事件 schema、写入、查询、红脱策略
+ * 审计事件 schema、写入、查询、红脱策略、NDJSON 文件持久化
  */
+
+const fs = require('fs');
+const path = require('path');
 
 // ============================================================
 // 审计事件类型
@@ -98,6 +101,96 @@ class AuditLog {
     this._nextEventId = 1;
     /** @type {number} */
     this._maxEntries = options.maxEntries || 10000;
+    /** @type {string|null} */
+    this.storagePath = options.storagePath || null;
+    /** @type {boolean} */
+    this.loadExisting = options.loadExisting !== false;
+    /** @type {boolean} */
+    this.appendOnRecord = options.appendOnRecord !== false;
+    /** @type {object[]} */
+    this.loadErrors = [];
+
+    // 指定 storagePath 且 loadExisting 不为 false 时，加载历史记录
+    if (this.storagePath && this.loadExisting) {
+      this.loadFromFile();
+    }
+  }
+
+  /**
+   * 从 NDJSON 文件加载历史记录
+   * @returns {object[]} 加载的记录
+   */
+  loadFromFile() {
+    if (!this.storagePath) return [];
+
+    try {
+      if (!fs.existsSync(this.storagePath)) return [];
+    } catch {
+      return [];
+    }
+
+    let content;
+    try {
+      content = fs.readFileSync(this.storagePath, 'utf-8');
+    } catch {
+      return [];
+    }
+
+    if (!content || !content.trim()) return [];
+
+    const lines = content.split('\n');
+    const loaded = [];
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line) continue;
+
+      try {
+        const entry = JSON.parse(line);
+        loaded.push(entry);
+
+        // 恢复 eventId 编号
+        if (entry.eventId && typeof entry.eventId === 'string') {
+          const match = entry.eventId.match(/^audit-(\d+)$/);
+          if (match) {
+            const num = parseInt(match[1], 10);
+            if (num >= this._nextEventId) {
+              this._nextEventId = num + 1;
+            }
+          }
+        }
+      } catch (err) {
+        this.loadErrors.push({
+          lineNumber: i + 1,
+          line: line.substring(0, 200),
+          message: err.message || 'JSON 解析失败',
+        });
+      }
+    }
+
+    // 应用 maxEntries 约束
+    this.entries = loaded.length > this._maxEntries
+      ? loaded.slice(-this._maxEntries)
+      : loaded;
+
+    return this.entries;
+  }
+
+  /**
+   * 追加一条已红脱的 entry 到 NDJSON 文件
+   * @param {object} entry
+   */
+  appendToFile(entry) {
+    if (!this.storagePath) return;
+    if (this.appendOnRecord === false) return;
+
+    const dir = path.dirname(this.storagePath);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+
+    const line = JSON.stringify(entry) + '\n';
+    fs.appendFileSync(this.storagePath, line, 'utf-8');
   }
 
   /**
@@ -135,6 +228,9 @@ class AuditLog {
     if (this.entries.length > this._maxEntries) {
       this.entries = this.entries.slice(-this._maxEntries);
     }
+
+    // 追加到文件（使用已红脱的 entry）
+    this.appendToFile(entry);
 
     return { ...entry, metadata: { ...entry.metadata } };
   }
@@ -208,11 +304,28 @@ class AuditLog {
   }
 
   /**
-   * 清空审计日志
+   * 清空审计日志（同时清空内存和持久化文件）
    */
   clear() {
     this.entries = [];
     this._nextEventId = 1;
+    this.loadErrors = [];
+
+    if (this.storagePath) {
+      const dir = path.dirname(this.storagePath);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      fs.writeFileSync(this.storagePath, '', 'utf-8');
+    }
+  }
+
+  /**
+   * 获取坏行加载错误
+   * @returns {object[]}
+   */
+  getLoadErrors() {
+    return this.loadErrors.map(e => ({ ...e }));
   }
 
   /**
