@@ -152,20 +152,20 @@
   "hotPaths": [
     {
       "path": "src/init/init-applier.js",
-      "accessCount": 52,
-      "lastAccessed": 1778037685745,
-      "type": "file"
-    },
-    {
-      "path": "src/init/manifest-installer.js",
-      "accessCount": 19,
-      "lastAccessed": 1778036353857,
+      "accessCount": 53,
+      "lastAccessed": 1778070120643,
       "type": "file"
     },
     {
       "path": "package.json",
-      "accessCount": 19,
-      "lastAccessed": 1778065877935,
+      "accessCount": 24,
+      "lastAccessed": 1778071788620,
+      "type": "file"
+    },
+    {
+      "path": "src/init/manifest-installer.js",
+      "accessCount": 20,
+      "lastAccessed": 1778070120270,
       "type": "file"
     },
     {
@@ -223,15 +223,15 @@
       "type": "file"
     },
     {
-      "path": "tests/ide/claude-adapter.test.js",
-      "accessCount": 8,
-      "lastAccessed": 1778038470327,
+      "path": "src/project/json-utils.js",
+      "accessCount": 9,
+      "lastAccessed": 1778070138971,
       "type": "file"
     },
     {
-      "path": "src/project/json-utils.js",
+      "path": "tests/ide/claude-adapter.test.js",
       "accessCount": 8,
-      "lastAccessed": 1778048343747,
+      "lastAccessed": 1778038470327,
       "type": "file"
     },
     {
