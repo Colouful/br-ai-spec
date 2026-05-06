@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { ensureDir } = require('../../project/json-utils');
 const { SYNC_ACTIONS, PROFILES } = require('../ide-types');
+const { IDEAdapter, createAdapterOutput } = require('./adapter-protocol');
 
 function buildClaudeEntryContent() {
   return [
@@ -278,15 +279,32 @@ function buildSettingsJson() {
   }, null, 2);
 }
 
-class ClaudeAdapter {
+class ClaudeAdapter extends IDEAdapter {
+  get adapterId() {
+    return 'claude';
+  }
+
+  detect(input) {
+    const rootDir = input.rootDir;
+    const hasClaudeDir = fs.existsSync(path.join(rootDir, '.claude'));
+    const hasAiSpec = fs.existsSync(path.join(rootDir, '.ai-spec'));
+    if (hasAiSpec && !hasClaudeDir) {
+      return { applicable: true, reason: '项目已初始化且尚未生成 Claude Code 适配文件' };
+    }
+    if (hasClaudeDir) {
+      return { applicable: true, reason: 'Claude Code 目录已存在，可更新' };
+    }
+    return { applicable: true, reason: '默认适用' };
+  }
+
   /**
    * 生成 Claude Code IDE 指针文件列表
-   * @param {{ profile: string }} context
-   * @returns {Array<{ relativePath: string, content: string, type: string }>}
+   * @param {{ profile: string }|import('./adapter-protocol').AdapterInput} input
+   * @returns {import('./adapter-protocol').AdapterOutput}
    */
-  generateFiles(context = {}) {
-    const profile = context.profile || PROFILES.AUTO;
-    return [
+  generateFiles(input = {}) {
+    const profile = input.profile || PROFILES.AUTO;
+    const files = [
       {
         relativePath: '.claude/ai-spec-auto.md',
         content: buildClaudeEntryContent(),
@@ -295,6 +313,16 @@ class ClaudeAdapter {
       {
         relativePath: '.claude/commands/spec-start.md',
         content: buildClaudeCommandContent('spec-start', profile),
+        type: 'command',
+      },
+      {
+        relativePath: '.claude/commands/spec-update.md',
+        content: buildClaudeCommandContent('spec-update', profile),
+        type: 'command',
+      },
+      {
+        relativePath: '.claude/commands/spec-status.md',
+        content: buildClaudeCommandContent('spec-status', profile),
         type: 'command',
       },
       {
@@ -338,6 +366,7 @@ class ClaudeAdapter {
         type: 'config',
       },
     ];
+    return createAdapterOutput(this.adapterId, files);
   }
 
   /**
@@ -347,10 +376,10 @@ class ClaudeAdapter {
    * @returns {Array<{ path: string, action: string }>}
    */
   write(rootDir, options = {}) {
-    const files = this.generateFiles({ profile: options.profile });
+    const output = this.generateFiles({ profile: options.profile });
     const results = [];
 
-    for (const file of files) {
+    for (const file of output.files) {
       const filePath = path.join(rootDir, file.relativePath);
       const exists = fs.existsSync(filePath);
       const action = exists ? SYNC_ACTIONS.UPDATE : SYNC_ACTIONS.CREATE;
@@ -375,7 +404,8 @@ class ClaudeAdapter {
    * @returns {Array<{ path: string, exists: boolean }>}
    */
   check(rootDir) {
-    return this.generateFiles().map((file) => ({
+    const output = this.generateFiles();
+    return output.files.map((file) => ({
       path: file.relativePath,
       exists: fs.existsSync(path.join(rootDir, file.relativePath)),
     }));

@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { ensureDir } = require('../../project/json-utils');
 const { SYNC_ACTIONS, PROFILES } = require('../ide-types');
+const { IDEAdapter, createAdapterOutput } = require('./adapter-protocol');
 
 function buildCursorRuleContent() {
   return [
@@ -358,15 +359,32 @@ function buildCommandContent(commandName, profile) {
   return '';
 }
 
-class CursorAdapter {
+class CursorAdapter extends IDEAdapter {
+  get adapterId() {
+    return 'cursor';
+  }
+
+  detect(input) {
+    const rootDir = input.rootDir;
+    const hasCursorDir = fs.existsSync(path.join(rootDir, '.cursor'));
+    const hasAiSpec = fs.existsSync(path.join(rootDir, '.ai-spec'));
+    if (hasAiSpec && !hasCursorDir) {
+      return { applicable: true, reason: '项目已初始化且尚未生成 Cursor 适配文件' };
+    }
+    if (hasCursorDir) {
+      return { applicable: true, reason: 'Cursor 目录已存在，可更新' };
+    }
+    return { applicable: true, reason: '默认适用' };
+  }
+
   /**
    * 生成 Cursor IDE 指针文件列表
-   * @param {{ profile: string }} context
-   * @returns {Array<{ relativePath: string, content: string, type: string }>}
+   * @param {{ profile: string }|import('./adapter-protocol').AdapterInput} input
+   * @returns {import('./adapter-protocol').AdapterOutput}
    */
-  generateFiles(context = {}) {
-    const profile = context.profile || PROFILES.AUTO;
-    return [
+  generateFiles(input = {}) {
+    const profile = input.profile || PROFILES.AUTO;
+    const files = [
       {
         relativePath: '.cursor/rules/ai-spec-auto.mdc',
         content: buildCursorRuleContent(),
@@ -413,6 +431,7 @@ class CursorAdapter {
         type: 'command',
       },
     ];
+    return createAdapterOutput(this.adapterId, files);
   }
 
   /**
@@ -422,10 +441,10 @@ class CursorAdapter {
    * @returns {Array<{ path: string, action: string }>}
    */
   write(rootDir, options = {}) {
-    const files = this.generateFiles({ profile: options.profile });
+    const output = this.generateFiles({ profile: options.profile });
     const results = [];
 
-    for (const file of files) {
+    for (const file of output.files) {
       const filePath = path.join(rootDir, file.relativePath);
       const exists = fs.existsSync(filePath);
       const action = exists ? SYNC_ACTIONS.UPDATE : SYNC_ACTIONS.CREATE;
@@ -450,7 +469,8 @@ class CursorAdapter {
    * @returns {Array<{ path: string, exists: boolean }>}
    */
   check(rootDir) {
-    return this.generateFiles().map((file) => ({
+    const output = this.generateFiles();
+    return output.files.map((file) => ({
       path: file.relativePath,
       exists: fs.existsSync(path.join(rootDir, file.relativePath)),
     }));

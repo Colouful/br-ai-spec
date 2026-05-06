@@ -227,15 +227,20 @@ async function testWorkspaceTopologyShapeIsStable() {
   assert.strictEqual(result.workspace.packageManager, 'pnpm');
   assert(result.workspace.rootDependencies.next);
   assert.deepStrictEqual(Object.keys(result.packages[0]).sort(), [
+    'buildTool',
     'candidates',
+    'componentLibraries',
     'confidence',
+    'language',
     'name',
     'packageId',
+    'packageManager',
     'path',
     'primary',
     'reasons',
     'recommendedManifest',
     'tags',
+    'testTools',
   ]);
 }
 

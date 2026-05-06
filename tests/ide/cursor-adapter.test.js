@@ -40,14 +40,16 @@ async function testBuildCommandContent() {
 
 async function testGenerateFiles() {
   const adapter = new CursorAdapter();
-  const files = adapter.generateFiles({ profile: 'react' });
+  const output = adapter.generateFiles({ profile: 'react' });
 
-  assert(Array.isArray(files));
-  assert(files.length === 4);
-  assert(files[0].relativePath === '.cursor/rules/ai-spec-auto.mdc');
-  assert(files[1].relativePath === '.cursor/commands/spec-start.md');
-  assert(files[2].relativePath === '.cursor/commands/spec-update.md');
-  assert(files[3].relativePath === '.cursor/commands/spec-status.md');
+  assert.strictEqual(output.adapterId, 'cursor');
+  assert(Array.isArray(output.files));
+  assert(output.files.length === 9);
+  assert(output.files[0].relativePath === '.cursor/rules/ai-spec-auto.mdc');
+  assert(output.files[1].relativePath === '.cursor/rules/00-project-overview.mdc');
+  assert(output.files[6].relativePath === '.cursor/commands/spec-start.md');
+  assert(output.files[7].relativePath === '.cursor/commands/spec-update.md');
+  assert(output.files[8].relativePath === '.cursor/commands/spec-status.md');
 }
 
 async function testWrite() {
@@ -55,7 +57,7 @@ async function testWrite() {
   const adapter = new CursorAdapter();
 
   const results = adapter.write(root, { profile: 'react' });
-  assert.strictEqual(results.length, 4);
+  assert.strictEqual(results.length, 9);
 
   for (const result of results) {
     assert.strictEqual(result.action, 'create');
@@ -74,7 +76,7 @@ async function testWriteDryRun() {
   const adapter = new CursorAdapter();
 
   const results = adapter.write(root, { profile: 'react', dryRun: true });
-  assert.strictEqual(results.length, 4);
+  assert.strictEqual(results.length, 9);
 
   // dry-run 不创建文件
   for (const result of results) {

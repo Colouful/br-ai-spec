@@ -3,6 +3,7 @@ const IDE_SCHEMA_VERSION = '1.0.0';
 const IDE_TYPES = Object.freeze({
   CURSOR: 'cursor',
   CLAUDE: 'claude',
+  CODEX: 'codex',
 });
 
 const LINK_MODES = Object.freeze({

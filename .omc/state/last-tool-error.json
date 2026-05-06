@@ -1,7 +1,7 @@
 {
   "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"node bin/cli.js spec-start \\\"测试需求：用户登录功能\\\" \\\"/Users/lizhenwei/workspace/test/test-ai-spec/prd-to-delivery-local-first-060/test_副本22\\\" --no-worktree --dry-run 2>&1\",\"description\":\"Test spec...",
-  "error": "Exit code 1\n项目初始化状态检查失败：registry 缺少资产索引：sha256:9b6c8b3552a1113ac01837731f1baa27437b452947b6bbdfae55f4ef11d747a2",
-  "timestamp": "2026-04-30T18:47:06.577Z",
+  "tool_input_preview": "{\"command\":\"node tests/p1/multi-project-validation.test.js 2>&1\",\"description\":\"Run multi-project validation tests\"}",
+  "error": "Exit code 1\nTypeError: Cannot read properties of undefined (reading 'join')\n    at testCrossAdapterConsistency (/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/tests/p1/multi-project-validation.test.js:230:74)\n    at main (/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/tests/p1/multi-project-validation.test.js:326:9)",
+  "timestamp": "2026-05-06T03:39:37.561Z",
   "retry_count": 1
 }

@@ -152,14 +152,14 @@
   "hotPaths": [
     {
       "path": "src/init/init-applier.js",
-      "accessCount": 50,
-      "lastAccessed": 1777575074313,
+      "accessCount": 52,
+      "lastAccessed": 1778037685745,
       "type": "file"
     },
     {
       "path": "src/init/manifest-installer.js",
-      "accessCount": 18,
-      "lastAccessed": 1777574022525,
+      "accessCount": 19,
+      "lastAccessed": 1778036353857,
       "type": "file"
     },
     {
@@ -170,8 +170,8 @@
     },
     {
       "path": "src/init/init-plan.js",
-      "accessCount": 16,
-      "lastAccessed": 1777573492810,
+      "accessCount": 17,
+      "lastAccessed": 1778036369954,
       "type": "file"
     },
     {
@@ -188,38 +188,62 @@
     },
     {
       "path": "src/init/init-service.js",
-      "accessCount": 12,
-      "lastAccessed": 1777573492102,
+      "accessCount": 13,
+      "lastAccessed": 1778036354280,
+      "type": "file"
+    },
+    {
+      "path": "src/ide/adapters/claude-adapter.js",
+      "accessCount": 13,
+      "lastAccessed": 1778038453904,
       "type": "file"
     },
     {
       "path": "src/project/lock-file-writer.js",
-      "accessCount": 10,
-      "lastAccessed": 1778033382685,
-      "type": "file"
-    },
-    {
-      "path": "src/project/policy-config-writer.js",
-      "accessCount": 7,
-      "lastAccessed": 1777573669676,
+      "accessCount": 12,
+      "lastAccessed": 1778036592740,
       "type": "file"
     },
     {
       "path": "src/ide/adapters/cursor-adapter.js",
+      "accessCount": 12,
+      "lastAccessed": 1778038453396,
+      "type": "file"
+    },
+    {
+      "path": "src/project/policy-config-writer.js",
+      "accessCount": 9,
+      "lastAccessed": 1778037665143,
+      "type": "file"
+    },
+    {
+      "path": "tests/ide/claude-adapter.test.js",
+      "accessCount": 8,
+      "lastAccessed": 1778038470327,
+      "type": "file"
+    },
+    {
+      "path": "src/project/json-utils.js",
       "accessCount": 7,
-      "lastAccessed": 1777574271680,
+      "lastAccessed": 1778037662927,
+      "type": "file"
+    },
+    {
+      "path": "src/scanner/engine.js",
+      "accessCount": 7,
+      "lastAccessed": 1778038452879,
+      "type": "file"
+    },
+    {
+      "path": "tests/ide/cursor-adapter.test.js",
+      "accessCount": 7,
+      "lastAccessed": 1778038469768,
       "type": "file"
     },
     {
       "path": "src/init/ide-pointer-injector.js",
       "accessCount": 6,
       "lastAccessed": 1777574290550,
-      "type": "file"
-    },
-    {
-      "path": "src/ide/adapters/claude-adapter.js",
-      "accessCount": 6,
-      "lastAccessed": 1777574424041,
       "type": "file"
     },
     {
@@ -230,8 +254,20 @@
     },
     {
       "path": "src/init/types.js",
+      "accessCount": 6,
+      "lastAccessed": 1778036439947,
+      "type": "file"
+    },
+    {
+      "path": "src/ide/ide-types.js",
+      "accessCount": 6,
+      "lastAccessed": 1778036600952,
+      "type": "file"
+    },
+    {
+      "path": "src/ide/ide-service.js",
       "accessCount": 5,
-      "lastAccessed": 1777288738200,
+      "lastAccessed": 1778034878760,
       "type": "file"
     },
     {
@@ -241,15 +277,9 @@
       "type": "file"
     },
     {
-      "path": "src/scanner/engine.js",
+      "path": "src/project/project-files.js",
       "accessCount": 4,
-      "lastAccessed": 1777289830191,
-      "type": "file"
-    },
-    {
-      "path": "src/project/json-utils.js",
-      "accessCount": 4,
-      "lastAccessed": 1778033066542,
+      "lastAccessed": 1778037663363,
       "type": "file"
     },
     {
@@ -265,45 +295,33 @@
       "type": "file"
     },
     {
+      "path": "src/ide/anchors/markdown-anchor-writer.js",
+      "accessCount": 3,
+      "lastAccessed": 1778034399017,
+      "type": "file"
+    },
+    {
+      "path": "tests/ide/ide-sync.test.js",
+      "accessCount": 3,
+      "lastAccessed": 1778035598911,
+      "type": "file"
+    },
+    {
+      "path": "manifest.json",
+      "accessCount": 3,
+      "lastAccessed": 1778036354762,
+      "type": "file"
+    },
+    {
       "path": "AGENTS.md",
       "accessCount": 2,
       "lastAccessed": 1777272140350,
       "type": "file"
     },
     {
-      "path": "tests/ide/cursor-adapter.test.js",
-      "accessCount": 2,
-      "lastAccessed": 1777274118478,
-      "type": "file"
-    },
-    {
-      "path": "tests/ide/claude-adapter.test.js",
-      "accessCount": 2,
-      "lastAccessed": 1777274128216,
-      "type": "file"
-    },
-    {
-      "path": "src/ide/ide-types.js",
-      "accessCount": 2,
-      "lastAccessed": 1777275413540,
-      "type": "file"
-    },
-    {
-      "path": "src/ide/anchors/markdown-anchor-writer.js",
-      "accessCount": 2,
-      "lastAccessed": 1777275461869,
-      "type": "file"
-    },
-    {
       "path": "tests/ide/ide-doctor.test.js",
       "accessCount": 2,
       "lastAccessed": 1777275476921,
-      "type": "file"
-    },
-    {
-      "path": "tests/ide/ide-sync.test.js",
-      "accessCount": 2,
-      "lastAccessed": 1777275483962,
       "type": "file"
     },
     {
@@ -319,33 +337,27 @@
       "type": "file"
     },
     {
-      "path": "src/project/project-files.js",
-      "accessCount": 2,
-      "lastAccessed": 1777278307100,
-      "type": "file"
-    },
-    {
-      "path": "manifest.json",
-      "accessCount": 2,
-      "lastAccessed": 1777573504607,
-      "type": "file"
-    },
-    {
       "path": "src/check/check-service.js",
       "accessCount": 2,
       "lastAccessed": 1777573513295,
       "type": "file"
     },
     {
-      "path": "README.md",
-      "accessCount": 1,
-      "lastAccessed": 1777270751645,
+      "path": "src/ide/links/link-mode-resolver.js",
+      "accessCount": 2,
+      "lastAccessed": 1778034397897,
       "type": "file"
     },
     {
       "path": "src/sync/sync-service.js",
+      "accessCount": 2,
+      "lastAccessed": 1778036451801,
+      "type": "file"
+    },
+    {
+      "path": "README.md",
       "accessCount": 1,
-      "lastAccessed": 1777271062488,
+      "lastAccessed": 1777270751645,
       "type": "file"
     },
     {
@@ -418,18 +430,6 @@
       "path": "src/state-machine/types.js",
       "accessCount": 1,
       "lastAccessed": 1777271088309,
-      "type": "file"
-    },
-    {
-      "path": "src/ide/links/link-mode-resolver.js",
-      "accessCount": 1,
-      "lastAccessed": 1777272837190,
-      "type": "file"
-    },
-    {
-      "path": "src/ide/ide-service.js",
-      "accessCount": 1,
-      "lastAccessed": 1777272964843,
       "type": "file"
     },
     {

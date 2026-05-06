@@ -39,6 +39,49 @@ function detectPackageManager(packageDir, packageJson) {
   return null;
 }
 
+const TEST_TOOL_MARKERS = {
+  vitest: ['vitest'],
+  jest: ['jest', '@jest/core', 'ts-jest'],
+  mocha: ['mocha', '@types/mocha'],
+  cypress: ['cypress'],
+  playwright: ['playwright', '@playwright/test'],
+  'testing-library': ['@testing-library/react', '@testing-library/vue', '@testing-library/jest-dom'],
+};
+
+const COMPONENT_LIBRARY_MARKERS = {
+  'ant-design': ['antd', '@ant-design/icons', '@ant-design/pro-components'],
+  'element-plus': ['element-plus'],
+  'element-ui': ['element-ui'],
+  'ant-design-vue': ['ant-design-vue'],
+  'arco-design': ['@arco-design/web-react', '@arco-design/web-vue'],
+  'naive-ui': ['naive-ui'],
+  'vuetify': ['vuetify'],
+  'chakra-ui': ['@chakra-ui/react', '@chakra-ui/vue'],
+  'mui': ['@mui/material', '@mui/icons-material', '@mui/x-data-grid'],
+  'radix-ui': ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu'],
+  'shadcn-ui': ['@shadcn/ui'],
+};
+
+function detectTestTools(allDeps) {
+  const found = [];
+  for (const [tool, markers] of Object.entries(TEST_TOOL_MARKERS)) {
+    if (markers.some((m) => allDeps[m])) {
+      found.push(tool);
+    }
+  }
+  return found;
+}
+
+function detectComponentLibraries(allDeps) {
+  const found = [];
+  for (const [lib, markers] of Object.entries(COMPONENT_LIBRARY_MARKERS)) {
+    if (markers.some((m) => allDeps[m])) {
+      found.push(lib);
+    }
+  }
+  return found;
+}
+
 function collectKeyPaths(packageDir) {
   const candidates = [
     'package.json',
@@ -143,6 +186,8 @@ class FactExtractor {
       scripts: packageJson?.scripts || {},
       dependencies,
       devDependencies,
+      testTools: detectTestTools({ ...dependencies, ...devDependencies }),
+      componentLibraries: detectComponentLibraries({ ...dependencies, ...devDependencies }),
       manifestFiles: keyPaths.filter((item) => ['package.json', 'pom.xml', 'build.gradle', 'build.gradle.kts', 'go.mod', 'pyproject.toml', 'requirements.txt'].includes(item)),
       keyPaths,
       java: {

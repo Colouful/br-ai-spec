@@ -23,6 +23,11 @@ function buildPackageResult(facts, detection) {
     recommendedManifest: primary?.manifestSlug || undefined,
     confidence: primary?.confidence || 0,
     reasons: primary?.reasons || [],
+    buildTool: primary?.buildTool || undefined,
+    language: primary?.language || undefined,
+    testTools: facts.testTools || [],
+    componentLibraries: facts.componentLibraries || [],
+    packageManager: facts.packageManager || undefined,
   };
 }
 

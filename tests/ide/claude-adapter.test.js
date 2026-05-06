@@ -39,14 +39,16 @@ async function testBuildClaudeCommandContent() {
 
 async function testGenerateFiles() {
   const adapter = new ClaudeAdapter();
-  const files = adapter.generateFiles({ profile: 'vue' });
+  const output = adapter.generateFiles({ profile: 'vue' });
 
-  assert(Array.isArray(files));
-  assert(files.length === 4);
-  assert(files[0].relativePath === '.claude/ai-spec-auto.md');
-  assert(files[1].relativePath === '.claude/commands/spec-start.md');
-  assert(files[2].relativePath === '.claude/commands/spec-update.md');
-  assert(files[3].relativePath === '.claude/commands/spec-status.md');
+  assert.strictEqual(output.adapterId, 'claude');
+  assert(Array.isArray(output.files));
+  assert(output.files.length === 12);
+  assert(output.files[0].relativePath === '.claude/ai-spec-auto.md');
+  assert(output.files[1].relativePath === '.claude/commands/spec-start.md');
+  assert(output.files[2].relativePath === '.claude/commands/spec-update.md');
+  assert(output.files[3].relativePath === '.claude/commands/spec-status.md');
+  assert(output.files[4].relativePath === '.claude/commands/spec-implement.md');
 }
 
 async function testWrite() {
@@ -54,7 +56,7 @@ async function testWrite() {
   const adapter = new ClaudeAdapter();
 
   const results = adapter.write(root, { profile: 'react' });
-  assert.strictEqual(results.length, 4);
+  assert.strictEqual(results.length, 12);
 
   for (const result of results) {
     assert.strictEqual(result.action, 'create');
@@ -73,7 +75,7 @@ async function testWriteDryRun() {
   const adapter = new ClaudeAdapter();
 
   const results = adapter.write(root, { profile: 'vue', dryRun: true });
-  assert.strictEqual(results.length, 4);
+  assert.strictEqual(results.length, 12);
 
   for (const result of results) {
     assert.strictEqual(result.action, 'create');

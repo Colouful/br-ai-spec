@@ -75,8 +75,8 @@ class IdeService {
     // 4. 生成 Cursor 指针文件
     let linkModeUsed = LINK_MODES.COPY;
     if (ideList.includes(IDE_TYPES.CURSOR)) {
-      const cursorFiles = this.cursorAdapter.generateFiles({ profile });
-      for (const file of cursorFiles) {
+      const cursorOutput = this.cursorAdapter.generateFiles({ profile });
+      for (const file of cursorOutput.files) {
         try {
           const result = this.linkResolver.write(rootDir, file.relativePath, file.content, {
             mode: linkMode,
@@ -94,8 +94,8 @@ class IdeService {
 
     // 5. 生成 Claude 指针文件
     if (ideList.includes(IDE_TYPES.CLAUDE)) {
-      const claudeFiles = this.claudeAdapter.generateFiles({ profile });
-      for (const file of claudeFiles) {
+      const claudeOutput = this.claudeAdapter.generateFiles({ profile });
+      for (const file of claudeOutput.files) {
         try {
           const result = this.linkResolver.write(rootDir, file.relativePath, file.content, {
             mode: linkMode,
