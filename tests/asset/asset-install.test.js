@@ -268,6 +268,49 @@ async function testPersistenceBadLineTolerance() {
 }
 
 // ============================================================
+// P5.8 — metadata 脱敏
+// ============================================================
+
+async function testMetadataRedactsToken() {
+  const ai = createAssetInstall();
+  const r = ai.record({ assetId: 'a', version: '1.0.0', projectId: 'p', metadata: { token: 'secret123' } });
+  assert.strictEqual(r.metadata.token, '[REDACTED]');
+}
+
+async function testMetadataRedactsPassword() {
+  const ai = createAssetInstall();
+  const r = ai.record({ assetId: 'a', version: '1.0.0', projectId: 'p', metadata: { password: 'pw123' } });
+  assert.strictEqual(r.metadata.password, '[REDACTED]');
+}
+
+async function testMetadataRedactsSecret() {
+  const ai = createAssetInstall();
+  const r = ai.record({ assetId: 'a', version: '1.0.0', projectId: 'p', metadata: { secret: 's1' } });
+  assert.strictEqual(r.metadata.secret, '[REDACTED]');
+}
+
+async function testMetadataRedactsApiKey() {
+  const ai = createAssetInstall();
+  const r = ai.record({ assetId: 'a', version: '1.0.0', projectId: 'p', metadata: { apiKey: 'key1' } });
+  assert.strictEqual(r.metadata.apiKey, '[REDACTED]');
+}
+
+async function testMetadataRedactsRawPrompt() {
+  const ai = createAssetInstall();
+  const r = ai.record({ assetId: 'a', version: '1.0.0', projectId: 'p', metadata: { rawPrompt: 'user input' } });
+  assert.strictEqual(r.metadata.rawPrompt, '[REDACTED]');
+}
+
+async function testGetListReturnsCopies() {
+  const ai = createAssetInstall();
+  ai.record({ assetId: 'a', version: '1.0.0', projectId: 'p', metadata: { x: 1 } });
+  const list = ai.list();
+  list[0].metadata.x = 999;
+  const list2 = ai.list();
+  assert.strictEqual(list2[0].metadata.x, 1);
+}
+
+// ============================================================
 // P5.1.4 — 导出
 // ============================================================
 
@@ -317,6 +360,14 @@ async function main() {
   await testPersistenceWriteAndReload();
   await testPersistenceStatusUpdateSurvivesReload();
   await testPersistenceBadLineTolerance();
+
+  // P5.8 metadata 脱敏
+  await testMetadataRedactsToken();
+  await testMetadataRedactsPassword();
+  await testMetadataRedactsSecret();
+  await testMetadataRedactsApiKey();
+  await testMetadataRedactsRawPrompt();
+  await testGetListReturnsCopies();
 
   // 导出
   await testIndexExports();

@@ -311,6 +311,49 @@ async function testPersistenceBadLineTolerance() {
 }
 
 // ============================================================
+// P5.8 — metadata 脱敏
+// ============================================================
+
+async function testMetadataRedactsToken() {
+  const af = createAssetFeedback();
+  const r = af.submit({ assetId: 'a', version: '1.0.0', metadata: { token: 'secret123' } });
+  assert.strictEqual(r.metadata.token, '[REDACTED]');
+}
+
+async function testMetadataRedactsPassword() {
+  const af = createAssetFeedback();
+  const r = af.submit({ assetId: 'a', version: '1.0.0', metadata: { password: 'pw123' } });
+  assert.strictEqual(r.metadata.password, '[REDACTED]');
+}
+
+async function testMetadataRedactsSecret() {
+  const af = createAssetFeedback();
+  const r = af.submit({ assetId: 'a', version: '1.0.0', metadata: { secret: 's1' } });
+  assert.strictEqual(r.metadata.secret, '[REDACTED]');
+}
+
+async function testMetadataRedactsApiKey() {
+  const af = createAssetFeedback();
+  const r = af.submit({ assetId: 'a', version: '1.0.0', metadata: { apiKey: 'key1' } });
+  assert.strictEqual(r.metadata.apiKey, '[REDACTED]');
+}
+
+async function testMetadataRedactsRawPrompt() {
+  const af = createAssetFeedback();
+  const r = af.submit({ assetId: 'a', version: '1.0.0', metadata: { rawPrompt: 'user input' } });
+  assert.strictEqual(r.metadata.rawPrompt, '[REDACTED]');
+}
+
+async function testGetListReturnsCopies() {
+  const af = createAssetFeedback();
+  af.submit({ assetId: 'a', version: '1.0.0', metadata: { x: 1 } });
+  const list = af.list();
+  list[0].metadata.x = 999;
+  const list2 = af.list();
+  assert.strictEqual(list2[0].metadata.x, 1);
+}
+
+// ============================================================
 // P5.1.5 — 导出
 // ============================================================
 
@@ -365,6 +408,14 @@ async function main() {
   // 持久化
   await testPersistenceWriteAndReload();
   await testPersistenceBadLineTolerance();
+
+  // P5.8 metadata 脱敏
+  await testMetadataRedactsToken();
+  await testMetadataRedactsPassword();
+  await testMetadataRedactsSecret();
+  await testMetadataRedactsApiKey();
+  await testMetadataRedactsRawPrompt();
+  await testGetListReturnsCopies();
 
   // 导出
   await testIndexExports();

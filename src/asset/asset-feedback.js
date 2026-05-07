@@ -7,6 +7,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { redactObject } = require('../governance/audit-log');
 
 // ============================================================
 // 常量
@@ -172,7 +173,7 @@ class AssetFeedback {
       category: spec.category || 'quality',
       status: 'pending',
       createdAt: new Date().toISOString(),
-      metadata: spec.metadata || {},
+      metadata: redactObject(spec.metadata || {}),
     };
 
     this._records.set(record.feedbackId, record);

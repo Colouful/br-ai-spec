@@ -26,6 +26,22 @@ function cleanupTempDir(dir) {
   try { fs.rmSync(dir, { recursive: true, force: true }); } catch {}
 }
 
+function createTestPackage(packagesDir, assetId, version, files = {}) {
+  const pkgDir = path.join(packagesDir, assetId, version);
+  fs.mkdirSync(pkgDir, { recursive: true });
+  const generatedFiles = Object.keys(files);
+  for (const [rel, content] of Object.entries(files)) {
+    const filePath = path.join(pkgDir, rel);
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    fs.writeFileSync(filePath, content, 'utf-8');
+  }
+  const manifest = {
+    assetId, assetType: 'rule', version, source: 'local',
+    checksum: 'sha256:test-checksum', lockedAt: new Date().toISOString(), generatedFiles,
+  };
+  fs.writeFileSync(path.join(pkgDir, 'manifest.json'), JSON.stringify(manifest, null, 2), 'utf-8');
+}
+
 // ============================================================
 // TC01: 全链路 AssetRegistry — 注册→查询→更新→注销
 // ============================================================
@@ -152,8 +168,13 @@ async function testTC06_ManagerFullChain() {
 
 async function testTC07_InstallerFullChain() {
   const tmpDir = createTempDir();
+  const packagesDir = path.join(tmpDir, 'packages');
+  const projectRoot = path.join(tmpDir, 'project');
+  fs.mkdirSync(projectRoot, { recursive: true });
   try {
-    const installer = createAssetInstaller({ storageDir: tmpDir });
+    createTestPackage(packagesDir, 'tc07', '1.0.0', { 'rules/r.md': 'v1' });
+    createTestPackage(packagesDir, 'tc07', '2.0.0', { 'rules/r.md': 'v2' });
+    const installer = createAssetInstaller({ storageDir: tmpDir, packagesDir, projectRoot });
 
     installer.registry.register({ assetId: 'tc07', assetType: 'rule', name: 'searchable', currentVersion: '1.0.0', description: '测试资产' });
 
@@ -164,14 +185,17 @@ async function testTC07_InstallerFullChain() {
     // 安装
     const inst = installer.install('tc07', '1.0.0', 'proj-01');
     assert.strictEqual(inst.status, 'installed');
+    assert(inst.installedFiles.length > 0);
 
     // 升级
     const upg = installer.upgrade('tc07', '2.0.0', 'proj-01');
     assert.strictEqual(upg.status, 'upgraded');
+    assert.strictEqual(upg.metadata.previousVersion, '1.0.0');
 
     // 回滚
     const rb = installer.rollback('tc07', 'proj-01');
     assert.strictEqual(rb.status, 'rolled_back');
+    assert.strictEqual(rb.version, '1.0.0');
 
     // Lock
     const lock = installer.updateLock('proj-01');
@@ -285,8 +309,13 @@ async function testTC11_CrossModuleRegistryVersionDep() {
 
 async function testTC12_CrossModuleInstallLockFeedback() {
   const tmpDir = createTempDir();
+  const packagesDir = path.join(tmpDir, 'packages');
+  const projectRoot = path.join(tmpDir, 'project');
+  fs.mkdirSync(projectRoot, { recursive: true });
   try {
-    const installer = createAssetInstaller({ storageDir: tmpDir });
+    createTestPackage(packagesDir, 'tc12', '1.0.0', { 'r.md': 'v1' });
+    createTestPackage(packagesDir, 'tc12', '2.0.0', { 'r.md': 'v2' });
+    const installer = createAssetInstaller({ storageDir: tmpDir, packagesDir, projectRoot });
     installer.registry.register({ assetId: 'tc12', assetType: 'rule', name: 'test', currentVersion: '1.0.0' });
 
     installer.install('tc12', '1.0.0', 'proj-01');

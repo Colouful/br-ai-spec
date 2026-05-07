@@ -66,7 +66,7 @@ function redactSensitive(text) {
   return result;
 }
 
-const SENSITIVE_KEY_PATTERNS = /^(password|api[_-]?key|secret|token|access[_-]?key|private[_-]?key)$/i;
+const SENSITIVE_KEY_PATTERNS = /^(password|api[_-]?key|secret|token|access[_-]?key|private[_-]?key|raw[_-]?prompt)$/i;
 
 function redactObject(obj) {
   if (obj === null || obj === undefined) return obj;

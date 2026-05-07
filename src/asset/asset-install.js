@@ -7,6 +7,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { redactObject } = require('../governance/audit-log');
 
 // ============================================================
 // 常量
@@ -152,7 +153,7 @@ class AssetInstall {
       installedAt: new Date().toISOString(),
       installedFiles: Array.isArray(spec.installedFiles) ? [...spec.installedFiles] : [],
       checksum: spec.checksum || '',
-      metadata: spec.metadata || {},
+      metadata: redactObject(spec.metadata || {}),
     };
 
     this._records.set(record.installId, record);

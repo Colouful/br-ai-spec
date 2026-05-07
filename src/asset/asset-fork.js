@@ -30,6 +30,9 @@ class AssetFork {
     /** @type {Map<string, object>} forkKey(assetId:projectId) → ForkRecord */
     this._forks = new Map();
 
+    /** @type {Array<{line: number, raw: string, error: string}>} */
+    this.loadErrors = [];
+
     /** @type {string|null} */
     this._storagePath = storageDir ? path.join(storageDir, 'forks.ndjson') : null;
 
@@ -63,8 +66,8 @@ class AssetFork {
     const lines = content.split('\n');
     this._forks.clear();
 
-    for (const line of lines) {
-      const trimmed = line.trim();
+    for (let i = 0; i < lines.length; i++) {
+      const trimmed = lines[i].trim();
       if (!trimmed) continue;
       try {
         const entry = JSON.parse(trimmed);
@@ -72,8 +75,8 @@ class AssetFork {
           const key = this._key(entry.assetId, entry.projectId);
           this._forks.set(key, entry);
         }
-      } catch {
-        // 坏行容错
+      } catch (err) {
+        this.loadErrors.push({ line: i + 1, raw: trimmed, error: err.message });
       }
     }
   }
@@ -90,6 +93,14 @@ class AssetFork {
 
   _key(assetId, projectId) {
     return `${assetId}:${projectId}`;
+  }
+
+  /**
+   * 获取加载坏行错误列表
+   * @returns {Array<{line: number, raw: string, error: string}>}
+   */
+  getLoadErrors() {
+    return [...this.loadErrors];
   }
 
   // ============================================================

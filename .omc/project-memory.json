@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1778033011739,
+  "lastScanned": 1778120397770,
   "projectRoot": "/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec",
   "techStack": {
     "languages": [
@@ -28,6 +28,16 @@
       "test:registry": "node ./tests/registry/validate-registry.test.js",
       "test:runtime": "node ./tests/runtime/command-template-renderer.test.js && node ./tests/runtime/runtime-bootstrap.test.js && node ./tests/runtime/runtime-launcher.test.js && node ./tests/runtime/runtime-state-checkpoints.test.js && node ./tests/runtime/archive-change.test.js && node ./tests/runtime/task-orchestrator-runner.test.js && node ./tests/runtime/expert-executor.test.js && node ./tests/runtime/auto-fix-runtime.test.js && node ./tests/runtime/protocol-workflow-registry.test.js && node ./tests/runtime/protocol-update-fast-path.test.js && node ./tests/runtime/protocol-interaction-enhancements.test.js && node ./tests/runtime/spec-start-replay.test.js && node ./tests/runtime/demo-runtime-smoke.test.js && node ./tests/runtime/expert-delivery-template-content.test.js && node ./tests/runtime/sync.test.js && node ./tests/runtime/visual-command.test.js && node ./tests/runtime/hub-install.test.js && node ./tests/runtime/hub-diff.test.js && node ./tests/runtime/hub-upgrade-rollback.test.js && node ./tests/runtime/hub-runtime-report.test.js",
       "verify:install-ps1-bom": "node ./scripts/verify-install-ps1-bom.js",
+      "test:p1": "node ./tests/ide/adapter-protocol.test.js && node ./tests/ide/cursor-adapter.test.js && node ./tests/ide/claude-adapter.test.js && node ./tests/ide/ide-sync.test.js && node ./tests/scanner/tech-scanner.test.js && node ./tests/asset/asset-package.test.js && node ./tests/config/config-layer.test.js && node ./tests/p1/multi-project-validation.test.js && node ./tests/p1/p1-integration.test.js",
+      "verify:p1": "npm run test:registry && npm run test:runtime && npm run test:p1 && npm pack --dry-run",
+      "test:p2": "node ./tests/agent/agent-profile.test.js && node ./tests/agent/tool-permission.test.js && node ./tests/agent/file-permission.test.js && node ./tests/agent/agent-context.test.js && node ./tests/agent/collaboration-protocol.test.js && node ./tests/agent/review-repair-loop.test.js && node ./tests/agent/conflict-handler.test.js && node ./tests/p2/p2-integration.test.js",
+      "verify:p2": "npm run test:registry && npm run test:runtime && npm run test:p1 && npm run test:p2 && npm pack --dry-run",
+      "test:p3": "node ./tests/governance/rbac.test.js && node ./tests/governance/asset-review.test.js && node ./tests/governance/audit-log.test.js && node ./tests/governance/gray-release.test.js && node ./tests/governance/rollback.test.js && node ./tests/governance/security-policy.test.js && node ./tests/p3/p3-integration.test.js",
+      "verify:p3": "npm run test:registry && npm run test:runtime && npm run test:p1 && npm run test:p2 && npm run test:p3 && npm pack --dry-run",
+      "test:p4": "node ./tests/visual/event-gateway.test.js && node ./tests/visual/timeline.test.js && node ./tests/visual/hook-dashboard.test.js && node ./tests/visual/agent-visual.test.js && node ./tests/visual/metrics.test.js && node ./tests/visual/risk-board.test.js && node ./tests/p4/p4-integration.test.js",
+      "verify:p4": "npm run test:registry && npm run test:runtime && npm run test:p1 && npm run test:p2 && npm run test:p3 && npm run test:p4 && npm pack --dry-run",
+      "test:p5": "node ./tests/asset/asset-registry.test.js && node ./tests/asset/asset-version.test.js && node ./tests/asset/asset-dependency.test.js && node ./tests/asset/asset-install.test.js && node ./tests/asset/asset-feedback.test.js && node ./tests/asset/asset-manager.test.js && node ./tests/asset/asset-installer.test.js && node ./tests/asset/asset-lifecycle.test.js && node ./tests/asset/asset-fork.test.js && node ./tests/asset/asset-quality.test.js && node ./tests/p5/p5-integration.test.js",
+      "verify:p5": "npm run test:registry && npm run test:runtime && npm run test:p1 && npm run test:p2 && npm run test:p3 && npm run test:p4 && npm run test:p5 && npm pack --dry-run",
       "prepack": "npm run verify:install-ps1-bom"
     }
   },
@@ -55,7 +65,7 @@
       "path": "bin",
       "purpose": "Executable scripts",
       "fileCount": 43,
-      "lastAccessed": 1778033011721,
+      "lastAccessed": 1778120397742,
       "keyFiles": [
         "archive-change.js",
         "check-command.js",
@@ -68,14 +78,14 @@
       "path": "configs",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1778033011721,
+      "lastAccessed": 1778120397749,
       "keyFiles": []
     },
     "docs": {
       "path": "docs",
       "purpose": "Documentation",
       "fileCount": 21,
-      "lastAccessed": 1778033011722,
+      "lastAccessed": 1778120397750,
       "keyFiles": [
         "AI Coding时代，我们处在什么位置？.md",
         "README.md",
@@ -88,7 +98,7 @@
       "path": "internal",
       "purpose": null,
       "fileCount": 3,
-      "lastAccessed": 1778033011723,
+      "lastAccessed": 1778120397751,
       "keyFiles": [
         "ai-protocol-workflow.js",
         "hub-client.js",
@@ -99,7 +109,7 @@
       "path": "openspec",
       "purpose": null,
       "fileCount": 1,
-      "lastAccessed": 1778033011723,
+      "lastAccessed": 1778120397752,
       "keyFiles": [
         "config.yaml.template"
       ]
@@ -108,7 +118,7 @@
       "path": "scripts",
       "purpose": "Build/utility scripts",
       "fileCount": 13,
-      "lastAccessed": 1778033011723,
+      "lastAccessed": 1778120397753,
       "keyFiles": [
         "acceptance-zero-intrusion.sh",
         "hub-sync-assets.config.example.json",
@@ -121,31 +131,41 @@
       "path": "src",
       "purpose": "Source code",
       "fileCount": 0,
-      "lastAccessed": 1778033011723,
+      "lastAccessed": 1778120397753,
       "keyFiles": []
     },
     "tests": {
       "path": "tests",
       "purpose": "Test files",
       "fileCount": 0,
-      "lastAccessed": 1778033011723,
+      "lastAccessed": 1778120397753,
       "keyFiles": []
     },
     "openspec/schemas": {
       "path": "openspec/schemas",
       "purpose": "Schema definitions",
       "fileCount": 0,
-      "lastAccessed": 1778033011724,
+      "lastAccessed": 1778120397754,
       "keyFiles": []
     },
     "src/config": {
       "path": "src/config",
       "purpose": "Configuration files",
-      "fileCount": 2,
-      "lastAccessed": 1778033011724,
+      "fileCount": 3,
+      "lastAccessed": 1778120397755,
       "keyFiles": [
+        "config-layer.js",
         "config-loader.js",
         "defaults.js"
+      ]
+    },
+    "tests/config": {
+      "path": "tests/config",
+      "purpose": "Configuration files",
+      "fileCount": 1,
+      "lastAccessed": 1778120397755,
+      "keyFiles": [
+        "config-layer.test.js"
       ]
     }
   },
@@ -158,8 +178,8 @@
     },
     {
       "path": "package.json",
-      "accessCount": 24,
-      "lastAccessed": 1778071788620,
+      "accessCount": 26,
+      "lastAccessed": 1778122579678,
       "type": "file"
     },
     {
@@ -217,15 +237,15 @@
       "type": "file"
     },
     {
-      "path": "src/project/policy-config-writer.js",
-      "accessCount": 9,
-      "lastAccessed": 1778037665143,
+      "path": "src/project/json-utils.js",
+      "accessCount": 10,
+      "lastAccessed": 1778120086775,
       "type": "file"
     },
     {
-      "path": "src/project/json-utils.js",
+      "path": "src/project/policy-config-writer.js",
       "accessCount": 9,
-      "lastAccessed": 1778070138971,
+      "lastAccessed": 1778037665143,
       "type": "file"
     },
     {

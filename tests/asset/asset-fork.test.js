@@ -235,6 +235,40 @@ async function testPersistenceWriteAndReload() {
 }
 
 // ============================================================
+// P5.8 — loadErrors
+// ============================================================
+
+async function testLoadErrorsRecordsBadLine() {
+  const tmpDir = createTempDir();
+  try {
+    const storagePath = path.join(tmpDir, 'forks.ndjson');
+    fs.writeFileSync(storagePath, '{"valid":true,"assetId":"a","projectId":"p"}\nnot-json\n{"assetId":"b","projectId":"q"}\n', 'utf-8');
+    const fork = createAssetFork({ storageDir: tmpDir });
+
+    assert(fork.loadErrors.length === 1, '应记录 1 个坏行');
+    assert.strictEqual(fork.loadErrors[0].line, 2);
+    assert(fork.loadErrors[0].error.includes('JSON'));
+  } finally {
+    cleanupTempDir(tmpDir);
+  }
+}
+
+async function testGetLoadErrorsReturnsCopy() {
+  const tmpDir = createTempDir();
+  try {
+    const storagePath = path.join(tmpDir, 'forks.ndjson');
+    fs.writeFileSync(storagePath, 'bad\n', 'utf-8');
+    const fork = createAssetFork({ storageDir: tmpDir });
+
+    const errors = fork.getLoadErrors();
+    errors.push({ fake: true });
+    assert.strictEqual(fork.getLoadErrors().length, 1, '应返回副本');
+  } finally {
+    cleanupTempDir(tmpDir);
+  }
+}
+
+// ============================================================
 // P5.5 — 导出
 // ============================================================
 
@@ -282,6 +316,10 @@ async function main() {
 
   // 持久化
   await testPersistenceWriteAndReload();
+
+  // P5.8 loadErrors
+  await testLoadErrorsRecordsBadLine();
+  await testGetLoadErrorsReturnsCopy();
 
   // 导出
   await testIndexExports();
