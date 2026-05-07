@@ -1,7 +1,0 @@
-{
-  "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"ls -la /Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/p5/ 2>&1\",\"description\":\"List P5 docs directory\"}",
-  "error": "Exit code 1\nls: /Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/docs/p5/: No such file or directory",
-  "timestamp": "2026-05-06T13:18:09.677Z",
-  "retry_count": 1
-}
