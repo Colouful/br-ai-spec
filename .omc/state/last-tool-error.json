@@ -1,7 +1,0 @@
-{
-  "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"node ./tests/asset/asset-install.test.js\",\"description\":\"Run asset-install tests\"}",
-  "error": "Exit code 1\nAssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n+ actual - expected\n\n+ 'user input'\n- '[REDACTED]'\n\n    at testMetadataRedactsRawPrompt (/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/tests/asset/asset-install.test.js:301:10)\n    at main (/Users/lizhenwei/workspace/vueworkspace/bairong/br-ai-spec/tests/asset/asset-install.test.js:369:9) {\n  generatedMessage: true,\n  code: 'ERR_ASSERTION',\n  actual: 'user input',\n  expected: '[REDACTED]',\n  operator: ...",
-  "timestamp": "2026-05-07T02:56:43.285Z",
-  "retry_count": 1
-}
