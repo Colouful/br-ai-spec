@@ -1,5 +1,6 @@
 const { resolveVisualConfig } = require('./visual-config');
 const { VisualClient } = require('./visual-client');
+const { VisualConnector } = require('../connectors/visual');
 const {
   buildHistoryPayload,
   buildIncidentPayload,
@@ -14,6 +15,10 @@ function warning(message, code = 'VISUAL_REPORT_WARNING') {
 class VisualReporter {
   constructor(options = {}) {
     this.visualClient = options.visualClient || new VisualClient();
+    this.visualConnector = options.visualConnector || new VisualConnector({
+      visualClient: this.visualClient,
+      queueDir: options.queueDir,
+    });
   }
 
   resolve(rootDir, options = {}) {
@@ -30,7 +35,12 @@ class VisualReporter {
       if (type === 'project-state') {
         data = await this.visualClient.sendProjectState(payload, { visualUrl: config.url });
       } else if (type === 'run-event') {
-        data = await this.visualClient.sendRunEvent(payload, { visualUrl: config.url });
+        const result = await this.visualConnector.reportRunEvent(payload, {
+          visualUrl: config.url,
+          enabled: config.enabled !== false,
+        });
+        if (!result.ok) return result;
+        data = result.data;
       } else if (type === 'history') {
         data = await this.visualClient.sendHistory(payload, { visualUrl: config.url });
       } else if (type === 'incident') {
