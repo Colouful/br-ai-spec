@@ -34,7 +34,7 @@
 配置完成后，直接执行：
 
 ```bash
-npx @ex/ai-spec-auto@latest init .
+npx @br-ai/ai-spec-auto@latest init .
 ```
 
 ### 2.2 通过仓库脚本入口获取
@@ -64,22 +64,22 @@ bash install.sh init /path/to/your-project
 
 ```bash
 # 首次安装
-npx @ex/ai-spec-auto@latest init .
+npx @br-ai/ai-spec-auto@latest init .
 
 # 首次安装，并直接按 manifest 同步
-npx @ex/ai-spec-auto@latest init . --manifest ./manifest.json
+npx @br-ai/ai-spec-auto@latest init . --manifest ./manifest.json
 
 # 更新已安装内容
-npx @ex/ai-spec-auto@latest update .
+npx @br-ai/ai-spec-auto@latest update .
 
 # 按 manifest 刷新已安装资产（项目内已存在 .ai-spec/manifest.json 时）
-npx @ex/ai-spec-auto@latest sync .
+npx @br-ai/ai-spec-auto@latest sync .
 
 # 安装后自检
-npx @ex/ai-spec-auto@latest check .
+npx @br-ai/ai-spec-auto@latest check .
 
 # 卸载工具管理的安装层内容
-npx @ex/ai-spec-auto@latest uninstall .
+npx @br-ai/ai-spec-auto@latest uninstall .
 ```
 
 建议这样理解：
@@ -116,9 +116,9 @@ npx @ex/ai-spec-auto@latest uninstall .
 兼容用法如下：
 
 ```bash
-npx @ex/ai-spec-auto@latest init . --level L1
-npx @ex/ai-spec-auto@latest init . --level L2
-npx @ex/ai-spec-auto@latest init . --level L3
+npx @br-ai/ai-spec-auto@latest init . --level L1
+npx @br-ai/ai-spec-auto@latest init . --level L2
+npx @br-ai/ai-spec-auto@latest init . --level L3
 ```
 
 ## 5. `init` 会问什么
@@ -139,8 +139,8 @@ npx @ex/ai-spec-auto@latest init . --level L3
 ### 6.1 技术栈
 
 ```bash
-npx @ex/ai-spec-auto@latest init . --profile vue
-npx @ex/ai-spec-auto@latest init . --profile react
+npx @br-ai/ai-spec-auto@latest init . --profile vue
+npx @br-ai/ai-spec-auto@latest init . --profile react
 ```
 
 ### 6.2 IDE 目标
@@ -148,10 +148,10 @@ npx @ex/ai-spec-auto@latest init . --profile react
 如果你只想给特定 IDE 落命令模板和链接，可以显式指定：
 
 ```bash
-npx @ex/ai-spec-auto@latest init . --ide cursor
-npx @ex/ai-spec-auto@latest init . --ide claude
-npx @ex/ai-spec-auto@latest init . --ide cursor,claude
-npx @ex/ai-spec-auto@latest init . --ide all
+npx @br-ai/ai-spec-auto@latest init . --ide cursor
+npx @br-ai/ai-spec-auto@latest init . --ide claude
+npx @br-ai/ai-spec-auto@latest init . --ide cursor,claude
+npx @br-ai/ai-spec-auto@latest init . --ide all
 ```
 
 常见理解方式：
@@ -164,8 +164,8 @@ npx @ex/ai-spec-auto@latest init . --ide all
 ### 6.3 自定义规则
 
 ```bash
-npx @ex/ai-spec-auto@latest init . --custom-rules
-npx @ex/ai-spec-auto@latest init . --standard-rules
+npx @br-ai/ai-spec-auto@latest init . --custom-rules
+npx @br-ai/ai-spec-auto@latest init . --standard-rules
 ```
 
 可自定义规则范围固定为：
@@ -194,40 +194,40 @@ npx @ex/ai-spec-auto@latest init . --standard-rules
 也可以直接显式指定：
 
 ```bash
-npx @ex/ai-spec-auto@latest init . --package packages/web
-npx @ex/ai-spec-auto@latest init . --workspace-root
+npx @br-ai/ai-spec-auto@latest init . --package packages/web
+npx @br-ai/ai-spec-auto@latest init . --workspace-root
 ```
 
 环境变量也支持：
 
 ```bash
-EX_AI_SPEC_WORKSPACE_PACKAGE=packages/web npx @ex/ai-spec-auto@latest init .
+EX_AI_SPEC_WORKSPACE_PACKAGE=packages/web npx @br-ai/ai-spec-auto@latest init .
 ```
 
 ### 6.5 UIPro / lint / husky
 
 ```bash
-npx @ex/ai-spec-auto@latest init . --uipro
-npx @ex/ai-spec-auto@latest init . --no-uipro
-npx @ex/ai-spec-auto@latest init . --lint
-npx @ex/ai-spec-auto@latest init . --no-lint
-npx @ex/ai-spec-auto@latest init . --husky
-npx @ex/ai-spec-auto@latest init . --no-husky
+npx @br-ai/ai-spec-auto@latest init . --uipro
+npx @br-ai/ai-spec-auto@latest init . --no-uipro
+npx @br-ai/ai-spec-auto@latest init . --lint
+npx @br-ai/ai-spec-auto@latest init . --no-lint
+npx @br-ai/ai-spec-auto@latest init . --husky
+npx @br-ai/ai-spec-auto@latest init . --no-husky
 ```
 
 ### 6.6 `update` 细粒度控制
 
 ```bash
-npx @ex/ai-spec-auto@latest update . --skip-skills
-npx @ex/ai-spec-auto@latest update . --skip-configs
-npx @ex/ai-spec-auto@latest update . --skip-commands
-npx @ex/ai-spec-auto@latest update . --skip-ide-links
-npx @ex/ai-spec-auto@latest update . --skip-openspec
-npx @ex/ai-spec-auto@latest update . --skip-uipro
-npx @ex/ai-spec-auto@latest update . --update-commands
-npx @ex/ai-spec-auto@latest update . --update-uipro
-npx @ex/ai-spec-auto@latest update . --update-rules
-npx @ex/ai-spec-auto@latest update . --no-update-rules
+npx @br-ai/ai-spec-auto@latest update . --skip-skills
+npx @br-ai/ai-spec-auto@latest update . --skip-configs
+npx @br-ai/ai-spec-auto@latest update . --skip-commands
+npx @br-ai/ai-spec-auto@latest update . --skip-ide-links
+npx @br-ai/ai-spec-auto@latest update . --skip-openspec
+npx @br-ai/ai-spec-auto@latest update . --skip-uipro
+npx @br-ai/ai-spec-auto@latest update . --update-commands
+npx @br-ai/ai-spec-auto@latest update . --update-uipro
+npx @br-ai/ai-spec-auto@latest update . --update-rules
+npx @br-ai/ai-spec-auto@latest update . --no-update-rules
 ```
 
 交互式 `update` 也支持直接勾选模块，不必先记这些参数。
@@ -241,13 +241,13 @@ npx @ex/ai-spec-auto@latest update . --no-update-rules
 如果项目还是空白接入期，优先使用：
 
 ```bash
-npx @ex/ai-spec-auto@latest init . --manifest ./manifest.json
+npx @br-ai/ai-spec-auto@latest init . --manifest ./manifest.json
 ```
 
 或者：
 
 ```bash
-npx @ex/ai-spec-auto@latest init . --manifest https://hub.example.com/manifests/project-abc.json
+npx @br-ai/ai-spec-auto@latest init . --manifest https://hub.example.com/manifests/project-abc.json
 ```
 
 这条路径适合：
@@ -267,19 +267,19 @@ npx @ex/ai-spec-auto@latest init . --manifest https://hub.example.com/manifests/
 如果项目已经接过一次，后续更适合使用：
 
 ```bash
-npx @ex/ai-spec-auto@latest sync . --manifest ./manifest.json
+npx @br-ai/ai-spec-auto@latest sync . --manifest ./manifest.json
 ```
 
 或者直接使用 Hub 导出的远程清单：
 
 ```bash
-npx @ex/ai-spec-auto@latest sync . --manifest https://hub.example.com/manifests/project-abc.json
+npx @br-ai/ai-spec-auto@latest sync . --manifest https://hub.example.com/manifests/project-abc.json
 ```
 
 如果项目里已经存在 `.ai-spec/manifest.json`，通常继续执行：
 
 ```bash
-npx @ex/ai-spec-auto@latest sync .
+npx @br-ai/ai-spec-auto@latest sync .
 ```
 
 `sync` 更适合下面这些场景：
@@ -300,16 +300,16 @@ npx @ex/ai-spec-auto@latest sync .
 
 ```bash
 # 本地 manifest 缺失资产时，显式指定 Hub 来源
-npx @ex/ai-spec-auto@latest sync . --manifest ./manifest.json --hub-origin http://172.16.185.63:3000
+npx @br-ai/ai-spec-auto@latest sync . --manifest ./manifest.json --hub-origin http://172.16.185.63:3000
 
 # 禁止本地 manifest 通过 Hub 自动补齐缺失资产
-npx @ex/ai-spec-auto@latest sync . --manifest ./manifest.json --no-hub-fetch
+npx @br-ai/ai-spec-auto@latest sync . --manifest ./manifest.json --no-hub-fetch
 
 # 临时覆盖 manifest 里的 profile / ide
-npx @ex/ai-spec-auto@latest sync . --manifest ./manifest.json --profile vue --ide cursor,claude
+npx @br-ai/ai-spec-auto@latest sync . --manifest ./manifest.json --profile vue --ide cursor,claude
 
 # 只预览，不真正落盘
-npx @ex/ai-spec-auto@latest sync . --manifest ./manifest.json --dry-run
+npx @br-ai/ai-spec-auto@latest sync . --manifest ./manifest.json --dry-run
 ```
 
 建议按下面的边界理解：
@@ -411,7 +411,7 @@ Cursor 里 MCP 默认关闭是预期行为，不等于安装失败。
 推荐安装完成后执行：
 
 ```bash
-npx @ex/ai-spec-auto@latest check .
+npx @br-ai/ai-spec-auto@latest check .
 ```
 
 `check` 主要检查：
@@ -429,7 +429,7 @@ npx @ex/ai-spec-auto@latest check .
 执行：
 
 ```bash
-npx @ex/ai-spec-auto@latest uninstall .
+npx @br-ai/ai-spec-auto@latest uninstall .
 ```
 
 会移除工具管理的安装层内容，通常包括：
@@ -470,7 +470,7 @@ powershell -ExecutionPolicy Bypass -File .\install.ps1 init .
 
 ## 13. 常见排错
 
-### 1）`npx @ex/ai-spec-auto@latest init .` 拉不到包
+### 1）`npx @br-ai/ai-spec-auto@latest init .` 拉不到包
 
 通常是 registry 没配。
 
@@ -501,7 +501,7 @@ node --version
 如果你后续要在本地稳定执行协议命令，补一次：
 
 ```bash
-npx @ex/ai-spec-auto@latest init . --manifest ./manifest.json
+npx @br-ai/ai-spec-auto@latest init . --manifest ./manifest.json
 ```
 
 ### 4）安装完成但 Cursor 没法执行协议命令
@@ -516,7 +516,7 @@ npx @ex/ai-spec-auto@latest init . --manifest ./manifest.json
 重新执行并显式指定：
 
 ```bash
-npx @ex/ai-spec-auto@latest init . --package packages/web
+npx @br-ai/ai-spec-auto@latest init . --package packages/web
 ```
 
 ### 6）OpenSpec 没装上
@@ -537,7 +537,7 @@ npm install -g @fission-ai/openspec@latest
 可以后补：
 
 ```bash
-npx @ex/ai-spec-auto@latest update . --uipro
+npx @br-ai/ai-spec-auto@latest update . --uipro
 ```
 
 如果机器没有 `python3`，UIPro 的部分辅助能力可能不可用。
@@ -554,19 +554,19 @@ npx @ex/ai-spec-auto@latest update . --uipro
 建议重新执行：
 
 ```bash
-npx @ex/ai-spec-auto@latest sync . --manifest ./manifest.json
+npx @br-ai/ai-spec-auto@latest sync . --manifest ./manifest.json
 ```
 
 或者：
 
 ```bash
-npx @ex/ai-spec-auto@latest sync . --manifest https://hub.example.com/manifests/project-abc.json
+npx @br-ai/ai-spec-auto@latest sync . --manifest https://hub.example.com/manifests/project-abc.json
 ```
 
 如果你只是想先确认不会改文件，可以先加：
 
 ```bash
-npx @ex/ai-spec-auto@latest sync . --manifest ./manifest.json --dry-run
+npx @br-ai/ai-spec-auto@latest sync . --manifest ./manifest.json --dry-run
 ```
 
 ## 14. 相关文档

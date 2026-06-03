@@ -14,7 +14,7 @@ BR AI Spec 体系包含两个独立部署单元：
 
 | 单元 | 角色 | 部署方式 |
 |------|------|----------|
-| br-ai-spec（底座） | npm 包，安装到业务项目 | `npx @ex/ai-spec-auto init .` |
+| br-ai-spec（底座） | npm 包，安装到业务项目 | `npx @br-ai/ai-spec-auto init .` |
 | br-ai-spec-visual（控制面） | Next.js 应用 | Docker / docker-compose / 裸机 |
 
 ```mermaid
@@ -93,30 +93,30 @@ npm config get @ex:registry
 
 ```bash
 cd /path/to/your-project
-npx @ex/ai-spec-auto@latest init .
+npx @br-ai/ai-spec-auto@latest init .
 ```
 
 **指定技术栈：**
 
 ```bash
 # Vue 项目
-npx @ex/ai-spec-auto@latest init . --profile vue
+npx @br-ai/ai-spec-auto@latest init . --profile vue
 
 # React 项目
-npx @ex/ai-spec-auto@latest init . --profile react
+npx @br-ai/ai-spec-auto@latest init . --profile react
 ```
 
 **Monorepo 子包：**
 
 ```bash
-npx @ex/ai-spec-auto@latest init . --package packages/web
+npx @br-ai/ai-spec-auto@latest init . --package packages/web
 ```
 
 ### 2.4 安装后验证
 
 ```bash
 # 检查安装状态
-npx @ex/ai-spec-auto@latest check .
+npx @br-ai/ai-spec-auto@latest check .
 
 # 查看已安装资产
 ls -la .agents/rules/
@@ -129,13 +129,13 @@ ls -la .ai-spec/
 
 ```bash
 # 更新
-npx @ex/ai-spec-auto@latest update .
+npx @br-ai/ai-spec-auto@latest update .
 
 # 部分更新
-npx @ex/ai-spec-auto@latest update . --skip-skills --skip-configs
+npx @br-ai/ai-spec-auto@latest update . --skip-skills --skip-configs
 
 # 卸载
-npx @ex/ai-spec-auto@latest uninstall .
+npx @br-ai/ai-spec-auto@latest uninstall .
 ```
 
 ---

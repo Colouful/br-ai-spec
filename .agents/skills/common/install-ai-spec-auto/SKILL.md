@@ -122,7 +122,7 @@ metadata:
 单 profile 时，优先使用：
 
 ```bash
-npx @ex/ai-spec-auto@latest init . --profile <profile> --custom-rules
+npx @br-ai/ai-spec-auto@latest init . --profile <profile> --custom-rules
 ```
 
 其中 `<profile>` 为 `vue`、`react`、`nestjs`、`springboot` 或 `node-tooling`。
@@ -130,7 +130,7 @@ npx @ex/ai-spec-auto@latest init . --profile <profile> --custom-rules
 多 profile 时，传入逗号分隔的 profiles：
 
 ```bash
-npx @ex/ai-spec-auto@latest init . --profiles vue,nestjs --custom-rules
+npx @br-ai/ai-spec-auto@latest init . --profiles vue,nestjs --custom-rules
 ```
 
 仅在"当前工作区就是 `ai-spec-auto(安装工具)` 源码仓库，且用户明确要走本地源码调试安装"时，才改用：
@@ -187,19 +187,19 @@ Progress:
 单 profile 安装命令：
 
 ```bash
-npx @ex/ai-spec-auto@latest init . --profile <profile> --custom-rules
+npx @br-ai/ai-spec-auto@latest init . --profile <profile> --custom-rules
 ```
 
 多 profile（同一仓库含多技术栈子包）安装命令：
 
 ```bash
-npx @ex/ai-spec-auto@latest init . --profiles vue,nestjs --custom-rules
+npx @br-ai/ai-spec-auto@latest init . --profiles vue,nestjs --custom-rules
 ```
 
 如用户提供 `manifest(安装清单)`，命令改为：
 
 ```bash
-npx @ex/ai-spec-auto@latest init . --profile <profile> --custom-rules --manifest <file-or-url>
+npx @br-ai/ai-spec-auto@latest init . --profile <profile> --custom-rules --manifest <file-or-url>
 ```
 
 ### 第三步：执行安装
@@ -213,7 +213,7 @@ npx @ex/ai-spec-auto@latest init . --profile <profile> --custom-rules --manifest
 优先执行：
 
 ```bash
-npx @ex/ai-spec-auto@latest check .
+npx @br-ai/ai-spec-auto@latest check .
 ```
 
 如果当前环境不适合再次走 `npx(包执行命令)`，至少核对：

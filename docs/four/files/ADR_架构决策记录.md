@@ -247,13 +247,13 @@ Visual 需要构建一个管理后台，需要选择前端框架。
 
 ### 背景
 
-`@ex/ai-spec-auto` 需要在团队内部分发，需要选择包管理方案。
+`@br-ai/ai-spec-auto` 需要在团队内部分发，需要选择包管理方案。
 
 ### 决策
 
 选择 **内网 npm registry** 分发：
 - Registry 地址：`http://nodejs.100credit.cn/`
-- 包名：`@ex/ai-spec-auto`
+- 包名：`@br-ai/ai-spec-auto`
 - 配置：`~/.npmrc` 中添加 `@ex:registry=http://nodejs.100credit.cn/`
 
 ### 理由

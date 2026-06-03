@@ -62,9 +62,9 @@ function main() {
   }), pkgRoot);
   assert.ok(buildInstallArgs('pnpm', pkgRoot, {
     ...env,
-    AI_SPEC_RUNTIME_INSTALL_SPEC: '@ex/ai-spec-auto@latest',
-    AI_SPEC_RUNTIME_REGISTRY: 'http://nodejs.100credit.cn/',
-  }).includes('@ex/ai-spec-auto@latest'));
+    AI_SPEC_RUNTIME_INSTALL_SPEC: '@br-ai/ai-spec-auto@latest',
+    AI_SPEC_RUNTIME_REGISTRY: 'https://registry.npmjs.org/',
+  }).includes('@br-ai/ai-spec-auto@latest'));
 
   const refreshed = refreshRuntime({
     pkgRoot,
@@ -218,7 +218,7 @@ function main() {
         writeBootstrapConfig(embeddedEnv, {
           install_spec: pkgRoot,
           registry: '',
-          package_name: '@ex/ai-spec-auto',
+          package_name: '@br-ai/ai-spec-auto',
           updated_at: '2026-04-20T10:00:00.000Z',
         });
         const embeddedEntry = path.join(embeddedEnv.AI_SPEC_HOME, 'runtime', 'embedded', 'bin', process.platform === 'win32' ? 'ai-spec-auto.cmd' : 'ai-spec-auto');

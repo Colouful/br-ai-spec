@@ -38,13 +38,13 @@
 建议把它保存为项目根目录下的 `manifest.json`，然后执行：
 
 ```bash
-npx @ex/ai-spec-auto@latest init . --manifest ./manifest.json
+npx @br-ai/ai-spec-auto@latest init . --manifest ./manifest.json
 ```
 
 如果项目之前已经接过一次，也可以执行：
 
 ```bash
-npx @ex/ai-spec-auto@latest sync . --manifest ./manifest.json
+npx @br-ai/ai-spec-auto@latest sync . --manifest ./manifest.json
 ```
 
 ## 2. 字段说明
@@ -90,7 +90,7 @@ npx @ex/ai-spec-auto@latest sync . --manifest ./manifest.json
 用 `init --manifest`：
 
 ```bash
-npx @ex/ai-spec-auto@latest init . --manifest ./manifest.json
+npx @br-ai/ai-spec-auto@latest init . --manifest ./manifest.json
 ```
 
 适合：
@@ -104,7 +104,7 @@ npx @ex/ai-spec-auto@latest init . --manifest ./manifest.json
 用 `sync --manifest`：
 
 ```bash
-npx @ex/ai-spec-auto@latest sync . --manifest ./manifest.json
+npx @br-ai/ai-spec-auto@latest sync . --manifest ./manifest.json
 ```
 
 适合：
@@ -118,17 +118,17 @@ npx @ex/ai-spec-auto@latest sync . --manifest ./manifest.json
 除了本地 `manifest.json`，也可以直接传 Hub 导出的远程地址：
 
 ```bash
-npx @ex/ai-spec-auto@latest init . --manifest https://hub.example.com/manifests/project-abc.json
+npx @br-ai/ai-spec-auto@latest init . --manifest https://hub.example.com/manifests/project-abc.json
 ```
 
 ```bash
-npx @ex/ai-spec-auto@latest sync . --manifest https://hub.example.com/manifests/project-abc.json
+npx @br-ai/ai-spec-auto@latest sync . --manifest https://hub.example.com/manifests/project-abc.json
 ```
 
 如果是本地 `manifest.json`，但其中引用的资产并不都在当前 npm 包内，可以加上：
 
 ```bash
-npx @ex/ai-spec-auto@latest sync . --manifest ./manifest.json --hub-origin http://172.16.185.63:3000
+npx @br-ai/ai-spec-auto@latest sync . --manifest ./manifest.json --hub-origin http://172.16.185.63:3000
 ```
 
 ## 6. 常见错误

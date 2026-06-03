@@ -8,13 +8,13 @@
 
 ```bash
 # 推荐方式（新 init）
-npx @ex/ai-spec-auto@latest init <目录> --recommend --yes
+npx @br-ai/ai-spec-auto@latest init <目录> --recommend --yes
 
 # 手动指定 Manifest（新 init）
-npx @ex/ai-spec-auto@latest init <目录> --manifest <slug> --yes
+npx @br-ai/ai-spec-auto@latest init <目录> --manifest <slug> --yes
 
 # 旧 init（无需 --recommend）
-npx @ex/ai-spec-auto@latest init <目录>
+npx @br-ai/ai-spec-auto@latest init <目录>
 ```
 
 ---
@@ -181,10 +181,10 @@ ai-spec-auto init . --recommend --workspace-root --yes
 ```bash
 # 新 init：先 cd 到子包目录
 cd packages/my-app
-npx @ex/ai-spec-auto@latest init . --recommend --yes
+npx @br-ai/ai-spec-auto@latest init . --recommend --yes
 
 # 旧 init：用 --package
-npx @ex/ai-spec-auto@latest init . --package packages/my-app
+npx @br-ai/ai-spec-auto@latest init . --package packages/my-app
 ```
 
 ### 场景 3：交互式选择（旧 init）
@@ -208,7 +208,7 @@ npx @ex/ai-spec-auto@latest init . --package packages/my-app
 ```bash
 # 等价于 --package
 export EX_AI_SPEC_WORKSPACE_PACKAGE=packages/web
-npx @ex/ai-spec-auto@latest init .
+npx @br-ai/ai-spec-auto@latest init .
 ```
 
 ---
@@ -270,10 +270,10 @@ ai-spec-auto init <目录> --recommend --yes
 
 ```bash
 # 新 init
-npx @ex/ai-spec-auto@latest init . --recommend --yes
+npx @br-ai/ai-spec-auto@latest init . --recommend --yes
 
 # 旧 init + 跳过 lint/husky 提示（默认 ask）
-npx @ex/ai-spec-auto@latest init . --profile vue --lint --no-husky
+npx @br-ai/ai-spec-auto@latest init . --profile vue --lint --no-husky
 ```
 
 ### init 后如何更新？
@@ -281,5 +281,5 @@ npx @ex/ai-spec-auto@latest init . --profile vue --lint --no-husky
 ```bash
 # 新 init 后：重新 init 即可（会写入/覆盖 .ai-spec/ 文件）
 # 旧 init 后：
-npx @ex/ai-spec-auto@latest update .
+npx @br-ai/ai-spec-auto@latest update .
 ```

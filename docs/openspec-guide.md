@@ -55,7 +55,7 @@ ai-spec-auto 不再把“小需求”简单等同于“直接开发即可”，�
 
 ```bash
 cd /path/to/your-project
-npx @ex/ai-spec-auto@latest init . --profile vue
+npx @br-ai/ai-spec-auto@latest init . --profile vue
 ```
 
 默认安装已经包含 OpenSpec。`--level L1/L2/L3` 现在只保留为兼容参数；只有你明确需要兼容旧安装模型时才再显式传入。
@@ -103,7 +103,7 @@ your-project/
 ### 2.4 验证安装
 
 ```bash
-npx @ex/ai-spec-auto@latest check
+npx @br-ai/ai-spec-auto@latest check
 ```
 
 检查项中应看到：
@@ -722,7 +722,7 @@ openspec update            # 应用配置
 如果项目安装时间较早，还没有同步到这个命令，可执行：
 
 ```bash
-npx @ex/ai-spec-auto@latest update . --update-commands
+npx @br-ai/ai-spec-auto@latest update . --update-commands
 ```
 
 ### 7.5 旧版命令迁移对照
@@ -748,7 +748,7 @@ npx @ex/ai-spec-auto@latest update . --update-commands
 可以。在已安装 L2 的项目中运行：
 
 ```bash
-npx @ex/ai-spec-auto@latest init --level L3
+npx @br-ai/ai-spec-auto@latest init --level L3
 ```
 
 脚本会检测到 `.agents/` 已存在，只补充 OpenSpec 部分。
@@ -764,7 +764,7 @@ npx openspec init --tools cursor,claude
 
 **Q：config.yaml 被覆盖了怎么办？**
 
-运行 `npx @ex/ai-spec-auto@latest update --level L3`，脚本会检测 `config.yaml` 中是否已有 `context:` 字段，没有才追加，不会覆盖已有配置。
+运行 `npx @br-ai/ai-spec-auto@latest update --level L3`，脚本会检测 `config.yaml` 中是否已有 `context:` 字段，没有才追加，不会覆盖已有配置。
 
 **Q：不是所有需求都需要走 OpenSpec 吧？**
 

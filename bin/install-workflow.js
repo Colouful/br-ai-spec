@@ -1415,7 +1415,7 @@ async function resolveMonorepoTarget(targetDir, options) {
 
   if (!isInteractive()) {
     warn(`检测到 Monorepo（工作区根: ${workspaceRoot}），非交互模式将继续在根目录安装。`);
-    warn(`如需安装到子包，请使用: npx @ex/ai-spec-auto@latest init . --package packages/your-app`);
+    warn(`如需安装到子包，请使用: npx @br-ai/ai-spec-auto@latest init . --package packages/your-app`);
     return workspaceRoot;
   }
 
@@ -2331,7 +2331,7 @@ function printInstallReport(targetDir, options, pending) {
   }
   console.log('');
   info('提醒事项：');
-  console.log('  1. 当前包通过内网 npm registry 分发；首次接入前，请在 ~/.npmrc 中配置 @ex:registry=http://nodejs.100credit.cn/');
+  console.log('  1. 当前包通过公共 npm 分发：npx @br-ai/ai-spec-auto@latest <command>（内网遗留包见 README）');
   if (options.level !== 'L1' && resolvedIdes.includes('cursor')) {
     console.log('  2. 配置 .cursor/mcp.json（按需启用 MCP）');
     console.log(`     ${color('→', 'yellow')} Cursor 里各 MCP 默认关闭/未启用是预期行为，并非安装失败`);
@@ -2536,7 +2536,7 @@ async function handleInit(options) {
 
   if (fs.existsSync(path.join(targetDir, '.agents'))) {
     warn('目标项目已包含 .agents/ 目录');
-    console.log(`  如果只需更新规范，请使用: ${color('npx @ex/ai-spec-auto@latest update .', 'bold')}`);
+    console.log(`  如果只需更新规范，请使用: ${color('npx @br-ai/ai-spec-auto@latest update .', 'bold')}`);
     console.log('');
     if (!options.force && isInteractive()) {
       const goOn = await confirm('继续初始化将覆盖现有规范（01/03 和自定义规则除外），确认？', false);
@@ -2802,17 +2802,17 @@ function handleCheck(options) {
     if (!fs.existsSync(path.join(agentsDir, 'flows'))) missingProtocolAssets.push('.agents/flows');
     if (!fs.existsSync(path.join(agentsDir, 'orchestration'))) missingProtocolAssets.push('.agents/orchestration');
     if (missingProtocolAssets.length > 0) {
-      warn(`检测到 OpenSpec 或协议命令入口，但缺少 ${missingProtocolAssets.join('、')}；建议运行: npx @ex/ai-spec-auto@latest update .`);
+      warn(`检测到 OpenSpec 或协议命令入口，但缺少 ${missingProtocolAssets.join('、')}；建议运行: npx @br-ai/ai-spec-auto@latest update .`);
     }
   }
   const staleCursorProtocolCommands = collectStaleCursorProtocolCommands(targetDir);
   if (staleCursorProtocolCommands.length > 0) {
-    warn(`检测到 Cursor 协议命令模板可能过旧：${staleCursorProtocolCommands.join('、')}；建议运行: npx @ex/ai-spec-auto@latest update . 或重新执行 sync`);
+    warn(`检测到 Cursor 协议命令模板可能过旧：${staleCursorProtocolCommands.join('、')}；建议运行: npx @br-ai/ai-spec-auto@latest update . 或重新执行 sync`);
   }
   printTools(detectInstalledLevel(targetDir), hasInstalledUiproData(targetDir) ? 'yes' : 'no');
   console.log('');
   if (hasIssue) {
-    err('存在问题，建议运行: npx @ex/ai-spec-auto@latest init .');
+    err('存在问题，建议运行: npx @br-ai/ai-spec-auto@latest init .');
     return 1;
   }
   ok('全部检查通过');
@@ -2882,16 +2882,16 @@ async function handleUninstall(options) {
 function printUsage() {
   console.log(`${color('ai-spec-auto', 'bold')} 安装工具\n`);
   console.log('推荐入口：');
-  console.log('  npx @ex/ai-spec-auto@latest init .');
-  console.log('  npx @ex/ai-spec-auto@latest init . --manifest <file-or-url>');
-  console.log('  npx @ex/ai-spec-auto@latest update .');
-  console.log('  npx @ex/ai-spec-auto@latest sync .');
-  console.log('  npx @ex/ai-spec-auto@latest check .');
+  console.log('  npx @br-ai/ai-spec-auto@latest init .');
+  console.log('  npx @br-ai/ai-spec-auto@latest init . --manifest <file-or-url>');
+  console.log('  npx @br-ai/ai-spec-auto@latest update .');
+  console.log('  npx @br-ai/ai-spec-auto@latest sync .');
+  console.log('  npx @br-ai/ai-spec-auto@latest check .');
   console.log('');
   console.log('说明：');
   console.log('  - 默认安装为完整安装（规范 + IDE 适配 + OpenSpec）');
   console.log('  - L1/L2/L3 仅保留为兼容参数，不再作为主路径概念');
-  console.log('  - 当前包通过内网 npm registry 分发，首次使用前请先配置 @ex:registry=http://nodejs.100credit.cn/');
+  console.log('  - 公共 npm：npx @br-ai/ai-spec-auto@latest <command>；内网 @ex 包见 README 折叠说明');
   console.log('');
   console.log('命令：');
   console.log('  init [dir]        首次安装到目标项目（支持 --manifest 首装即同步）');

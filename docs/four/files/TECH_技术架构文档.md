@@ -17,7 +17,7 @@ graph TB
         I4[Trae]
     end
 
-    subgraph CLI["br-ai-spec 底座（@ex/ai-spec-auto）"]
+    subgraph CLI["br-ai-spec 底座（@br-ai/ai-spec-auto）"]
         C1[CLI 入口 bin/cli.js]
         C2[Protocol Workflow]
         C3[Runner]
@@ -69,7 +69,7 @@ graph TB
 ### 2.1 Node CLI 架构
 
 ```
-@ex/ai-spec-auto@0.1.11
+@br-ai/ai-spec-auto@0.1.11
 ├── bin/cli.js              # CLI 入口（Commander 命令路由）
 ├── internal/               # 内部模块
 │   ├── hooks/              # Hook 推送模块
@@ -215,7 +215,7 @@ graph LR
 
 ```mermaid
 graph TB
-    H["Hub 平台<br/>(npm registry)"] -->|"npm install @ex/ai-spec-auto"| C["CLI bin/cli.js"]
+    H["Hub 平台<br/>(npm registry)"] -->|"npm install @br-ai/ai-spec-auto"| C["CLI bin/cli.js"]
     C -->|"npx ai-spec-auto init"| M["manifest.json 读取"]
     M -->|"按 Profile 合并"| I["IDE 入口<br/>.cursor/ .claude/ .opencode/ .trae/"]
     I -->|"symlink"| A[".agents/ 规范源"]
@@ -237,7 +237,7 @@ graph TB
 
 ```mermaid
 graph TB
-    U["L1: 用户 / IDE<br/>Cursor, Claude Code, OpenCode, Trae"] -->|"自然语言指令"| C["L2: CLI<br/>@ex/ai-spec-auto"]
+    U["L1: 用户 / IDE<br/>Cursor, Claude Code, OpenCode, Trae"] -->|"自然语言指令"| C["L2: CLI<br/>@br-ai/ai-spec-auto"]
     C -->|"命令路由"| P["L3: Protocol Workflow<br/>状态机 + 角色调度"]
     P -->|"任务执行"| R["L4: Runner<br/>AI 编码执行引擎"]
     R -->|"读取/写入"| S["L5: .agents / .ai-spec / OpenSpec<br/>规范 + 运行态 + 流程"]

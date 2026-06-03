@@ -18,7 +18,7 @@
 
 ## 当前项目定位
 
-`br-ai-spec` 当前定位是 `@ex/ai-spec-auto` CLI(命令行工具)包，主能力集中在：
+`br-ai-spec` 当前定位是 `@br-ai/ai-spec-auto` CLI(命令行工具)包，主能力集中在：
 
 - 将 `.agents/rules`、`.agents/skills`、`.agents/roles`、`.agents/flows`、`.cursor`、`.claude`、`openspec` 等资产安装到目标项目。
 - 提供 `init`、`update`、`check`、`sync`、`uninstall` 等安装与同步命令。

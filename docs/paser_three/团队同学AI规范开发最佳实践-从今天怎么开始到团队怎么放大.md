@@ -238,12 +238,12 @@
    - `rules`
    - `entry_role`
 
-4. **`@ex/ai-spec-auto` 负责“解析并安装”**  
+4. **`@br-ai/ai-spec-auto` 负责“解析并安装”**  
    场景页已经能生成类似这样的命令：
 
    ```bash
-   npx @ex/ai-spec-auto@latest init . --profile vue --manifest <manifest-url>
-   npx @ex/ai-spec-auto@latest sync . --manifest <manifest-url>
+   npx @br-ai/ai-spec-auto@latest init . --profile vue --manifest <manifest-url>
+   npx @br-ai/ai-spec-auto@latest sync . --manifest <manifest-url>
    ```
 
 5. **目标项目负责“承接并运行”**  
@@ -255,7 +255,7 @@
 
 也就是说，这条链已经不再是纯概念，而是开始形成：
 
-> Hub 选资产 -> manifest 描述安装清单 -> `@ex/ai-spec-auto` 安装到目标项目 -> 目标项目按统一规则运行
+> Hub 选资产 -> manifest 描述安装清单 -> `@br-ai/ai-spec-auto` 安装到目标项目 -> 目标项目按统一规则运行
 
 ### 人工方案 vs 工具方案
 
@@ -272,7 +272,7 @@
 >
 > 先不要等“平台全部做完”。  
 > 最好的开始方式，是先选一个试点项目、一个高频场景，先把规则补齐、把闭环跑通。  
-> 当你们已经知道“什么方法有效”之后，再用 Hub、manifest 和 `@ex/ai-spec-auto` 把这套方法放大。
+> 当你们已经知道“什么方法有效”之后，再用 Hub、manifest 和 `@br-ai/ai-spec-auto` 把这套方法放大。
 
 这一章最后只留一句总结：
 

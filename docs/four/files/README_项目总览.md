@@ -10,7 +10,7 @@ br-ai-spec 是一个 **AI 规范驱动的前端项目交付体系**，由两个�
 
 | 项目 | npm 包名 | 定位 | 核心价值 |
 |------|----------|------|----------|
-| **br-ai-spec** | `@ex/ai-spec-auto` | 项目级交付底座 | 把需求、实现、检查、归档串成完整的团队开发链路 |
+| **br-ai-spec** | `@br-ai/ai-spec-auto` | 项目级交付底座 | 把需求、实现、检查、归档串成完整的团队开发链路 |
 | **br-ai-spec-visual** | — | 团队可视化与控制面 | 聚合已接入项目的运行态、变更、拓扑与采集数据，提供统一控制面 |
 
 两项目协作关系：
@@ -97,7 +97,7 @@ br-ai-spec 是一个 **AI 规范驱动的前端项目交付体系**，由两个�
 
 ```bash
 # 1. 安装底座包
-npm install @ex/ai-spec-auto --save-dev
+npm install @br-ai/ai-spec-auto --save-dev
 
 # 2. 初始化（仅注入 .agents/ 目录）
 npx ai-spec init --level 1
@@ -161,7 +161,7 @@ npm run dev
 | **语言** | JavaScript | ESM | 模块系统 |
 | **规范框架** | OpenSpec | — | 规范产物定义 |
 | **包管理** | npm | — | 内网 registry: `http://nodejs.100credit.cn/` |
-| **包名** | @ex/ai-spec-auto | 0.1.11 | 当前发布版本 |
+| **包名** | @br-ai/ai-spec-auto | 0.1.11 | 当前发布版本 |
 
 ### br-ai-spec-visual（控制面）
 
@@ -213,7 +213,7 @@ npm run dev
 
 ## 🔗 相关链接
 
-- **npm 包**：`@ex/ai-spec-auto`（内网 registry: `http://nodejs.100credit.cn/`）
+- **npm 包**：`@br-ai/ai-spec-auto`（内网 registry: `http://nodejs.100credit.cn/`）
 - **底座仓库**：`br-ai-spec`
 - **控制面仓库**：`br-ai-spec-visual`
 - **试点场景**：组件替换类需求

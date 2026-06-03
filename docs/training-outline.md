@@ -86,11 +86,11 @@
 
 ```bash
 # 推荐：在目标项目根目录使用默认完整安装
-npx @ex/ai-spec-auto@latest init --profile react
-npx @ex/ai-spec-auto@latest init --profile vue
+npx @br-ai/ai-spec-auto@latest init --profile react
+npx @br-ai/ai-spec-auto@latest init --profile vue
 
 # 仅在兼容旧安装模型时才显式传 --level
-npx @ex/ai-spec-auto@latest init --profile vue --level L2
+npx @br-ai/ai-spec-auto@latest init --profile vue --level L2
 
 # 或：克隆规范库后
 bash install.sh init /path/to/project --profile react
@@ -145,7 +145,7 @@ bash install.sh init /path/to/project --profile vue
 ### 第一轮试点检查表
 
 - [ ] 确定试点项目与负责人（前端 Vue 或 React 仓库）
-- [ ] 选择 Profile 并运行安装（推荐 `npx @ex/ai-spec-auto@latest init`）
+- [ ] 选择 Profile 并运行安装（推荐 `npx @br-ai/ai-spec-auto@latest init`）
 - [ ] 填写 01-项目概述 和 03-项目结构（若自定义规则缺失，补确认 04/05/06/07/09 是否已按项目生成）
 - [ ] 跑通一个组件创建场景
 - [ ] 接通至少一个 MCP（Figma/ApiFox/Playwright）

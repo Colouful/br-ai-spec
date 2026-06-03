@@ -1,6 +1,6 @@
 # AI Coding 时代，我们处在什么位置？
 
-> 本文档用于团队内部分享：厘清 **AI 辅助编程的演进阶段**、**个人与团队应强化的能力**，以及 **ai-spec-auto**（npm：`@ex/ai-spec-auto`）在其中的定位。  
+> 本文档用于团队内部分享：厘清 **AI 辅助编程的演进阶段**、**个人与团队应强化的能力**，以及 **ai-spec-auto**（npm：`@br-ai/ai-spec-auto`）在其中的定位。  
 > 可与 [《项目需求说明》](http://git.100credit.cn/zhenwei.li/ai-spec-auto/-/blob/main/docs/项目需求说明.md)、[《规范驱动开发团队内部培训手册》](http://git.100credit.cn/zhenwei.li/ai-spec-auto/-/blob/main/docs/规范驱动开发团队内部培训手册.md) 配合阅读（仓库 [ai-spec-auto](http://git.100credit.cn/zhenwei.li/ai-spec-auto)，默认分支 `main`）。
 
 ---
@@ -85,7 +85,7 @@ Andrej Karpathy 提出的 **Vibe Coding** 描述了一种真实状态：凭感�
 
 ## 5. ai-spec-auto 在版图中的位置：从「会写指令」到「资产化规范」
 
-**ai-spec-auto** 的定位是：**AI Coding 团队的规范驱动开发 CLI（当前版本面向前端，内置 Vue 3 / React Profile）**；通过 npm 包 **`@ex/ai-spec-auto`**（`npx @ex/ai-spec-auto@latest init` 等）安装到业务仓库。目标一句话可概括为：
+**ai-spec-auto** 的定位是：**AI Coding 团队的规范驱动开发 CLI（当前版本面向前端，内置 Vue 3 / React Profile）**；通过 npm 包 **`@br-ai/ai-spec-auto`**（`npx @br-ai/ai-spec-auto@latest init` 等）安装到业务仓库。目标一句话可概括为：
 
 > **把「提示词能力」改造成「项目内资产」**——从依赖个人记忆与口头约定，转为 **结构化规范文件** 让 AI 自动遵循，并与 **可溯源的需求流程** 一体联动（L3）。
 

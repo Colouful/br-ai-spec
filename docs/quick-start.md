@@ -19,7 +19,7 @@
 在目标项目根目录执行：
 
 ```bash
-npx @ex/ai-spec-auto@latest init .
+npx @br-ai/ai-spec-auto@latest init .
 ```
 
 这条命令默认会安装：
@@ -84,7 +84,7 @@ npx @ex/ai-spec-auto@latest init .
 
 推荐这样试一轮：
 
-1. `npx @ex/ai-spec-auto@latest init .`
+1. `npx @br-ai/ai-spec-auto@latest init .`
 2. 在 IDE 里执行 `/project-init`
 3. 执行 `/spec-start`
 4. 说一个真实需求，比如：
@@ -116,32 +116,32 @@ npx @ex/ai-spec-auto@latest init .
 指定技术栈：
 
 ```bash
-npx @ex/ai-spec-auto@latest init . --profile vue
-npx @ex/ai-spec-auto@latest init . --profile react
+npx @br-ai/ai-spec-auto@latest init . --profile vue
+npx @br-ai/ai-spec-auto@latest init . --profile react
 ```
 
 Monorepo 直接指定子包：
 
 ```bash
-npx @ex/ai-spec-auto@latest init . --package packages/web
+npx @br-ai/ai-spec-auto@latest init . --package packages/web
 ```
 
 启用自定义规则：
 
 ```bash
-npx @ex/ai-spec-auto@latest init . --custom-rules
+npx @br-ai/ai-spec-auto@latest init . --custom-rules
 ```
 
 更新规范：
 
 ```bash
-npx @ex/ai-spec-auto@latest update .
+npx @br-ai/ai-spec-auto@latest update .
 ```
 
 只更新一部分：
 
 ```bash
-npx @ex/ai-spec-auto@latest update . --skip-skills --skip-configs --skip-openspec
+npx @br-ai/ai-spec-auto@latest update . --skip-skills --skip-configs --skip-openspec
 ```
 
 ## 6. 兼容参数说明

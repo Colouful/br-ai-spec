@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
 
-const PACKAGE_NAME = '@ex/ai-spec-auto';
+const PACKAGE_NAME = '@br-ai/ai-spec-auto';
 const SKIP_ENV = 'BR_AI_SPEC_SKIP_SELF_UPGRADE';
 const SKIP_FLAG = '--no-self-upgrade';
 const REENTRY_ENV = 'BR_AI_SPEC_SELF_UPGRADE_REENTRY';
@@ -87,7 +87,7 @@ function stripSelfUpgradeFlag(args) {
 }
 
 /**
- * 自举升级目标项目里的 @ex/ai-spec-auto 到 latest，并 re-exec 升级后的 CLI 继续跑 update。
+ * 自举升级目标项目里的 @br-ai/ai-spec-auto 到 latest，并 re-exec 升级后的 CLI 继续跑 update。
  *
  * 任何分支失败都返回 { upgraded: false }，主流程继续，不会中断。
  *
@@ -158,7 +158,10 @@ function maybeSelfUpgradeForUpdate(ctx) {
     : ['install', '-D', installSpec];
   if (registry) {
     addArgs.push('--registry', registry);
-    addArgs.push(`--@ex:registry=${registry}`);
+    if (PACKAGE_NAME.startsWith('@')) {
+      const scope = PACKAGE_NAME.split('/')[0];
+      addArgs.push(`--${scope}:registry=${registry}`);
+    }
   }
   const addResult = spawnSync(pkgManager, addArgs, {
     cwd: targetDir,

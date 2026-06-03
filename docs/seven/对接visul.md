@@ -1,7 +1,7 @@
 # br-ai-spec 对接 Visual 可视化平台文档
 
 > Visual 项目地址：`http://localhost:18780`
-> br-ai-spec 项目：`@ex/ai-spec-auto`
+> br-ai-spec 项目：`@br-ai/ai-spec-auto`
 > 更新时间：2026-04-27
 
 ---

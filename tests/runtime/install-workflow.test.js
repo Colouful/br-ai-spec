@@ -973,7 +973,7 @@ exit 1
       prepare: 'husky install',
     },
     devDependencies: {
-      '@ex/ai-spec-auto': '0.0.60',
+      '@br-ai/ai-spec-auto': '0.0.60',
       eslint: '^9.0.0',
       prettier: '^3.0.0',
     },
@@ -992,7 +992,7 @@ exit 1
     schema_version: 1,
     managed_paths: ['.agents', '.cursor/commands/opsx-propose.md'],
     created_config_files: ['.eslintrc.js'],
-    added_dev_dependencies: ['@ex/ai-spec-auto', 'eslint'],
+    added_dev_dependencies: ['@br-ai/ai-spec-auto', 'eslint'],
     package_json: {
       prepare_script: 'husky install',
     },
@@ -1005,7 +1005,7 @@ exit 1
   assert.ok(!fs.existsSync(path.join(uninstallTarget, '.eslintrc.js')));
   assert.ok(fs.existsSync(path.join(uninstallTarget, '.prettierrc.json')));
   assert.ok(!('prepare' in (uninstallPkg.scripts || {})));
-  assert.ok(!('@ex/ai-spec-auto' in (uninstallPkg.devDependencies || {})));
+  assert.ok(!('@br-ai/ai-spec-auto' in (uninstallPkg.devDependencies || {})));
   assert.ok(!('eslint' in (uninstallPkg.devDependencies || {})));
   assert.ok('prettier' in (uninstallPkg.devDependencies || {}));
   assert.ok(!fs.existsSync(path.join(uninstallTarget, '.ai-spec')));
@@ -1067,8 +1067,8 @@ exit 1
 
   result = runInstallWrapper(['help']);
   assert.strictEqual(result.status, 0, result.stderr);
-  assert.ok(result.stdout.includes('npx @ex/ai-spec-auto@latest init .'));
-  assert.ok(result.stdout.includes('npx @ex/ai-spec-auto@latest init . --manifest <file-or-url>'));
+  assert.ok(result.stdout.includes('npx @br-ai/ai-spec-auto@latest init .'));
+  assert.ok(result.stdout.includes('npx @br-ai/ai-spec-auto@latest init . --manifest <file-or-url>'));
 
   console.log('install workflow test passed: node installer core handles init/check, and thin bash wrapper forwards help to the node workflow');
 }

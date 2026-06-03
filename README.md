@@ -54,12 +54,10 @@ bash install.sh update .
 .\install.ps1 update .
 ```
 
-> ⚠️ **已知限制（自举升级包名未对齐）**：当前 `update` 的「自举自升级」在代码层仍指向内部包名 `@ex/ai-spec-auto` 与内网 registry，尚未对齐到对外的 `@br-ai/ai-spec-auto`。若你从公共 npm 安装，触发自动升级时可能无法命中公共源。在代码对齐前，可用 `--no-self-upgrade` 关闭自举升级，或手动重新执行 `npx @br-ai/ai-spec-auto@latest update .`。
-
 <details>
 <summary>内部用户：从内网 registry 安装（历史 <code>@ex</code> 包）</summary>
 
-内部环境若仍使用内网分发的 `@ex/ai-spec-auto`，需先在 `~/.npmrc` 中配置安装来源（这不是代码运行时依赖，而是安装来源依赖）：
+内部环境若仍使用内网分发的历史包 `@ex/ai-spec-auto`，需先在 `~/.npmrc` 中配置安装来源（这不是代码运行时依赖，而是安装来源依赖）：
 
 ```ini
 @ex:registry=http://nodejs.100credit.cn/

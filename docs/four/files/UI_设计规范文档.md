@@ -142,7 +142,7 @@
 | 阶段 | 图标 | 说明 |
 |------|------|------|
 | 未接入 | 🔴 | 尚未安装 ai-spec-auto |
-| 已安装 Base | 🟡 | 已执行 `npx @ex/ai-spec-auto init .` |
+| 已安装 Base | 🟡 | 已执行 `npx @br-ai/ai-spec-auto init .` |
 | 已联通 Visual | 🟢 | Collector 上报成功 |
 | 已启动首个需求 | 🔵 | 首个 Run 已创建 |
 | 已完成首个归档 | 🟣 | 首个 Change 已归档 |
@@ -162,7 +162,7 @@
 
 | 当前状态 | 建议动作 |
 |----------|----------|
-| 未接入 | 执行 `npx @ex/ai-spec-auto init .` 开始接入 |
+| 未接入 | 执行 `npx @br-ai/ai-spec-auto init .` 开始接入 |
 | 已安装 Base | 运行 Collector 联通 Visual |
 | 已联通 Visual | 开始一个需求，跑通首个闭环 |
 | 已启动首个需求 | 等待归档完成，查看首页数据 |

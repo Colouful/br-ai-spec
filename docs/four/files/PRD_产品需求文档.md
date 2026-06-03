@@ -16,7 +16,7 @@ br-ai-spec 是一套面向前端团队的 **AI 规范驱动开发底座 + 可视
 
 | 层级 | 产品 | 定位 |
 |------|------|------|
-| **底座层** | br-ai-spec（`@ex/ai-spec-auto`） | AI 规范驱动开发底座，负责规则注入、流程落地、运行态沉淀 |
+| **底座层** | br-ai-spec（`@br-ai/ai-spec-auto`） | AI 规范驱动开发底座，负责规则注入、流程落地、运行态沉淀 |
 | **控制面层** | br-ai-spec-visual | 团队可视化与控制面，负责数据聚合、运行态监控、拓扑展示 |
 
 ### 1.3 首版定位
@@ -168,7 +168,7 @@ sequenceDiagram
     participant Agents as .agents/
     participant Visual as Visual 控制面
 
-    Dev->>IDE: 1. 安装 @ex/ai-spec-auto
+    Dev->>IDE: 1. 安装 @br-ai/ai-spec-auto
     IDE->>CLI: 2. npx ai-spec init --level L1
     CLI->>Agents: 3. 注入 .agents/rules/ + .agents/skills/
     Dev->>IDE: 4. 创建需求描述

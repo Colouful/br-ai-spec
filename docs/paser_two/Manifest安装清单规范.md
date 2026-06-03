@@ -409,7 +409,7 @@ CLI 读取 `manifest（安装清单）` 后，建议按下面顺序做校验：
 ### 10.1 初始化安装
 
 ```bash
-npx @ex/ai-spec-auto@latest init . \
+npx @br-ai/ai-spec-auto@latest init . \
   --profile vue \
   --ide default \
   --manifest https://hub.example.com/manifests/vue-frontend-basic.json
@@ -418,14 +418,14 @@ npx @ex/ai-spec-auto@latest init . \
 ### 10.2 增量同步
 
 ```bash
-npx @ex/ai-spec-auto@latest sync . \
+npx @br-ai/ai-spec-auto@latest sync . \
   --manifest https://hub.example.com/manifests/project-abc-20260327.json
 ```
 
 ### 10.3 本地文件清单
 
 ```bash
-npx @ex/ai-spec-auto@latest sync . \
+npx @br-ai/ai-spec-auto@latest sync . \
   --manifest ./ai-spec.manifest.json
 ```
 

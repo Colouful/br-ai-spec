@@ -16,7 +16,7 @@
 
 ## 2. 为什么要这样做
 
-在持续迭代阶段，`ai-spec-auto` 更新频率很高。如果仍然依赖每个项目自己的 `node_modules/@ex/ai-spec-auto`，会带来几个明显问题：
+在持续迭代阶段，`ai-spec-auto` 更新频率很高。如果仍然依赖每个项目自己的 `node_modules/@br-ai/ai-spec-auto`，会带来几个明显问题：
 
 - 用户需要在多个项目里重复更新依赖
 - 更新动作容易改动 `package.json`、lockfile 或项目内命令模板

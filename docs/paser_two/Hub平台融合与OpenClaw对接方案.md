@@ -161,7 +161,7 @@ flowchart LR
 示例命令：
 
 ```bash
-npx @ex/ai-spec-auto@latest init . \
+npx @br-ai/ai-spec-auto@latest init . \
   --profile vue \
   --ide default \
   --manifest https://hub.example.com/manifests/vue-frontend-basic.json
@@ -174,14 +174,14 @@ npx @ex/ai-spec-auto@latest init . \
 用户在 Hub 上勾选若干内容后，Hub 生成：
 
 ```bash
-npx @ex/ai-spec-auto@latest sync . \
+npx @br-ai/ai-spec-auto@latest sync . \
   --manifest https://hub.example.com/manifests/project-abc-20260326.json
 ```
 
 或者：
 
 ```bash
-npx @ex/ai-spec-auto@latest add . \
+npx @br-ai/ai-spec-auto@latest add . \
   --skills create-proposal,design-analysis \
   --rules api-standard,route-standard
 ```

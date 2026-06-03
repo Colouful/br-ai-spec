@@ -6,7 +6,7 @@ ai-spec-auto文档聚焦一件事：按受众拆开文档入口
 当前工具通过内网 npm registry 获取，推荐安装命令如下：
 
 ```bash
-npx @ex/ai-spec-auto@latest init .
+npx @br-ai/ai-spec-auto@latest init .
 ```
 
 如果你刚读完文档想直接开始，这就是最短入口。更完整的安装说明可以继续看 [安装指南](../install-guide.md)。
