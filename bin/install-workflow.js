@@ -147,7 +147,7 @@ function getSourceDir() {
     return PKG_ROOT;
   }
   const cacheDir = process.env.BR_AI_SPEC_CACHE || path.join(os.homedir(), '.ai-spec-auto');
-  const repo = process.env.BR_AI_SPEC_REPO || 'http://git.100credit.cn/zhenwei.li/ai-spec-auto.git';
+  const repo = process.env.BR_AI_SPEC_REPO || 'https://github.com/Colouful/br-ai-spec.git';
   const branch = process.env.BR_AI_SPEC_BRANCH || 'main';
   if (fs.existsSync(path.join(cacheDir, '.git'))) {
     spawnSync('git', ['-C', cacheDir, 'pull', '--quiet'], { stdio: 'ignore' });

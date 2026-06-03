@@ -1,5 +1,5 @@
 {
-  "$schema_comment": "CLI 匿名使用统计默认配置。仅用于默认值，用户可通过 ~/.ai-spec-auto/config.json 或环境变量覆盖。禁止写入 secret。",
-  "visualUrl": "http://82.156.14.216:3001",
-  "disabled": false
+  "$schema_comment": "CLI 匿名使用统计默认配置。开源默认关闭；仅 visualUrl 非空且 disabled 为 false 时启用。用户可通过 ~/.ai-spec-auto/config.json 或环境变量覆盖。禁止写入 secret。",
+  "visualUrl": "",
+  "disabled": true
 }

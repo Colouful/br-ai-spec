@@ -48,7 +48,7 @@ metadata:
 
 - [ ] 当前目录或目标目录是要安装的业务项目
 - [ ] 本机可执行 `node(运行时)` 与 `npm(包管理工具)` 或 `pnpm(包管理工具)`
-- [ ] `~/.npmrc` 已配置 `@ex:registry=http://nodejs.100credit.cn/`
+- [ ] `~/.npmrc` 已配置 `@br-ai:registry=https://registry.npmjs.org/`
 - [ ] 已判断当前项目是否已安装，避免误把重复安装当成首次接入
 
 ## 自动判断规则
@@ -170,7 +170,7 @@ Progress:
 
 - 项目标记文件是否存在（`package.json` / `pom.xml` / `build.gradle`）
 - `node -v`、`npm -v` 是否可用
-- `~/.npmrc` 是否包含 `@ex:registry=http://nodejs.100credit.cn/`
+- `~/.npmrc` 是否包含 `@br-ai:registry=https://registry.npmjs.org/`
 - 是否已存在 `.ai-spec/install-state.json`、`.agents/`、`openspec/`
 
 如果发现 `registry(包仓库)` 配置缺失：

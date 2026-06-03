@@ -1,5 +1,9 @@
 # ai-spec-auto
 
+[![npm version](https://img.shields.io/npm/v/@br-ai/ai-spec-auto.svg)](https://www.npmjs.com/package/@br-ai/ai-spec-auto)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![GitHub](https://img.shields.io/github/stars/Colouful/br-ai-spec?style=social)](https://github.com/Colouful/br-ai-spec)
+
 `ai-spec-auto` 是一套面向前端项目的 AI 规范驱动开发底座。它把项目规则、专家资产、IDE 命令入口、OpenSpec 交付产物和 `.ai-spec` 运行状态放进同一个项目里，让 AI 开发不再只停留在对话里，而是能够按统一约束执行、留痕、归档和复用。
 
 如果只保留一句对外口径，建议统一成下面这句：
@@ -26,7 +30,16 @@
 
 ## 推荐安装
 
-已发布到公共 npm，包名 `@br-ai/ai-spec-auto`，**无需额外配置 registry**。默认安装即完整安装：规范 + IDE 适配 + OpenSpec。
+已发布到公共 npm，包名 `@br-ai/ai-spec-auto`。默认安装即完整安装：规范 + IDE 适配 + OpenSpec。
+
+若本机 `npm config get registry` 为内网 `nodejs.100credit.cn`，且当前不在内网/VPN，**必须**让 `@br-ai` 作用域走公共 npm（见下方「安装失败 ETIMEDOUT」），否则会连 `10.100.144.135` 超时。
+
+```bash
+# 推荐：单次指定公共 registry（任意目录可用，如 mall 项目）
+npx --yes --registry https://registry.npmjs.org/ @br-ai/ai-spec-auto@latest init . --profile vue -y
+```
+
+或已在 `~/.npmrc` 配置 `@br-ai:registry=https://registry.npmjs.org/` 后：
 
 ```bash
 npx @br-ai/ai-spec-auto@latest init .
@@ -66,6 +79,31 @@ bash install.sh update .
 配置完成后再执行 `npx @ex/ai-spec-auto@latest init .`。
 
 </details>
+
+### 安装失败 `ETIMEDOUT`（连 `nodejs.100credit.cn`）
+
+报错类似：
+
+```text
+network request to https://nodejs.100credit.cn/@br-ai%2fai-spec-auto failed
+connect ETIMEDOUT 10.100.144.135:443
+```
+
+**原因**：`@br-ai/ai-spec-auto` 只在公共 npm 发布；未配置作用域 registry 时，npm 会用你全局默认内网源去拉包。
+
+**处理（任选其一）**：
+
+```bash
+# 方式 A：单次命令（最快）
+npx --yes --registry https://registry.npmjs.org/ @br-ai/ai-spec-auto@latest init . --profile vue -y
+```
+
+```ini
+# 方式 B：写入 ~/.npmrc（永久，推荐）
+@br-ai:registry=https://registry.npmjs.org/
+```
+
+写入后执行 `npx @br-ai/ai-spec-auto@latest init .` 即可。
 
 ## 默认会装什么
 
@@ -323,9 +361,11 @@ npx @br-ai/ai-spec-auto@latest hub runtime-report . --run-id run-100 --stage tes
 `bin/telemetry/` 是一个 **隔离的切面模块**，用于向私有部署的
 [`br-ai-spec-visual`](https://github.com/Colouful/br-ai-spec-visual) 上报 CLI 安装与使用情况（`init/update/sync/check/help`）。
 
-### 默认行为（零配置）
+### 默认行为（开源版）
 
-从当前版本起，仓库内置默认上报地址 `bin/telemetry/defaults.json`，**装包即启用**，首次运行会打印一次性提示：
+仓库内置 `bin/telemetry/defaults.json` **默认关闭**上报（`disabled: true`，`visualUrl` 为空）。需要统计时自行配置 Visual 地址并设置 `disabled: false`。
+
+若你自行启用上报，首次运行可能打印一次性提示：
 
 ```text
 [ai-spec-auto] 已开启匿名使用统计（可通过 AI_SPEC_TELEMETRY_DISABLED=1 关闭）
@@ -365,8 +405,8 @@ echo '{"disabled": true}' > ~/.ai-spec-auto/config.json
 
 | 场景 | 做法 |
 | --- | --- |
-| 使用官方默认 Visual，无 secret | **什么都不配**，装包即用 |
-| 使用官方默认 Visual，服务端开了 secret | 设置 `AI_SPEC_TELEMETRY_SECRET=<值>` 或写入用户配置 |
+| 默认（开源） | **无需配置**，遥测默认关闭 |
+| 自建 Visual 并开启上报 | 在 `~/.ai-spec-auto/config.json` 设置 `visualUrl` 且 `disabled: false`；有 secret 时设置 `AI_SPEC_TELEMETRY_SECRET` |
 | 本地联调指向本机 Visual | `export AI_SPEC_VISUAL_URL=http://127.0.0.1:3000` |
 | 个人不想参与匿名统计 | `export AI_SPEC_TELEMETRY_DISABLED=1` |
 | 排查上报链路问题 | `export AI_SPEC_TELEMETRY_DEBUG=1` 后再跑命令 |

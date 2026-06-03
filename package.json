@@ -1,7 +1,15 @@
 {
   "name": "@br-ai/ai-spec-auto",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "AI Coding 团队规范驱动开发 CLI — 一键安装规范、技能与工具配置",
+  "homepage": "https://github.com/Colouful/br-ai-spec#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Colouful/br-ai-spec.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Colouful/br-ai-spec/issues"
+  },
   "bin": {
     "ai-spec-auto": "./bin/cli.js"
   },
@@ -51,7 +59,7 @@
     "cursor",
     "claude"
   ],
-  "license": "UNLICENSED",
+  "license": "MIT",
   "optionalDependencies": {
     "node-machine-id": "^1.1.12"
   }
