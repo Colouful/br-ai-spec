@@ -1,6 +1,6 @@
 {
-  "name": "@ex/ai-spec-auto",
-  "version": "0.1.11",
+  "name": "@br-ai/ai-spec-auto",
+  "version": "0.2.1",
   "description": "AI Coding 团队规范驱动开发 CLI — 一键安装规范、技能与工具配置",
   "bin": {
     "ai-spec-auto": "./bin/cli.js"
@@ -10,7 +10,8 @@
     "lizhenwei"
   ],
   "publishConfig": {
-    "registry": "http://nodejs.100credit.cn/"
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
   },
   "scripts": {
     "demo:runtime": "node ./bin/cli.js demo-runtime-smoke",

@@ -26,48 +26,48 @@
 
 ## 推荐安装
 
-默认安装就是完整安装：规范 + IDE 适配 + OpenSpec。
+已发布到公共 npm，包名 `@br-ai/ai-spec-auto`，**无需额外配置 registry**。默认安装即完整安装：规范 + IDE 适配 + OpenSpec。
 
 ```bash
-npx @ex/ai-spec-auto@latest init .
+npx @br-ai/ai-spec-auto@latest init .
 ```
 
-更新、检查、卸载：
+常用维护命令：
 
 ```bash
-npx @ex/ai-spec-auto@latest update .
-npx @ex/ai-spec-auto@latest check .
-npx @ex/ai-spec-auto@latest uninstall .
+npx @br-ai/ai-spec-auto@latest update .      # 更新已安装资产
+npx @br-ai/ai-spec-auto@latest check .       # 检查安装完整性
+npx @br-ai/ai-spec-auto@latest uninstall .   # 卸载
 ```
 
-也支持脚本入口：
+也支持脚本入口（薄壳，转发到 Node 核心，能力完全一致）：
 
 ```bash
+# macOS / Linux
 bash install.sh init .
 bash install.sh update .
 ```
 
 ```powershell
+# Windows PowerShell
 .\install.ps1 init .
 .\install.ps1 update .
 ```
 
-## 内网 Registry 说明
+> ⚠️ **已知限制（自举升级包名未对齐）**：当前 `update` 的「自举自升级」在代码层仍指向内部包名 `@ex/ai-spec-auto` 与内网 registry，尚未对齐到对外的 `@br-ai/ai-spec-auto`。若你从公共 npm 安装，触发自动升级时可能无法命中公共源。在代码对齐前，可用 `--no-self-upgrade` 关闭自举升级，或手动重新执行 `npx @br-ai/ai-spec-auto@latest update .`。
 
-当前包通过内网 npm registry 分发。  
-这不是代码运行时依赖，而是安装来源依赖。
+<details>
+<summary>内部用户：从内网 registry 安装（历史 <code>@ex</code> 包）</summary>
 
-首次接入前，请先在 `~/.npmrc` 中配置：
+内部环境若仍使用内网分发的 `@ex/ai-spec-auto`，需先在 `~/.npmrc` 中配置安装来源（这不是代码运行时依赖，而是安装来源依赖）：
 
 ```ini
 @ex:registry=http://nodejs.100credit.cn/
 ```
 
-配置完成后，再执行：
+配置完成后再执行 `npx @ex/ai-spec-auto@latest init .`。
 
-```bash
-npx @ex/ai-spec-auto@latest init .
-```
+</details>
 
 ## 默认会装什么
 
@@ -125,45 +125,120 @@ npx @ex/ai-spec-auto@latest init .
 - 只要涉及新增 API、路由、全局状态、权限/支付/合规、跨模块范围变化，就升级回 `prd-to-delivery`
 - 只要你明确要求“留痕 / 归档 / 评审 / spec”，即使需求很小，也优先走完整 OpenSpec
 
-## 常见安装场景
+## 使用方式：命令与参数
 
-指定技术栈：
+### 两条安装路径
+
+| 路径 | 命令 | 适用 | 行为 |
+| --- | --- | --- | --- |
+| 默认完整安装（手动 / 交互） | `init .` | 大多数项目 | 直接落地 `.agents` / IDE 适配 / OpenSpec；未指定 profile 时交互选择或默认 `vue` |
+| 推荐安装（自动扫描 + Hub 推荐） | `init . --recommend` | 想让工具自动判断技术栈 | 先扫描技术栈，再结合 Hub / 本地推荐生成 InitPlan；`--dry-run` 预览、`--yes` 写入 |
 
 ```bash
-npx @ex/ai-spec-auto@latest init . --profile vue
-npx @ex/ai-spec-auto@latest init . --profile react
+# 默认完整安装
+npx @br-ai/ai-spec-auto@latest init .
+
+# 自动推荐安装：先预览，再确认写入
+npx @br-ai/ai-spec-auto@latest init . --recommend --dry-run
+npx @br-ai/ai-spec-auto@latest init . --recommend --yes
 ```
 
-Monorepo 安装到子包：
+### init 参数（默认完整安装路径）
+
+| 参数 | 取值 | 默认 | 说明 |
+| --- | --- | --- | --- |
+| `--profile <id>` | `vue` / `react` / `nestjs` / `springboot` / `node-tooling` | `vue` | 指定技术栈；不传则交互选择 |
+| `--profiles <a,b>` | 逗号分隔 | — | 一次安装多个技术栈 |
+| `--package <subpath>` | 如 `packages/web` | — | Monorepo 安装到子包 |
+| `--workspace-root` | — | 否 | Monorepo 在仓库根安装 |
+| `--custom-rules` | — | — | 启用可定制规则全集 |
+| `--standard-rules` | — | — | 使用标准规则集 |
+| `--ide <list>` | `default` / `all` / `cursor,claude` | `default` | IDE 适配范围，`default`=cursor+claude |
+| `--lint` / `--no-lint` | — | 交互询问 | 是否安装 lint 配置 |
+| `--husky` / `--no-husky` | — | 交互询问 | 是否安装提交钩子 |
+| `--uipro` / `--no-uipro` | — | 交互询问 | 是否安装 UI UX Pro Max |
+| `--manifest <path\|url>` | — | — | 按本地 / 远程 Manifest 安装 |
+| `--level <L1\|L2\|L3>` | — | `L3` | 兼容参数，不再是主路径概念 |
+| `-y` / `--force` | — | 否 | **强制覆盖**已存在的 `.agents`（跳过确认） |
+
+### init 参数（`--recommend` 自动推荐路径）
+
+| 参数 | 说明 |
+| --- | --- |
+| `--recommend` | 启用「扫描 + 推荐」 |
+| `--dry-run` | 只输出 InitPlan，不写盘 |
+| `--yes` / `-y` | 确认并写入 |
+| `--json` | 以 JSON 输出 |
+| `--manifest <slug>` | 指定 Hub 上的 Manifest slug |
+| `--hub-url <url>` | Hub 地址 |
+| `--visual-url <url>` | 写入时的 Visual 上报地址 |
+| `--no-hub-fallback` | Hub 失败时不降级到本地推荐 |
+
+> ⚠️ `-y` 在两条路径含义不同：默认安装里是「**强制覆盖**已有 `.agents`」，推荐安装里是「**确认写入** InitPlan」。
+
+### update：更新已安装资产
+
+不传 `--profile` / `--ide` 时会**自动继承**项目已安装的 manifest 配置；只更新部分内容可叠加 `--skip-*`。
 
 ```bash
-npx @ex/ai-spec-auto@latest init . --package packages/web
+# 全量更新
+npx @br-ai/ai-spec-auto@latest update .
+
+# 只更新规则与命令，跳过技能、配置、OpenSpec
+npx @br-ai/ai-spec-auto@latest update . --skip-skills --skip-configs --skip-openspec
 ```
 
-启用自定义规则：
+| 参数 | 说明 |
+| --- | --- |
+| `--skip-skills` / `--skip-configs` / `--skip-commands` / `--skip-ide-links` / `--skip-openspec` / `--skip-uipro` | 跳过对应部分更新 |
+| `--force-update-rules` / `--no-force-update-rules` | 是否覆盖本地已改动的规则 |
+| `--no-self-upgrade` | 关闭自举自升级 |
+| `--profile` / `--ide` | 覆盖自动继承的配置 |
+
+### check / sync：自动双模式
+
+`check` 与 `sync` 会按项目状态自动分流：当存在 `.ai-spec/ai-spec.lock.json` 或 `.agents/registry.index.json` 时，走「完整性校验 / 缓存同步」模式（基于 lock 校验 checksum、检测资产篡改）；否则走传统文件检查 / Manifest 同步。
+
+| 命令 | 说明 |
+| --- | --- |
+| `check .` | 检查安装完整性、资产是否被篡改 |
+| `sync . [--hub-url <url>]` | 按 lock 将远程资产同步到本机全局缓存 |
+
+### Monorepo / 自定义规则示例
 
 ```bash
-npx @ex/ai-spec-auto@latest init . --custom-rules
+# 指定技术栈
+npx @br-ai/ai-spec-auto@latest init . --profile react
+
+# Monorepo 安装到子包
+npx @br-ai/ai-spec-auto@latest init . --package packages/web
+
+# 启用自定义规则
+npx @br-ai/ai-spec-auto@latest init . --custom-rules
 ```
 
-只更新一部分：
+### Hub（资产中心）
 
 ```bash
-npx @ex/ai-spec-auto@latest update . --skip-skills --skip-configs --skip-openspec
-```
-
-从 Hub（资产中心）安装 Manifest（方案包清单）：
-
-```bash
-npx @ex/ai-spec-auto@latest hub search react --kind manifest --hub http://localhost:3000
-npx @ex/ai-spec-auto@latest hub install react-standard-delivery . --hub http://localhost:3000 --mode standard --profile react --ide cursor
-npx @ex/ai-spec-auto@latest hub diff .
-npx @ex/ai-spec-auto@latest hub sync . --yes
-npx @ex/ai-spec-auto@latest hub rollback 1.0.0 .
-npx @ex/ai-spec-auto@latest hub runtime-report . --run-id run-100 --stage test --status success --duration-ms 1200
+npx @br-ai/ai-spec-auto@latest hub search react --kind manifest --hub http://localhost:3000
+npx @br-ai/ai-spec-auto@latest hub install react-standard-delivery . --hub http://localhost:3000 --mode standard --profile react --ide cursor
+npx @br-ai/ai-spec-auto@latest hub diff .
+npx @br-ai/ai-spec-auto@latest hub sync . --yes
+npx @br-ai/ai-spec-auto@latest hub rollback 1.0.0 .
+npx @br-ai/ai-spec-auto@latest hub runtime-report . --run-id run-100 --stage test --status success --duration-ms 1200
 ```
 
 安装成功后会写入 `.agents/registry/hub-lock.json`（Hub 锁文件），Visual（可视化控制台）会基于它展示当前 Manifest、资产版本、本地改动和高风险资产。`hub runtime-report`（运行上报）会读取锁文件中的资产清单，把本次 run（运行）的阶段、状态、耗时和失败原因回传到 Hub，用于成功率、失败原因和推荐等级分析。
+
+### 自动与手动一览
+
+| 能力 | 自动 | 手动 / 可控 |
+| --- | --- | --- |
+| 技术栈识别 | `scan`、`init --recommend` 自动扫描并推荐 profile | `init --profile <id>` 显式指定 |
+| CLI 自升级 | `update` 触发自举升级（registry 上有新版时自动升级并重跑） | `--no-self-upgrade` 关闭 |
+| 更新配置继承 | `update` 不传 `--profile/--ide` 时自动沿用已装 manifest | 显式传参覆盖 |
+| 安装确认 | `--yes` / `-y` 跳过交互 | 省略则进入交互选择 |
+| 需求主流程 | `/spec-start` 默认 `auto + none`，自动推进开发 | 切到 `main-flow-blocking` 启用人工审核门禁 |
 
 ## 后续规划
 
@@ -248,7 +323,7 @@ npx @ex/ai-spec-auto@latest hub runtime-report . --run-id run-100 --stage test -
 ## 匿名使用统计
 
 `bin/telemetry/` 是一个 **隔离的切面模块**，用于向私有部署的
-[`br-ai-spec-visual`](../br-ai-spec-visual) 上报 CLI 安装与使用情况（`init/update/sync/check/help`）。
+[`br-ai-spec-visual`](https://github.com/Colouful/br-ai-spec-visual) 上报 CLI 安装与使用情况（`init/update/sync/check/help`）。
 
 ### 默认行为（零配置）
 
